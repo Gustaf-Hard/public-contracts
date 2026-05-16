@@ -5,19 +5,26 @@ const LIST_URL =
   'https://sv.wikipedia.org/wiki/Lista_%C3%B6ver_Sveriges_kommuner';
 const WIKI_BASE = 'https://sv.wikipedia.org';
 
-const GENITIVE_CORRECTIONS = new Map([
-  ['Stockholms', 'Stockholm'],
-  ['Bjurholms', 'Bjurholm'],
-  ['Borgholms', 'Borgholm'],
-  ['Boxholms', 'Boxholm'],
-  ['Gotlands', 'Gotland'],
-  ['Hässleholms', 'Hässleholm'],
-  ['Katrineholms', 'Katrineholm'],
-  ['Laholms', 'Laholm'],
-  ['Tidaholms', 'Tidaholm'],
-  ['Vaxholms', 'Vaxholm'],
-  ['Ängelholms', 'Ängelholm'],
+// Swedish kommun names that legitimately end in 's' (no genitive correction needed).
+// These cover the place-name suffixes -ås (ridge), -näs (cape/headland), -fors (rapids),
+// plus the standalone name "Grums". Any other name ending in 's' after stripping
+// ' kommun' is in genitive form and the trailing 's' should be removed.
+const NAMES_ENDING_IN_S_NATURALLY = new Set([
+  // -ås
+  'Alingsås', 'Borås', 'Mönsterås', 'Torsås', 'Tranås', 'Västerås',
+  // -näs
+  'Bollnäs', 'Höganäs', 'Sotenäs', 'Strängnäs', 'Vännäs',
+  // -fors
+  'Degerfors', 'Hagfors', 'Hofors', 'Kramfors', 'Munkfors', 'Robertsfors', 'Storfors',
+  // standalone
+  'Grums',
 ]);
+
+function correctGenitive(name) {
+  if (NAMES_ENDING_IN_S_NATURALLY.has(name)) return name;
+  if (name.endsWith('s')) return name.slice(0, -1);
+  return name;
+}
 
 export function parseKommunListPage(html) {
   const $ = cheerio.load(html);
@@ -48,7 +55,7 @@ export function parseKommunListPage(html) {
       // Strip trailing " kommun" suffix (present on live Wikipedia page)
       kommun_namn = kommun_namn.replace(/\s+kommun$/i, '').trim();
       // Correct Swedish genitive forms (e.g. "Stockholms" → "Stockholm")
-      kommun_namn = GENITIVE_CORRECTIONS.get(kommun_namn) ?? kommun_namn;
+      kommun_namn = correctGenitive(kommun_namn);
       const href = nameA.attr('href') ?? '';
       let wikipedia_url;
       if (href.startsWith('http')) {
