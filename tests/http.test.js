@@ -65,4 +65,32 @@ describe('politeFetch', () => {
     expect(seenHeaders['User-Agent']).toMatch(/mediagraf-municipal-contracts-bot/);
     expect(seenHeaders['User-Agent']).toMatch(/gustaf@binogi.com/);
   });
+
+  it('returns non-retryable non-2xx responses immediately without retry', async () => {
+    let calls = 0;
+    const fakeFetch = vi.fn(async () => {
+      calls++;
+      return { status: 404, ok: false, text: async () => 'not found' };
+    });
+    const { politeFetch } = await import('../src/http.js');
+    politeFetch.__setFetch(fakeFetch);
+
+    const res = await politeFetch('https://four04.example.com/x');
+    expect(res.status).toBe(404);
+    expect(calls).toBe(1);
+  });
+
+  it('throws after exhausting retries on repeated 429', async () => {
+    let calls = 0;
+    const fakeFetch = vi.fn(async () => {
+      calls++;
+      return { status: 429, ok: false, text: async () => '' };
+    });
+    const { politeFetch } = await import('../src/http.js');
+    politeFetch.__setFetch(fakeFetch);
+    politeFetch.__setBackoffBase(5);
+
+    await expect(politeFetch('https://always429.example.com/x')).rejects.toThrow(/429/);
+    expect(calls).toBe(3);
+  });
 });

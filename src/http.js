@@ -33,10 +33,12 @@ export async function politeFetch(url, options = {}) {
     };
 
     let lastErr;
+    let lastStatus;
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
       try {
         const res = await fetchImpl(url, { ...options, headers });
         if (res.status === 429 || res.status === 503) {
+          lastStatus = res.status;
           const backoff = backoffBase * Math.pow(2, attempt);
           await new Promise((r) => setTimeout(r, backoff));
           continue;
@@ -48,7 +50,9 @@ export async function politeFetch(url, options = {}) {
         await new Promise((r) => setTimeout(r, backoff));
       }
     }
-    throw lastErr ?? new Error(`Failed after ${MAX_RETRIES} attempts: ${url}`);
+    if (lastErr) throw lastErr;
+    if (lastStatus) throw new Error(`Failed after ${MAX_RETRIES} attempts: ${url} (last status ${lastStatus})`);
+    throw new Error(`Failed after ${MAX_RETRIES} attempts: ${url}`);
   } finally {
     release();
   }
