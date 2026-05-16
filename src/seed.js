@@ -15,7 +15,7 @@ const NAMES_ENDING_IN_S_NATURALLY = new Set([
   // -näs
   'Bollnäs', 'Höganäs', 'Sotenäs', 'Strängnäs', 'Vännäs',
   // -fors
-  'Degerfors', 'Hagfors', 'Hofors', 'Kramfors', 'Munkfors', 'Robertsfors', 'Storfors',
+  'Bengtsfors', 'Degerfors', 'Hagfors', 'Hofors', 'Kramfors', 'Munkfors', 'Robertsfors', 'Storfors',
   // standalone
   'Grums',
 ]);
