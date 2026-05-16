@@ -10,6 +10,37 @@ const fixture = (name) =>
   readFileSync(join(__dirname, 'fixtures', name), 'utf8');
 
 describe('parseKommunListPage', () => {
+  it('corrects Swedish genitive kommun names to nominative form', () => {
+    const html = `
+      <table class="wikitable">
+        <tr><th>Kod</th><th>Kommun</th><th>Centralort</th><th>Län</th></tr>
+        <tr>
+          <td>0180</td>
+          <td><a href="/wiki/Stockholms_kommun">Stockholms kommun</a></td>
+          <td>Stockholm</td>
+          <td>Stockholms län</td>
+        </tr>
+        <tr>
+          <td>0980</td>
+          <td><a href="/wiki/Gotlands_kommun">Gotlands kommun</a></td>
+          <td>Visby</td>
+          <td>Gotlands län</td>
+        </tr>
+        <tr>
+          <td>1980</td>
+          <td><a href="/wiki/V%C3%A4ster%C3%A5s_kommun">Västerås kommun</a></td>
+          <td>Västerås</td>
+          <td>Västmanlands län</td>
+        </tr>
+      </table>
+    `;
+    const list = parseKommunListPage(html);
+    const byKod = Object.fromEntries(list.map((r) => [r.kommun_kod, r.kommun_namn]));
+    expect(byKod['0180']).toBe('Stockholm');
+    expect(byKod['0980']).toBe('Gotland');
+    expect(byKod['1980']).toBe('Västerås'); // not stripped — already nominative
+  });
+
   it('extracts kommunkod, namn, län, and article URL for each row', () => {
     const list = parseKommunListPage(fixture('wikipedia-kommuner.html'));
     expect(list).toHaveLength(2);

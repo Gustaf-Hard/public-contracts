@@ -5,6 +5,20 @@ const LIST_URL =
   'https://sv.wikipedia.org/wiki/Lista_%C3%B6ver_Sveriges_kommuner';
 const WIKI_BASE = 'https://sv.wikipedia.org';
 
+const GENITIVE_CORRECTIONS = new Map([
+  ['Stockholms', 'Stockholm'],
+  ['Bjurholms', 'Bjurholm'],
+  ['Borgholms', 'Borgholm'],
+  ['Boxholms', 'Boxholm'],
+  ['Gotlands', 'Gotland'],
+  ['Hässleholms', 'Hässleholm'],
+  ['Katrineholms', 'Katrineholm'],
+  ['Laholms', 'Laholm'],
+  ['Tidaholms', 'Tidaholm'],
+  ['Vaxholms', 'Vaxholm'],
+  ['Ängelholms', 'Ängelholm'],
+]);
+
 export function parseKommunListPage(html) {
   const $ = cheerio.load(html);
   const out = [];
@@ -33,6 +47,8 @@ export function parseKommunListPage(html) {
       let kommun_namn = nameA.text().trim() || $(tds[colNamn]).text().trim();
       // Strip trailing " kommun" suffix (present on live Wikipedia page)
       kommun_namn = kommun_namn.replace(/\s+kommun$/i, '').trim();
+      // Correct Swedish genitive forms (e.g. "Stockholms" → "Stockholm")
+      kommun_namn = GENITIVE_CORRECTIONS.get(kommun_namn) ?? kommun_namn;
       const href = nameA.attr('href') ?? '';
       let wikipedia_url;
       if (href.startsWith('http')) {
