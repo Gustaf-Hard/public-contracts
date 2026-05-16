@@ -1,0 +1,2322 @@
+[
+  {
+    "kommun_kod": "1440",
+    "kommun_namn": "Ale",
+    "lan": "Västra Götalands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Ale_kommun",
+    "webbplats": "http://www.ale.se",
+    "org_nr": "212000-1439"
+  },
+  {
+    "kommun_kod": "1489",
+    "kommun_namn": "Alingsås",
+    "lan": "Västra Götalands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Alingsås_kommun",
+    "webbplats": "https://www.alingsas.se/",
+    "org_nr": "212000-1553"
+  },
+  {
+    "kommun_kod": "0764",
+    "kommun_namn": "Alvesta",
+    "lan": "Kronobergs län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Alvesta_kommun",
+    "webbplats": "http://www.alvesta.se",
+    "org_nr": "212000-0639"
+  },
+  {
+    "kommun_kod": "0604",
+    "kommun_namn": "Aneby",
+    "lan": "Jönköpings län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Aneby_kommun",
+    "webbplats": "http://www.aneby.se",
+    "org_nr": "212000-0498"
+  },
+  {
+    "kommun_kod": "1984",
+    "kommun_namn": "Arboga",
+    "lan": "Västmanlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Arboga_kommun",
+    "webbplats": "https://www.arboga.se",
+    "org_nr": "212000-2122"
+  },
+  {
+    "kommun_kod": "2506",
+    "kommun_namn": "Arjeplogs",
+    "lan": "Norrbottens län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Arjeplogs_kommun",
+    "webbplats": "http://www.arjeplog.se",
+    "org_nr": "212000-2668"
+  },
+  {
+    "kommun_kod": "2505",
+    "kommun_namn": "Arvidsjaurs",
+    "lan": "Norrbottens län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Arvidsjaurs_kommun",
+    "webbplats": "https://www.arvidsjaur.se/",
+    "org_nr": "212000-2650"
+  },
+  {
+    "kommun_kod": "1784",
+    "kommun_namn": "Arvika",
+    "lan": "Värmlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Arvika_kommun",
+    "webbplats": "http://www.arvika.se",
+    "org_nr": "212000-1892"
+  },
+  {
+    "kommun_kod": "1882",
+    "kommun_namn": "Askersunds",
+    "lan": "Örebro län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Askersunds_kommun",
+    "webbplats": "https://www.askersund.se/",
+    "org_nr": "212000-1983"
+  },
+  {
+    "kommun_kod": "2084",
+    "kommun_namn": "Avesta",
+    "lan": "Dalarnas län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Avesta_kommun",
+    "webbplats": "https://www.avesta.se",
+    "org_nr": "212000-2262"
+  },
+  {
+    "kommun_kod": "1460",
+    "kommun_namn": "Bengtsfors",
+    "lan": "Västra Götalands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Bengtsfors_kommun",
+    "webbplats": "http://www.bengtsfors.se",
+    "org_nr": "212000-1470"
+  },
+  {
+    "kommun_kod": "2326",
+    "kommun_namn": "Bergs",
+    "lan": "Jämtlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Bergs_kommun",
+    "webbplats": "https://www.berg.se",
+    "org_nr": "212000-2502"
+  },
+  {
+    "kommun_kod": "2403",
+    "kommun_namn": "Bjurholms",
+    "lan": "Västerbottens län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Bjurholms_kommun",
+    "webbplats": "https://www.bjurholm.se/",
+    "org_nr": "212000-2833"
+  },
+  {
+    "kommun_kod": "1260",
+    "kommun_namn": "Bjuvs",
+    "lan": "Skåne län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Bjuvs_kommun",
+    "webbplats": "http://www.bjuv.se",
+    "org_nr": "212000-1041"
+  },
+  {
+    "kommun_kod": "2582",
+    "kommun_namn": "Bodens",
+    "lan": "Norrbottens län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Bodens_kommun",
+    "webbplats": "http://www.boden.se",
+    "org_nr": "212000-2767"
+  },
+  {
+    "kommun_kod": "1443",
+    "kommun_namn": "Bollebygds",
+    "lan": "Västra Götalands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Bollebygds_kommun",
+    "webbplats": "https://www.bollebygd.se/",
+    "org_nr": "212000-2973"
+  },
+  {
+    "kommun_kod": "2183",
+    "kommun_namn": "Bollnäs",
+    "lan": "Gävleborgs län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Bollnäs_kommun",
+    "webbplats": "http://www.bollnas.se",
+    "org_nr": "212000-2361"
+  },
+  {
+    "kommun_kod": "0885",
+    "kommun_namn": "Borgholms",
+    "lan": "Kalmar län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Borgholms_kommun",
+    "webbplats": "http://www.borgholm.se",
+    "org_nr": "212000-0795"
+  },
+  {
+    "kommun_kod": "2081",
+    "kommun_namn": "Borlänge",
+    "lan": "Dalarnas län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Borlänge_kommun",
+    "webbplats": "http://www.borlange.se",
+    "org_nr": "212000-2239"
+  },
+  {
+    "kommun_kod": "1490",
+    "kommun_namn": "Borås",
+    "lan": "Västra Götalands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Borås_kommun",
+    "webbplats": "https://www.boras.se",
+    "org_nr": "212000-1561"
+  },
+  {
+    "kommun_kod": "0127",
+    "kommun_namn": "Botkyrka",
+    "lan": "Stockholms län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Botkyrka_kommun",
+    "webbplats": "http://www.botkyrka.se",
+    "org_nr": "212000-2882"
+  },
+  {
+    "kommun_kod": "0560",
+    "kommun_namn": "Boxholms",
+    "lan": "Östergötlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Boxholms_kommun",
+    "webbplats": "http://www.boxholm.se",
+    "org_nr": "212000-0407"
+  },
+  {
+    "kommun_kod": "1272",
+    "kommun_namn": "Bromölla",
+    "lan": "Skåne län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Bromölla_kommun",
+    "webbplats": "https://www.bromolla.se/",
+    "org_nr": "212000-0894"
+  },
+  {
+    "kommun_kod": "2305",
+    "kommun_namn": "Bräcke",
+    "lan": "Jämtlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Bräcke_kommun",
+    "webbplats": "http://www.bracke.se",
+    "org_nr": "212000-2460"
+  },
+  {
+    "kommun_kod": "1231",
+    "kommun_namn": "Burlövs",
+    "lan": "Skåne län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Burlövs_kommun",
+    "webbplats": "https://burlov.se",
+    "org_nr": "212000-1025"
+  },
+  {
+    "kommun_kod": "1278",
+    "kommun_namn": "Båstads",
+    "lan": "Skåne län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Båstads_kommun",
+    "webbplats": "http://www.bastad.se",
+    "org_nr": "212000-0944"
+  },
+  {
+    "kommun_kod": "1438",
+    "kommun_namn": "Dals-Eds",
+    "lan": "Västra Götalands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Dals-Eds_kommun",
+    "webbplats": "http://www.dalsed.se",
+    "org_nr": "212000-1413"
+  },
+  {
+    "kommun_kod": "0162",
+    "kommun_namn": "Danderyds",
+    "lan": "Stockholms län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Danderyds_kommun",
+    "webbplats": "http://www.danderyd.se",
+    "org_nr": "212000-0126"
+  },
+  {
+    "kommun_kod": "1862",
+    "kommun_namn": "Degerfors",
+    "lan": "Örebro län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Degerfors_kommun",
+    "webbplats": "http://www.degerfors.se",
+    "org_nr": "212000-1934"
+  },
+  {
+    "kommun_kod": "2425",
+    "kommun_namn": "Dorotea",
+    "lan": "Västerbottens län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Dorotea_kommun",
+    "webbplats": "http://www.dorotea.se",
+    "org_nr": "212000-2809"
+  },
+  {
+    "kommun_kod": "1730",
+    "kommun_namn": "Eda",
+    "lan": "Värmlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Eda_kommun",
+    "webbplats": "http://www.eda.se",
+    "org_nr": "212000-1769"
+  },
+  {
+    "kommun_kod": "0125",
+    "kommun_namn": "Ekerö",
+    "lan": "Stockholms län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Ekerö_kommun",
+    "webbplats": "http://www.ekero.se",
+    "org_nr": "212000-0050"
+  },
+  {
+    "kommun_kod": "0686",
+    "kommun_namn": "Eksjö",
+    "lan": "Jönköpings län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Eksjö_kommun",
+    "webbplats": "http://www.eksjo.se",
+    "org_nr": "212000-0589"
+  },
+  {
+    "kommun_kod": "0862",
+    "kommun_namn": "Emmaboda",
+    "lan": "Kalmar län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Emmaboda_kommun",
+    "webbplats": "https://www.emmaboda.se",
+    "org_nr": "212000-0738"
+  },
+  {
+    "kommun_kod": "0381",
+    "kommun_namn": "Enköpings",
+    "lan": "Uppsala län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Enköpings_kommun",
+    "webbplats": "https://enkoping.se",
+    "org_nr": "212000-0282"
+  },
+  {
+    "kommun_kod": "0484",
+    "kommun_namn": "Eskilstuna",
+    "lan": "Södermanlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Eskilstuna_kommun",
+    "webbplats": "http://www.eskilstuna.se",
+    "org_nr": "212000-0357"
+  },
+  {
+    "kommun_kod": "1285",
+    "kommun_namn": "Eslövs",
+    "lan": "Skåne län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Eslövs_kommun",
+    "webbplats": "http://www.eslov.se",
+    "org_nr": "212000-1173"
+  },
+  {
+    "kommun_kod": "1445",
+    "kommun_namn": "Essunga",
+    "lan": "Västra Götalands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Essunga_kommun",
+    "webbplats": "http://www.essunga.se",
+    "org_nr": "212000-2916"
+  },
+  {
+    "kommun_kod": "1982",
+    "kommun_namn": "Fagersta",
+    "lan": "Västmanlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Fagersta_kommun",
+    "webbplats": "http://www.fagersta.se",
+    "org_nr": "212000-2106"
+  },
+  {
+    "kommun_kod": "1382",
+    "kommun_namn": "Falkenbergs",
+    "lan": "Hallands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Falkenbergs_kommun",
+    "webbplats": "https://kommun.falkenberg.se/",
+    "org_nr": "212000-1231"
+  },
+  {
+    "kommun_kod": "1499",
+    "kommun_namn": "Falköpings",
+    "lan": "Västra Götalands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Falköpings_kommun",
+    "webbplats": "http://www.falkoping.se",
+    "org_nr": "212000-1744"
+  },
+  {
+    "kommun_kod": "2080",
+    "kommun_namn": "Falu",
+    "lan": "Dalarnas län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Falu_kommun",
+    "webbplats": "https://www.falun.se/",
+    "org_nr": "212000-2221"
+  },
+  {
+    "kommun_kod": "1782",
+    "kommun_namn": "Filipstads",
+    "lan": "Värmlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Filipstads_kommun",
+    "webbplats": "http://www.filipstad.se",
+    "org_nr": "212000-1876"
+  },
+  {
+    "kommun_kod": "0562",
+    "kommun_namn": "Finspångs",
+    "lan": "Östergötlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Finspångs_kommun",
+    "webbplats": "http://www.finspang.se",
+    "org_nr": "212000-0423"
+  },
+  {
+    "kommun_kod": "0482",
+    "kommun_namn": "Flens",
+    "lan": "Södermanlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Flens_kommun",
+    "webbplats": "https://flen.se",
+    "org_nr": "212000-0332"
+  },
+  {
+    "kommun_kod": "1763",
+    "kommun_namn": "Forshaga",
+    "lan": "Värmlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Forshaga_kommun",
+    "webbplats": "http://www.forshaga.se",
+    "org_nr": "212000-1819"
+  },
+  {
+    "kommun_kod": "1439",
+    "kommun_namn": "Färgelanda",
+    "lan": "Västra Götalands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Färgelanda_kommun",
+    "webbplats": "http://www.fargelanda.se",
+    "org_nr": "212000-1421"
+  },
+  {
+    "kommun_kod": "2026",
+    "kommun_namn": "Gagnefs",
+    "lan": "Dalarnas län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Gagnefs_kommun",
+    "webbplats": "http://www.gagnef.se",
+    "org_nr": "212000-2155"
+  },
+  {
+    "kommun_kod": "0662",
+    "kommun_namn": "Gislaveds",
+    "lan": "Jönköpings län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Gislaveds_kommun",
+    "webbplats": "http://www.gislaved.se",
+    "org_nr": "212000-0514"
+  },
+  {
+    "kommun_kod": "0461",
+    "kommun_namn": "Gnesta",
+    "lan": "Södermanlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Gnesta_kommun",
+    "webbplats": "http://www.gnesta.se",
+    "org_nr": "212000-2965"
+  },
+  {
+    "kommun_kod": "0617",
+    "kommun_namn": "Gnosjö",
+    "lan": "Jönköpings län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Gnosjö_kommun",
+    "webbplats": "http://www.gnosjo.se",
+    "org_nr": "212000-0506"
+  },
+  {
+    "kommun_kod": "0980",
+    "kommun_namn": "Gotlands",
+    "lan": "Gotlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Gotlands_kommun",
+    "webbplats": "http://www.gotland.se",
+    "org_nr": "212000-0803"
+  },
+  {
+    "kommun_kod": "1764",
+    "kommun_namn": "Grums",
+    "lan": "Värmlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Grums_kommun",
+    "webbplats": "https://www.grums.se/",
+    "org_nr": "212000-1827"
+  },
+  {
+    "kommun_kod": "1444",
+    "kommun_namn": "Grästorps",
+    "lan": "Västra Götalands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Grästorps_kommun",
+    "webbplats": "http://www.grastorp.se",
+    "org_nr": "212000-1595"
+  },
+  {
+    "kommun_kod": "1447",
+    "kommun_namn": "Gullspångs",
+    "lan": "Västra Götalands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Gullspångs_kommun",
+    "webbplats": "https://gullspang.se",
+    "org_nr": "212000-1637"
+  },
+  {
+    "kommun_kod": "2523",
+    "kommun_namn": "Gällivare",
+    "lan": "Norrbottens län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Gällivare_kommun",
+    "webbplats": "http://www.gellivare.se",
+    "org_nr": "212000-2726"
+  },
+  {
+    "kommun_kod": "2180",
+    "kommun_namn": "Gävle",
+    "lan": "Gävleborgs län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Gävle_kommun",
+    "webbplats": "http://www.gavle.se",
+    "org_nr": "212000-2338"
+  },
+  {
+    "kommun_kod": "1480",
+    "kommun_namn": "Göteborgs",
+    "lan": "Västra Götalands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Göteborgs_kommun",
+    "webbplats": "http://www.goteborg.se",
+    "org_nr": "212000-1355"
+  },
+  {
+    "kommun_kod": "1471",
+    "kommun_namn": "Götene",
+    "lan": "Västra Götalands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Götene_kommun",
+    "webbplats": "https://www.gotene.se",
+    "org_nr": "212000-1652"
+  },
+  {
+    "kommun_kod": "0643",
+    "kommun_namn": "Habo",
+    "lan": "Jönköpings län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Habo_kommun",
+    "webbplats": "http://www.habokommun.se",
+    "org_nr": "212000-1611"
+  },
+  {
+    "kommun_kod": "1783",
+    "kommun_namn": "Hagfors",
+    "lan": "Värmlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Hagfors_kommun",
+    "webbplats": "http://www.hagfors.se",
+    "org_nr": "212000-1884"
+  },
+  {
+    "kommun_kod": "1861",
+    "kommun_namn": "Hallsbergs",
+    "lan": "Örebro län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Hallsbergs_kommun",
+    "webbplats": "http://www.hallsberg.se",
+    "org_nr": "212000-1926"
+  },
+  {
+    "kommun_kod": "1961",
+    "kommun_namn": "Hallstahammars",
+    "lan": "Västmanlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Hallstahammars_kommun",
+    "webbplats": "http://www.hallstahammar.se",
+    "org_nr": "212000-2064"
+  },
+  {
+    "kommun_kod": "1380",
+    "kommun_namn": "Halmstads",
+    "lan": "Hallands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Halmstads_kommun",
+    "webbplats": "http://www.halmstad.se",
+    "org_nr": "212000-1215"
+  },
+  {
+    "kommun_kod": "1761",
+    "kommun_namn": "Hammarö",
+    "lan": "Värmlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Hammarö_kommun",
+    "webbplats": "https://www.hammaro.se/",
+    "org_nr": "212000-1793"
+  },
+  {
+    "kommun_kod": "0136",
+    "kommun_namn": "Haninge",
+    "lan": "Stockholms län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Haninge_kommun",
+    "webbplats": "http://www.haninge.se",
+    "org_nr": "212000-0084"
+  },
+  {
+    "kommun_kod": "2583",
+    "kommun_namn": "Haparanda",
+    "lan": "Norrbottens län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Haparanda_kommun",
+    "webbplats": "http://www.haparanda.se",
+    "org_nr": "212000-2775"
+  },
+  {
+    "kommun_kod": "0331",
+    "kommun_namn": "Heby",
+    "lan": "Uppsala län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Heby_kommun",
+    "webbplats": "http://www.heby.se",
+    "org_nr": "212000-2049"
+  },
+  {
+    "kommun_kod": "2083",
+    "kommun_namn": "Hedemora",
+    "lan": "Dalarnas län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Hedemora_kommun",
+    "webbplats": "http://www.hedemora.se",
+    "org_nr": "212000-2254"
+  },
+  {
+    "kommun_kod": "1283",
+    "kommun_namn": "Helsingborgs",
+    "lan": "Skåne län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Helsingborgs_kommun",
+    "webbplats": "http://www.helsingborg.se",
+    "org_nr": "212000-1157"
+  },
+  {
+    "kommun_kod": "1466",
+    "kommun_namn": "Herrljunga",
+    "lan": "Västra Götalands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Herrljunga_kommun",
+    "webbplats": "http://www.herrljunga.se",
+    "org_nr": "212000-1520"
+  },
+  {
+    "kommun_kod": "1497",
+    "kommun_namn": "Hjo",
+    "lan": "Västra Götalands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Hjo_kommun",
+    "webbplats": "http://www.hjo.se",
+    "org_nr": "212000-1728"
+  },
+  {
+    "kommun_kod": "2104",
+    "kommun_namn": "Hofors",
+    "lan": "Gävleborgs län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Hofors_kommun",
+    "webbplats": "http://www.hofors.se",
+    "org_nr": "212000-2296"
+  },
+  {
+    "kommun_kod": "0126",
+    "kommun_namn": "Huddinge",
+    "lan": "Stockholms län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Huddinge_kommun",
+    "webbplats": "https://www.huddinge.se",
+    "org_nr": "212000-0068"
+  },
+  {
+    "kommun_kod": "2184",
+    "kommun_namn": "Hudiksvalls",
+    "lan": "Gävleborgs län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Hudiksvalls_kommun",
+    "webbplats": "http://www.hudiksvall.se",
+    "org_nr": "212000-2379"
+  },
+  {
+    "kommun_kod": "0860",
+    "kommun_namn": "Hultsfreds",
+    "lan": "Kalmar län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Hultsfreds_kommun",
+    "webbplats": "http://www.hultsfred.se",
+    "org_nr": "212000-0712"
+  },
+  {
+    "kommun_kod": "1315",
+    "kommun_namn": "Hylte",
+    "lan": "Hallands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Hylte_kommun",
+    "webbplats": "http://www.hylte.se",
+    "org_nr": "212000-1207"
+  },
+  {
+    "kommun_kod": "0305",
+    "kommun_namn": "Håbo",
+    "lan": "Uppsala län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Håbo_kommun",
+    "webbplats": "http://www.habo.se",
+    "org_nr": "212000-0241"
+  },
+  {
+    "kommun_kod": "1863",
+    "kommun_namn": "Hällefors",
+    "lan": "Örebro län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Hällefors_kommun",
+    "webbplats": "https://www.hellefors.se/",
+    "org_nr": "212000-1942"
+  },
+  {
+    "kommun_kod": "2361",
+    "kommun_namn": "Härjedalens",
+    "lan": "Jämtlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Härjedalens_kommun",
+    "webbplats": "https://www.herjedalen.se/",
+    "org_nr": "212000-2510"
+  },
+  {
+    "kommun_kod": "2280",
+    "kommun_namn": "Härnösands",
+    "lan": "Västernorrlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Härnösands_kommun",
+    "webbplats": "https://www.harnosand.se",
+    "org_nr": "212000-2403"
+  },
+  {
+    "kommun_kod": "1401",
+    "kommun_namn": "Härryda",
+    "lan": "Västra Götalands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Härryda_kommun",
+    "webbplats": "http://www.harryda.se",
+    "org_nr": "212000-1264"
+  },
+  {
+    "kommun_kod": "1293",
+    "kommun_namn": "Hässleholms",
+    "lan": "Skåne län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Hässleholms_kommun",
+    "webbplats": "http://www.hassleholm.se",
+    "org_nr": "212000-0985"
+  },
+  {
+    "kommun_kod": "1284",
+    "kommun_namn": "Höganäs",
+    "lan": "Skåne län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Höganäs_kommun",
+    "webbplats": "http://www.hoganas.se",
+    "org_nr": "212000-1165"
+  },
+  {
+    "kommun_kod": "0821",
+    "kommun_namn": "Högsby",
+    "lan": "Kalmar län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Högsby_kommun",
+    "webbplats": "http://www.hogsby.se",
+    "org_nr": "212000-0688"
+  },
+  {
+    "kommun_kod": "1266",
+    "kommun_namn": "Hörby",
+    "lan": "Skåne län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Hörby_kommun",
+    "webbplats": "https://www.horby.se/",
+    "org_nr": "212000-1108"
+  },
+  {
+    "kommun_kod": "1267",
+    "kommun_namn": "Höörs",
+    "lan": "Skåne län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Höörs_kommun",
+    "webbplats": "http://www.hoor.se",
+    "org_nr": "212000-1116"
+  },
+  {
+    "kommun_kod": "2510",
+    "kommun_namn": "Jokkmokks",
+    "lan": "Norrbottens län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Jokkmokks_kommun",
+    "webbplats": "http://www.jokkmokk.se",
+    "org_nr": "212000-2676"
+  },
+  {
+    "kommun_kod": "0123",
+    "kommun_namn": "Järfälla",
+    "lan": "Stockholms län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Järfälla_kommun",
+    "webbplats": "http://www.jarfalla.se",
+    "org_nr": "212000-0043"
+  },
+  {
+    "kommun_kod": "0680",
+    "kommun_namn": "Jönköpings",
+    "lan": "Jönköpings län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Jönköpings_kommun",
+    "webbplats": "http://www.jonkoping.se",
+    "org_nr": "212000-0530"
+  },
+  {
+    "kommun_kod": "2514",
+    "kommun_namn": "Kalix",
+    "lan": "Norrbottens län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Kalix_kommun",
+    "webbplats": "http://www.kalix.se",
+    "org_nr": "212000-2692"
+  },
+  {
+    "kommun_kod": "0880",
+    "kommun_namn": "Kalmar",
+    "lan": "Kalmar län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Kalmar_kommun",
+    "webbplats": "https://kalmar.se",
+    "org_nr": "212000-0746"
+  },
+  {
+    "kommun_kod": "1446",
+    "kommun_namn": "Karlsborgs",
+    "lan": "Västra Götalands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Karlsborgs_kommun",
+    "webbplats": "https://www.karlsborg.se",
+    "org_nr": "212000-1629"
+  },
+  {
+    "kommun_kod": "1082",
+    "kommun_namn": "Karlshamns",
+    "lan": "Blekinge län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Karlshamns_kommun",
+    "webbplats": "http://www.karlshamn.se",
+    "org_nr": "212000-0845"
+  },
+  {
+    "kommun_kod": "1883",
+    "kommun_namn": "Karlskoga",
+    "lan": "Örebro län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Karlskoga_kommun",
+    "webbplats": "http://www.karlskoga.se",
+    "org_nr": "212000-1991"
+  },
+  {
+    "kommun_kod": "1080",
+    "kommun_namn": "Karlskrona",
+    "lan": "Blekinge län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Karlskrona_kommun",
+    "webbplats": "https://www.karlskrona.se/",
+    "org_nr": "212000-0829"
+  },
+  {
+    "kommun_kod": "1780",
+    "kommun_namn": "Karlstads",
+    "lan": "Värmlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Karlstads_kommun",
+    "webbplats": "https://karlstad.se",
+    "org_nr": "212000-1850"
+  },
+  {
+    "kommun_kod": "0483",
+    "kommun_namn": "Katrineholms",
+    "lan": "Södermanlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Katrineholms_kommun",
+    "webbplats": "https://www.katrineholm.se",
+    "org_nr": "212000-0340"
+  },
+  {
+    "kommun_kod": "1715",
+    "kommun_namn": "Kils",
+    "lan": "Värmlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Kils_kommun",
+    "webbplats": "http://www.kil.se",
+    "org_nr": "212000-1751"
+  },
+  {
+    "kommun_kod": "0513",
+    "kommun_namn": "Kinda",
+    "lan": "Östergötlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Kinda_kommun",
+    "webbplats": "http://www.kinda.se",
+    "org_nr": "212000-0399"
+  },
+  {
+    "kommun_kod": "2584",
+    "kommun_namn": "Kiruna",
+    "lan": "Norrbottens län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Kiruna_kommun",
+    "webbplats": "https://kiruna.se",
+    "org_nr": "212000-2783"
+  },
+  {
+    "kommun_kod": "1276",
+    "kommun_namn": "Klippans",
+    "lan": "Skåne län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Klippans_kommun",
+    "webbplats": "http://www.klippan.se",
+    "org_nr": "212000-0928"
+  },
+  {
+    "kommun_kod": "0330",
+    "kommun_namn": "Knivsta",
+    "lan": "Uppsala län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Knivsta_kommun",
+    "webbplats": "http://www.knivsta.se",
+    "org_nr": "212000-3013"
+  },
+  {
+    "kommun_kod": "2282",
+    "kommun_namn": "Kramfors",
+    "lan": "Västernorrlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Kramfors_kommun",
+    "webbplats": "http://www.kramfors.se",
+    "org_nr": "212000-2429"
+  },
+  {
+    "kommun_kod": "1290",
+    "kommun_namn": "Kristianstads",
+    "lan": "Skåne län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Kristianstads_kommun",
+    "webbplats": "http://www.kristianstad.se",
+    "org_nr": "212000-0951"
+  },
+  {
+    "kommun_kod": "1781",
+    "kommun_namn": "Kristinehamns",
+    "lan": "Värmlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Kristinehamns_kommun",
+    "webbplats": "http://www.kristinehamn.se",
+    "org_nr": "212000-1868"
+  },
+  {
+    "kommun_kod": "2309",
+    "kommun_namn": "Krokoms",
+    "lan": "Jämtlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Krokoms_kommun",
+    "webbplats": "http://www.krokom.se",
+    "org_nr": "212000-2478"
+  },
+  {
+    "kommun_kod": "1881",
+    "kommun_namn": "Kumla",
+    "lan": "Örebro län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Kumla_kommun",
+    "webbplats": "http://www.kumla.se",
+    "org_nr": "212000-1975"
+  },
+  {
+    "kommun_kod": "1384",
+    "kommun_namn": "Kungsbacka",
+    "lan": "Hallands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Kungsbacka_kommun",
+    "webbplats": "http://www.kungsbacka.se",
+    "org_nr": "212000-1256"
+  },
+  {
+    "kommun_kod": "1960",
+    "kommun_namn": "Kungsörs",
+    "lan": "Västmanlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Kungsörs_kommun",
+    "webbplats": "http://www.kungsor.se",
+    "org_nr": "212000-2056"
+  },
+  {
+    "kommun_kod": "1482",
+    "kommun_namn": "Kungälvs",
+    "lan": "Västra Götalands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Kungälvs_kommun",
+    "webbplats": "https://www.kungalv.se",
+    "org_nr": "212000-1371"
+  },
+  {
+    "kommun_kod": "1261",
+    "kommun_namn": "Kävlinge",
+    "lan": "Skåne län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Kävlinge_kommun",
+    "webbplats": "http://www.kavlinge.se",
+    "org_nr": "212000-1058"
+  },
+  {
+    "kommun_kod": "1983",
+    "kommun_namn": "Köpings",
+    "lan": "Västmanlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Köpings_kommun",
+    "webbplats": "http://www.koping.se",
+    "org_nr": "212000-2114"
+  },
+  {
+    "kommun_kod": "1381",
+    "kommun_namn": "Laholms",
+    "lan": "Hallands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Laholms_kommun",
+    "webbplats": "http://www.laholm.se",
+    "org_nr": "212000-1223"
+  },
+  {
+    "kommun_kod": "1282",
+    "kommun_namn": "Landskrona",
+    "lan": "Skåne län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Landskrona_kommun",
+    "webbplats": "http://www.landskrona.se",
+    "org_nr": "212000-1140"
+  },
+  {
+    "kommun_kod": "1860",
+    "kommun_namn": "Laxå",
+    "lan": "Örebro län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Laxå_kommun",
+    "webbplats": "http://www.laxa.se",
+    "org_nr": "212000-1918"
+  },
+  {
+    "kommun_kod": "1814",
+    "kommun_namn": "Lekebergs",
+    "lan": "Örebro län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Lekebergs_kommun",
+    "webbplats": "http://www.lekeberg.se",
+    "org_nr": "212000-2981"
+  },
+  {
+    "kommun_kod": "2029",
+    "kommun_namn": "Leksands",
+    "lan": "Dalarnas län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Leksands_kommun",
+    "webbplats": "http://www.leksand.se",
+    "org_nr": "212000-2163"
+  },
+  {
+    "kommun_kod": "1441",
+    "kommun_namn": "Lerums",
+    "lan": "Västra Götalands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Lerums_kommun",
+    "webbplats": "http://www.lerum.se",
+    "org_nr": "212000-1447"
+  },
+  {
+    "kommun_kod": "0761",
+    "kommun_namn": "Lessebo",
+    "lan": "Kronobergs län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Lessebo_kommun",
+    "webbplats": "http://www.lessebo.se",
+    "org_nr": "212000-0613"
+  },
+  {
+    "kommun_kod": "0186",
+    "kommun_namn": "Lidingö",
+    "lan": "Stockholms län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Lidingö_kommun",
+    "webbplats": "https://www.lidingo.se/",
+    "org_nr": "212000-0191"
+  },
+  {
+    "kommun_kod": "1494",
+    "kommun_namn": "Lidköpings",
+    "lan": "Västra Götalands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Lidköpings_kommun",
+    "webbplats": "https://lidkoping.se",
+    "org_nr": "212000-1694"
+  },
+  {
+    "kommun_kod": "1462",
+    "kommun_namn": "Lilla Edets",
+    "lan": "Västra Götalands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Lilla_Edets_kommun",
+    "webbplats": "http://www.lillaedet.se",
+    "org_nr": "212000-1496"
+  },
+  {
+    "kommun_kod": "1885",
+    "kommun_namn": "Lindesbergs",
+    "lan": "Örebro län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Lindesbergs_kommun",
+    "webbplats": "https://www.lindesberg.se/",
+    "org_nr": "212000-2015"
+  },
+  {
+    "kommun_kod": "0580",
+    "kommun_namn": "Linköpings",
+    "lan": "Östergötlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Linköpings_kommun",
+    "webbplats": "http://www.linkoping.se",
+    "org_nr": "212000-0449"
+  },
+  {
+    "kommun_kod": "0781",
+    "kommun_namn": "Ljungby",
+    "lan": "Kronobergs län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Ljungby_kommun",
+    "webbplats": "http://www.ljungby.se",
+    "org_nr": "212000-0670"
+  },
+  {
+    "kommun_kod": "2161",
+    "kommun_namn": "Ljusdals",
+    "lan": "Gävleborgs län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Ljusdals_kommun",
+    "webbplats": "http://www.ljusdal.se",
+    "org_nr": "212000-2320"
+  },
+  {
+    "kommun_kod": "1864",
+    "kommun_namn": "Ljusnarsbergs",
+    "lan": "Örebro län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Ljusnarsbergs_kommun",
+    "webbplats": "https://www.ljusnarsberg.se/",
+    "org_nr": "212000-1959"
+  },
+  {
+    "kommun_kod": "1262",
+    "kommun_namn": "Lomma",
+    "lan": "Skåne län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Lomma_kommun",
+    "webbplats": "https://lomma.se",
+    "org_nr": "212000-1066"
+  },
+  {
+    "kommun_kod": "2085",
+    "kommun_namn": "Ludvika",
+    "lan": "Dalarnas län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Ludvika_kommun",
+    "webbplats": "https://www.ludvika.se/",
+    "org_nr": "212000-2270"
+  },
+  {
+    "kommun_kod": "2580",
+    "kommun_namn": "Luleå",
+    "lan": "Norrbottens län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Luleå_kommun",
+    "webbplats": "http://www.lulea.se",
+    "org_nr": "212000-2742"
+  },
+  {
+    "kommun_kod": "1281",
+    "kommun_namn": "Lunds",
+    "lan": "Skåne län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Lunds_kommun",
+    "webbplats": "https://www.lund.se",
+    "org_nr": "212000-1132"
+  },
+  {
+    "kommun_kod": "2481",
+    "kommun_namn": "Lycksele",
+    "lan": "Västerbottens län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Lycksele_kommun",
+    "webbplats": "http://www.lycksele.se",
+    "org_nr": "212000-2635"
+  },
+  {
+    "kommun_kod": "1484",
+    "kommun_namn": "Lysekils",
+    "lan": "Västra Götalands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Lysekils_kommun",
+    "webbplats": "http://www.lysekil.se",
+    "org_nr": "212000-1389"
+  },
+  {
+    "kommun_kod": "1280",
+    "kommun_namn": "Malmö",
+    "lan": "Skåne län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Malmö_kommun",
+    "webbplats": "http://www.malmo.se",
+    "org_nr": "212000-1124"
+  },
+  {
+    "kommun_kod": "2023",
+    "kommun_namn": "Malung-Sälens",
+    "lan": "Dalarnas län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Malung-Sälens_kommun",
+    "webbplats": "https://www.malung-salen.se",
+    "org_nr": "212000-2148"
+  },
+  {
+    "kommun_kod": "2418",
+    "kommun_namn": "Malå",
+    "lan": "Västerbottens län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Malå_kommun",
+    "webbplats": "http://www.mala.se",
+    "org_nr": "212000-2866"
+  },
+  {
+    "kommun_kod": "1493",
+    "kommun_namn": "Mariestads",
+    "lan": "Västra Götalands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Mariestads_kommun",
+    "webbplats": "https://mariestad.se/Mariestads-kommun.html",
+    "org_nr": "212000-1686"
+  },
+  {
+    "kommun_kod": "1463",
+    "kommun_namn": "Marks",
+    "lan": "Västra Götalands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Marks_kommun",
+    "webbplats": "http://www.mark.se",
+    "org_nr": "212000-1504"
+  },
+  {
+    "kommun_kod": "0767",
+    "kommun_namn": "Markaryds",
+    "lan": "Kronobergs län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Markaryds_kommun",
+    "webbplats": "http://www.markaryd.se",
+    "org_nr": "212000-0654"
+  },
+  {
+    "kommun_kod": "1461",
+    "kommun_namn": "Melleruds",
+    "lan": "Västra Götalands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Melleruds_kommun",
+    "webbplats": "https://www.mellerud.se/",
+    "org_nr": "212000-1488"
+  },
+  {
+    "kommun_kod": "0586",
+    "kommun_namn": "Mjölby",
+    "lan": "Östergötlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Mjölby_kommun",
+    "webbplats": "http://www.mjolby.se",
+    "org_nr": "212000-0480"
+  },
+  {
+    "kommun_kod": "2062",
+    "kommun_namn": "Mora",
+    "lan": "Dalarnas län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Mora_kommun",
+    "webbplats": "https://morakommun.se",
+    "org_nr": "212000-2213"
+  },
+  {
+    "kommun_kod": "0583",
+    "kommun_namn": "Motala",
+    "lan": "Östergötlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Motala_kommun",
+    "webbplats": "http://www.motala.se",
+    "org_nr": "212000-2817"
+  },
+  {
+    "kommun_kod": "0642",
+    "kommun_namn": "Mullsjö",
+    "lan": "Jönköpings län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Mullsjö_kommun",
+    "webbplats": "http://www.mullsjo.se",
+    "org_nr": "212000-1603"
+  },
+  {
+    "kommun_kod": "1430",
+    "kommun_namn": "Munkedals",
+    "lan": "Västra Götalands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Munkedals_kommun",
+    "webbplats": "http://www.munkedal.se",
+    "org_nr": "212000-1330"
+  },
+  {
+    "kommun_kod": "1762",
+    "kommun_namn": "Munkfors",
+    "lan": "Värmlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Munkfors_kommun",
+    "webbplats": "http://www.munkfors.se",
+    "org_nr": "212000-1801"
+  },
+  {
+    "kommun_kod": "1481",
+    "kommun_namn": "Mölndals",
+    "lan": "Västra Götalands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Mölndals_kommun",
+    "webbplats": "http://www.molndal.se",
+    "org_nr": "212000-1363"
+  },
+  {
+    "kommun_kod": "0861",
+    "kommun_namn": "Mönsterås",
+    "lan": "Kalmar län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Mönsterås_kommun",
+    "webbplats": "http://www.monsteras.se",
+    "org_nr": "212000-0720"
+  },
+  {
+    "kommun_kod": "0840",
+    "kommun_namn": "Mörbylånga",
+    "lan": "Kalmar län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Mörbylånga_kommun",
+    "webbplats": "http://www.morbylanga.se",
+    "org_nr": "212000-0704"
+  },
+  {
+    "kommun_kod": "0182",
+    "kommun_namn": "Nacka",
+    "lan": "Stockholms län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Nacka_kommun",
+    "webbplats": "https://www.nacka.se/",
+    "org_nr": "212000-0167"
+  },
+  {
+    "kommun_kod": "1884",
+    "kommun_namn": "Nora",
+    "lan": "Örebro län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Nora_kommun",
+    "webbplats": "http://www.nora.se",
+    "org_nr": "212000-2007"
+  },
+  {
+    "kommun_kod": "1962",
+    "kommun_namn": "Norbergs",
+    "lan": "Västmanlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Norbergs_kommun",
+    "webbplats": "http://www.norberg.se",
+    "org_nr": "212000-2072"
+  },
+  {
+    "kommun_kod": "2132",
+    "kommun_namn": "Nordanstigs",
+    "lan": "Gävleborgs län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Nordanstigs_kommun",
+    "webbplats": "http://www.nordanstig.se",
+    "org_nr": "212000-2312"
+  },
+  {
+    "kommun_kod": "2401",
+    "kommun_namn": "Nordmalings",
+    "lan": "Västerbottens län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Nordmalings_kommun",
+    "webbplats": "http://www.nordmaling.se",
+    "org_nr": "212000-2536"
+  },
+  {
+    "kommun_kod": "0581",
+    "kommun_namn": "Norrköpings",
+    "lan": "Östergötlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Norrköpings_kommun",
+    "webbplats": "http://www.norrkoping.se",
+    "org_nr": "212000-0456"
+  },
+  {
+    "kommun_kod": "0188",
+    "kommun_namn": "Norrtälje",
+    "lan": "Stockholms län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Norrtälje_kommun",
+    "webbplats": "http://www.norrtalje.se",
+    "org_nr": "212000-0217"
+  },
+  {
+    "kommun_kod": "2417",
+    "kommun_namn": "Norsjö",
+    "lan": "Västerbottens län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Norsjö_kommun",
+    "webbplats": "https://www.norsjo.se/",
+    "org_nr": "212000-2858"
+  },
+  {
+    "kommun_kod": "0881",
+    "kommun_namn": "Nybro",
+    "lan": "Kalmar län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Nybro_kommun",
+    "webbplats": "http://www.nybro.se",
+    "org_nr": "212000-0753"
+  },
+  {
+    "kommun_kod": "0140",
+    "kommun_namn": "Nykvarns",
+    "lan": "Stockholms län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Nykvarns_kommun",
+    "webbplats": "http://www.nykvarn.se",
+    "org_nr": "212000-2999"
+  },
+  {
+    "kommun_kod": "0480",
+    "kommun_namn": "Nyköpings",
+    "lan": "Södermanlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Nyköpings_kommun",
+    "webbplats": "https://nykoping.se",
+    "org_nr": "212000-2940"
+  },
+  {
+    "kommun_kod": "0192",
+    "kommun_namn": "Nynäshamns",
+    "lan": "Stockholms län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Nynäshamns_kommun",
+    "webbplats": "http://www.nynashamn.se",
+    "org_nr": "212000-0233"
+  },
+  {
+    "kommun_kod": "0682",
+    "kommun_namn": "Nässjö",
+    "lan": "Jönköpings län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Nässjö_kommun",
+    "webbplats": "http://www.nassjo.se",
+    "org_nr": "212000-0548"
+  },
+  {
+    "kommun_kod": "2101",
+    "kommun_namn": "Ockelbo",
+    "lan": "Gävleborgs län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Ockelbo_kommun",
+    "webbplats": "https://ockelbo.se/",
+    "org_nr": "212000-2288"
+  },
+  {
+    "kommun_kod": "1060",
+    "kommun_namn": "Olofströms",
+    "lan": "Blekinge län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Olofströms_kommun",
+    "webbplats": "http://www.olofstrom.se",
+    "org_nr": "212000-0811"
+  },
+  {
+    "kommun_kod": "2034",
+    "kommun_namn": "Orsa",
+    "lan": "Dalarnas län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Orsa_kommun",
+    "webbplats": "http://www.orsa.se",
+    "org_nr": "212000-2189"
+  },
+  {
+    "kommun_kod": "1421",
+    "kommun_namn": "Orusts",
+    "lan": "Västra Götalands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Orusts_kommun",
+    "webbplats": "http://www.orust.se",
+    "org_nr": "212000-1314"
+  },
+  {
+    "kommun_kod": "1273",
+    "kommun_namn": "Osby",
+    "lan": "Skåne län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Osby_kommun",
+    "webbplats": "http://www.osby.se",
+    "org_nr": "212000-0902"
+  },
+  {
+    "kommun_kod": "0882",
+    "kommun_namn": "Oskarshamns",
+    "lan": "Kalmar län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Oskarshamns_kommun",
+    "webbplats": "http://www.oskarshamn.se",
+    "org_nr": "212000-0761"
+  },
+  {
+    "kommun_kod": "2121",
+    "kommun_namn": "Ovanåkers",
+    "lan": "Gävleborgs län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Ovanåkers_kommun",
+    "webbplats": "https://www.ovanaker.se/",
+    "org_nr": "212000-2304"
+  },
+  {
+    "kommun_kod": "0481",
+    "kommun_namn": "Oxelösunds",
+    "lan": "Södermanlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Oxelösunds_kommun",
+    "webbplats": "http://www.oxelosund.se",
+    "org_nr": "212000-0324"
+  },
+  {
+    "kommun_kod": "2521",
+    "kommun_namn": "Pajala",
+    "lan": "Norrbottens län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Pajala_kommun",
+    "webbplats": "http://www.pajala.se",
+    "org_nr": "212000-2718"
+  },
+  {
+    "kommun_kod": "1402",
+    "kommun_namn": "Partille",
+    "lan": "Västra Götalands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Partille_kommun",
+    "webbplats": "http://www.partille.se",
+    "org_nr": "212000-1272"
+  },
+  {
+    "kommun_kod": "1275",
+    "kommun_namn": "Perstorps",
+    "lan": "Skåne län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Perstorps_kommun",
+    "webbplats": "http://www.perstorp.se",
+    "org_nr": "212000-0910"
+  },
+  {
+    "kommun_kod": "2581",
+    "kommun_namn": "Piteå",
+    "lan": "Norrbottens län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Piteå_kommun",
+    "webbplats": "http://www.pitea.se",
+    "org_nr": "212000-2759"
+  },
+  {
+    "kommun_kod": "2303",
+    "kommun_namn": "Ragunda",
+    "lan": "Jämtlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Ragunda_kommun",
+    "webbplats": "https://www.ragunda.se/",
+    "org_nr": "212000-2452"
+  },
+  {
+    "kommun_kod": "2409",
+    "kommun_namn": "Robertsfors",
+    "lan": "Västerbottens län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Robertsfors_kommun",
+    "webbplats": "http://www.robertsfors.se",
+    "org_nr": "212000-2551"
+  },
+  {
+    "kommun_kod": "1081",
+    "kommun_namn": "Ronneby",
+    "lan": "Blekinge län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Ronneby_kommun",
+    "webbplats": "http://www.ronneby.se",
+    "org_nr": "212000-0837"
+  },
+  {
+    "kommun_kod": "2031",
+    "kommun_namn": "Rättviks",
+    "lan": "Dalarnas län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Rättviks_kommun",
+    "webbplats": "http://www.rattvik.se",
+    "org_nr": "212000-2171"
+  },
+  {
+    "kommun_kod": "1981",
+    "kommun_namn": "Sala",
+    "lan": "Västmanlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Sala_kommun",
+    "webbplats": "http://www.sala.se",
+    "org_nr": "212000-2098"
+  },
+  {
+    "kommun_kod": "0128",
+    "kommun_namn": "Salems",
+    "lan": "Stockholms län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Salems_kommun",
+    "webbplats": "http://www.salem.se",
+    "org_nr": "212000-2874"
+  },
+  {
+    "kommun_kod": "2181",
+    "kommun_namn": "Sandvikens",
+    "lan": "Gävleborgs län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Sandvikens_kommun",
+    "webbplats": "https://sandviken.se",
+    "org_nr": "212000-2346"
+  },
+  {
+    "kommun_kod": "0191",
+    "kommun_namn": "Sigtuna",
+    "lan": "Stockholms län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Sigtuna_kommun",
+    "webbplats": "http://www.sigtuna.se",
+    "org_nr": "212000-0225"
+  },
+  {
+    "kommun_kod": "1291",
+    "kommun_namn": "Simrishamns",
+    "lan": "Skåne län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Simrishamns_kommun",
+    "webbplats": "http://www.simrishamn.se",
+    "org_nr": "212000-0969"
+  },
+  {
+    "kommun_kod": "1265",
+    "kommun_namn": "Sjöbo",
+    "lan": "Skåne län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Sjöbo_kommun",
+    "webbplats": "http://www.sjobo.se",
+    "org_nr": "212000-1090"
+  },
+  {
+    "kommun_kod": "1495",
+    "kommun_namn": "Skara",
+    "lan": "Västra Götalands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Skara_kommun",
+    "webbplats": "https://www.skara.se",
+    "org_nr": "212000-1702"
+  },
+  {
+    "kommun_kod": "2482",
+    "kommun_namn": "Skellefteå",
+    "lan": "Västerbottens län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Skellefteå_kommun",
+    "webbplats": "http://www.skelleftea.se",
+    "org_nr": "212000-2643"
+  },
+  {
+    "kommun_kod": "1904",
+    "kommun_namn": "Skinnskattebergs",
+    "lan": "Västmanlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Skinnskattebergs_kommun",
+    "webbplats": "http://www.skinnskatteberg.se",
+    "org_nr": "212000-2023"
+  },
+  {
+    "kommun_kod": "1264",
+    "kommun_namn": "Skurups",
+    "lan": "Skåne län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Skurups_kommun",
+    "webbplats": "http://www.skurup.se",
+    "org_nr": "212000-1082"
+  },
+  {
+    "kommun_kod": "1496",
+    "kommun_namn": "Skövde",
+    "lan": "Västra Götalands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Skövde_kommun",
+    "webbplats": "https://www.skovde.se",
+    "org_nr": "212000-1710"
+  },
+  {
+    "kommun_kod": "2061",
+    "kommun_namn": "Smedjebackens",
+    "lan": "Dalarnas län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Smedjebackens_kommun",
+    "webbplats": "http://www.smedjebacken.se",
+    "org_nr": "212000-2205"
+  },
+  {
+    "kommun_kod": "2283",
+    "kommun_namn": "Sollefteå",
+    "lan": "Västernorrlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Sollefteå_kommun",
+    "webbplats": "http://www.solleftea.se",
+    "org_nr": "212000-2437"
+  },
+  {
+    "kommun_kod": "0163",
+    "kommun_namn": "Sollentuna",
+    "lan": "Stockholms län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Sollentuna_kommun",
+    "webbplats": "https://www.sollentuna.se/",
+    "org_nr": "212000-0134"
+  },
+  {
+    "kommun_kod": "0184",
+    "kommun_namn": "Solna",
+    "lan": "Stockholms län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Solna_kommun",
+    "webbplats": "http://www.solna.se",
+    "org_nr": "212000-0183"
+  },
+  {
+    "kommun_kod": "2422",
+    "kommun_namn": "Sorsele",
+    "lan": "Västerbottens län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Sorsele_kommun",
+    "webbplats": "http://www.sorsele.se",
+    "org_nr": "212000-2585"
+  },
+  {
+    "kommun_kod": "1427",
+    "kommun_namn": "Sotenäs",
+    "lan": "Västra Götalands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Sotenäs_kommun",
+    "webbplats": "http://www.sotenas.se",
+    "org_nr": "212000-1322"
+  },
+  {
+    "kommun_kod": "1230",
+    "kommun_namn": "Staffanstorps",
+    "lan": "Skåne län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Staffanstorps_kommun",
+    "webbplats": "http://www.staffanstorp.se",
+    "org_nr": "212000-1017"
+  },
+  {
+    "kommun_kod": "1415",
+    "kommun_namn": "Stenungsunds",
+    "lan": "Västra Götalands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Stenungsunds_kommun",
+    "webbplats": "https://www.stenungsund.se/",
+    "org_nr": "212000-1298"
+  },
+  {
+    "kommun_kod": "0180",
+    "kommun_namn": "Stockholms",
+    "lan": "Stockholms län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Stockholms_kommun",
+    "webbplats": "https://start.stockholm",
+    "org_nr": "212000-0142"
+  },
+  {
+    "kommun_kod": "1760",
+    "kommun_namn": "Storfors",
+    "lan": "Värmlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Storfors_kommun",
+    "webbplats": "http://www.storfors.se",
+    "org_nr": "212000-1785"
+  },
+  {
+    "kommun_kod": "2421",
+    "kommun_namn": "Storumans",
+    "lan": "Västerbottens län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Storumans_kommun",
+    "webbplats": "http://www.storuman.se",
+    "org_nr": "212000-2577"
+  },
+  {
+    "kommun_kod": "0486",
+    "kommun_namn": "Strängnäs",
+    "lan": "Södermanlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Strängnäs_kommun",
+    "webbplats": "https://www.strangnas.se/",
+    "org_nr": "212000-0365"
+  },
+  {
+    "kommun_kod": "1486",
+    "kommun_namn": "Strömstads",
+    "lan": "Västra Götalands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Strömstads_kommun",
+    "webbplats": "http://www.stromstad.se",
+    "org_nr": "212000-1405"
+  },
+  {
+    "kommun_kod": "2313",
+    "kommun_namn": "Strömsunds",
+    "lan": "Jämtlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Strömsunds_kommun",
+    "webbplats": "http://www.stromsund.se",
+    "org_nr": "212000-2486"
+  },
+  {
+    "kommun_kod": "0183",
+    "kommun_namn": "Sundbybergs",
+    "lan": "Stockholms län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Sundbybergs_kommun",
+    "webbplats": "http://www.sundbyberg.se",
+    "org_nr": "212000-0175"
+  },
+  {
+    "kommun_kod": "2281",
+    "kommun_namn": "Sundsvalls",
+    "lan": "Västernorrlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Sundsvalls_kommun",
+    "webbplats": "http://www.sundsvall.se",
+    "org_nr": "212000-2411"
+  },
+  {
+    "kommun_kod": "1766",
+    "kommun_namn": "Sunne",
+    "lan": "Värmlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Sunne_kommun",
+    "webbplats": "http://www.sunne.se",
+    "org_nr": "212000-1843"
+  },
+  {
+    "kommun_kod": "1907",
+    "kommun_namn": "Surahammars",
+    "lan": "Västmanlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Surahammars_kommun",
+    "webbplats": "http://www.surahammar.se",
+    "org_nr": "212000-2031"
+  },
+  {
+    "kommun_kod": "1214",
+    "kommun_namn": "Svalövs",
+    "lan": "Skåne län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Svalövs_kommun",
+    "webbplats": "http://www.svalov.se",
+    "org_nr": "212000-0993"
+  },
+  {
+    "kommun_kod": "1263",
+    "kommun_namn": "Svedala",
+    "lan": "Skåne län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Svedala_kommun",
+    "webbplats": "http://www.svedala.se",
+    "org_nr": "212000-1074"
+  },
+  {
+    "kommun_kod": "1465",
+    "kommun_namn": "Svenljunga",
+    "lan": "Västra Götalands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Svenljunga_kommun",
+    "webbplats": "https://www.svenljunga.se",
+    "org_nr": "212000-1512"
+  },
+  {
+    "kommun_kod": "1785",
+    "kommun_namn": "Säffle",
+    "lan": "Värmlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Säffle_kommun",
+    "webbplats": "https://www.saffle.se/",
+    "org_nr": "212000-1900"
+  },
+  {
+    "kommun_kod": "2082",
+    "kommun_namn": "Säters",
+    "lan": "Dalarnas län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Säters_kommun",
+    "webbplats": "http://www.sater.se",
+    "org_nr": "212000-2247"
+  },
+  {
+    "kommun_kod": "0684",
+    "kommun_namn": "Sävsjö",
+    "lan": "Jönköpings län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Sävsjö_kommun",
+    "webbplats": "http://www.savsjo.se",
+    "org_nr": "212000-0563"
+  },
+  {
+    "kommun_kod": "2182",
+    "kommun_namn": "Söderhamns",
+    "lan": "Gävleborgs län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Söderhamns_kommun",
+    "webbplats": "http://www.soderhamn.se",
+    "org_nr": "212000-2353"
+  },
+  {
+    "kommun_kod": "0582",
+    "kommun_namn": "Söderköpings",
+    "lan": "Östergötlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Söderköpings_kommun",
+    "webbplats": "http://www.soderkoping.se",
+    "org_nr": "212000-0464"
+  },
+  {
+    "kommun_kod": "0181",
+    "kommun_namn": "Södertälje",
+    "lan": "Stockholms län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Södertälje_kommun",
+    "webbplats": "http://www.sodertalje.se",
+    "org_nr": "212000-0159"
+  },
+  {
+    "kommun_kod": "1083",
+    "kommun_namn": "Sölvesborgs",
+    "lan": "Blekinge län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Sölvesborgs_kommun",
+    "webbplats": "http://www.solvesborg.se",
+    "org_nr": "212000-0852"
+  },
+  {
+    "kommun_kod": "1435",
+    "kommun_namn": "Tanums",
+    "lan": "Västra Götalands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Tanums_kommun",
+    "webbplats": "https://www.tanum.se",
+    "org_nr": "212000-1348"
+  },
+  {
+    "kommun_kod": "1472",
+    "kommun_namn": "Tibro",
+    "lan": "Västra Götalands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Tibro_kommun",
+    "webbplats": "http://www.tibro.se",
+    "org_nr": "212000-1660"
+  },
+  {
+    "kommun_kod": "1498",
+    "kommun_namn": "Tidaholms",
+    "lan": "Västra Götalands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Tidaholms_kommun",
+    "webbplats": "http://www.tidaholm.se",
+    "org_nr": "212000-1736"
+  },
+  {
+    "kommun_kod": "0360",
+    "kommun_namn": "Tierps",
+    "lan": "Uppsala län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Tierps_kommun",
+    "webbplats": "https://www.tierp.se/",
+    "org_nr": "212000-0266"
+  },
+  {
+    "kommun_kod": "2262",
+    "kommun_namn": "Timrå",
+    "lan": "Västernorrlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Timrå_kommun",
+    "webbplats": "http://www.timra.se",
+    "org_nr": "212000-2395"
+  },
+  {
+    "kommun_kod": "0763",
+    "kommun_namn": "Tingsryds",
+    "lan": "Kronobergs län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Tingsryds_kommun",
+    "webbplats": "https://tingsryd.se",
+    "org_nr": "212000-0621"
+  },
+  {
+    "kommun_kod": "1419",
+    "kommun_namn": "Tjörns",
+    "lan": "Västra Götalands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Tjörns_kommun",
+    "webbplats": "https://tjorn.se",
+    "org_nr": "212000-1306"
+  },
+  {
+    "kommun_kod": "1270",
+    "kommun_namn": "Tomelilla",
+    "lan": "Skåne län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Tomelilla_kommun",
+    "webbplats": "http://www.tomelilla.se",
+    "org_nr": "212000-0886"
+  },
+  {
+    "kommun_kod": "1737",
+    "kommun_namn": "Torsby",
+    "lan": "Värmlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Torsby_kommun",
+    "webbplats": "http://www.torsby.se",
+    "org_nr": "212000-1777"
+  },
+  {
+    "kommun_kod": "0834",
+    "kommun_namn": "Torsås",
+    "lan": "Kalmar län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Torsås_kommun",
+    "webbplats": "https://www.torsas.se/",
+    "org_nr": "212000-0696"
+  },
+  {
+    "kommun_kod": "1452",
+    "kommun_namn": "Tranemo",
+    "lan": "Västra Götalands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Tranemo_kommun",
+    "webbplats": "https://www.tranemo.se",
+    "org_nr": "212000-1462"
+  },
+  {
+    "kommun_kod": "0687",
+    "kommun_namn": "Tranås",
+    "lan": "Jönköpings län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Tranås_kommun",
+    "webbplats": "http://www.tranas.se",
+    "org_nr": "212000-0597"
+  },
+  {
+    "kommun_kod": "1287",
+    "kommun_namn": "Trelleborgs",
+    "lan": "Skåne län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Trelleborgs_kommun",
+    "webbplats": "http://www.trelleborg.se",
+    "org_nr": "212000-1199"
+  },
+  {
+    "kommun_kod": "1488",
+    "kommun_namn": "Trollhättans",
+    "lan": "Västra Götalands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Trollhättans_kommun",
+    "webbplats": "https://www.trollhattan.se/",
+    "org_nr": "212000-1546"
+  },
+  {
+    "kommun_kod": "0488",
+    "kommun_namn": "Trosa",
+    "lan": "Södermanlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Trosa_kommun",
+    "webbplats": "https://www.trosa.se/",
+    "org_nr": "212000-2957"
+  },
+  {
+    "kommun_kod": "0138",
+    "kommun_namn": "Tyresö",
+    "lan": "Stockholms län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Tyresö_kommun",
+    "webbplats": "https://www.tyreso.se/",
+    "org_nr": "212000-0092"
+  },
+  {
+    "kommun_kod": "0160",
+    "kommun_namn": "Täby",
+    "lan": "Stockholms län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Täby_kommun",
+    "webbplats": "http://www.taby.se",
+    "org_nr": "212000-0118"
+  },
+  {
+    "kommun_kod": "1473",
+    "kommun_namn": "Töreboda",
+    "lan": "Västra Götalands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Töreboda_kommun",
+    "webbplats": "https://toreboda.se",
+    "org_nr": "212000-1678"
+  },
+  {
+    "kommun_kod": "1485",
+    "kommun_namn": "Uddevalla",
+    "lan": "Västra Götalands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Uddevalla_kommun",
+    "webbplats": "https://www.uddevalla.se/",
+    "org_nr": "212000-1397"
+  },
+  {
+    "kommun_kod": "1491",
+    "kommun_namn": "Ulricehamns",
+    "lan": "Västra Götalands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Ulricehamns_kommun",
+    "webbplats": "https://www.ulricehamn.se",
+    "org_nr": "212000-1579"
+  },
+  {
+    "kommun_kod": "2480",
+    "kommun_namn": "Umeå",
+    "lan": "Västerbottens län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Umeå_kommun",
+    "webbplats": "http://www.umea.se",
+    "org_nr": "212000-2627"
+  },
+  {
+    "kommun_kod": "0114",
+    "kommun_namn": "Upplands Väsby",
+    "lan": "Stockholms län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Upplands_Väsby_kommun",
+    "webbplats": "http://www.upplandsvasby.se",
+    "org_nr": "212000-0019"
+  },
+  {
+    "kommun_kod": "0139",
+    "kommun_namn": "Upplands-Bro",
+    "lan": "Stockholms län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Upplands-Bro_kommun",
+    "webbplats": "https://www.upplands-bro.se",
+    "org_nr": "212000-0100"
+  },
+  {
+    "kommun_kod": "0380",
+    "kommun_namn": "Uppsala",
+    "lan": "Uppsala län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Uppsala_kommun",
+    "webbplats": "http://www.uppsala.se",
+    "org_nr": "212000-3005"
+  },
+  {
+    "kommun_kod": "0760",
+    "kommun_namn": "Uppvidinge",
+    "lan": "Kronobergs län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Uppvidinge_kommun",
+    "webbplats": "http://www.uppvidinge.se",
+    "org_nr": "212000-0605"
+  },
+  {
+    "kommun_kod": "0584",
+    "kommun_namn": "Vadstena",
+    "lan": "Östergötlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Vadstena_kommun",
+    "webbplats": "http://www.vadstena.se",
+    "org_nr": "212000-2825"
+  },
+  {
+    "kommun_kod": "0665",
+    "kommun_namn": "Vaggeryds",
+    "lan": "Jönköpings län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Vaggeryds_kommun",
+    "webbplats": "http://www.vaggeryd.se",
+    "org_nr": "212000-0522"
+  },
+  {
+    "kommun_kod": "0563",
+    "kommun_namn": "Valdemarsviks",
+    "lan": "Östergötlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Valdemarsviks_kommun",
+    "webbplats": "http://www.valdemarsvik.se",
+    "org_nr": "212000-0431"
+  },
+  {
+    "kommun_kod": "0115",
+    "kommun_namn": "Vallentuna",
+    "lan": "Stockholms län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Vallentuna_kommun",
+    "webbplats": "http://www.vallentuna.se",
+    "org_nr": "212000-0027"
+  },
+  {
+    "kommun_kod": "2021",
+    "kommun_namn": "Vansbro",
+    "lan": "Dalarnas län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Vansbro_kommun",
+    "webbplats": "http://www.vansbro.se",
+    "org_nr": "212000-2130"
+  },
+  {
+    "kommun_kod": "1470",
+    "kommun_namn": "Vara",
+    "lan": "Västra Götalands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Vara_kommun",
+    "webbplats": "https://www.vara.se",
+    "org_nr": "212000-2924"
+  },
+  {
+    "kommun_kod": "1383",
+    "kommun_namn": "Varbergs",
+    "lan": "Hallands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Varbergs_kommun",
+    "webbplats": "https://www.varberg.se",
+    "org_nr": "212000-1249"
+  },
+  {
+    "kommun_kod": "0187",
+    "kommun_namn": "Vaxholms",
+    "lan": "Stockholms län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Vaxholms_kommun",
+    "webbplats": "http://www.vaxholm.se",
+    "org_nr": "212000-2908"
+  },
+  {
+    "kommun_kod": "1233",
+    "kommun_namn": "Vellinge",
+    "lan": "Skåne län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Vellinge_kommun",
+    "webbplats": "http://www.vellinge.se",
+    "org_nr": "212000-1033"
+  },
+  {
+    "kommun_kod": "0685",
+    "kommun_namn": "Vetlanda",
+    "lan": "Jönköpings län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Vetlanda_kommun",
+    "webbplats": "https://kommun.vetlanda.se/",
+    "org_nr": "212000-0571"
+  },
+  {
+    "kommun_kod": "2462",
+    "kommun_namn": "Vilhelmina",
+    "lan": "Västerbottens län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Vilhelmina_kommun",
+    "webbplats": "http://www.vilhelmina.se",
+    "org_nr": "212000-2601"
+  },
+  {
+    "kommun_kod": "0884",
+    "kommun_namn": "Vimmerby",
+    "lan": "Kalmar län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Vimmerby_kommun",
+    "webbplats": "http://www.vimmerby.se",
+    "org_nr": "212000-0787"
+  },
+  {
+    "kommun_kod": "2404",
+    "kommun_namn": "Vindelns",
+    "lan": "Västerbottens län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Vindelns_kommun",
+    "webbplats": "http://www.vindeln.se",
+    "org_nr": "212000-2544"
+  },
+  {
+    "kommun_kod": "0428",
+    "kommun_namn": "Vingåkers",
+    "lan": "Södermanlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Vingåkers_kommun",
+    "webbplats": "http://www.vingaker.se",
+    "org_nr": "212000-0308"
+  },
+  {
+    "kommun_kod": "1442",
+    "kommun_namn": "Vårgårda",
+    "lan": "Västra Götalands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Vårgårda_kommun",
+    "webbplats": "https://www.vargarda.se/",
+    "org_nr": "212000-1454"
+  },
+  {
+    "kommun_kod": "1487",
+    "kommun_namn": "Vänersborgs",
+    "lan": "Västra Götalands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Vänersborgs_kommun",
+    "webbplats": "http://www.vanersborg.se",
+    "org_nr": "212000-1538"
+  },
+  {
+    "kommun_kod": "2460",
+    "kommun_namn": "Vännäs",
+    "lan": "Västerbottens län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Vännäs_kommun",
+    "webbplats": "https://www.vannas.se",
+    "org_nr": "212000-2841"
+  },
+  {
+    "kommun_kod": "0120",
+    "kommun_namn": "Värmdö",
+    "lan": "Stockholms län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Värmdö_kommun",
+    "webbplats": "http://www.varmdo.se",
+    "org_nr": "212000-0035"
+  },
+  {
+    "kommun_kod": "0683",
+    "kommun_namn": "Värnamo",
+    "lan": "Jönköpings län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Värnamo_kommun",
+    "webbplats": "https://kommun.varnamo.se",
+    "org_nr": "212000-0555"
+  },
+  {
+    "kommun_kod": "0883",
+    "kommun_namn": "Västerviks",
+    "lan": "Kalmar län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Västerviks_kommun",
+    "webbplats": "http://www.vastervik.se",
+    "org_nr": "212000-0779"
+  },
+  {
+    "kommun_kod": "1980",
+    "kommun_namn": "Västerås",
+    "lan": "Västmanlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Västerås_kommun",
+    "webbplats": "http://www.vasteras.se",
+    "org_nr": "212000-2080"
+  },
+  {
+    "kommun_kod": "0780",
+    "kommun_namn": "Växjö",
+    "lan": "Kronobergs län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Växjö_kommun",
+    "webbplats": "https://www.vaxjo.se/",
+    "org_nr": "212000-0662"
+  },
+  {
+    "kommun_kod": "0512",
+    "kommun_namn": "Ydre",
+    "lan": "Östergötlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Ydre_kommun",
+    "webbplats": "http://www.ydre.se",
+    "org_nr": "212000-0381"
+  },
+  {
+    "kommun_kod": "1286",
+    "kommun_namn": "Ystads",
+    "lan": "Skåne län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Ystads_kommun",
+    "webbplats": "https://www.ystad.se/",
+    "org_nr": "212000-1181"
+  },
+  {
+    "kommun_kod": "1492",
+    "kommun_namn": "Åmåls",
+    "lan": "Västra Götalands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Åmåls_kommun",
+    "webbplats": "http://www.amal.se",
+    "org_nr": "212000-1587"
+  },
+  {
+    "kommun_kod": "2260",
+    "kommun_namn": "Ånge",
+    "lan": "Västernorrlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Ånge_kommun",
+    "webbplats": "http://www.ange.se",
+    "org_nr": "212000-2387"
+  },
+  {
+    "kommun_kod": "2321",
+    "kommun_namn": "Åre",
+    "lan": "Jämtlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Åre_kommun",
+    "webbplats": "http://www.are.se",
+    "org_nr": "212000-2494"
+  },
+  {
+    "kommun_kod": "1765",
+    "kommun_namn": "Årjängs",
+    "lan": "Värmlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Årjängs_kommun",
+    "webbplats": "http://www.arjang.se",
+    "org_nr": "212000-1835"
+  },
+  {
+    "kommun_kod": "2463",
+    "kommun_namn": "Åsele",
+    "lan": "Västerbottens län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Åsele_kommun",
+    "webbplats": "http://www.asele.se",
+    "org_nr": "212000-2791"
+  },
+  {
+    "kommun_kod": "1277",
+    "kommun_namn": "Åstorps",
+    "lan": "Skåne län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Åstorps_kommun",
+    "webbplats": "http://www.astorp.se",
+    "org_nr": "212000-0936"
+  },
+  {
+    "kommun_kod": "0561",
+    "kommun_namn": "Åtvidabergs",
+    "lan": "Östergötlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Åtvidabergs_kommun",
+    "webbplats": "http://www.atvidaberg.se",
+    "org_nr": "212000-0415"
+  },
+  {
+    "kommun_kod": "0765",
+    "kommun_namn": "Älmhults",
+    "lan": "Kronobergs län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Älmhults_kommun",
+    "webbplats": "http://www.almhult.se",
+    "org_nr": "212000-0647"
+  },
+  {
+    "kommun_kod": "2039",
+    "kommun_namn": "Älvdalens",
+    "lan": "Dalarnas län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Älvdalens_kommun",
+    "webbplats": "http://www.alvdalen.se",
+    "org_nr": "212000-2197"
+  },
+  {
+    "kommun_kod": "0319",
+    "kommun_namn": "Älvkarleby",
+    "lan": "Uppsala län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Älvkarleby_kommun",
+    "webbplats": "http://www.alvkarleby.se",
+    "org_nr": "212000-0258"
+  },
+  {
+    "kommun_kod": "2560",
+    "kommun_namn": "Älvsbyns",
+    "lan": "Norrbottens län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Älvsbyns_kommun",
+    "webbplats": "http://www.alvsbyn.se",
+    "org_nr": "212000-2734"
+  },
+  {
+    "kommun_kod": "1292",
+    "kommun_namn": "Ängelholms",
+    "lan": "Skåne län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Ängelholms_kommun",
+    "webbplats": "http://www.angelholm.se",
+    "org_nr": "212000-0977"
+  },
+  {
+    "kommun_kod": "1407",
+    "kommun_namn": "Öckerö",
+    "lan": "Västra Götalands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Öckerö_kommun",
+    "webbplats": "http://www.ockero.se",
+    "org_nr": "212000-1280"
+  },
+  {
+    "kommun_kod": "0509",
+    "kommun_namn": "Ödeshögs",
+    "lan": "Östergötlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Ödeshögs_kommun",
+    "webbplats": "http://www.odeshog.se",
+    "org_nr": "212000-0373"
+  },
+  {
+    "kommun_kod": "1880",
+    "kommun_namn": "Örebro",
+    "lan": "Örebro län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Örebro_kommun",
+    "webbplats": "https://www.orebro.se",
+    "org_nr": "212000-1967"
+  },
+  {
+    "kommun_kod": "1257",
+    "kommun_namn": "Örkelljunga",
+    "lan": "Skåne län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Örkelljunga_kommun",
+    "webbplats": "http://www.orkelljunga.se",
+    "org_nr": "212000-0878"
+  },
+  {
+    "kommun_kod": "2284",
+    "kommun_namn": "Örnsköldsviks",
+    "lan": "Västernorrlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Örnsköldsviks_kommun",
+    "webbplats": "http://www.ornskoldsvik.se",
+    "org_nr": "212000-2445"
+  },
+  {
+    "kommun_kod": "2380",
+    "kommun_namn": "Östersunds",
+    "lan": "Jämtlands län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Östersunds_kommun",
+    "webbplats": "http://www.ostersund.se",
+    "org_nr": "212000-2528"
+  },
+  {
+    "kommun_kod": "0117",
+    "kommun_namn": "Österåkers",
+    "lan": "Stockholms län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Österåkers_kommun",
+    "webbplats": "https://www.osteraker.se/",
+    "org_nr": "212000-2890"
+  },
+  {
+    "kommun_kod": "0382",
+    "kommun_namn": "Östhammars",
+    "lan": "Uppsala län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Östhammars_kommun",
+    "webbplats": "http://www.osthammar.se",
+    "org_nr": "212000-0290"
+  },
+  {
+    "kommun_kod": "1256",
+    "kommun_namn": "Östra Göinge",
+    "lan": "Skåne län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Östra_Göinge_kommun",
+    "webbplats": "http://www.ostragoinge.se",
+    "org_nr": "212000-0860"
+  },
+  {
+    "kommun_kod": "2513",
+    "kommun_namn": "Överkalix",
+    "lan": "Norrbottens län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Överkalix_kommun",
+    "webbplats": "http://www.overkalix.se",
+    "org_nr": "212000-2684"
+  },
+  {
+    "kommun_kod": "2518",
+    "kommun_namn": "Övertorneå",
+    "lan": "Norrbottens län",
+    "wikipedia_url": "https://sv.wikipedia.org/wiki/Övertorneå_kommun",
+    "webbplats": "http://www.overtornea.se",
+    "org_nr": "212000-2700"
+  }
+]
