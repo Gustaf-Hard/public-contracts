@@ -22,6 +22,7 @@ export function extractEmails(html, sourceUrl) {
     .get()
     .filter(Boolean);
 
+  $('script, style, noscript').remove();
   const text = deobfuscate($('body').text());
   const fromText = [...text.matchAll(EMAIL_RE)].map((m) => m[0]);
 

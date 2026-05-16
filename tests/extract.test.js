@@ -47,4 +47,17 @@ describe('extractEmails', () => {
     const res = extractEmails('<html><body>nothing here</body></html>', 'https://k.se/');
     expect(res).toEqual([]);
   });
+
+  it('ignores emails embedded in <script>, <style>, and <noscript>', () => {
+    const html = `
+      <html><body>
+        <script>var x = 'leak@hidden.se';</script>
+        <style>.cls { content: 'css@hidden.se'; }</style>
+        <noscript>fallback@hidden.se</noscript>
+        <p>real <a href="mailto:registrator@kommun.se">registrator@kommun.se</a></p>
+      </body></html>
+    `;
+    const emails = extractEmails(html, 'https://k.se/').map((r) => r.email);
+    expect(emails).toEqual(['registrator@kommun.se']);
+  });
 });
