@@ -1,0 +1,903 @@
+kommun_kod,kommun_namn,email,role,forvaltning_namn,source_url,found_via
+0114,Upplands Väsby,vux@upplandsvasby.se,vuxenutbildning,,http://www.upplandsvasby.se/kontakt/vuxenutbildningen,contact_page
+0117,Österåker,servicecenter@osteraker.se,central,,https://www.osteraker.se/,pattern_match
+0117,Österåker,kommunikationsenheten@osteraker.se,other,,https://www.osteraker.se/ovrigt/kontaktaoss/teletaltexttelefoniochandrastodnardukontaktaross.4.367d658917909e8fc2b5280.html,contact_page
+0117,Österåker,fakturaskanning@osteraker.se,upphandling,,https://www.osteraker.se/jobbforetagande/upphandlingochinkop/faktureringsinformation.4.367d658917909e8fc2b70eb.html,contact_page
+0117,Österåker,ekonomi@osteraker.se,upphandling,,https://www.osteraker.se/jobbforetagande/upphandlingochinkop/faktureringsinformation.4.367d658917909e8fc2b70eb.html,contact_page
+0117,Österåker,kommunarkivet@osteraker.se,central,,https://www.osteraker.se/diarium,contact_page
+0120,Värmdö,varmdo.kommun@varmdo.se,central,,https://www.varmdo.se/kontakt.4.3251048d16e2a7e784851453.html,contact_page
+0120,Värmdö,dataskyddsombud@varmdo.se,vuxenutbildning,,https://www.varmdo.se/kommunochpolitik/insynochdialog/lamnasynpunkterforslagellerklagomal.4.18c983316e0536cb18deeba.html,contact_page
+0120,Värmdö,kontaktavarmdo.ekonomi@varmdo.se,other,,https://www.varmdo.se/kontakt/fakturerakommunen.4.92083c718a8d3409723494c.html,contact_page
+0120,Värmdö,vux@varmdo.se,vuxenutbildning,,https://www.varmdo.se/barnochutbildning/vuxenutbildning/alltomkommunalvuxenutbildning/studieochyrkesvagledning/kontaktavuxenutbildningen.4.57741cd17802c53a6c5d3c7.html,pattern_match
+0123,Järfälla,kontakt@jarfalla.se,central,,http://www.jarfalla.se/,pattern_match
+0123,Järfälla,dataskydd@jarfalla.se,vuxenutbildning,,http://www.jarfalla.se/kommunochpolitik/insynochrattssakerhet/hanteringavpersonuppgifter.4.6835195e1641249152313a94.html,contact_page
+0123,Järfälla,kommunarkivet@jarfalla.se,central,,http://www.jarfalla.se/kommunochpolitik/kommunarkivet/kontaktakommunarkivet.4.49c72f5418de88c69e928c3.html,contact_page
+0123,Järfälla,utbildningsnamnden@jarfalla.se,utbildning,Utbildningsnämnden,http://www.jarfalla.se/kontaktinfo/servicecenter/skrivtilloss.4.66bc235b14a5ecdf291cdeec.html,contact_page
+0123,Järfälla,forskolenamnden@jarfalla.se,utbildning,Utbildningsnämnden,http://www.jarfalla.se/kontaktinfo/servicecenter/skrivtilloss.4.66bc235b14a5ecdf291cdeec.html,contact_page
+0123,Järfälla,familjerattsnamnden.jarfalla.upplands-bro@jarfalla.se,utbildning,Utbildningsnämnden,http://www.jarfalla.se/kontaktinfo/servicecenter/skrivtilloss.4.66bc235b14a5ecdf291cdeec.html,contact_page
+0123,Järfälla,kommunstyrelsen@jarfalla.se,utbildning,Utbildningsnämnden,http://www.jarfalla.se/kontaktinfo/servicecenter/skrivtilloss.4.66bc235b14a5ecdf291cdeec.html,contact_page
+0123,Järfälla,kultur.demokrati.fritidsnamnden@jarfalla.se,utbildning,Utbildningsnämnden,http://www.jarfalla.se/kontaktinfo/servicecenter/skrivtilloss.4.66bc235b14a5ecdf291cdeec.html,contact_page
+0123,Järfälla,miljo.och.bygglovsnamnden@jarfalla.se,utbildning,Utbildningsnämnden,http://www.jarfalla.se/kontaktinfo/servicecenter/skrivtilloss.4.66bc235b14a5ecdf291cdeec.html,contact_page
+0123,Järfälla,socialnamnden@jarfalla.se,utbildning,Utbildningsnämnden,http://www.jarfalla.se/kontaktinfo/servicecenter/skrivtilloss.4.66bc235b14a5ecdf291cdeec.html,contact_page
+0123,Järfälla,aldrenamnden@jarfalla.se,utbildning,Utbildningsnämnden,http://www.jarfalla.se/kontaktinfo/servicecenter/skrivtilloss.4.66bc235b14a5ecdf291cdeec.html,contact_page
+0123,Järfälla,mndenaldrenamnden@jarfalla.se,utbildning,Utbildningsnämnden,http://www.jarfalla.se/kontaktinfo/servicecenter/skrivtilloss.4.66bc235b14a5ecdf291cdeec.html,contact_page
+0123,Järfälla,lisa.ringbom.axner@jarfalla.se,utbildning,Kommun­styrelse­förvaltningen,http://www.jarfalla.se/kommunochpolitik/forvaltningarochtjanstemannaorganisation.4.640dac6b1300db73e7c800022040.html,contact_page
+0123,Järfälla,happy.arenvall.hilmarsdottir@jarfalla.se,utbildning,Kommun­styrelse­förvaltningen,http://www.jarfalla.se/kommunochpolitik/forvaltningarochtjanstemannaorganisation.4.640dac6b1300db73e7c800022040.html,contact_page
+0123,Järfälla,anna.waldman.haapaniemi@jarfalla.se,utbildning,Kommun­styrelse­förvaltningen,http://www.jarfalla.se/kommunochpolitik/forvaltningarochtjanstemannaorganisation.4.640dac6b1300db73e7c800022040.html,contact_page
+0123,Järfälla,johanna.karlsson3@jarfalla.se,utbildning,Kommun­styrelse­förvaltningen,http://www.jarfalla.se/kommunochpolitik/forvaltningarochtjanstemannaorganisation.4.640dac6b1300db73e7c800022040.html,contact_page
+0123,Järfälla,amanda.touman.redstorm@jarfalla.se,utbildning,Kommun­styrelse­förvaltningen,http://www.jarfalla.se/kommunochpolitik/forvaltningarochtjanstemannaorganisation.4.640dac6b1300db73e7c800022040.html,contact_page
+0125,Ekerö,info@ekero.se,central,,http://www.ekero.se/,contact_page
+0125,Ekerö,itsupport@ekero.se,other,,http://www.ekero.se/kommun-politik/kontakta-oss/information-till-fortroendevalda,contact_page
+0125,Ekerö,kommunarkivet@ekero.se,central,,http://www.ekero.se/kommun-politik/moten-handlingar--protokoll/diarium-arkiv-och-sekretess,contact_page
+0125,Ekerö,bounamnden@ekero.se,utbildning,Barn- och utbildningsnämnden,http://www.ekero.se/kommun-politik/politik-och-demokrati/namnder/barn--och-utbildningsnamnden,contact_page
+0125,Ekerö,buf@ekero.se,utbildning,Personuppgifter barn- och utbildningsförvaltningen,http://www.ekero.se/kommun-politik/om-webbplatsen/personuppgifter-gdpr/personuppgifter-barn--och-utbildningsforvaltningen,contact_page
+0125,Ekerö,dataskydd@ekero.se,utbildning,Personuppgifter barn- och utbildningsförvaltningen,http://www.ekero.se/kommun-politik/om-webbplatsen/personuppgifter-gdpr/personuppgifter-barn--och-utbildningsforvaltningen,contact_page
+0126,Huddinge,servicecenter@huddinge.se,central,,https://www.huddinge.se/,pattern_match
+0126,Huddinge,kommunikation@huddinge.se,other,,https://www.huddinge.se/organisation-och-styrning/nyheter-press-och-webb-tv/pressrum,contact_page
+0126,Huddinge,barn-utbildning@huddinge.se,other,,https://www.huddinge.se/organisation-och-styrning/ansvar-och-organisation/behandling-av-personuppgifter-enligt-gdpr,contact_page
+0126,Huddinge,ksf.registrator@huddinge.se,central,,https://www.huddinge.se/organisation-och-styrning/ansvar-och-organisation/behandling-av-personuppgifter-enligt-gdpr,contact_page
+0127,Botkyrka,medborgarcenter@botkyrka.se,vuxenutbildning,,http://www.botkyrka.se/,pattern_match
+0127,Botkyrka,upphandling@botkyrka.se,upphandling,,http://www.botkyrka.se/naringsliv-och-foretag/upphandlingar-och-inkop,contact_page
+0127,Botkyrka,it-support@botkyrka.se,vuxenutbildning,,http://www.botkyrka.se/jobb-och-vuxenutbildning/jobba-hos-oss/vara-verksamheter/vard--och-omsorgsforvaltningen/timvikarie-hos-vard--och-omsorgsforvaltningen,contact_page
+0127,Botkyrka,sbf@botkyrka.se,vuxenutbildning,Samhällsbyggnads-förvaltningen,http://www.botkyrka.se/jobb-och-vuxenutbildning/jobba-hos-oss/vara-verksamheter/samhallsbyggnadsforvaltningen,contact_page
+0127,Botkyrka,ods@botkyrka.se,vuxenutbildning,,http://www.botkyrka.se/jobb-och-vuxenutbildning/jobba-hos-oss/vara-verksamheter/samhallsbyggnadsforvaltningen/vill-du-bli-en-digital-pionjar,contact_page
+0128,Salem,info@salem.se,central,,http://www.salem.se/,contact_page
+0128,Salem,kommunikation@salem.se,other,,http://www.salem.se/kommunochpolitik/press/pressochgrafiskmanual.4.7f96211d191cfb9f1ee3d1b2.html,contact_page
+0128,Salem,kommunikationsenhetenkommunikation@salem.se,other,,http://www.salem.se/kommunochpolitik/press/pressochgrafiskmanual.4.7f96211d191cfb9f1ee3d1b2.html,contact_page
+0128,Salem,kommunsekreterarekommunstyrelsenksf@salem.se,other,,http://www.salem.se/kommunochpolitik/kommunensorganisation/kommunstyrelsen.4.566cf51e192955939b2ded2.html,contact_page
+0128,Salem,bou@salem.se,utbildning,Barn- och utbildningsnämnden,http://www.salem.se/kommunochpolitik/kommunensorganisation/namnder/barnochutbildningsnamnden.4.566cf51e192955939b2df0a.html,contact_page
+0128,Salem,mndenbou@salem.se,utbildning,Barn- och utbildningsnämnden,http://www.salem.se/kommunochpolitik/kommunensorganisation/namnder/barnochutbildningsnamnden.4.566cf51e192955939b2df0a.html,contact_page
+0136,Haninge,gymnasieocharbetsmarknad@haninge.se,other,,http://www.haninge.se/kontakta-oss/,contact_page
+0136,Haninge,inkop@haninge.se,upphandling,,http://www.haninge.se/kommun-och-politik/politik-och-organisation/ekonomi-och-budget/faktura-och-rakning/,contact_page
+0136,Haninge,kansliet@haninge.se,other,,http://www.haninge.se/kommun-och-politik/politik-och-organisation/organisation/politikerportal/,contact_page
+0136,Haninge,utbildningsforvaltningen@haninge.se,other,Kommunstyrelsen och nämnder,http://www.haninge.se/kommun-och-politik/politik-och-organisation/organisation/kommunstyrelsen-och-namnder/,contact_page
+0136,Haninge,barnochutbildning@haninge.se,utbildning,Förvaltningar,http://www.haninge.se/kommun-och-politik/politik-och-organisation/organisation/forvaltningar/,contact_page
+0136,Haninge,registratorhaningekommun@haninge.se,other,Förvaltningar,http://www.haninge.se/kommun-och-politik/politik-och-organisation/organisation/forvaltningar/,contact_page
+0138,Tyresö,kommun@tyreso.se,central,,https://www.tyreso.se/,pattern_match
+0138,Tyresö,kommunikation@tyreso.se,other,,https://www.tyreso.se/kontakt-och-oppettider.html,contact_page
+0138,Tyresö,servicecenter@tyreso.se,central,,https://www.tyreso.se/kontakt-och-oppettider/servicecenters-oppettider---dag-fore-rod-dag-afton.html,contact_page
+0138,Tyresö,kommunkansli@tyreso.se,other,,https://www.tyreso.se/organisation--styrning/styrning-och-uppfoljning/lagar-och-styrdokument/offentlighetsprincipen-och-sekretess.html,contact_page
+0139,Upplands-Bro,kommun@upplands-bro.se,central,,https://www.upplands-bro.se/,contact_page
+0139,Upplands-Bro,sussanne.persson2@upplands-bro.se,gymnasie,Gymnasie- och arbetslivsnämnden,https://www.upplands-bro.se/kommun-och-politik/politik-och-demokrati/namnder/gymnasie--och-arbetslivsnamnden.html,contact_page
+0139,Upplands-Bro,ines.riveraazua2@upplands-bro.se,utbildning,Utbildningsnämnden,https://www.upplands-bro.se/kommun-och-politik/politik-och-demokrati/namnder/utbildningsnamnden.html,contact_page
+0139,Upplands-Bro,katarina.schierenbeckljungqvist@upplands-bro.se,utbildning,Utbildningsnämnden,https://www.upplands-bro.se/kommun-och-politik/politik-och-demokrati/namnder/utbildningsnamnden.html,contact_page
+0139,Upplands-Bro,ekonomi.fragor@upplands-bro.se,upphandling,,https://www.upplands-bro.se/foretagare-och-naringsliv/upphandling.html,contact_page
+0139,Upplands-Bro,vux@upplands-bro.se,vuxenutbildning,,https://www.upplands-bro.se/forskola-och-skola/vuxenutbildning/kontakta-vuxenutbildningen.html,contact_page
+0139,Upplands-Bro,specvux@upplands-bro.se,vuxenutbildning,,https://www.upplands-bro.se/forskola-och-skola/vuxenutbildning/kontakta-vuxenutbildningen.html,contact_page
+0139,Upplands-Bro,auktorisation@upplands-bro.se,vuxenutbildning,,https://www.upplands-bro.se/forskola-och-skola/vuxenutbildning/kontakta-vuxenutbildningen.html,contact_page
+0140,Nykvarn,kommun@nykvarn.se,central,Finskt förvaltningsområde,http://www.nykvarn.se/,pattern_match
+0160,Täby,redovisning@taby.se,upphandling,,http://www.taby.se/naringsliv-och-arbete/etablera-utveckla-och-upphandla/inkop-och-upphandling/faktura-till-taby-kommun,contact_page
+0160,Täby,upphandlingen@taby.se,upphandling,,http://www.taby.se/naringsliv-och-arbete/etablera-utveckla-och-upphandla/inkop-och-upphandling,contact_page
+0163,Sollentuna,kontaktcenter@sollentuna.se,central,,https://www.sollentuna.se/,pattern_match
+0163,Sollentuna,kontaktcenter-foretag@sollentuna.se,other,,https://www.sollentuna.se/valkommen-till-sollentuna-kommun/,contact_page
+0163,Sollentuna,e-post.kontaktcenter-foretag@sollentuna.se,other,,https://www.sollentuna.se/valkommen-till-sollentuna-kommun/,contact_page
+0163,Sollentuna,magnus.nyberg.blixt@sollentuna.se,utbildning,Utbildningsnämnden,https://www.sollentuna.se/kommun--politik/sa-styrs-sollentuna/kommunens-organisation/Namnder/utbildningsnamnden/,contact_page
+0163,Sollentuna,proceedosupport@sollentuna.se,upphandling,,https://www.sollentuna.se/jobb--foretagande/upphandling-och-inkop/fakturering/,contact_page
+0181,Södertälje,kontaktcenter@sodertalje.se,central,,http://www.sodertalje.se/,contact_page
+0181,Södertälje,sodertalje.kommun@sodertalje.se,central,,http://www.sodertalje.se/,contact_page
+0182,Nacka,info@nacka.se,central,,https://www.nacka.se/,pattern_match
+0182,Nacka,registrator@nacka.se,central,,https://www.nacka.se/kommun--politik/kontakta-oss/,contact_page
+0182,Nacka,nackainkop@nacka.se,upphandling,,https://www.nacka.se/medarbetare/inkop-och-upphandling/kontakta-inkop-och-upphandling/,contact_page
+0183,Sundbyberg,kommunstyrelsen@sundbyberg.se,central,,http://www.sundbyberg.se/kommun-och-politik/kontakta-oss,contact_page
+0183,Sundbyberg,servicecenter@sundbyberg.se,central,,http://www.sundbyberg.se/kommun-och-politik/kontakta-oss/felanmalan,contact_page
+0183,Sundbyberg,forskolenamnden@sundbyberg.se,utbildning,Kontakta till Sundbybergs stads nämnder,http://www.sundbyberg.se/kommun-och-politik/kontakta-oss/kontakta-till-sundbybergs-stads-namnder,contact_page
+0184,Solna,kommunikation@solna.se,other,,https://www.solna.se/om-solna-stad/kontakt-och-kommunikation/grafisk-profil,pattern_match
+0187,Vaxholm,kansliet@vaxholm.se,other,,http://www.vaxholm.se/,contact_page
+0187,Vaxholm,utbildning@vaxholm.se,utbildning,Kontakta förvaltningar,http://www.vaxholm.se/kommun--politik/kontakter-vaxholms-stad,contact_page
+0188,Norrtälje,kontaktcenter@norrtalje.se,central,,http://www.norrtalje.se/,pattern_match
+0188,Norrtälje,registrator.sjukvardomsorg@norrtalje.se,central,,http://www.norrtalje.se/info/kommun-och-politik/kontakt/kontaktcenter/,contact_page
+0188,Norrtälje,kommunikation@norrtalje.se,other,,http://www.norrtalje.se/info/kommun-och-politik/kontakt/press-och-media/,contact_page
+0188,Norrtälje,kommunikationsavdelningen@norrtalje.se,other,,http://www.norrtalje.se/info/kommun-och-politik/kontakt/sociala-medier/,contact_page
+0191,Sigtuna,kontaktcenter@sigtuna.se,central,,http://www.sigtuna.se/kontakta-oss.html,contact_page
+0192,Nynäshamn,kontaktcenter@nynashamn.se,central,,http://www.nynashamn.se/,contact_page
+0192,Nynäshamn,kommunstyrelsen@nynashamn.se,central,,http://www.nynashamn.se/service/organisation--styrning/politik-och-organisation/kommunfullmaktige/webbsandning-av-kommunfullmaktige,contact_page
+0192,Nynäshamn,kommunikation@nynashamn.se,other,,http://www.nynashamn.se/service/organisation--styrning/kontakta-oss,contact_page
+0192,Nynäshamn,upphandling@nynashamn.se,upphandling,,http://www.nynashamn.se/service/naringsliv--foretagande/upphandling-och-inkop,contact_page
+0305,Håbo,kommun@habo.se,central,,http://www.habo.se/,contact_page
+0319,Älvkarleby,kommun@alvkarleby.se,central,,http://www.alvkarleby.se/,pattern_match
+0319,Älvkarleby,upphandling@alvkarleby.se,upphandling,,http://www.alvkarleby.se/naringsliv-och-arbete/upphandling-och-inkop.html,contact_page
+0319,Älvkarleby,utbildningsnamnden@alvkarleby.se,utbildning,,http://www.alvkarleby.se/kommun-och-politik/beslut-insyn-och-rattssakerhet/hantering-av-personuppgifter.html,contact_page
+0330,Knivsta,knivsta@knivsta.se,central,,http://www.knivsta.se/,pattern_match
+0330,Knivsta,vuxenutbildning@knivsta.se,vuxenutbildning,,http://www.knivsta.se/forskola-och-skola/vuxenutbildning/kontakta-vuxenutbildningen,contact_page
+0330,Knivsta,upphandling@knivsta.se,upphandling,,http://www.knivsta.se/jobb-och-naringsliv/upphandling-och-inkop,contact_page
+0331,Heby,information@heby.se,other,,http://www.heby.se/,contact_page
+0331,Heby,petterssonberedskapssamordnarealva.pettersson@heby.se,utbildning,Förvaltningar och verksamhet,http://www.heby.se/organisation-plats-och-politik/kommunens-organisation/forvaltningar-och-verksamhet,contact_page
+0331,Heby,67camilla.rojeras@heby.se,utbildning,Förvaltningar och verksamhet,http://www.heby.se/organisation-plats-och-politik/kommunens-organisation/forvaltningar-och-verksamhet,contact_page
+0331,Heby,21bo.stromquist@heby.se,utbildning,Förvaltningar och verksamhet,http://www.heby.se/organisation-plats-och-politik/kommunens-organisation/forvaltningar-och-verksamhet,contact_page
+0331,Heby,90maria.rosen@heby.se,utbildning,Förvaltningar och verksamhet,http://www.heby.se/organisation-plats-och-politik/kommunens-organisation/forvaltningar-och-verksamhet,contact_page
+0331,Heby,53mina.hagenvall@heby.se,utbildning,Förvaltningar och verksamhet,http://www.heby.se/organisation-plats-och-politik/kommunens-organisation/forvaltningar-och-verksamhet,contact_page
+0331,Heby,0224-36015ulrika.axelsson@heby.se,utbildning,Förvaltningar och verksamhet,http://www.heby.se/organisation-plats-och-politik/kommunens-organisation/forvaltningar-och-verksamhet,contact_page
+0331,Heby,kostchef0224-36174mikael.sandin@heby.se,utbildning,Förvaltningar och verksamhet,http://www.heby.se/organisation-plats-och-politik/kommunens-organisation/forvaltningar-och-verksamhet,contact_page
+0331,Heby,nd0224-36087mauro.pliscovaz@heby.se,utbildning,Förvaltningar och verksamhet,http://www.heby.se/organisation-plats-och-politik/kommunens-organisation/forvaltningar-och-verksamhet,contact_page
+0331,Heby,carola.eriksson1@heby.se,utbildning,Vård- och omsorgsnämnden,http://www.heby.se/organisation-plats-och-politik/demokrati-dialog-och-inflytande/hitta-din-politiker,contact_page
+0331,Heby,per.moller2@heby.se,utbildning,Vård- och omsorgsnämnden,http://www.heby.se/organisation-plats-och-politik/demokrati-dialog-och-inflytande/hitta-din-politiker,contact_page
+0331,Heby,ewa.westling.olzon@heby.se,utbildning,Vård- och omsorgsnämnden,http://www.heby.se/organisation-plats-och-politik/demokrati-dialog-och-inflytande/hitta-din-politiker,contact_page
+0331,Heby,maria.flink.opoku@heby.se,utbildning,Vård- och omsorgsnämnden,http://www.heby.se/organisation-plats-och-politik/demokrati-dialog-och-inflytande/hitta-din-politiker,contact_page
+0331,Heby,leif.nilsson2@heby.se,utbildning,Vård- och omsorgsnämnden,http://www.heby.se/organisation-plats-och-politik/demokrati-dialog-och-inflytande/hitta-din-politiker,contact_page
+0331,Heby,patrik.spanning.vesterlund@heby.se,utbildning,Vård- och omsorgsnämnden,http://www.heby.se/organisation-plats-och-politik/demokrati-dialog-och-inflytande/hitta-din-politiker,contact_page
+0331,Heby,kerstin.karlsson1@heby.se,utbildning,Vård- och omsorgsnämnden,http://www.heby.se/organisation-plats-och-politik/demokrati-dialog-och-inflytande/hitta-din-politiker,contact_page
+0360,Tierp,medborgarservice@tierp.se,central,,https://www.tierp.se/tierp.se/kommun-och-politik/kommunfakta/dina-rattigheter-som-nationell-minoritet/finskt-forvaltningsomrade/suomen-kielen-hallintoalue.html,contact_page
+0360,Tierp,kommunstyrelsen@tierp.se,central,,https://www.tierp.se/tierp.se/kommun-och-politik/kommunens-organisation/kommunstyrelsen.html,contact_page
+0380,Uppsala,uppsala.kommun@uppsala.se,central,,http://www.uppsala.se/,pattern_match
+0380,Uppsala,upphandling@uppsala.se,upphandling,,http://www.uppsala.se/foretag-och-naringsliv/upphandling-och-leverantor/,contact_page
+0380,Uppsala,godkannandehuvudmanubf@uppsala.se,upphandling,,http://www.uppsala.se/foretag-och-naringsliv/upphandling-och-leverantor/starta-forskola/,contact_page
+0380,Uppsala,omsorgsresor@uppsala.se,upphandling,,http://www.uppsala.se/foretag-och-naringsliv/upphandling-och-leverantor/valfrihetssystemen-bli-utforare/bli-utforare-av-daglig-verksamhet/,contact_page
+0380,Uppsala,dagligverksamhet@uppsala.se,upphandling,,http://www.uppsala.se/foretag-och-naringsliv/upphandling-och-leverantor/valfrihetssystemen-bli-utforare/bli-utforare-av-daglig-verksamhet/,contact_page
+0380,Uppsala,lov@uppsala.se,upphandling,,http://www.uppsala.se/foretag-och-naringsliv/upphandling-och-leverantor/valfrihetssystemen-bli-utforare/bli-utforare-av-vard-och-omsorgsboende/,contact_page
+0380,Uppsala,kommunledningskontoret@uppsala.se,other,,http://www.uppsala.se/kommun-och-politik/organisation/ledning/kommunfullmaktige/,contact_page
+0380,Uppsala,kommunrevisionen@uppsala.se,other,,http://www.uppsala.se/kommun-och-politik/organisation/ledning/kommunfullmaktige/kommunrevisionen/,contact_page
+0380,Uppsala,utbildningsforvaltningen@uppsala.se,other,Kontaktuppgifter till kommunens nämnder,http://www.uppsala.se/kommun-och-politik/arkiv-och-allmanna-handlingar/allmanna-handlingar-och-diarium/,contact_page
+0381,Enköping,kommunen@enkoping.se,central,,https://enkoping.se/kontakt/mejla-till-kommunen.html,contact_page
+0382,Östhammar,kommunstyrelsen@osthammar.se,central,,http://www.osthammar.se/organisation/namnd/kommunfullmaktige/,contact_page
+0382,Östhammar,kommunikation@osthammar.se,other,,http://www.osthammar.se/kommunpolitik/kommunen/organisation/forvaltning/kommunledningskontoret/kommunikation-och-kundtjanst/,contact_page
+0428,Vingåker,kommun@vingaker.se,central,,http://www.vingaker.se/,contact_page
+0461,Gnesta,gnesta.kommun@gnesta.se,central,,http://www.gnesta.se/,pattern_match
+0480,Nyköping,kundservice@nykoping.se,utbildning,,https://nykoping.se/,pattern_match
+0480,Nyköping,kommun@nykoping.se,central,,https://nykoping.se/kommun--politik/hallbar-utveckling-i-nykopings-kommun/program-for-effektiv-organisation/,contact_page
+0480,Nyköping,registrator.klk@nykoping.se,central,,https://nykoping.se/kommun--politik/arenden-och-handlingar/diarium/,contact_page
+0480,Nyköping,upphandling@nykoping.se,upphandling,,https://nykoping.se/naringsliv--arbete/upphandling-och-inkop/,contact_page
+0480,Nyköping,info.kommunfastigheter@nykoping.se,other,,https://nykoping.se/kommun--politik/sa-styrs-kommunen/kontakta-kommunen/,contact_page
+0480,Nyköping,infomaster@nykoping.se,other,,https://nykoping.se/kommun--politik/sa-styrs-kommunen/kontakta-kommunen/,contact_page
+0481,Oxelösund,kommun@oxelosund.se,central,,http://www.oxelosund.se/,contact_page
+0482,Flen,kontaktcenter@flen.se,central,,https://flen.se/kontakt,contact_page
+0482,Flen,kommunikation@flen.se,other,,https://flen.se/kontaktcenter,contact_page
+0483,Katrineholm,kommunen@katrineholm.se,central,,https://www.katrineholm.se/,pattern_match
+0483,Katrineholm,kontaktcenter@katrineholm.se,central,Bildnings- och arbetsmarknadsförvaltningen,https://www.katrineholm.se/kommun-och-politik/kontakta-oss.html,contact_page
+0483,Katrineholm,kommunledningsforvaltning@katrineholm.se,other,Bildnings- och arbetsmarknadsförvaltningen,https://www.katrineholm.se/kommun-och-politik/kontakta-oss.html,contact_page
+0483,Katrineholm,supportekonomiochinkop@katrineholm.se,upphandling,,https://www.katrineholm.se/foretag-och-naringsliv/upphandling-och-inkop/skicka-faktura-till-kommunen.html,contact_page
+0484,Eskilstuna,info@eskilstuna.se,central,,http://www.eskilstuna.se/,pattern_match
+0484,Eskilstuna,kommunledningskontor@eskilstuna.se,gymnasie,Kontaktuppgifter till nämndernas förvaltningar,http://www.eskilstuna.se/kommun-och-politik/ta-del-av-beslut/diarium/namndernas-forvaltningar,contact_page
+0484,Eskilstuna,arbetsmarknads-vuxenutbildningsforvaltningen@eskilstuna.se,gymnasie,Kontaktuppgifter till nämndernas förvaltningar,http://www.eskilstuna.se/kommun-och-politik/ta-del-av-beslut/diarium/namndernas-forvaltningar,contact_page
+0484,Eskilstuna,barn-utbildningsforvaltningen@eskilstuna.se,gymnasie,Kontaktuppgifter till nämndernas förvaltningar,http://www.eskilstuna.se/kommun-och-politik/ta-del-av-beslut/diarium/namndernas-forvaltningar,contact_page
+0484,Eskilstuna,kultur-fritidsforvaltningen@eskilstuna.se,gymnasie,Kontaktuppgifter till nämndernas förvaltningar,http://www.eskilstuna.se/kommun-och-politik/ta-del-av-beslut/diarium/namndernas-forvaltningar,contact_page
+0484,Eskilstuna,samhallsbyggnad@eskilstuna.se,gymnasie,Kontaktuppgifter till nämndernas förvaltningar,http://www.eskilstuna.se/kommun-och-politik/ta-del-av-beslut/diarium/namndernas-forvaltningar,contact_page
+0484,Eskilstuna,serviceforvaltningen@eskilstuna.se,gymnasie,Kontaktuppgifter till nämndernas förvaltningar,http://www.eskilstuna.se/kommun-och-politik/ta-del-av-beslut/diarium/namndernas-forvaltningar,contact_page
+0484,Eskilstuna,socialforvaltningen@eskilstuna.se,gymnasie,Kontaktuppgifter till nämndernas förvaltningar,http://www.eskilstuna.se/kommun-och-politik/ta-del-av-beslut/diarium/namndernas-forvaltningar,contact_page
+0484,Eskilstuna,torshalla-stads-namnd@eskilstuna.se,gymnasie,Kontaktuppgifter till nämndernas förvaltningar,http://www.eskilstuna.se/kommun-och-politik/ta-del-av-beslut/diarium/namndernas-forvaltningar,contact_page
+0484,Eskilstuna,valnamnden@eskilstuna.se,gymnasie,Kontaktuppgifter till nämndernas förvaltningar,http://www.eskilstuna.se/kommun-och-politik/ta-del-av-beslut/diarium/namndernas-forvaltningar,contact_page
+0484,Eskilstuna,vard-omsorgsforvaltningen@eskilstuna.se,gymnasie,Kontaktuppgifter till nämndernas förvaltningar,http://www.eskilstuna.se/kommun-och-politik/ta-del-av-beslut/diarium/namndernas-forvaltningar,contact_page
+0484,Eskilstuna,overformyndarkontoret@eskilstuna.se,gymnasie,Kontaktuppgifter till nämndernas förvaltningar,http://www.eskilstuna.se/kommun-och-politik/ta-del-av-beslut/diarium/namndernas-forvaltningar,contact_page
+0486,Strängnäs,kontaktcenter@strangnas.se,central,,https://www.strangnas.se/,pattern_match
+0486,Strängnäs,vuxen@strangnas.se,other,,https://www.strangnas.se/kontakt,contact_page
+0486,Strängnäs,fakturacentralen@strangnas.se,upphandling,,https://www.strangnas.se/arbete-och-foretagande/upphandling-och-inkop/e-handel-e-faktura,contact_page
+0486,Strängnäs,inkop@strangnas.se,upphandling,,https://www.strangnas.se/arbete-och-foretagande/upphandling-och-inkop/e-handel-e-faktura,contact_page
+0486,Strängnäs,kommun@strangnas.se,central,,https://www.strangnas.se/kommun-och-politik/overklaga-beslut-rattssakerhet/personuppgifter-i-strangnas-kommun,contact_page
+0486,Strängnäs,kommunstyrelsen@strangnas.se,central,,https://www.strangnas.se/kommun-och-politik/kommunens-organisation/kommunstyrelsen,contact_page
+0488,Trosa,trosa@trosa.se,central,,https://www.trosa.se/,pattern_match
+0488,Trosa,upphandling@trosa.se,upphandling,,https://www.trosa.se/foretagande-och-arbete/upphandling/,contact_page
+0509,Ödeshög,kommun@odeshog.se,central,,http://www.odeshog.se/,pattern_match
+0509,Ödeshög,barnochutbildningsnamnden@odeshog.se,utbildning,Barn- och utbildningsnämnden,http://www.odeshog.se/kommunochpolitik/kommunensorganisation/namnder/barnochutbildningsnamnden.4.78ae827d1605526e94b61825.html,contact_page
+0509,Ödeshög,54anngela.sundback@odeshog.se,utbildning,Barn- och utbildningsnämnden,http://www.odeshog.se/kommunochpolitik/kommunensorganisation/namnder/barnochutbildningsnamnden.4.78ae827d1605526e94b61825.html,contact_page
+0509,Ödeshög,64peter.johansson@odeshog.se,utbildning,Barn- och utbildningsnämnden,http://www.odeshog.se/kommunochpolitik/kommunensorganisation/namnder/barnochutbildningsnamnden.4.78ae827d1605526e94b61825.html,contact_page
+0509,Ödeshög,rvaltningenbarnochutbildningsnamnden@odeshog.se,vuxenutbildning,Kontakta bildningsförvaltningen,http://www.odeshog.se/kommunochpolitik/kontaktaoss/kontaktabildningsforvaltningen.106.3318e6f4194ac9ecf0bb3e0.html,contact_page
+0509,Ödeshög,12cathrin.castensson@odeshog.se,vuxenutbildning,Kontakta bildningsförvaltningen,http://www.odeshog.se/kommunochpolitik/kontaktaoss/kontaktabildningsforvaltningen.106.3318e6f4194ac9ecf0bb3e0.html,contact_page
+0509,Ödeshög,skolskjutssamordnarebarnochutbildningsnamnden@odeshog.se,vuxenutbildning,Kontakta bildningsförvaltningen,http://www.odeshog.se/kommunochpolitik/kontaktaoss/kontaktabildningsforvaltningen.106.3318e6f4194ac9ecf0bb3e0.html,contact_page
+0509,Ödeshög,81richard.olofsson@utb.odeshog.se,vuxenutbildning,Kontakta bildningsförvaltningen,http://www.odeshog.se/kommunochpolitik/kontaktaoss/kontaktabildningsforvaltningen.106.3318e6f4194ac9ecf0bb3e0.html,contact_page
+0509,Ödeshög,63jenny.aakula@utb.odeshog.se,vuxenutbildning,Kontakta bildningsförvaltningen,http://www.odeshog.se/kommunochpolitik/kontaktaoss/kontaktabildningsforvaltningen.106.3318e6f4194ac9ecf0bb3e0.html,contact_page
+0509,Ödeshög,aiv@odeshog.se,vuxenutbildning,Kontakta kommunledningsförvaltningen,http://www.odeshog.se/kommunochpolitik/kontaktaoss/kontaktakommunledningsforvaltningen.106.3318e6f4194ac9ecf0bb409.html,contact_page
+0509,Ödeshög,08mersiha.karisik@odeshog.se,vuxenutbildning,Kontakta kommunledningsförvaltningen,http://www.odeshog.se/kommunochpolitik/kontaktaoss/kontaktakommunledningsforvaltningen.106.3318e6f4194ac9ecf0bb409.html,contact_page
+0509,Ödeshög,60annika.brandin@odeshog.se,vuxenutbildning,Kontakta kommunledningsförvaltningen,http://www.odeshog.se/kommunochpolitik/kontaktaoss/kontaktakommunledningsforvaltningen.106.3318e6f4194ac9ecf0bb409.html,contact_page
+0509,Ödeshög,09rebecca.olovsson@odeshog.se,vuxenutbildning,Kontakta kommunledningsförvaltningen,http://www.odeshog.se/kommunochpolitik/kontaktaoss/kontaktakommunledningsforvaltningen.106.3318e6f4194ac9ecf0bb409.html,contact_page
+0509,Ödeshög,42jenny.carlsson@odeshog.se,vuxenutbildning,Kontakta kommunledningsförvaltningen,http://www.odeshog.se/kommunochpolitik/kontaktaoss/kontaktakommunledningsforvaltningen.106.3318e6f4194ac9ecf0bb409.html,contact_page
+0509,Ödeshög,kommunstyrelsen@odeshog.se,utbildning,Behandling av personuppgifter - Barn- och utbildningsnämnden,http://www.odeshog.se/kommunochpolitik/personuppgifterochdataskydd/behandlingavpersonuppgifterikommunen/behandlingavpersonuppgifterbarnochutbildningsnamnden.4.6a91930d17cbcc51c6d216d0.html,contact_page
+0509,Ödeshög,24markus.tollin@odeshog.se,upphandling,,http://www.odeshog.se/jobbochforetagande/upphandlingochinkop.4.1d2711b015e13c528de30e3e.html,contact_page
+0512,Ydre,ydre.kommun@ydre.se,central,,http://www.ydre.se/,contact_page
+0513,Kinda,kinda@kinda.se,central,,http://www.kinda.se/,contact_page
+0513,Kinda,212000-0399kinda@kinda.se,upphandling,,http://www.kinda.se/,contact_page
+0513,Kinda,upphandling-inkop@kinda.se,upphandling,,http://www.kinda.se/kommunochpolitik/upphandlingochinkop.4.590ab7dd19c88eb9a378234b.html,contact_page
+0513,Kinda,ekonomi@kinda.se,upphandling,,http://www.kinda.se/kommunochpolitik/upphandlingochinkop/fakturatillkindakommun.106.6fd7474419c891adb54e0071.html,contact_page
+0513,Kinda,kontaktcenter@kinda.se,central,,http://www.kinda.se/naringslivocharbete/naringsliv/kontaktaoss.4.4e22b7941927054aecb35e.html,contact_page
+0560,Boxholm,kommun@boxholm.se,central,,http://www.boxholm.se/,pattern_match
+0560,Boxholm,barnochutbildning@boxholm.se,utbildning,Förvaltningskontor,http://www.boxholm.se/kommun-och-politik/om-boxholm/kontakta-oss/kontakta-barn--och-utbildningsforvaltningen,contact_page
+0560,Boxholm,kommunikation@boxholm.se,other,,http://www.boxholm.se/kommun-och-politik/om-boxholm/kontakta-oss/kontakta-kommunstyrelsekontoret,contact_page
+0560,Boxholm,vuxenmottagning@boxholm.se,other,Kontakta socialförvaltningen,http://www.boxholm.se/kommun-och-politik/om-boxholm/kontakta-oss/kontakta-socialforvaltningen,contact_page
+0561,Åtvidaberg,kontakt@atvidaberg.se,central,,http://www.atvidaberg.se/,pattern_match
+0561,Åtvidaberg,56rikard.spalle@atvidaberg.se,utbildning,"Förvaltningar, nämnder och utskott",http://www.atvidaberg.se/kommun-och-politik/kommunens-organisation/forvaltningar-namnder-och-utskott,contact_page
+0561,Åtvidaberg,26kristina.cleber@atvidaberg.se,utbildning,"Förvaltningar, nämnder och utskott",http://www.atvidaberg.se/kommun-och-politik/kommunens-organisation/forvaltningar-namnder-och-utskott,contact_page
+0561,Åtvidaberg,kommun@atvidaberg.se,central,,http://www.atvidaberg.se/kommun-och-politik/diarium-arkiv-och-sekretess,contact_page
+0561,Åtvidaberg,kompetenscenter@atvidaberg.se,vuxenutbildning,Kontakta utbildnings­förvaltningen,http://www.atvidaberg.se/kommun-och-politik/kontakt/kontakta-utbildningsforvaltningen,contact_page
+0561,Åtvidaberg,skolskjuts@atvidaberg.se,vuxenutbildning,Kontakta utbildnings­förvaltningen,http://www.atvidaberg.se/kommun-och-politik/kontakt/kontakta-utbildningsforvaltningen,contact_page
+0561,Åtvidaberg,03fredrik.gustafsson@atvidaberg.se,vuxenutbildning,Kontakta utbildnings­förvaltningen,http://www.atvidaberg.se/kommun-och-politik/kontakt/kontakta-utbildningsforvaltningen,contact_page
+0561,Åtvidaberg,51kompetenscenter@atvidaberg.se,vuxenutbildning,Kontakta utbildnings­förvaltningen,http://www.atvidaberg.se/kommun-och-politik/kontakt/kontakta-utbildningsforvaltningen,contact_page
+0561,Åtvidaberg,38malin.henriksson@atvidaberg.se,vuxenutbildning,Kontakta utbildnings­förvaltningen,http://www.atvidaberg.se/kommun-och-politik/kontakt/kontakta-utbildningsforvaltningen,contact_page
+0561,Åtvidaberg,servicebostad@atvidaberg.se,central,Kontakta vård- och omsorgs­förvaltningen,http://www.atvidaberg.se/kommun-och-politik/kontakt/kontakta-vard--och-omsorgsforvaltningen,contact_page
+0561,Åtvidaberg,32servicebostad@atvidaberg.se,central,Kontakta vård- och omsorgs­förvaltningen,http://www.atvidaberg.se/kommun-och-politik/kontakt/kontakta-vard--och-omsorgsforvaltningen,contact_page
+0562,Finspång,kommun@finspang.se,central,,http://www.finspang.se/,contact_page
+0563,Valdemarsvik,kommun@valdemarsvik.se,central,,http://www.valdemarsvik.se/,pattern_match
+0580,Linköping,kontakt@linkoping.se,central,,http://www.linkoping.se/,contact_page
+0580,Linköping,utbildningsforvaltningen@linkoping.se,other,,http://www.linkoping.se/kontakt/lamna-synpunkt-eller-klagomal,contact_page
+0580,Linköping,kommunstyrelsensdiarium@linkoping.se,other,,http://www.linkoping.se/kommun-och-politik/overklaga-beslut-rattssakerhet/kommunens-behandling-av-personuppgifter,contact_page
+0580,Linköping,kanslioverformyndarenheten@linkoping.se,other,Kontakta ansvarig nämnd,http://www.linkoping.se/kommun-och-politik/overklaga-beslut-rattssakerhet/kommunens-behandling-av-personuppgifter/behandling-av-personuppgifter-pa-verksamhetsstod-och-service,contact_page
+0581,Norrköping,kontakt@norrkoping.se,central,,http://www.norrkoping.se/,pattern_match
+0582,Söderköping,kommun@soderkoping.se,vuxenutbildning,,http://www.soderkoping.se/,pattern_match
+0582,Söderköping,anders.lennart.senestad@soderkoping.se,central,,http://www.soderkoping.se/kontakter/kommunens-revisorer/,contact_page
+0582,Söderköping,kommunstyrelsen@soderkoping.se,central,E-post till nämnder,http://www.soderkoping.se/kommun-politik/om-kommunen/e-diarium/,contact_page
+0583,Motala,motala.kommun@motala.se,central,,http://www.motala.se/,pattern_match
+0584,Vadstena,vadstena.kommun@vadstena.se,central,,http://www.vadstena.se/,pattern_match
+0584,Vadstena,kulturochutbildningsnamnden@vadstena.se,utbildning,Kultur- och utbildningsnämnd,https://www.vadstena.se/kommun-demokrati/politik-och-beslut/sa-styrs-vadstena/namnder/kultur-och-utbildningsnamnd/,contact_page
+0586,Mjölby,utbildning@mjolby.se,utbildning,,http://www.mjolby.se/kommun-och-politik/overklaga-beslut-rattssakerhet/allman-handling,contact_page
+0604,Aneby,info@aneby.se,utbildning,,http://www.aneby.se/,contact_page
+0604,Aneby,e-postinfo@aneby.se,utbildning,,http://www.aneby.se/,contact_page
+0642,Mullsjö,kommun@mullsjo.se,central,,http://www.mullsjo.se/,pattern_match
+0642,Mullsjö,infocenter@mullsjo.se,other,,http://www.mullsjo.se/ovrigt/kontakta-oss,contact_page
+0643,Habo,info@habokommun.se,central,,http://www.habokommun.se/,pattern_match
+0643,Habo,bun@habokommun.se,utbildning,Synpunkter barn- och utbildningsförvaltningen,http://www.habokommun.se/Barn--utbildning/synpunkter-barn--och-utbildningsforvaltningen/,contact_page
+0643,Habo,upphandling@habokommun.se,upphandling,,http://www.habokommun.se/Naringsliv--arbete/Upphandling-och-inkop/,contact_page
+0662,Gislaved,kommunen@gislaved.se,central,,http://www.gislaved.se/,contact_page
+0662,Gislaved,dataskyddsombud@gislaved.se,utbildning,Kommunledning och kommunstyrelseförvaltning,http://www.gislaved.se/sidfot/mer-kontaktuppgifter/kommunledning-och-kommunstyrelseforvaltning,contact_page
+0662,Gislaved,info@gislaved.se,utbildning,Kommunledning och kommunstyrelseförvaltning,http://www.gislaved.se/sidfot/mer-kontaktuppgifter/kommunledning-och-kommunstyrelseforvaltning,contact_page
+0665,Vaggeryd,info@vaggeryd.se,utbildning,Ny förvaltningschef för barn- och utbildningsförva...,http://www.vaggeryd.se/,contact_page
+0665,Vaggeryd,bun@vaggeryd.se,utbildning,"Barn- och utbildningsförvaltningen, organisation och kontaktuppgifter",http://www.vaggeryd.se/kommun-och-politik/kommunens-organisation/forvaltningar/barn--och-utbildningsforvaltningen.html,contact_page
+0665,Vaggeryd,fenix@vaggeryd.se,utbildning,"Barn- och utbildningsförvaltningen, organisation och kontaktuppgifter",http://www.vaggeryd.se/kommun-och-politik/kommunens-organisation/forvaltningar/barn--och-utbildningsforvaltningen.html,contact_page
+0665,Vaggeryd,kommunstyrelsen@vaggeryd.se,central,Förvaltningsledning och organisation,http://www.vaggeryd.se/kommun-och-politik/kommunens-organisation/forvaltningar/kommunledningskontoret.html,contact_page
+0665,Vaggeryd,upphandling@vaggeryd.se,upphandling,,http://www.vaggeryd.se/naringsliv-och-arbete/upphandling.html,contact_page
+0665,Vaggeryd,ekonomi@vaggeryd.se,upphandling,,http://www.vaggeryd.se/naringsliv-och-arbete/upphandling/e-faktura.html,contact_page
+0680,Jönköping,kontaktcenter@jonkoping.se,central,,http://www.jonkoping.se/,contact_page
+0680,Jönköping,kommunstyrelse@jonkoping.se,other,,http://www.jonkoping.se/kommun--politik/kommunens-organisation/kommunfullmaktige,contact_page
+0682,Nässjö,kommunstyrelsen@nassjo.se,central,,http://www.nassjo.se/,contact_page
+0682,Nässjö,kontaktcenter@nassjo.se,central,,http://www.nassjo.se/,contact_page
+0682,Nässjö,larcenter@nassjo.se,vuxenutbildning,,http://www.nassjo.se/barn-och-utbildning/vuxenutbildning/kontakt-komvux.html,contact_page
+0682,Nässjö,hermods.malin.sandberg@nassjo.se,vuxenutbildning,,http://www.nassjo.se/barn-och-utbildning/vuxenutbildning/kontakt-komvux.html,contact_page
+0682,Nässjö,upphandling@nassjo.se,upphandling,,http://www.nassjo.se/kommun-och-politik/kommun/kommunens-ekonomi/upphandling.html,contact_page
+0682,Nässjö,kenneth.johansson1@nassjo.se,utbildning,Barn- och utbildningsförvaltningen,http://www.nassjo.se/kommun-och-politik/kommun/kommunens-organisation.html,contact_page
+0682,Nässjö,johanssonkenneth.johansson1@nassjo.se,utbildning,Barn- och utbildningsförvaltningen,http://www.nassjo.se/kommun-och-politik/kommun/kommunens-organisation.html,contact_page
+0682,Nässjö,bukontoret@nassjo.se,utbildning,Nämnder,http://www.nassjo.se/kommun-och-politik/politik/sa-styrs-kommunen/namnder.html,contact_page
+0682,Nässjö,samhallsplaneringskontoret@nassjo.se,utbildning,Nämnder,http://www.nassjo.se/kommun-och-politik/politik/sa-styrs-kommunen/namnder.html,contact_page
+0682,Nässjö,tekniska@nassjo.se,utbildning,Nämnder,http://www.nassjo.se/kommun-och-politik/politik/sa-styrs-kommunen/namnder.html,contact_page
+0682,Nässjö,overformyndaren@nassjo.se,utbildning,Nämnder,http://www.nassjo.se/kommun-och-politik/politik/sa-styrs-kommunen/namnder.html,contact_page
+0682,Nässjö,nster.samhallsplaneringskontoret@nassjo.se,utbildning,Nämnder,http://www.nassjo.se/kommun-och-politik/politik/sa-styrs-kommunen/namnder.html,contact_page
+0684,Sävsjö,kommun@savsjo.se,utbildning,,http://www.savsjo.se/,contact_page
+0684,Sävsjö,kansli@savsjo.se,central,,http://www.savsjo.se/kommun-och-politik/politik-och-beslut/kontakta-politiker-.html,contact_page
+0684,Sävsjö,utbildning@savsjo.se,utbildning,Förvaltningar,http://www.savsjo.se/kommun-och-politik/forvaltningar-och-bolag/forvaltningar.html,contact_page
+0684,Sävsjö,miljobygg@savsjo.se,utbildning,Förvaltningar,http://www.savsjo.se/kommun-och-politik/forvaltningar-och-bolag/forvaltningar.html,contact_page
+0684,Sävsjö,tekniska@savsjo.se,utbildning,Förvaltningar,http://www.savsjo.se/kommun-och-politik/forvaltningar-och-bolag/forvaltningar.html,contact_page
+0684,Sävsjö,ekonomi@savsjo.se,upphandling,,http://www.savsjo.se/kommun-och-politik/ekonomi-och-upphandling/budget-och-verksamhetsplan.html,contact_page
+0684,Sävsjö,upphandling@savsjo.se,upphandling,,http://www.savsjo.se/kommun-och-politik/ekonomi-och-upphandling/upphandlingar-och-inkop/aktuella-upphandlingar.html,contact_page
+0684,Sävsjö,43jorgen.frej@savsjo.se,upphandling,,http://www.savsjo.se/kommun-och-politik/ekonomi-och-upphandling/upphandlingar-och-inkop/hoglandets-affarsstrategiska-rad.html,contact_page
+0684,Sävsjö,kristdemokraternafredrik.hakansson@savsjo.se,utbildning,Barn- och utbildningsnämnden,http://www.savsjo.se/kommun-och-politik/politik-och-beslut/namnder/barn--och-utbildningsnamnden.html,contact_page
+0686,Eksjö,kommun@eksjo.se,central,,http://www.eksjo.se/,pattern_match
+0686,Eksjö,upphandling@eksjo.se,upphandling,Förvaltningens organisation,http://www.eksjo.se/kommun-och-politik/organisationen/forvaltningens-organisation,contact_page
+0686,Eksjö,kommunikation@eksjo.se,other,Förvaltningens organisation,http://www.eksjo.se/kommun-och-politik/organisationen/forvaltningens-organisation,contact_page
+0686,Eksjö,barn-utbildningssektorn@eksjo.se,other,Förvaltningens organisation,http://www.eksjo.se/kommun-och-politik/organisationen/forvaltningens-organisation,contact_page
+0686,Eksjö,kommunfastigheter@eksjo.se,other,,http://www.eksjo.se/kommun-och-politik/organisationen/bolag-kommunagda,contact_page
+0686,Eksjö,kansli@eksjo.se,central,,http://www.eksjo.se/kommun-och-politik/politik-och-paverkan/kommunfullmaktige-namnder-utskott-styrelser-och-revision/kommunstyrelsen,contact_page
+0686,Eksjö,kommunrevisionen@eksjo.se,other,,http://www.eksjo.se/kommun-och-politik/politik-och-paverkan/kommunfullmaktige-namnder-utskott-styrelser-och-revision/kommunrevisionen,contact_page
+0687,Tranås,tranas.kommun@tranas.se,central,,http://www.tranas.se/,pattern_match
+0687,Tranås,kansli@tranas.se,central,Förvaltningar,http://www.tranas.se/forvaltning,contact_page
+0760,Uppvidinge,info@uppvidinge.se,central,,http://www.uppvidinge.se/,contact_page
+0760,Uppvidinge,upphandling@uppvidinge.se,upphandling,,http://www.uppvidinge.se/naringsliv-och-arbete/inkop-och-upphandling.html,contact_page
+0760,Uppvidinge,ks@uppvidinge.se,central,,http://www.uppvidinge.se/kommun-och-politik/overklaga-beslut-rattssakerhet/anmalan-om-allvarliga-missforhallanden.html,contact_page
+0760,Uppvidinge,bun@uppvidinge.se,utbildning,,http://www.uppvidinge.se/kommun-och-politik/kontakt-och-oppettider.html,contact_page
+0760,Uppvidinge,skolskjuts@uppvidinge.se,other,,http://www.uppvidinge.se/kommun-och-politik/kontakt-och-oppettider.html,contact_page
+0760,Uppvidinge,skoladmin@uppvidinge.se,other,,http://www.uppvidinge.se/forskola-och-skola/forskolor/junibacken.html,contact_page
+0761,Lessebo,kontaktcenter@lessebo.se,central,,http://www.lessebo.se/,pattern_match
+0761,Lessebo,bun@lessebo.se,utbildning,,http://www.lessebo.se/kontakta-oss.html,contact_page
+0761,Lessebo,kommunstyrelsen@lessebo.se,central,,http://www.lessebo.se/kontakta-oss.html,contact_page
+0761,Lessebo,kommunikation@lessebo.se,other,,http://www.lessebo.se/kontakta-oss.html,contact_page
+0761,Lessebo,upphandling@lessebo.se,upphandling,,http://www.lessebo.se/kontakta-oss.html,contact_page
+0763,Tingsryd,kommunen@tingsryd.se,vuxenutbildning,,https://tingsryd.se/,pattern_match
+0763,Tingsryd,info@tingsryd.se,central,Förvaltningar,https://tingsryd.se/kommun-och-politik/kontakt/,contact_page
+0763,Tingsryd,barn.utbildning@tingsryd.se,other,Förvaltningar,https://tingsryd.se/kommun-och-politik/kontakt/,contact_page
+0764,Alvesta,kommunen@alvesta.se,central,,http://www.alvesta.se/,pattern_match
+0765,Älmhult,info@almhult.se,central,,http://www.almhult.se/,pattern_match
+0765,Älmhult,ks@almhult.se,central,Förvaltningar,http://www.almhult.se/servicecenter/kontaktaoss.905.html,contact_page
+0765,Älmhult,utbildning@almhult.se,utbildning,Förvaltningar,http://www.almhult.se/servicecenter/kontaktaoss.905.html,contact_page
+0765,Älmhult,arkiv@almhult.se,other,Förvaltningar,http://www.almhult.se/servicecenter/kontaktaoss.905.html,contact_page
+0767,Markaryd,info@markaryd.se,central,,http://www.markaryd.se/,pattern_match
+0767,Markaryd,ks@markaryd.se,central,Kommunstyrelseförvaltningen,http://www.markaryd.se/ovrigt/kontakta-oss/kommunstyrelseforvaltningen.html,contact_page
+0780,Växjö,info@vaxjo.se,central,,https://www.vaxjo.se/,pattern_match
+0781,Ljungby,info@ljungby.se,central,,http://www.ljungby.se/,contact_page
+0781,Ljungby,kontaktcenter@ljungby.se,central,,http://www.ljungby.se/,contact_page
+0781,Ljungby,upphandling@ljungby.se,upphandling,,http://www.ljungby.se/jobb-och-foretagande/upphandling-och-inkop,contact_page
+0834,Torsås,info@torsas.se,central,,https://www.torsas.se/,pattern_match
+0834,Torsås,info.tbab@torsas.se,other,,https://www.torsas.se/kommun-och-politik/organisation/bolag/,contact_page
+0834,Torsås,info_bildning@torsas.se,other,Bildningsförvaltningen,https://www.torsas.se/kommun-och-politik/organisation/forvaltningar/bildningsforvaltningen/,contact_page
+0840,Mörbylånga,kommun@morbylanga.se,central,,http://www.morbylanga.se/,contact_page
+0840,Mörbylånga,servicecenter@morbylanga.se,central,,https://www.morbylanga.se/kontakta-oss/,contact_page
+0840,Mörbylånga,registrator@morbylanga.se,central,,https://www.morbylanga.se/kommun-och-politik/arkiv-och-allmanna-handlingar/diarium-och-allmanna-handlingar/,contact_page
+0860,Hultsfred,kommunen@hultsfred.se,central,,http://www.hultsfred.se/,pattern_match
+0861,Mönsterås,kommun@monsteras.se,central,,http://www.monsteras.se/,pattern_match
+0861,Mönsterås,agneta.hultman.svensson@monsteras.se,utbildning,Barn- och utbildningsnämnden,https://www.monsteras.se/kommun-och-politik/kommunens-organisation/namnder/barn-och-utbildningsnamnden/,contact_page
+0861,Mönsterås,victor.karlsson2@monsteras.se,utbildning,Barn- och utbildningsnämnden,https://www.monsteras.se/kommun-och-politik/kommunens-organisation/namnder/barn-och-utbildningsnamnden/,contact_page
+0861,Mönsterås,jakob.olsson.bergstrand@monsteras.se,utbildning,Barn- och utbildningsnämnden,https://www.monsteras.se/kommun-och-politik/kommunens-organisation/namnder/barn-och-utbildningsnamnden/,contact_page
+0861,Mönsterås,ef@monsteras.se,upphandling,,https://www.monsteras.se/jobb-och-foretagande/upphandling-och-inkop/leverantorsfaktura/,contact_page
+0861,Mönsterås,ekonomi.info@monsteras.se,upphandling,,https://www.monsteras.se/jobb-och-foretagande/upphandling-och-inkop/leverantorsfaktura/,contact_page
+0862,Emmaboda,kommunen@emmaboda.se,central,,https://www.emmaboda.se/,pattern_match
+0862,Emmaboda,kommun@emmaboda.se,central,Kontakta förvaltningar och politiker,https://www.emmaboda.se/kontakta-oss/kontakta-forvaltningar-och-politiker.html,contact_page
+0862,Emmaboda,info.energi@emmaboda.se,other,Kontakta förvaltningar och politiker,https://www.emmaboda.se/kontakta-oss/kontakta-forvaltningar-och-politiker.html,contact_page
+0880,Kalmar,kommun@kalmar.se,central,,https://kalmar.se/,pattern_match
+0881,Nybro,kommun@nybro.se,central,,http://www.nybro.se/,contact_page
+0881,Nybro,medborgarkontoret@nybro.se,other,,http://www.nybro.se/kontakter/medborgarkontor/,contact_page
+0882,Oskarshamn,servicecenter@oskarshamn.se,central,,http://www.oskarshamn.se/,contact_page
+0882,Oskarshamn,kommunen@oskarshamn.se,central,,http://www.oskarshamn.se/,contact_page
+0882,Oskarshamn,kommunstyrelsen@oskarshamn.se,central,,http://www.oskarshamn.se/mer-om-kommunen/politik-och-forvaltning/paverka/e-forslag/,contact_page
+0882,Oskarshamn,ekonomi@oskarshamn.se,upphandling,,http://www.oskarshamn.se/mer-om-kommunen/ekonomi-och-finans/upphandling-och-inkop/leverantorsfakturor/,contact_page
+0883,Västervik,kommun@vastervik.se,central,,http://www.vastervik.se/,pattern_match
+0883,Västervik,upphandlingsenheten@vastervik.se,upphandling,,http://www.vastervik.se/Jobb-och-foretagande/Upphandling-och-inkop/,contact_page
+0883,Västervik,e-handel@vastervik.se,upphandling,,http://www.vastervik.se/Jobb-och-foretagande/Upphandling-och-inkop/e-handel/,contact_page
+0883,Västervik,ekonomi.kundtjanst@vastervik.se,upphandling,,http://www.vastervik.se/Jobb-och-foretagande/Upphandling-och-inkop/e-handel/,contact_page
+0883,Västervik,naringsliv@vastervik.se,upphandling,,http://www.vastervik.se/Jobb-och-foretagande/Starta-driva-och-utveckla-foretag/pa-gang-for-naringslivet/upphandlingsskola-kommunen-som-kund--en-strategisk-mojlighet/,contact_page
+0884,Vimmerby,kommun@vimmerby.se,central,,http://www.vimmerby.se/,contact_page
+0884,Vimmerby,kontaktcenter@vimmerby.se,central,,http://www.vimmerby.se/kontakt,contact_page
+0884,Vimmerby,barn.utbildningsforvaltning@vimmerby.se,utbildning,Barn- och utbildningsförvaltningen,http://www.vimmerby.se/kommun-och-politik/kommunens-organisation/forvaltningar/barn--och-utbildningsforvaltningen,contact_page
+0885,Borgholm,kommun@borgholm.se,central,,http://www.borgholm.se/,contact_page
+0885,Borgholm,upphandling@borgholm.se,upphandling,,https://www.borgholm.se/upphandling-och-inkop/,contact_page
+0980,Gotland,registrator-bun@gotland.se,central,Kontaktuppgifter till nämnderna:,http://www.gotland.se/region-och-politik/diarium-allmanna-handlingar-och-arkiv/allmanna-handlingar,contact_page
+0980,Gotland,registrator-gvn@gotland.se,central,Kontaktuppgifter till nämnderna:,http://www.gotland.se/region-och-politik/diarium-allmanna-handlingar-och-arkiv/allmanna-handlingar,contact_page
+0980,Gotland,registrator-hsn@gotland.se,central,Kontaktuppgifter till nämnderna:,http://www.gotland.se/region-och-politik/diarium-allmanna-handlingar-och-arkiv/allmanna-handlingar,contact_page
+0980,Gotland,registrator-mbn@gotland.se,central,Kontaktuppgifter till nämnderna:,http://www.gotland.se/region-och-politik/diarium-allmanna-handlingar-och-arkiv/allmanna-handlingar,contact_page
+0980,Gotland,registrator-pan@gotland.se,central,Kontaktuppgifter till nämnderna:,http://www.gotland.se/region-och-politik/diarium-allmanna-handlingar-och-arkiv/allmanna-handlingar,contact_page
+0980,Gotland,registrator-rs@gotland.se,central,Kontaktuppgifter till nämnderna:,http://www.gotland.se/region-och-politik/diarium-allmanna-handlingar-och-arkiv/allmanna-handlingar,contact_page
+0980,Gotland,registrator-son@gotland.se,central,Kontaktuppgifter till nämnderna:,http://www.gotland.se/region-och-politik/diarium-allmanna-handlingar-och-arkiv/allmanna-handlingar,contact_page
+0980,Gotland,registrator-tn@gotland.se,central,Kontaktuppgifter till nämnderna:,http://www.gotland.se/region-och-politik/diarium-allmanna-handlingar-och-arkiv/allmanna-handlingar,contact_page
+0980,Gotland,registrator_valnamnden@gotland.se,central,Kontaktuppgifter till nämnderna:,http://www.gotland.se/region-och-politik/diarium-allmanna-handlingar-och-arkiv/allmanna-handlingar,contact_page
+0980,Gotland,registrator-ofn@gotland.se,central,Kontaktuppgifter till nämnderna:,http://www.gotland.se/region-och-politik/diarium-allmanna-handlingar-och-arkiv/allmanna-handlingar,contact_page
+1060,Olofström,medborgarcenter@olofstrom.se,other,,http://www.olofstrom.se/,contact_page
+1060,Olofström,ks@olofstrom.se,central,,http://www.olofstrom.se/medborgarcenter,contact_page
+1060,Olofström,ubn@olofstrom.se,utbildning,Utbildningsnämnden,http://www.olofstrom.se/kommun-och-politik/kommunens-organisation/namnder/utbildningsnamnden,contact_page
+1060,Olofström,fakturasupport@olofstrom.se,upphandling,,http://www.olofstrom.se/naringsliv-och-arbete/upphandling-och-inkop/hur-man-fakturerar-kommunen,contact_page
+1080,Karlskrona,kundservice@karlskrona.se,upphandling,,https://www.karlskrona.se/,pattern_match
+1080,Karlskrona,karlskrona.kommun@karlskrona.se,central,,https://www.karlskrona.se/kommun-och-politik/kontakt-och-dialog/,contact_page
+1080,Karlskrona,rekryteringshubb@karlskrona.se,upphandling,,https://www.karlskrona.se/naringsliv/rekrytering-och-kompetens/tjanster-for-arbetsgivare/socialt-foretagande-och-upphandlingar/,contact_page
+1080,Karlskrona,upphandlingsenheten@karlskrona.se,upphandling,,https://www.karlskrona.se/naringsliv/upphandling-och-ink%C3%B6p/att-lamna-anbud/,contact_page
+1080,Karlskrona,kommunikation@karlskrona.se,other,,https://www.karlskrona.se/kommun-och-politik/kontakt-och-dialog/sociala-medier/regler-i-vara-sociala-medier/,contact_page
+1080,Karlskrona,kommunledningsforvaltningen@karlskrona.se,other,Förvaltningsorganisation,https://www.karlskrona.se/kommun-och-politik/sa-fungerar-kommunen/organisation/,contact_page
+1081,Ronneby,kontakt@ronneby.se,central,,http://www.ronneby.se/,contact_page
+1081,Ronneby,sadiku0457-618526sabrije.sadiku@edu.ronneby.se,vuxenutbildning,,https://www.ronneby.se/sidowebbplatser/ronneby-vuxenutbildning/vara-utbildningar/sfi/kontakt.html,contact_page
+1081,Ronneby,vgren0457-618516henrik.lovgren@edu.ronneby.se,vuxenutbildning,,https://www.ronneby.se/sidowebbplatser/ronneby-vuxenutbildning/vara-utbildningar/anpassad-utbildning-for-vuxna/kontakt.html,contact_page
+1082,Karlshamn,info@karlshamn.se,central,,http://www.karlshamn.se/,pattern_match
+1082,Karlshamn,kommunikation@karlshamn.se,other,,https://www.karlshamn.se/kommun-och-politik/demokrati-och-insyn/press-och-media/,contact_page
+1082,Karlshamn,kommunstyrelsen@karlshamn.se,central,,http://www.karlshamn.se/kommun-och-politik/demokrati-och-insyn/dialog-och-synpunkter,contact_page
+1082,Karlshamn,info@waldorfkarlshamn.se,central,,https://www.karlshamn.se/kontaktkort/karlshamns-waldorfskola/,contact_page
+1083,Sölvesborg,info@solvesborg.se,central,,http://www.solvesborg.se/,contact_page
+1083,Sölvesborg,medborgarkontoret@solvesborg.se,other,,http://www.solvesborg.se/kommun-och-politik-/kommunens-organisation/forvaltningar/kommunledningsforvaltning/medborgarservice.html,contact_page
+1083,Sölvesborg,bun@solvesborg.se,utbildning,Barn- och utbildningsförvaltningen,http://www.solvesborg.se/kommun-och-politik-/kommunens-organisation/forvaltningar/barn--och-utbildningsforvaltningen.html,contact_page
+1214,Svalöv,kontakt@svalov.se,central,,http://www.svalov.se/,pattern_match
+1214,Svalöv,kommunstyrelsen@svalov.se,central,,http://www.svalov.se/om-webbplatsen/kontakta-oss,contact_page
+1214,Svalöv,info@svalov.se,central,,http://www.svalov.se/om-webbplatsen/kontakta-oss,contact_page
+1214,Svalöv,btkemi-info@svalov.se,other,,http://www.svalov.se/om-webbplatsen/kontakta-oss,contact_page
+1230,Staffanstorp,kommunen@staffanstorp.se,central,,http://www.staffanstorp.se/,pattern_match
+1231,Burlöv,burlovs.kommun@burlov.se,central,,https://burlov.se/,pattern_match
+1231,Burlöv,tillburlovs.kommun@burlov.se,central,,https://burlov.se/hjalpmeny/kontaktaoss.4.3df4b8a31583154e8e7ae2ed.html,contact_page
+1233,Vellinge,vellinge.kommun@vellinge.se,central,,http://www.vellinge.se/,contact_page
+1256,Östra Göinge,kontakt@ostragoinge.se,central,,http://www.ostragoinge.se/,contact_page
+1256,Östra Göinge,kommunikation@ostragoinge.se,other,,http://www.ostragoinge.se/ovrigt/kontakt-och-oppettider,contact_page
+1256,Östra Göinge,upphandling@ostragoinge.se,upphandling,,http://www.ostragoinge.se/jobb-och-foretagande/inkop-och-upphandling/fakturera-kommunen,contact_page
+1256,Östra Göinge,pscentralenupphandling@ostragoinge.se,upphandling,,http://www.ostragoinge.se/jobb-och-foretagande/inkop-och-upphandling,contact_page
+1257,Örkelljunga,kommunkontor@orkelljunga.se,central,,http://www.orkelljunga.se/,contact_page
+1260,Bjuv,info@bjuv.se,central,,http://www.bjuv.se/,contact_page
+1261,Kävlinge,kontakt@kavlinge.se,central,,http://www.kavlinge.se/,pattern_match
+1261,Kävlinge,kommunikation@kavlinge.se,other,,http://www.kavlinge.se/kommun-och-politik/kommunfakta/kontakta-kavlinge-kommun,contact_page
+1261,Kävlinge,kommunstyrelsen@kavlinge.se,central,,http://www.kavlinge.se/kommun-och-politik/kommunfakta/kontakta-kavlinge-kommun,contact_page
+1261,Kävlinge,utbildningsnamnden@kavlinge.se,utbildning,,http://www.kavlinge.se/kommun-och-politik/kommunfakta/kontakta-kavlinge-kommun,contact_page
+1262,Lomma,info@lomma.se,central,,https://lomma.se/,contact_page
+1262,Lomma,ehandel@lomma.se,upphandling,,https://lomma.se/jobbochforetagande/upphandlingochinkop/fakturerakommunen.1243.html,contact_page
+1263,Svedala,kommunen@svedala.se,central,,http://www.svedala.se/,pattern_match
+1263,Svedala,naringsliv@svedala.se,upphandling,,http://www.svedala.se/arbeta/naringsliv/inkop-och-upphandling-foretag/,contact_page
+1263,Svedala,fakturacentralen@svedala.se,upphandling,,http://www.svedala.se/arbeta/upphandling-och-inkop/e-faktura-leverantor/,contact_page
+1263,Svedala,kommunikation@svedala.se,other,,http://www.svedala.se/paverka/kommun/press--och-kommunikation/pressrum/,contact_page
+1263,Svedala,registrator.ks@svedala.se,central,,http://www.svedala.se/paverka/kommun/kommunens-organisation/kommunstyrelsen/,contact_page
+1264,Skurup,kontakt@skurup.se,central,,http://www.skurup.se/,contact_page
+1264,Skurup,kansli@skurup.se,central,,http://www.skurup.se/jobb-och-foretagande/upphandling-och-inkop/upphandlingar,contact_page
+1264,Skurup,upphandling@skurup.se,upphandling,,http://www.skurup.se/jobb-och-foretagande/upphandling-och-inkop/upphandlingar,contact_page
+1265,Sjöbo,kommun@sjobo.se,central,,http://www.sjobo.se/,contact_page
+1265,Sjöbo,ekonomisupport@sjobo.se,upphandling,,http://www.sjobo.se/naringsliv-och-foretag/upphandling-och-inkop/skicka-faktura-till-sjobo-kommun.html,contact_page
+1266,Hörby,kommunen@horby.se,central,,https://www.horby.se/,contact_page
+1266,Hörby,ekonomi@horby.se,upphandling,,https://www.horby.se/naringsliv-och-arbete/inkop-och-upphandling/,contact_page
+1266,Hörby,upphandling@horby.se,upphandling,,https://www.horby.se/naringsliv-och-arbete/inkop-och-upphandling/,contact_page
+1266,Hörby,arkivet@horby.se,other,,https://www.horby.se/kommun-och-politik/arenden-och-handlingar/,contact_page
+1267,Höör,kommun@hoor.se,central,,http://www.hoor.se/,contact_page
+1267,Höör,barn-utbildningsnamnd@hoor.se,utbildning,Kontaktuppgifter till verksamheter och nämnder,https://www.hoor.se/kommunen/kontakt/kontaktuppgifter-till-verksamheter-och-namnder/,contact_page
+1267,Höör,socialnamnd@hoor.se,utbildning,Kontaktuppgifter till verksamheter och nämnder,https://www.hoor.se/kommunen/kontakt/kontaktuppgifter-till-verksamheter-och-namnder/,contact_page
+1267,Höör,kaf@hoor.se,utbildning,Kontaktuppgifter till verksamheter och nämnder,https://www.hoor.se/kommunen/kontakt/kontaktuppgifter-till-verksamheter-och-namnder/,contact_page
+1267,Höör,tillstands-tillsynsnamnd@hoor.se,utbildning,Kontaktuppgifter till verksamheter och nämnder,https://www.hoor.se/kommunen/kontakt/kontaktuppgifter-till-verksamheter-och-namnder/,contact_page
+1267,Höör,samhallsbyggnad@hoor.se,utbildning,Kontaktuppgifter till verksamheter och nämnder,https://www.hoor.se/kommunen/kontakt/kontaktuppgifter-till-verksamheter-och-namnder/,contact_page
+1267,Höör,rtjskanemitt@hoor.se,utbildning,Kontaktuppgifter till verksamheter och nämnder,https://www.hoor.se/kommunen/kontakt/kontaktuppgifter-till-verksamheter-och-namnder/,contact_page
+1270,Tomelilla,kommun@tomelilla.se,central,,http://www.tomelilla.se/,pattern_match
+1272,Bromölla,kommunstyrelsen@bromolla.se,central,,https://www.bromolla.se/,contact_page
+1272,Bromölla,komvux@bromolla.se,vuxenutbildning,,https://www.bromolla.se/utbildning-barnomsorg/vuxenutbildning/kontakt2/,contact_page
+1272,Bromölla,malin..rubin@bromolla.se,vuxenutbildning,,https://www.bromolla.se/utbildning-barnomsorg/vuxenutbildning/kontakt2/,contact_page
+1272,Bromölla,upphandling@bromolla.se,upphandling,,https://www.bromolla.se/jobb-foretagande/foretagsservice/upphandling-och-inkop/,contact_page
+1273,Osby,kommun@osby.se,central,,http://www.osby.se/,contact_page
+1273,Osby,arbeteochvalfard@osby.se,utbildning,Kontakta förvaltningarna,http://www.osby.se/kontakt/kontakta-forvaltningarna.html,contact_page
+1273,Osby,barnochutbildning@osby.se,utbildning,Kontakta förvaltningarna,http://www.osby.se/kontakt/kontakta-forvaltningarna.html,contact_page
+1273,Osby,kansliet@osby.se,utbildning,Kontakta förvaltningarna,http://www.osby.se/kontakt/kontakta-forvaltningarna.html,contact_page
+1273,Osby,hon@osby.se,utbildning,Kontakta förvaltningarna,http://www.osby.se/kontakt/kontakta-forvaltningarna.html,contact_page
+1273,Osby,samhallsbyggnad@osby.se,utbildning,Kontakta förvaltningarna,http://www.osby.se/kontakt/kontakta-forvaltningarna.html,contact_page
+1273,Osby,miljobygg@osby.se,utbildning,Kontakta förvaltningarna,http://www.osby.se/kontakt/kontakta-forvaltningarna.html,contact_page
+1275,Perstorp,kommunhuset@perstorp.se,central,,http://www.perstorp.se/,pattern_match
+1276,Klippan,kommun@klippan.se,central,,http://www.klippan.se/,contact_page
+1277,Åstorp,kommun@astorp.se,utbildning,,http://www.astorp.se/,pattern_match
+1278,Båstad,bastads.kommun@bastad.se,central,,http://www.bastad.se/,contact_page
+1278,Båstad,ehandel@bastad.se,upphandling,,http://www.bastad.se/jobb-och-foretagande/upphandling-och-inkop/fakturera-kommunen.html,contact_page
+1280,Malmö,malmostad@malmo.se,central,,http://www.malmo.se/,pattern_match
+1281,Lund,lunds.kommun@lund.se,central,,https://www.lund.se/,contact_page
+1281,Lund,lund.kommun@lund.se,central,,https://www.lund.se/kontakt/faktura-fran-lunds-kommun,contact_page
+1281,Lund,kommunikation@lund.se,other,,https://www.lund.se/kontakt/press-och-informationsmaterial/lund-i-sociala-medier,contact_page
+1282,Landskrona,kontaktcenter@landskrona.se,central,,http://www.landskrona.se/,contact_page
+1283,Helsingborg,kontaktcenter@helsingborg.se,central,,http://www.helsingborg.se/,pattern_match
+1284,Höganäs,kommunen@hoganas.se,central,,http://www.hoganas.se/,pattern_match
+1284,Höganäs,kommunkansli@hoganas.se,upphandling,,http://www.hoganas.se/foretagande--naringsliv/etablera-och-utveckla/upphandling.html,contact_page
+1285,Eslöv,kommunen@eslov.se,central,,http://www.eslov.se/,pattern_match
+1286,Ystad,kommunen@ystad.se,central,,https://www.ystad.se/,contact_page
+1287,Trelleborg,kontaktcenter@trelleborg.se,central,,http://www.trelleborg.se/,contact_page
+1287,Trelleborg,kansli@trelleborg.se,central,Anslag/bevis: Socialnämnden 2026-05-12 omedelbar justering paragraf 67,https://www.trelleborg.se/kommun-politik/beslut-insyn-och-rattssakerhet/anslagstavla/,contact_page
+1290,Kristianstad,kommun@kristianstad.se,central,,http://www.kristianstad.se/,pattern_match
+1290,Kristianstad,e-faktura@kristianstad.se,upphandling,,http://www.kristianstad.se/jobbochforetagande/upphandlingochinkop/hurmanfakturerarkommunen.1031.html,contact_page
+1290,Kristianstad,buf@kristianstad.se,utbildning,,http://www.kristianstad.se/kommunochpolitik/overklagabeslutrattssakerhet/personuppgifter/personuppgifteriskolan.4197.html,contact_page
+1291,Simrishamn,kontakt@simrishamn.se,central,,http://www.simrishamn.se/,contact_page
+1291,Simrishamn,naringsliv@simrishamn.se,upphandling,,http://www.simrishamn.se/naringsliv-och-upphandling,contact_page
+1291,Simrishamn,upphandling@simrishamn.se,upphandling,,http://www.simrishamn.se/naringsliv-och-upphandling,contact_page
+1291,Simrishamn,ekr@simrishamn.se,upphandling,,http://www.simrishamn.se/naringsliv-och-upphandling/radgivning-stod-och-finansiering,contact_page
+1291,Simrishamn,ekonomi@simrishamn.se,upphandling,,http://www.simrishamn.se/naringsliv-och-upphandling/upphandling/e-faktura,contact_page
+1293,Hässleholm,kontaktcenter@hassleholm.se,central,,http://www.hassleholm.se/,pattern_match
+1293,Hässleholm,kommunen@hassleholm.se,central,,https://www.hassleholm.se/kommun-och-politik/kontakt/kontaktcenter,contact_page
+1293,Hässleholm,stadsbyggnad@hassleholm.se,utbildning,Barn- och utbildningsförvaltningen,https://www.hassleholm.se/kommun-och-politik/kontakt/besoksadresser-besokstider-och-postadresser,contact_page
+1293,Hässleholm,miljo@hassleholm.se,utbildning,Barn- och utbildningsförvaltningen,https://www.hassleholm.se/kommun-och-politik/kontakt/besoksadresser-besokstider-och-postadresser,contact_page
+1293,Hässleholm,lon@hassleholm.se,utbildning,Barn- och utbildningsförvaltningen,https://www.hassleholm.se/kommun-och-politik/kontakt/besoksadresser-besokstider-och-postadresser,contact_page
+1293,Hässleholm,65lon@hassleholm.se,utbildning,Barn- och utbildningsförvaltningen,https://www.hassleholm.se/kommun-och-politik/kontakt/besoksadresser-besokstider-och-postadresser,contact_page
+1293,Hässleholm,kommunikation@hassleholm.se,other,,https://www.hassleholm.se/kommun-och-politik/kontakt/press--och-informationsmaterial-,contact_page
+1315,Hylte,kommunen@hylte.se,central,,http://www.hylte.se/,pattern_match
+1315,Hylte,kommunikation@hylte.se,utbildning,Kommunledningsförvaltningen,http://www.hylte.se/kommun-och-politik/press--och-informationsmaterial,contact_page
+1315,Hylte,94kristin.engholm@hylte.se,utbildning,Kommunledningsförvaltningen,http://www.hylte.se/kommun-och-politik/press--och-informationsmaterial,contact_page
+1315,Hylte,57rebecka.merkel@hylte.se,utbildning,Kommunledningsförvaltningen,http://www.hylte.se/kommun-och-politik/press--och-informationsmaterial,contact_page
+1315,Hylte,37philip.norrman@hylte.se,utbildning,Kommunledningsförvaltningen,http://www.hylte.se/kommun-och-politik/press--och-informationsmaterial,contact_page
+1315,Hylte,mndsekreterare072-3967036rebecca.lorentzon@hylte.se,utbildning,Kommunledningsförvaltningen,http://www.hylte.se/kommun-och-politik/press--och-informationsmaterial,contact_page
+1380,Halmstad,direkt@halmstad.se,utbildning,,http://www.halmstad.se/,pattern_match
+1381,Laholm,medborgarservice@laholm.se,central,,http://www.laholm.se/,contact_page
+1381,Laholm,kommun@laholm.se,central,,http://www.laholm.se/,contact_page
+1381,Laholm,utbildningsnamnden@laholm.se,utbildning,,http://www.laholm.se/forskola-skola-och-utbildning/grundskola-och-fritidshem/forandrad-skolorganisation,contact_page
+1381,Laholm,upphandlingsenheten@laholm.se,upphandling,,http://www.laholm.se/jobb-och-foretagande/upphandling-och-inkop/upphandlingar,contact_page
+1381,Laholm,portalen.ekonomi@laholm.se,upphandling,,http://www.laholm.se/jobb-och-foretagande/upphandling-och-inkop/hur-du-fakturerar-kommunen,contact_page
+1381,Laholm,arkiv@laholm.se,other,,http://www.laholm.se/kommun-och-politik/diarium-arkiv-och-sekretess,contact_page
+1381,Laholm,kommunstyrelsen@laholm.se,utbildning,Förvaltningar och nämnder,http://www.laholm.se/kommun-och-politik/kommunens-organisation/forvaltningar-och-namnder,contact_page
+1381,Laholm,samhallsbyggnadsnamnden@laholm.se,utbildning,Förvaltningar och nämnder,http://www.laholm.se/kommun-och-politik/kommunens-organisation/forvaltningar-och-namnder,contact_page
+1381,Laholm,socialnamnden@laholm.se,utbildning,Förvaltningar och nämnder,http://www.laholm.se/kommun-och-politik/kommunens-organisation/forvaltningar-och-namnder,contact_page
+1384,Kungsbacka,info@kungsbacka.se,central,,http://www.kungsbacka.se/,contact_page
+1384,Kungsbacka,kommunarkivet@kungsbacka.se,central,,http://www.kungsbacka.se/kommun-och-politik/diarium-och-arkiv/hitta-information-i-diariet-och-arkivet,contact_page
+1401,Härryda,kommun@harryda.se,central,,http://www.harryda.se/,pattern_match
+1401,Härryda,fakturacentralen@harryda.se,upphandling,,http://www.harryda.se/foretagande/upphandlingochinkop/fakturerakommunen.4.1439a0061817fd1d9403f5c.html,contact_page
+1401,Härryda,utbildning@harryda.se,utbildning,Förvaltningsledning och administration,http://www.harryda.se/kommunochpolitik/kommunensorganisation/forvaltning/forvaltningsledningochadministration.4.1439a0061817fd1d9405f78.html,contact_page
+1401,Härryda,kommunarkiv@harryda.se,central,,http://www.harryda.se/kommunochpolitik/diariumocharkiv/arkiv.4.1439a0061817fd1d9405600.html,contact_page
+1407,Öckerö,kommun@ockero.se,central,,http://www.ockero.se/var-service/kontakta-oss,contact_page
+1415,Stenungsund,kommun@stenungsund.se,central,,https://www.stenungsund.se/kontakta-oss/kontaktcenter,contact_page
+1419,Tjörn,kommun@tjorn.se,central,,https://tjorn.se/,contact_page
+1419,Tjörn,britt.notsjo.ahlstrand@tjorn.se,utbildning,Politiker i Barn- och utbildningsnämnden,https://tjorn.se/kommun-och-politik/kommunens-organisation/namnder-och-forvaltningar/politiker-i-barn--och-utbildningsnamnden,contact_page
+1421,Orust,kommun@orust.se,central,,http://www.orust.se/,pattern_match
+1427,Sotenäs,info@sotenas.se,central,,http://www.sotenas.se/,pattern_match
+1427,Sotenäs,registrator.kommun@sotenas.se,central,Miljö- och byggnämndens arbetsutskotts kallelse 21 maj,http://www.sotenas.se/kommun--politik/politik-och-demokrati/kallelser-och-protokoll/kallelse--protokoll/2026-05-13-miljo--och-byggnamndens-arbetsutskotts-kallelse-21-maj,contact_page
+1430,Munkedal,kommun@munkedal.se,central,,http://www.munkedal.se/,contact_page
+1430,Munkedal,ks@munkedal.se,central,,http://www.munkedal.se/sidor/kontakta-oss/kontakta-munkedals-kommun,contact_page
+1430,Munkedal,upphandling@munkedal.se,upphandling,,http://www.munkedal.se/naringsliv-och-arbete/upphandling-och-inkop,contact_page
+1435,Tanum,kommun@tanum.se,central,,https://www.tanum.se/,contact_page
+1435,Tanum,ks.diarium@tanum.se,central,,https://www.tanum.se/kommunpolitik/kontaktaoss/kommunalabolag.4.18a4009114a72ab6c7f1575.html,contact_page
+1435,Tanum,inkop@tanum.se,upphandling,,https://www.tanum.se/naringslivarbete/upphandlingochinkop.4.7664b4813898b7df9844fb9.html,contact_page
+1435,Tanum,bun.diarium@tanum.se,central,,https://www.tanum.se/kommunpolitik/diariumocharkiv.4.58e914a013a0d49788a47c.html,contact_page
+1435,Tanum,mbn.diarium@tanum.se,central,,https://www.tanum.se/kommunpolitik/diariumocharkiv.4.58e914a013a0d49788a47c.html,contact_page
+1435,Tanum,on.diarium@tanum.se,central,,https://www.tanum.se/kommunpolitik/diariumocharkiv.4.58e914a013a0d49788a47c.html,contact_page
+1435,Tanum,rev.diarium@tanum.se,central,,https://www.tanum.se/kommunpolitik/diariumocharkiv.4.58e914a013a0d49788a47c.html,contact_page
+1435,Tanum,tn.diarium@tanum.se,central,,https://www.tanum.se/kommunpolitik/diariumocharkiv.4.58e914a013a0d49788a47c.html,contact_page
+1438,Dals-Ed,kommun@dalsed.se,central,,http://www.dalsed.se/,pattern_match
+1438,Dals-Ed,fokusnamnden@dalsed.se,utbildning,Synpunkter och klagomål inom barn- och utbildningsnämnden,http://www.dalsed.se/forskola-skola-och-utbildning/allman-information/synpunkter-och-klagomal-inom-barn-och-utbildningsnamnden/,contact_page
+1438,Dals-Ed,bun@dalsed.se,utbildning,Synpunkter och klagomål inom barn- och utbildningsnämnden,http://www.dalsed.se/forskola-skola-och-utbildning/allman-information/synpunkter-och-klagomal-inom-barn-och-utbildningsnamnden/,contact_page
+1438,Dals-Ed,arkiv@dalsed.se,other,,http://www.dalsed.se/kommun-och-politik/forvaltningar/kommunstyrelseforvaltningen/kanslienheten/administration-och-informationshantering/,contact_page
+1438,Dals-Ed,kommunstyrelsen@dalsed.se,central,,http://www.dalsed.se/kommun-och-politik/forvaltningar/kommunstyrelseforvaltningen/kanslienheten/administration-och-informationshantering/,contact_page
+1438,Dals-Ed,kommunikation@dalsed.se,other,,http://www.dalsed.se/kommun-och-politik/forvaltningar/kommunstyrelseforvaltningen/kanslienheten/kommunikation-och-utveckling/,contact_page
+1439,Färgelanda,kommun@fargelanda.se,central,,http://www.fargelanda.se/,pattern_match
+1439,Färgelanda,skolkontoret@fargelanda.se,other,,http://www.fargelanda.se/skola-och-barnomsorg/grundskola/odeborg-skola/kontakt/,contact_page
+1440,Ale,kommun@ale.se,central,,http://www.ale.se/,contact_page
+1440,Ale,kansli@ale.se,central,,http://www.ale.se/om-kommunen/kommunens-organisation/kommunfullmaktige.html,contact_page
+1440,Ale,kommunarkivet@ale.se,central,,http://www.ale.se/om-kommunen/diarium-och-arkiv.html,contact_page
+1441,Lerum,kommun@lerum.se,central,,http://www.lerum.se/,pattern_match
+1441,Lerum,kommunarkivet@lerum.se,central,,http://www.lerum.se/kommun-och-politik/diarium-arkiv-och-sekretess,contact_page
+1442,Vårgårda,kommunen@vargarda.se,central,,https://www.vargarda.se/,contact_page
+1443,Bollebygd,kommunen@bollebygd.se,central,,https://www.bollebygd.se/,contact_page
+1443,Bollebygd,06daniel.aronsson@bollebygd.se,upphandling,,https://www.bollebygd.se/naringslivocharbete/upphandlingochinkop.4.4b88096f14fb4d9accd2b0d0.html,contact_page
+1443,Bollebygd,ekonomi@bollebygd.se,upphandling,,https://www.bollebygd.se/naringslivocharbete/upphandlingochinkop/fakturaochefaktura.106.20bfba7e17a31ff03a5e2f84.html,contact_page
+1444,Grästorp,kommun@grastorp.se,central,,http://www.grastorp.se/,contact_page
+1444,Grästorp,kansli@grastorp.se,central,,http://www.grastorp.se/kommun-och-politik/politisk-organisation/for-fortroendevalda.html,contact_page
+1444,Grästorp,medborgarkontoret@grastorp.se,other,,http://www.grastorp.se/kommun-och-politik/kontakta-kommunen.html,contact_page
+1445,Essunga,kommun@essunga.se,central,,http://www.essunga.se/,contact_page
+1445,Essunga,agneta.andersson3@essunga.se,utbildning,Bygg- och miljönämnden,http://www.essunga.se/kommun--politik/kommunens-organisation.html,contact_page
+1446,Karlsborg,kommun@karlsborg.se,central,,https://www.karlsborg.se/,pattern_match
+1446,Karlsborg,boukontoret@karlsborg.se,utbildning,Om barn- och utbildningsförvaltningen,https://www.karlsborg.se/utbildning--barnomsorg/om-barn--och-utbildningsforvaltningen/,contact_page
+1446,Karlsborg,kristina.edvardsson.bjork@karlsborg.se,vuxenutbildning,,https://www.karlsborg.se/utbildning--barnomsorg/vuxenutbildning/grundlaggande-vuxenutbildning/kontakt/,contact_page
+1447,Gullspång,info@gullspang.se,central,,https://gullspang.se/,pattern_match
+1447,Gullspång,skoladmin@gullspang.se,other,,https://gullspang.se/forskola-skola-och-utbildning/kontakta-oss,contact_page
+1447,Gullspång,kommun@gullspang.se,central,,https://gullspang.se/kontakt-felanmalan-och-e-forslag/kontakt-och-oppettider,contact_page
+1447,Gullspång,kommunkansliinfo@gullspang.se,other,,https://gullspang.se/kontakt-felanmalan-och-e-forslag/kontakt-och-oppettider,contact_page
+1447,Gullspång,48johan.hellman@gullspang.se,upphandling,,https://gullspang.se/jobb-och-foretagande/upphandling-och-inkop/att-lamna-anbud,contact_page
+1452,Tranemo,kommun@tranemo.se,central,,https://www.tranemo.se/,contact_page
+1460,Bengtsfors,kommun@bengtsfors.se,central,,http://www.bengtsfors.se/,contact_page
+1460,Bengtsfors,diarium.kommunstyrelsen@bengtsfors.se,other,,http://www.bengtsfors.se/kommun-och-politik/sa-styrs-kommunen/webbdiarium,contact_page
+1461,Mellerud,kommunen@mellerud.se,central,,https://www.mellerud.se/,pattern_match
+1461,Mellerud,kulturutbildnamnd@mellerud.se,utbildning,Kultur- och Utbildningsnämnden,https://www.mellerud.se/kommun-och-politik/demokrati-och-politik/politisk-organisation/namnder/kultur-och-utbildningsnamnden/,contact_page
+1461,Mellerud,karoline.larsen.andersson@mellerud.se,vuxenutbildning,,https://www.mellerud.se/skola-och-barnomsorg/vuxenutbildning/kontakta-oss/,contact_page
+1461,Mellerud,gledarekaroline.larsen.andersson@mellerud.se,vuxenutbildning,,https://www.mellerud.se/skola-och-barnomsorg/vuxenutbildning/kontakta-oss/,contact_page
+1462,Lilla Edet,upphandling@lillaedet.se,upphandling,,http://www.lillaedet.se/naringsliv-och-arbete/upphandling-och-inkop/pagaende-upphandlingar,contact_page
+1462,Lilla Edet,kommunen@lillaedet.se,central,,http://www.lillaedet.se/4.3384d1de17ce9d9b02c70d21.html,contact_page
+1462,Lilla Edet,medborgarservice@lillaedet.se,central,,http://www.lillaedet.se/4.3384d1de17ce9d9b02c70d21.html,contact_page
+1463,Mark,kontaktcenter@mark.se,central,,http://www.mark.se/,contact_page
+1463,Mark,ks@mark.se,central,"Anslag från kommunalförbund, samordningsförbund och överförmyndarnämnden",http://www.mark.se/kommun-och-politik/overklaga-beslut-och-rattssakerhet/digital-anslagstavla,contact_page
+1465,Svenljunga,kommun@svenljunga.se,central,,https://www.svenljunga.se/,contact_page
+1465,Svenljunga,kansliet@svenljunga.se,other,,https://www.svenljunga.se/ovrigt/kontakta-oss,contact_page
+1470,Vara,kommun@vara.se,utbildning,,https://www.vara.se/,pattern_match
+1471,Götene,gotene.kommun@gotene.se,central,,https://www.gotene.se/,contact_page
+1471,Götene,gotene.kommun@gotene.sewww.gotene.se,central,,https://www.gotene.se/,contact_page
+1471,Götene,kommunstyrelsen@gotene.se,central,,https://www.gotene.se/kommunochpolitik/omkommunen/kontaktaoss.6.html,contact_page
+1471,Götene,utbildningkulturfritid@gotene.se,other,,https://www.gotene.se/kommunochpolitik/omkommunen/kontaktaoss.6.html,contact_page
+1472,Tibro,kommun@tibro.se,central,,http://www.tibro.se/,pattern_match
+1472,Tibro,bun@tibro.se,utbildning,,http://www.tibro.se/kommun-och-politik/paverkan-insyn-och-delaktighet/Offentlighet-och-sekretess/,contact_page
+1472,Tibro,kommunstyrelsen@tibro.se,central,,http://www.tibro.se/kommun-och-politik/paverkan-insyn-och-delaktighet/Allmanna-val/valet-2026/,contact_page
+1473,Töreboda,kommunen@toreboda.se,central,,https://toreboda.se/,pattern_match
+1473,Töreboda,itsupport@toreboda.se,other,,https://toreboda.se/kommun-och-politik/kommunens-organisation/kommunens-verksamheter/it-mtg,contact_page
+1480,Göteborg,inkopochupphandling@ink.goteborg.se,upphandling,Kontakta inköps- och upphandlingsförvaltningen,http://www.goteborg.se/wps/portal?uri=gbglnk%3a20251113145436983,pattern_match
+1480,Göteborg,goteborg@goteborg.se,central,,http://www.goteborg.se/wps/portal/kontakta-oss/kontakta-goteborgs-stad,contact_page
+1481,Mölndal,kontakt@molndal.se,central,,http://www.molndal.se/,pattern_match
+1481,Mölndal,mpab@mpab.molndal.se,central,,http://www.molndal.se/kommun-och-politik/insyn-och-paverkan/diarium,contact_page
+1481,Mölndal,efakturainfo@molndal.se,upphandling,,http://www.molndal.se/jobb-och-naringsliv/naringsliv/upphandling-och-inkop/fakturera-kommunen,contact_page
+1482,Kungälv,naringsliv@kungalv.se,upphandling,,https://www.kungalv.se/foretagande/nyhetsbrev-naringsliv2/nyhetsbrev-naringsliv-december-2023/informationskvall-om-offentliga-upphandlingar/,pattern_match
+1482,Kungälv,kommun@kungalv.se,central,,https://www.kungalv.se/kommun--politik/organisation/vara-kommunalrad/,contact_page
+1482,Kungälv,kontaktstod@kungalv.se,other,,https://www.kungalv.se/omsorg--hjalp/funktionsnedsattning/kontaktperson/,contact_page
+1482,Kungälv,upphandling@kungalv.se,upphandling,,https://www.kungalv.se/foretagande/upphandling/,contact_page
+1482,Kungälv,upphandlingsenhetenupphandling@kungalv.se,upphandling,,https://www.kungalv.se/foretagande/upphandling/ny-e-tjanst/,contact_page
+1484,Lysekil,kommun@lysekil.se,vuxenutbildning,,http://www.lysekil.se/,contact_page
+1484,Lysekil,kommunikation@lysekil.se,other,,http://www.lysekil.se/kommun-och-politik/kommunens-organisation/kontaktcenter,contact_page
+1485,Uddevalla,kommunen@uddevalla.se,central,,https://www.uddevalla.se/,contact_page
+1486,Strömstad,kommun@stromstad.se,central,,http://www.stromstad.se/,contact_page
+1486,Strömstad,bun@stromstad.se,utbildning,Barn- och utbildningsnämnden,http://www.stromstad.se/kommunochpolitik/motenhandlingarochprotokoll/barnochutbildningsnamnden.4.3fed02301498a2c0998bcea.html,contact_page
+1486,Strömstad,2bun@stromstad.se,utbildning,Barn- och utbildningsnämnden,http://www.stromstad.se/kommunochpolitik/motenhandlingarochprotokoll/barnochutbildningsnamnden.4.3fed02301498a2c0998bcea.html,contact_page
+1486,Strömstad,ks@stromstad.se,central,,http://www.stromstad.se/kommunochpolitik/kommunensorganisation/kommunfullmaktige.4.b5400fe1453b28b6b71e593.html,contact_page
+1487,Vänersborg,kommun@vanersborg.se,central,,http://www.vanersborg.se/,contact_page
+1487,Vänersborg,barnutbildning@vanersborg.se,utbildning,Telefonnummer och e-post till förvaltningar,http://www.vanersborg.se/kommun-och-politik/kontakta-kommunen,contact_page
+1487,Vänersborg,kulturfritid@vanersborg.se,utbildning,Telefonnummer och e-post till förvaltningar,http://www.vanersborg.se/kommun-och-politik/kontakta-kommunen,contact_page
+1487,Vänersborg,byggnad@vanersborg.se,utbildning,Telefonnummer och e-post till förvaltningar,http://www.vanersborg.se/kommun-och-politik/kontakta-kommunen,contact_page
+1487,Vänersborg,miljo@vanersborg.se,utbildning,Telefonnummer och e-post till förvaltningar,http://www.vanersborg.se/kommun-och-politik/kontakta-kommunen,contact_page
+1487,Vänersborg,social@vanersborg.se,utbildning,Telefonnummer och e-post till förvaltningar,http://www.vanersborg.se/kommun-och-politik/kontakta-kommunen,contact_page
+1487,Vänersborg,overformyndar@vanersborg.se,utbildning,Telefonnummer och e-post till förvaltningar,http://www.vanersborg.se/kommun-och-politik/kontakta-kommunen,contact_page
+1487,Vänersborg,biblioteket@vanersborg.se,utbildning,Telefonnummer och e-post till förvaltningar,http://www.vanersborg.se/kommun-och-politik/kontakta-kommunen,contact_page
+1487,Vänersborg,kommunikation@vanersborg.se,utbildning,Telefonnummer och e-post till förvaltningar,http://www.vanersborg.se/kommun-och-politik/kontakta-kommunen,contact_page
+1487,Vänersborg,webbredaktionen@vanersborg.se,utbildning,Telefonnummer och e-post till förvaltningar,http://www.vanersborg.se/kommun-och-politik/kontakta-kommunen,contact_page
+1488,Trollhättan,kontaktcenter@trollhattan.se,central,,https://www.trollhattan.se/,contact_page
+1488,Trollhättan,kommunstyrelsen@trollhattan.se,central,Nämnder och förvaltningar - för dig i tjänst,https://www.trollhattan.se/startsida/kontakta-oss/,contact_page
+1488,Trollhättan,utbildning@trollhattan.se,utbildning,Nämnder och förvaltningar - för dig i tjänst,https://www.trollhattan.se/startsida/kontakta-oss/,contact_page
+1488,Trollhättan,ekonomikontoret@trollhattan.se,upphandling,,https://www.trollhattan.se/startsida/jobbochforetagande/upphandling/e-faktura/,contact_page
+1489,Alingsås,kommunstyrelsen@alingsas.se,utbildning,,https://www.alingsas.se/,pattern_match
+1489,Alingsås,kultur.utbildning@alingsas.se,other,Snabbfakta förvaltningar,https://www.alingsas.se/kontakta-alingsas-kommun/,contact_page
+1489,Alingsås,kommunarkivet@alingsas.se,central,,https://www.alingsas.se/kommun-och-politik/diarium-och-arkiv/,contact_page
+1490,Borås,grundskola@boras.se,utbildning,"Kommunfullmäktige, Kommunstyrelse och nämnder",https://www.boras.se/funktioner/adresserochtelefonnummer.4.2eb8bcd11596bfb22a1bf93.html,contact_page
+1490,Borås,utbildning@boras.se,utbildning,"Kommunfullmäktige, Kommunstyrelse och nämnder",https://www.boras.se/funktioner/adresserochtelefonnummer.4.2eb8bcd11596bfb22a1bf93.html,contact_page
+1490,Borås,komvux@boras.se,vuxenutbildning,"Kommunfullmäktige, Kommunstyrelse och nämnder",https://www.boras.se/funktioner/adresserochtelefonnummer.4.2eb8bcd11596bfb22a1bf93.html,contact_page
+1491,Ulricehamn,kommun@ulricehamn.se,central,,https://www.ulricehamn.se/,contact_page
+1492,Åmål,kommun@amal.se,central,,http://www.amal.se/,contact_page
+1492,Åmål,kultur.utbildning@amal.se,other,E-post till kommunala nämnder,http://www.amal.se/4.780ec6c118d876d4bc459c1.html,contact_page
+1494,Lidköping,kommun@lidkoping.se,utbildning,,https://lidkoping.se/,pattern_match
+1494,Lidköping,kommunstyrelsen@lidkoping.se,central,Nämndbeslut i korthet,https://lidkoping.se/kommun-och-politik/politik-och-demokrati/namndbeslut-i-korthet,contact_page
+1494,Lidköping,kommunikation@lidkoping.se,other,,https://lidkoping.se/kommun-och-politik/pressinformation-och-presskontakt,contact_page
+1494,Lidköping,upphandling@lidkoping.se,upphandling,,https://lidkoping.se/foretag-naringsliv-och-exploatering/inkopscentralen-vastra-skaraborg-icv6/upphandlingsplan-vastra-skaraborg,contact_page
+1494,Lidköping,naringsliv@lidkoping.se,upphandling,,https://lidkoping.se/foretag-naringsliv-och-exploatering/inkopscentralen-vastra-skaraborg-icv6/upphandlingsplan-vastra-skaraborg,contact_page
+1495,Skara,skara.kommun@skara.se,central,,https://www.skara.se/,pattern_match
+1495,Skara,kommunstyrelsen@skara.se,central,,https://www.skara.se/kommunochpolitik/overklagabeslutrattssakerhet/anslagstavla.740.html,contact_page
+1496,Skövde,kontaktuppgifterdataskyddsombuddataskyddsombud@skovde.se,other,,https://www.skovde.se/sv/kommun-och-politik/kontakt-med-skovde-kommun/dataskyddsombud/,contact_page
+1496,Skövde,medborgarserviceryd@skovde.se,other,,https://www.skovde.se/sv/kommun-och-politik/kontakt-med-skovde-kommun/medborgarservice/,contact_page
+1496,Skövde,medborgarservicemedborgarserviceryd@skovde.se,other,,https://www.skovde.se/sv/kommun-och-politik/kontakt-med-skovde-kommun/medborgarservice/,contact_page
+1497,Hjo,kommunen@hjo.se,central,,http://www.hjo.se/,contact_page
+1497,Hjo,kontaktcenter@hjo.se,central,,http://www.hjo.se/kommun--politik/kontakta-hjo-kommun/,contact_page
+1498,Tidaholm,kommun@tidaholm.se,central,,http://www.tidaholm.se/,contact_page
+1498,Tidaholm,kontaktcenter@tidaholm.se,central,,http://www.tidaholm.se/kontaktaoss.1214.html,contact_page
+1498,Tidaholm,tidaholms.kommun@tidaholm.se,central,,http://www.tidaholm.se/kontaktaoss.1214.html,contact_page
+1498,Tidaholm,kommunikation@tidaholm.se,other,,http://www.tidaholm.se/kontaktaoss.1214.html,contact_page
+1498,Tidaholm,barn.utbildning@tidaholm.se,other,,http://www.tidaholm.se/kontaktaoss.1214.html,contact_page
+1498,Tidaholm,05barn.utbildning@tidaholm.se,other,,http://www.tidaholm.se/kontaktaoss.1214.html,contact_page
+1499,Falköping,kommunen@falkoping.se,central,,http://www.falkoping.se/kontakta-kommunen,contact_page
+1499,Falköping,kommunstyrelsen@falkoping.se,central,,http://www.falkoping.se/kontakta-kommunen/nationaldagsfirande-for-barn-fodda-2025,pattern_match
+1499,Falköping,barn.utb@falkoping.se,utbildning,Barn- och utbildningsnämnden,http://www.falkoping.se/kommun--politik/kommunfullmaktige-kommunstyrelse-och-namnder/namnder/barn--och-utbildningsnamnden,pattern_match
+1715,Kil,kommun@kil.se,central,,http://www.kil.se/,pattern_match
+1715,Kil,kommunikation@kil.se,other,,http://www.kil.se/kontakta-oss/kommun-och-politik,contact_page
+1730,Eda,kommun@eda.se,central,,http://www.eda.se/styrdokument/upphandling-och-n%C3%A4ringsliv__1298,contact_page
+1737,Torsby,torsby.kommun@torsby.se,utbildning,Nämnder och bolag,http://www.torsby.se/nykontaktaossfunktion/namnderochbolag.4.1f3a3f84162b424002fd5fab.html,contact_page
+1737,Torsby,bun@torsby.se,utbildning,Nämnder och bolag,http://www.torsby.se/nykontaktaossfunktion/namnderochbolag.4.1f3a3f84162b424002fd5fab.html,contact_page
+1737,Torsby,kln@torsby.se,utbildning,Nämnder och bolag,http://www.torsby.se/nykontaktaossfunktion/namnderochbolag.4.1f3a3f84162b424002fd5fab.html,contact_page
+1737,Torsby,mbr@torsby.se,utbildning,Nämnder och bolag,http://www.torsby.se/nykontaktaossfunktion/namnderochbolag.4.1f3a3f84162b424002fd5fab.html,contact_page
+1737,Torsby,sn@torsby.se,utbildning,Nämnder och bolag,http://www.torsby.se/nykontaktaossfunktion/namnderochbolag.4.1f3a3f84162b424002fd5fab.html,contact_page
+1737,Torsby,valn@torsby.se,utbildning,Nämnder och bolag,http://www.torsby.se/nykontaktaossfunktion/namnderochbolag.4.1f3a3f84162b424002fd5fab.html,contact_page
+1737,Torsby,ofn@torsby.se,utbildning,Nämnder och bolag,http://www.torsby.se/nykontaktaossfunktion/namnderochbolag.4.1f3a3f84162b424002fd5fab.html,contact_page
+1737,Torsby,kpr@torsby.se,utbildning,Nämnder och bolag,http://www.torsby.se/nykontaktaossfunktion/namnderochbolag.4.1f3a3f84162b424002fd5fab.html,contact_page
+1737,Torsby,ktr@torsby.se,utbildning,Nämnder och bolag,http://www.torsby.se/nykontaktaossfunktion/namnderochbolag.4.1f3a3f84162b424002fd5fab.html,contact_page
+1737,Torsby,kontaktcenter@torsby.se,central,,http://www.torsby.se/nykontaktaossfunktion/kontaktcenter.4.317a0c141808e71d74a37cfc.html,contact_page
+1760,Storfors,storfors.kommun@storfors.se,central,,http://www.storfors.se/,contact_page
+1761,Hammarö,kommun@hammaro.se,central,,https://www.hammaro.se/,contact_page
+1762,Munkfors,kommun@munkfors.se,central,,http://www.munkfors.se/,pattern_match
+1762,Munkfors,kontaktcenter@munkfors.se,central,,https://www.munkfors.se/kommun-och-politik/politik/politisk-organisation/redovisning-av-partistod/,contact_page
+1763,Forshaga,kommun@forshaga.se,central,,http://www.forshaga.se/,contact_page
+1764,Grums,kommunstyrelse@grums.se,other,,https://www.grums.se/,pattern_match
+1764,Grums,17gustav.hagerskog@grums.se,gymnasie,,https://www.grums.se/kommunpolitik/kommunensorganisation/forvaltningsorganisation/sektorutbildningochfritid.11205.html,contact_page
+1765,Årjäng,kommun@arjang.se,central,,http://www.arjang.se/kontakt,pattern_match
+1765,Årjäng,medborgarkontor@arjang.se,other,,http://www.arjang.se/kommunalservice/startsida/kommunochpolitik/kontaktmedoss/medborgarkontoret.2161.html,contact_page
+1780,Karlstad,kommunarkivet@karlstad.se,central,,https://karlstad.se/kommun-och-politik/diarium-arkiv-och-sekretess/kommunarkivet,contact_page
+1781,Kristinehamn,kommunen@kristinehamn.se,central,,http://www.kristinehamn.se/,pattern_match
+1781,Kristinehamn,kommunikation@kristinehamn.se,other,Nämnder och förvaltningar,http://www.kristinehamn.se/kommun-och-politik/kommunens-organisation/sa-jobbar-vi-med-olika-fragor/oversattning-av-hemsidan/,contact_page
+1781,Kristinehamn,kommunrevision@kristinehamn.se,other,Nämnder och förvaltningar,http://www.kristinehamn.se/kommun-och-politik/kommunens-organisation/kommunrevisionen/,contact_page
+1781,Kristinehamn,skolnamnden@kristinehamn.se,utbildning,Skolnämnden,http://www.kristinehamn.se/kommun-och-politik/kommunens-organisation/namnder-och-forvaltningar/skolnamnden/,contact_page
+1782,Filipstad,kommun@filipstad.se,central,,http://www.filipstad.se/,contact_page
+1783,Hagfors,kommun@hagfors.se,central,,http://www.hagfors.se/,contact_page
+1784,Arvika,arvika.kommun@arvika.se,central,,http://www.arvika.se/,contact_page
+1784,Arvika,upphandling@arvika.se,upphandling,,http://www.arvika.se/kommunochpolitik/diariumallmanhandling.2238.html,contact_page
+1785,Säffle,kommun@saffle.se,central,,https://www.saffle.se/,pattern_match
+1785,Säffle,barn.utbildning@saffle.se,other,,https://www.saffle.se/kommun-och-politik/blandat/kontaktcenter.html,contact_page
+1785,Säffle,90barn.utbildning@saffle.se,other,,https://www.saffle.se/kommun-och-politik/blandat/kontaktcenter.html,contact_page
+1785,Säffle,erika.andersson2@saffle.se,utbildning,Barn- och utbildningsförvaltning,https://www.saffle.se/kommun-och-politik/press-och-kommunikation/kontaktvagar.html,contact_page
+1785,Säffle,arkivet@saffle.se,upphandling,,https://www.saffle.se/kommun-och-politik/kommunens-organisation/kommunala-bolag/safflebostader-ab/om-oss.html,contact_page
+1814,Lekeberg,kontaktcenter@lekeberg.se,central,,http://www.lekeberg.se/,contact_page
+1860,Laxå,kommun@laxa.se,central,,http://www.laxa.se/,contact_page
+1861,Hallsberg,kommun@hallsberg.se,central,,http://www.hallsberg.se/,pattern_match
+1861,Hallsberg,kommunikation@hallsberg.se,other,,https://www.hallsberg.se/organisation-och-styrning/press.html,contact_page
+1862,Degerfors,kommun@degerfors.se,central,,http://www.degerfors.se/naringsliv-och-arbete/upphandlingar-och-inkop.html,contact_page
+1862,Degerfors,kommunikation@degerfors.se,other,,http://www.degerfors.se/kommun-och-politik/kommunens-organisation/kontakta-oss.html,contact_page
+1862,Degerfors,skoladministration@degerfors.se,other,,http://www.degerfors.se/kommun-och-politik/kommunens-organisation/kontakta-oss.html,contact_page
+1863,Hällefor,kommun@hellefors.se,central,,https://www.hellefors.se/,contact_page
+1864,Ljusnarsberg,kommun@ljusnarsberg.se,central,,https://www.ljusnarsberg.se/,contact_page
+1880,Örebro,servicecenter@orebro.se,central,,https://www.orebro.se/,contact_page
+1881,Kumla,servicecenter@kumla.se,central,,http://www.kumla.se/,pattern_match
+1881,Kumla,inkop@kumla.se,upphandling,,https://www.kumla.se/naringsliv-och-arbetsmarknad/upphandling-e-handel-och-inkop.html,contact_page
+1882,Askersund,kommun@askersund.se,central,,https://www.askersund.se/,pattern_match
+1882,Askersund,elin.fennander.sahlberg@askersund.se,utbildning,Kontakta förvaltningarna,https://www.askersund.se/kommun--politik/kontakta-askersunds-kommun/kontakta-forvaltningarna,contact_page
+1882,Askersund,ekonomikontoret@askersund.se,upphandling,,https://www.askersund.se/naringsliv--arbete/upphandling-och-inkop/e-faktura-fran-foretag-till-kommunen,contact_page
+1882,Askersund,per.johansson2@askersund.se,upphandling,,https://www.askersund.se/naringsliv--arbete/upphandling-och-inkop,contact_page
+1883,Karlskoga,info@karlskoga.se,central,,http://www.karlskoga.se/,pattern_match
+1883,Karlskoga,upphandling@karlskoga.se,upphandling,,http://www.karlskoga.se/naringsliv--arbete/upphandling-och-inkop/offentlig-upphandling-och-inkop.html,contact_page
+1884,Nora,nora.kommun@nora.se,central,,http://www.nora.se/,pattern_match
+1885,Lindesberg,kommun@lindesberg.se,central,,https://www.lindesberg.se/kommun-och-politik/kontakta-oss,contact_page
+1885,Lindesberg,barn.utbildningsforvaltningen@lindesberg.se,other,,https://www.lindesberg.se/kommun-och-politik/kontakta-oss,contact_page
+1885,Lindesberg,kommunkommun@lindesberg.se,other,,https://www.lindesberg.se/kommun-och-politik/diarium-arkiv-och-sekretess/arenden-och-handlingar,contact_page
+1885,Lindesberg,fakturasupport@lindesberg.se,upphandling,,https://www.lindesberg.se/jobb-och-foretagande/upphandling-och-inkop/fakturera-lindesbergs-kommun,contact_page
+1885,Lindesberg,leverantorsfaktura@lindesberg.se,upphandling,,https://www.lindesberg.se/jobb-och-foretagande/upphandling-och-inkop/fakturera-lindesbergs-kommun,contact_page
+1885,Lindesberg,upphandling@lindesberg.se,upphandling,,https://www.lindesberg.se/jobb-och-foretagande/upphandling-och-inkop/aktuella-kommunovergripande-upphandlingar,pattern_match
+1904,Skinnskatteberg,kommun@skinnskatteberg.se,central,,http://www.skinnskatteberg.se/,pattern_match
+1904,Skinnskatteberg,upphandling@skinnskatteberg.se,upphandling,,https://www.skinnskatteberg.se/kommun-och-demokrati/ekonomi/upphandlingar-och-inkop/,contact_page
+1907,Surahammar,kommunen@surahammar.se,utbildning,,http://www.surahammar.se/,pattern_match
+1960,Kungsör,info@kungsor.se,central,,http://www.kungsor.se/,pattern_match
+1960,Kungsör,info@kfab.kungsor.se,central,,http://www.kungsor.se/kommun-och-politik/kontakt-och-dialog/kontakt-och-oppettider.html,contact_page
+1960,Kungsör,kommunikation@kungsor.se,other,,http://www.kungsor.se/kommun-och-politik/kommunkontakt-kungsor.html,contact_page
+1961,Hallstahammar,kommunstyrelsen@hallstahammar.se,central,Förvaltningsbesvär - Överklaga ett beslut som gäller dig personligen,http://www.hallstahammar.se/organisation-och-politik/lagar-regler-och-dokument-som-styr-kommunen/att-overklaga-ett-beslut,contact_page
+1961,Hallstahammar,kommun@hallstahammar.se,central,,http://www.hallstahammar.se/organisation-och-politik/lagar-regler-och-dokument-som-styr-kommunen/offentlighet-och-sekretess,contact_page
+1961,Hallstahammar,upphandling@hallstahammar.se,upphandling,,http://www.hallstahammar.se/organisation-och-politik/lagar-regler-och-dokument-som-styr-kommunen/offentlig-upphandling,contact_page
+1961,Hallstahammar,naringslivsenheten@hallstahammar.se,upphandling,,http://www.hallstahammar.se/organisation-och-politik/lagar-regler-och-dokument-som-styr-kommunen/offentlig-upphandling,contact_page
+1961,Hallstahammar,upphanlding@hallstahammar.se,upphandling,,http://www.hallstahammar.se/organisation-och-politik/lagar-regler-och-dokument-som-styr-kommunen/offentlig-upphandling,contact_page
+1961,Hallstahammar,asa.oberg.thorstenson@hallstahammar.se,utbildning,"Kommunens förvaltningar, bolag och förbund",http://www.hallstahammar.se/organisation-och-politik/kommunens-forvaltningar-bolag-och-forbund,contact_page
+1962,Norberg,info@norberg.se,central,,http://www.norberg.se/,contact_page
+1962,Norberg,kommunikation@norberg.se,other,,http://www.norberg.se/kommun--politik/insyn-och-paverkan/press-media-och-information.html,contact_page
+1980,Västerås,kontaktcenter@vasteras.se,utbildning,,http://www.vasteras.se/,contact_page
+1980,Västerås,upphandling@vasteras.se,upphandling,,http://www.vasteras.se/naringsliv-och-arbete/upphandling-och-inkop/for-dig-som-ar-eller-vill-bli-leverantor.html,contact_page
+1980,Västerås,kontaktaupphandling@vasteras.se,upphandling,,http://www.vasteras.se/naringsliv-och-arbete/upphandling-och-inkop/for-dig-som-ar-eller-vill-bli-leverantor.html,contact_page
+1980,Västerås,ehandelsupport@vasteras.se,upphandling,,http://www.vasteras.se/naringsliv-och-arbete/upphandling-och-inkop/e-handel-e-faktura.html,contact_page
+1981,Sala,kommun.info@sala.se,utbildning,,http://www.sala.se/,pattern_match
+1982,Fagersta,info@fagersta.se,central,,http://www.fagersta.se/,contact_page
+1982,Fagersta,upphandling@fagersta.se,upphandling,,http://www.fagersta.se/foretag--upphandling/upphandling/om-oss,contact_page
+1982,Fagersta,syvvux@edu.fagersta.se,vuxenutbildning,,http://www.fagersta.se/forskola-skola--utbildning/vuxenutbildningen/komvux-norra-vastmanland/komvux---kontaktuppgifter-och-oppettider,contact_page
+1982,Fagersta,vux@edu.fagersta.se,vuxenutbildning,,http://www.fagersta.se/forskola-skola--utbildning/vuxenutbildningen/komvux-norra-vastmanland/komvux---kontaktuppgifter-och-oppettider,contact_page
+1982,Fagersta,nicoleta.anaida.pavlicu@edu.fagersta.se,vuxenutbildning,,http://www.fagersta.se/forskola-skola--utbildning/vuxenutbildningen/komvux-norra-vastmanland/komvux---kontaktuppgifter-och-oppettider,contact_page
+1982,Fagersta,fakturor@fagersta.se,upphandling,,http://www.fagersta.se/foretag--upphandling/fakturor/skicka-faktura,contact_page
+1982,Fagersta,kund@fagersta.se,upphandling,,http://www.fagersta.se/foretag--upphandling/fakturor/ta-emot-faktura,contact_page
+1982,Fagersta,naringsliv@fagersta.se,upphandling,,http://www.fagersta.se/foretag--upphandling/foretag/foretagsbesok,contact_page
+1983,Köping,kopings.kommun@koping.se,central,,http://www.koping.se/,pattern_match
+1983,Köping,miljo@koping.se,upphandling,,http://www.koping.se/foretagare--naringsliv/upphandling-tillstand-och-tillsyn/tillstand-regler-och-tillsyn/tobak-e-cigaretter-tobaksfria-nikotinprodukter-folkol-och-receptfria-lakemedel.html,contact_page
+1983,Köping,samhallsbyggnad@koping.se,upphandling,,http://www.koping.se/foretagare--naringsliv/upphandling-tillstand-och-tillsyn/tillstand-regler-och-tillsyn/saneringsintyg-for-fartyg.html,contact_page
+1983,Köping,bygglov@koping.se,upphandling,,http://www.koping.se/foretagare--naringsliv/upphandling-tillstand-och-tillsyn/tillstand-regler-och-tillsyn/bygglov.html,contact_page
+1983,Köping,retag.0221-25347bygglov@koping.se,upphandling,,http://www.koping.se/foretagare--naringsliv/upphandling-tillstand-och-tillsyn/tillstand-regler-och-tillsyn/bygglov.html,contact_page
+1984,Arboga,arboga.kommun@arboga.se,central,,https://www.arboga.se/,pattern_match
+2023,Malung-Sälen,kommun@malung-salen.se,central,,https://www.malung-salen.se/,pattern_match
+2023,Malung-Sälen,arkivavdelningen@malung-salen.se,other,Kontakta nämndkansliet,https://www.malung-salen.se/kommun-och-politik/kontakta-namndkansliet,contact_page
+2023,Malung-Sälen,78mats.johansson@malung-salen.se,upphandling,,https://www.malung-salen.se/naringsliv-foretag-och-jobb/upphandling-och-inkop,contact_page
+2026,Gagnef,registrator@gagnef.se,central,,http://www.gagnef.se/,pattern_match
+2029,Leksand,kommun@leksand.se,central,,http://www.leksand.se/,contact_page
+2029,Leksand,gymnasiet@leksand.se,other,,http://www.leksand.se/skola-och-forskola/leksands-gymnasium/kontakta-oss-pa-gymnasiet,contact_page
+2029,Leksand,vuxenutbildning@leksand.se,vuxenutbildning,,http://www.leksand.se/kommun-och-politik/politik-och-demokrati/diarium-handlingar-och-arkiv,contact_page
+2031,Rättvik,kommun@rattvik.se,central,,http://www.rattvik.se/,contact_page
+2031,Rättvik,barn.utbildning@rattvik.se,utbildning,Stab- och serviceförvaltning,http://www.rattvik.se/kommun-och-politik/kontakta-oss.html,contact_page
+2031,Rättvik,mark.plan@rattvik.se,utbildning,Stab- och serviceförvaltning,http://www.rattvik.se/kommun-och-politik/kontakta-oss.html,contact_page
+2031,Rättvik,miljo.bygg@rattvik.se,utbildning,Stab- och serviceförvaltning,http://www.rattvik.se/kommun-och-politik/kontakta-oss.html,contact_page
+2031,Rättvik,kultur@rattvik.se,utbildning,Stab- och serviceförvaltning,http://www.rattvik.se/kommun-och-politik/kontakta-oss.html,contact_page
+2031,Rättvik,bibliotek@rattvik.se,utbildning,Stab- och serviceförvaltning,http://www.rattvik.se/kommun-och-politik/kontakta-oss.html,contact_page
+2031,Rättvik,fritid@rattvik.se,utbildning,Stab- och serviceförvaltning,http://www.rattvik.se/kommun-och-politik/kontakta-oss.html,contact_page
+2031,Rättvik,sociala@rattvik.se,utbildning,Stab- och serviceförvaltning,http://www.rattvik.se/kommun-och-politik/kontakta-oss.html,contact_page
+2031,Rättvik,gymnasiet@rattvik.se,utbildning,Barn- och utbildningsförvaltning,http://www.rattvik.se/kommun-och-politik/kontakta-oss/besoksadresser.html,contact_page
+2031,Rättvik,kundstod@rattvik.se,utbildning,Barn- och utbildningsförvaltning,http://www.rattvik.se/kommun-och-politik/kontakta-oss/besoksadresser.html,contact_page
+2031,Rättvik,personalarenden@rattvik.se,utbildning,Barn- och utbildningsförvaltning,http://www.rattvik.se/kommun-och-politik/kontakta-oss/besoksadresser.html,contact_page
+2031,Rättvik,raddningstjansten@rattvik.se,utbildning,Barn- och utbildningsförvaltning,http://www.rattvik.se/kommun-och-politik/kontakta-oss/besoksadresser.html,contact_page
+2031,Rättvik,info.rfab@rattvik.se,utbildning,Barn- och utbildningsförvaltning,http://www.rattvik.se/kommun-och-politik/kontakta-oss/besoksadresser.html,contact_page
+2034,Orsa,orsa.kommun@orsa.se,central,,http://www.orsa.se/,pattern_match
+2034,Orsa,andreas.larsson1@orsa.se,upphandling,,http://www.orsa.se/naringsliv-och-arbete/inkop-och-upphandling/elektroniska-fakturor-e-faktura.html,contact_page
+2039,Älvdalen,kommun@alvdalen.se,central,,http://www.alvdalen.se/,pattern_match
+2039,Älvdalen,nnqvistkontaktuppgifterlevfaktura@alvdalen.se,upphandling,,http://www.alvdalen.se/naringsliv-och-arbete/inkop-och-upphandling/elektroniska-fakturor-e-fakturor.html,contact_page
+2061,Smedjebacken,kommun@smedjebacken.se,central,,http://www.smedjebacken.se/,pattern_match
+2061,Smedjebacken,skolbibliotekscentralen@smedjebacken.se,other,,http://www.smedjebacken.se/kommun-och-politik/kontakta-oss.html,contact_page
+2061,Smedjebacken,info@mekensmedjebacken.se,central,,http://www.smedjebacken.se/kommun-och-politik/kontakta-oss.html,contact_page
+2061,Smedjebacken,upphandling@smedjebacken.se,upphandling,,http://www.smedjebacken.se/kommun-och-politik/kontakta-oss.html,contact_page
+2080,Falu,kontaktcenter@falun.se,central,,https://www.falun.se/,contact_page
+2080,Falu,ulrika.a.gustafsson@falun.se,utbildning,Barn- och utbildningsförvaltningen,https://www.falun.se/kommun--demokrati/politik-och-demokrati/sa-kan-du-paverka/kontakta-kommunen/tjansteman.html,contact_page
+2080,Falu,kristina.knutsson.sjolund@falun.se,utbildning,Barn- och utbildningsförvaltningen,https://www.falun.se/kommun--demokrati/politik-och-demokrati/sa-kan-du-paverka/kontakta-kommunen/tjansteman.html,contact_page
+2080,Falu,fakturaenheten@falun.se,utbildning,Barn- och utbildningsförvaltningen,https://www.falun.se/kommun--demokrati/politik-och-demokrati/sa-kan-du-paverka/kontakta-kommunen/tjansteman.html,contact_page
+2081,Borlänge,kommun@borlange.se,central,,http://www.borlange.se/,contact_page
+2081,Borlänge,kommunfullmaktige@borlange.se,other,,http://www.borlange.se/kommun-och-politik/kommunens-organisation/kommunfullmaktige,contact_page
+2081,Borlänge,kommunstyrelsen@borlange.se,central,,http://www.borlange.se/kommun-och-politik/kommunens-organisation/kommunstyrelsen,contact_page
+2081,Borlänge,gymnasienamnden@borlange.se,gymnasie,Nämnder,http://www.borlange.se/kommun-och-politik/kommunens-organisation/namnder,contact_page
+2081,Borlänge,skolnamnden@borlange.se,other,Nämnder,http://www.borlange.se/kommun-och-politik/kommunens-organisation/namnder,contact_page
+2082,Säter,kommun@sater.se,central,,http://www.sater.se/,pattern_match
+2083,Hedemora,kommun@hedemora.se,central,,http://www.hedemora.se/,pattern_match
+2084,Avesta,servicecenter@avesta.se,central,,https://www.avesta.se/,contact_page
+2084,Avesta,vi@avesta.se,vuxenutbildning,,https://www.avesta.se/barn-och-utbildning/vuxenutbildning/valkommen-att-kontakta-oss/,contact_page
+2084,Avesta,upphandling@avesta.se,upphandling,,https://www.avesta.se/naringsliv-och-arbete/upphandling-och-inkop/aktuella-upphandlingar/,contact_page
+2084,Avesta,redovisning@avesta.se,upphandling,,https://www.avesta.se/naringsliv-och-arbete/upphandling-och-inkop/fakturor-till-avesta-kommun/,contact_page
+2085,Ludvika,info@ludvika.se,utbildning,,https://www.ludvika.se/,pattern_match
+2085,Ludvika,rvaltningensocial.utbildning@ludvika.se,other,,https://www.ludvika.se/barn-och-utbildning/forskola-och-fritidshem/forskolorna/sunnansjo-forskola-solangen/kontaktuppgifter---solangens-forskola,contact_page
+2085,Ludvika,kommuninfo@ludvika.se,central,,https://www.ludvika.se/jobb-och-foretagande/upphandlingar,contact_page
+2085,Ludvika,social.utbildning@ludvika.se,other,,https://www.ludvika.se/omsorg-och-hjalp/vill-du-hjalpa/bli-familjehem-jourhem-kontaktperson-eller-kontaktfamilj,contact_page
+2101,Ockelbo,kommun@ockelbo.se,central,,https://ockelbo.se/,contact_page
+2101,Ockelbo,utbildningochkultur@ockelbo.se,other,,https://ockelbo.se/kontakta-oss,contact_page
+2104,Hofors,hofors.kommun@hofors.se,central,,http://www.hofors.se/,pattern_match
+2104,Hofors,inkop@hofors.se,upphandling,,http://www.hofors.se/kommun--politik/ekonomi/upphandling-och-inkop.html,contact_page
+2121,Ovanåker,kommun@ovanaker.se,central,,https://www.ovanaker.se/,pattern_match
+2132,Nordanstig,kommun@nordanstig.se,central,,http://www.nordanstig.se/,pattern_match
+2132,Nordanstig,85lars.larsson@nordanstig.se,utbildning,Förvaltning,http://www.nordanstig.se/startsida/sidor/kommun-och-politik/forvaltning.html,contact_page
+2132,Nordanstig,18ulrika.segervald@nordanstig.se,utbildning,Förvaltning,http://www.nordanstig.se/startsida/sidor/kommun-och-politik/forvaltning.html,contact_page
+2132,Nordanstig,08lena.kahre@nordanstig.se,utbildning,Förvaltning,http://www.nordanstig.se/startsida/sidor/kommun-och-politik/forvaltning.html,contact_page
+2132,Nordanstig,64karin.henningsson@nordanstig.se,utbildning,Förvaltning,http://www.nordanstig.se/startsida/sidor/kommun-och-politik/forvaltning.html,contact_page
+2132,Nordanstig,77gunilla.voxlin@nordanstig.se,utbildning,Förvaltning,http://www.nordanstig.se/startsida/sidor/kommun-och-politik/forvaltning.html,contact_page
+2161,Ljusdal,kommun@ljusdal.se,central,,http://www.ljusdal.se/samlingssidor/kontaktaossljusdalskommun/kontaktaosskommunpolitik.4.6ad1488f14bc069646a26878.html,contact_page
+2181,Sandviken,medborgarservice@sandviken.se,central,,https://sandviken.se/,pattern_match
+2181,Sandviken,kommun@sandviken.se,central,Arbetslivsförvaltningen,https://sandviken.se/kommunochpolitik/kontaktaoss/kontaktuppgiftertillverksamheter.30008.html,contact_page
+2182,Söderhamn,kommunstyrelsen@soderhamn.se,central,"Kontakta nämnder (registrator, kansli)",http://www.soderhamn.se/sidor/kommun-och-politik/kundtjanst-kontakt.html,contact_page
+2182,Söderhamn,barn-utbildningsnamnden@soderhamn.se,other,"Kontakta nämnder (registrator, kansli)",http://www.soderhamn.se/sidor/kommun-och-politik/kundtjanst-kontakt.html,contact_page
+2182,Söderhamn,ehandel@soderhamn.se,upphandling,Film från DIGG – Myndigheten för digital förvaltning,http://www.soderhamn.se/underwebbar/naringsliv/upphandling-och-inkop/e-handel-och-fakturering/e-faktura.html,contact_page
+2182,Söderhamn,kommunrevisionen@soderhamn.se,other,,http://www.soderhamn.se/sidor/kommun-och-politik/organisation/revisorer.html,contact_page
+2183,Bollnäs,diariet@bollnas.se,central,,http://www.bollnas.se/kommun-och-politik/kommunfakta/kontakt,contact_page
+2183,Bollnäs,bollnas@bollnas.se,central,,http://www.bollnas.se/kommun-och-politik/politik-och-demokrati/overklaga-beslut-rattssakerhet/allmanna-handlingar,contact_page
+2184,Hudiksvall,kommun@hudiksvall.se,central,,http://www.hudiksvall.se/Sidor/Kommun-och-politik/Kontakta-kommunen.html,contact_page
+2184,Hudiksvall,fakturacentralen@hudiksvall.se,upphandling,,http://www.hudiksvall.se/Sidor/Tillvaxt-och-naringsliv/Upphandling-och-inkop/Leverantor-till-kommunen.html,contact_page
+2262,Timrå,timra.kommun@timra.se,central,,http://www.timra.se/,contact_page
+2280,Härnösand,kommun@harnosand.se,central,,https://www.harnosand.se/,pattern_match
+2280,Härnösand,syv@harnosand.se,vuxenutbildning,,https://www.harnosand.se/barn--utbildning/vuxenutbildning/att-studera-pa-komvux/kontaktuppgifter.html,contact_page
+2280,Härnösand,kommunarkivet@harnosand.se,central,,https://www.harnosand.se/kommun--styrning/forvaltning-och-organisation/kommunstyrelseforvaltningen/diarium-och-arkiv.html,contact_page
+2280,Härnösand,upphandling@harnosand.se,upphandling,,https://www.harnosand.se/kommun--styrning/forvaltning-och-organisation/kommunstyrelseforvaltningen/ekonomienheten.html,contact_page
+2280,Härnösand,ite@harnosand.se,other,,https://www.harnosand.se/kommun--styrning/forvaltning-och-organisation/kommunstyrelseforvaltningen/it-avdelningen.html,contact_page
+2280,Härnösand,servicecenter@harnosand.se,central,,https://www.harnosand.se/kommun--styrning/forvaltning-och-organisation/kommunstyrelseforvaltningen/kommunens-servicecenter.html,contact_page
+2280,Härnösand,kommunikationsavdelningen@harnosand.se,other,,https://www.harnosand.se/kommun--styrning/forvaltning-och-organisation/kommunstyrelseforvaltningen/kommunikationsavdelningen.html,contact_page
+2281,Sundsvall,kontakt@sundsvall.se,central,,http://www.sundsvall.se/,pattern_match
+2281,Sundsvall,sscleverantor@sundsvall.se,upphandling,,http://www.sundsvall.se/kommun/jobb-och-foretagande/upphandling-och-inkop/hur-du-fakturerar-kommunen,contact_page
+2281,Sundsvall,kommunstyrelsen@sundsvall.se,central,,http://www.sundsvall.se/kommun/kommun-och-politik/politik-och-demokrati/dialog-och-synpunkter/kontakta-politiker-fortroendemannaregister,contact_page
+2281,Sundsvall,skolan@sundsvall.se,other,,http://www.sundsvall.se/kommun/kommun-och-politik/overklaga-beslut-rattssakerhet/behandling-av-personuppgifter,contact_page
+2282,Kramfors,kommun@kramfors.se,central,,http://www.kramfors.se/,contact_page
+2282,Kramfors,kommunarkivet@kramfors.se,central,,http://www.kramfors.se/kommun--demokrati/arkiv-och-diarium.html,contact_page
+2282,Kramfors,registrator@kramfors.se,central,,http://www.kramfors.se/kommun--demokrati/arkiv-och-diarium.html,contact_page
+2282,Kramfors,diariumregistrator@kramfors.se,other,,http://www.kramfors.se/kommun--demokrati/arkiv-och-diarium.html,contact_page
+2282,Kramfors,ekonomikontoret.kommunen@kramfors.se,upphandling,,http://www.kramfors.se/naringsliv--arbete/upphandling-och-inkop/elektroniska-fakturor.html,contact_page
+2282,Kramfors,upphandling@kramfors.se,upphandling,,http://www.kramfors.se/naringsliv--arbete/upphandling-och-inkop.html,contact_page
+2283,Sollefteå,kommun@solleftea.se,central,,http://www.solleftea.se/,contact_page
+2284,Örnsköldsvik,kontaktcenter@ornskoldsvik.se,central,,http://www.ornskoldsvik.se/,contact_page
+2284,Örnsköldsvik,cfg@ornskoldsvik.se,upphandling,,https://www.ornskoldsvik.se/foretagsservice/upphandling-och-inkop/fakturera-kommunen-och-de-kommunala-bolagen,contact_page
+2284,Örnsköldsvik,upphandling@ornskoldsvik.se,upphandling,,https://www.ornskoldsvik.se/foretagsservice/upphandling-och-inkop/aktuella-upphandlingar,contact_page
+2303,Ragunda,kommun@ragunda.se,central,,https://www.ragunda.se/,contact_page
+2303,Ragunda,naringsliv@ragunda.se,upphandling,,https://www.ragunda.se/naringslivochupphandling/startadrivaochutveckla.798.html,contact_page
+2303,Ragunda,kundcenter@ragunda.se,upphandling,,https://www.ragunda.se/naringslivochupphandling/startadrivaochutveckla.798.html,contact_page
+2303,Ragunda,k.naringsliv@ragunda.se,upphandling,,https://www.ragunda.se/naringslivochupphandling/ragundakommunsnaringsliv.792.html,contact_page
+2303,Ragunda,utvecklingsenhetennaringsliv@ragunda.se,upphandling,,https://www.ragunda.se/naringslivochupphandling/expansionochetableringiragundakommun.796.html,contact_page
+2303,Ragunda,bygg.miljo@ragunda.se,upphandling,,https://www.ragunda.se/naringslivochupphandling/forsaljningavtobakochliknandeprodukter.3838.html,contact_page
+2303,Ragunda,upphandlingssamordnare@ragunda.se,upphandling,,https://www.ragunda.se/naringslivochupphandling/nyheternaringslivochupphandling/nyhetsarkiv/inbjudantillupphandlingstraff.5234.html,contact_page
+2303,Ragunda,kommundirektor@ragunda.se,other,,https://www.ragunda.se/kundcenter/kontaktaoss.1369.html,contact_page
+2303,Ragunda,skolchef@ragunda.se,other,,https://www.ragunda.se/kundcenter/kontaktaoss.1369.html,contact_page
+2303,Ragunda,kansli@ragunda.se,central,,https://www.ragunda.se/kundcenter/kontaktaoss.1369.html,contact_page
+2303,Ragunda,info@ragunda.se,central,,https://www.ragunda.se/kundcenter/kontaktaoss.1369.html,contact_page
+2303,Ragunda,bostad@ragunda.se,central,,https://www.ragunda.se/kundcenter/kontaktaoss.1369.html,contact_page
+2303,Ragunda,stad@ragunda.se,central,,https://www.ragunda.se/kundcenter/kontaktaoss.1369.html,contact_page
+2305,Bräcke,bracke@bracke.se,central,,http://www.bracke.se/,contact_page
+2305,Bräcke,kommunikation@bracke.se,other,,http://www.bracke.se/kommun--och-demokrati/organisation-och-projekt/om-webbplatsen/tillganglighetsredogorelse,contact_page
+2309,Krokom,krokoms.kommun@krokom.se,central,,http://www.krokom.se/,contact_page
+2321,Åre,kontaktcenter@are.se,central,,http://www.are.se/,pattern_match
+2321,Åre,thor.kruse.een@are.se,utbildning,Förvaltningschefer,http://www.are.se/kommun-och-politik/kontakta-oss/ta-kontakt-med-tjanstepersoner,contact_page
+2321,Åre,malin.andersson.7@are.se,utbildning,Förvaltningschefer,http://www.are.se/kommun-och-politik/kontakta-oss/ta-kontakt-med-tjanstepersoner,contact_page
+2326,Berg,bergs.kommun@berg.se,utbildning,Sammanträdesprotokoll från utbildningsnämnden den 6 maj 2026,https://www.berg.se/,contact_page
+2326,Berg,e-postbergs.kommun@berg.se,utbildning,Sammanträdesprotokoll från utbildningsnämnden den 6 maj 2026,https://www.berg.se/,contact_page
+2326,Berg,kommunikation@berg.se,other,,https://www.berg.se/om-webbplatsen/kontakta-bergs-kommun,contact_page
+2361,Härjedalen,kommun@herjedalen.se,central,,https://www.herjedalen.se/,pattern_match
+2361,Härjedalen,barn.utbildning@herjedalen.se,other,,https://www.herjedalen.se/ovrigt-sokbart/kontakta-harjedalens-kommun.html,contact_page
+2361,Härjedalen,info.harjegardar@herjedalen.se,other,,https://www.herjedalen.se/ovrigt-sokbart/kontakta-harjedalens-kommun.html,contact_page
+2361,Härjedalen,kommunikation@herjedalen.se,other,,https://www.herjedalen.se/ovrigt-sokbart/kontakta-harjedalens-kommun.html,contact_page
+2380,Östersund,magnus.o.andersson@ostersund.se,utbildning,Förvaltningar,http://www.ostersund.se/kommun-och-politik/kommunens-organisation/forvaltningar.html,contact_page
+2380,Östersund,cecilia.lindhe.nadjalin@ostersund.se,utbildning,Förvaltningar,http://www.ostersund.se/kommun-och-politik/kommunens-organisation/forvaltningar.html,contact_page
+2380,Östersund,anna.i.backlund@ostersund.se,utbildning,Förvaltningar,http://www.ostersund.se/kommun-och-politik/kommunens-organisation/forvaltningar.html,contact_page
+2380,Östersund,eva.m.larsson@ostersund.se,utbildning,Förvaltningar,http://www.ostersund.se/kommun-och-politik/kommunens-organisation/forvaltningar.html,contact_page
+2380,Östersund,camilla.wiktorsson.sand@ostersund.se,utbildning,Förvaltningar,http://www.ostersund.se/kommun-och-politik/kommunens-organisation/forvaltningar.html,contact_page
+2380,Östersund,christina.von.leitgeb@ostersund.se,utbildning,Förvaltningar,http://www.ostersund.se/kommun-och-politik/kommunens-organisation/forvaltningar.html,contact_page
+2380,Östersund,tobias.1.johansson@ostersund.se,utbildning,Förvaltningar,http://www.ostersund.se/kommun-och-politik/kommunens-organisation/forvaltningar.html,contact_page
+2380,Östersund,eva.lek.jansson@ostersund.se,utbildning,Förvaltningar,http://www.ostersund.se/kommun-och-politik/kommunens-organisation/forvaltningar.html,contact_page
+2380,Östersund,gdpr@ostersund.se,utbildning,Barn- och utbildningsnämndens behandling av personuppgifter,http://www.ostersund.se/barn-och-utbildning/barn--och-utbildningsnamndens-behandling-av-personuppgifter.html,contact_page
+2380,Östersund,kommunarkivet@ostersund.se,vuxenutbildning,,http://www.ostersund.se/kommun-och-politik/diarium-och-arkiv/kommunarkivet.html,contact_page
+2403,Bjurholm,kommunen@bjurholm.se,utbildning,,https://www.bjurholm.se/,contact_page
+2403,Bjurholm,per-olof.t.bylund@bjurholm.se,it_digitalisering,,https://www.bjurholm.se/kommun-och-politik/kommun/forvaltningsorganisation/kommunstyrelsens-verksamheter,contact_page
+2403,Bjurholm,veronica.t.bylund@bjurholm.se,it_digitalisering,,https://www.bjurholm.se/kommun-och-politik/kommun/forvaltningsorganisation/kommunstyrelsens-verksamheter,contact_page
+2404,Vindeln,vindelns.kommun@vindeln.se,central,,http://www.vindeln.se/kontakt,contact_page
+2404,Vindeln,komvux@vindeln.se,vuxenutbildning,,http://www.vindeln.se/barn-och-utbildning/vindelnvux/kontakta-oss,contact_page
+2404,Vindeln,kommunalutveckling@vindeln.se,other,,http://www.vindeln.se/bygga-miljo-och-infrastruktur/gator-vagar-och-bredband/kontakta-gata-och-park,contact_page
+2409,Robertsfors,kommun@robertsfors.se,central,,http://www.robertsfors.se/,contact_page
+2409,Robertsfors,information@robertsfors.se,other,Robertsfors förvaltning,http://www.robertsfors.se/kommunochpolitik/kontakterkommunochpolitik.1138.html,contact_page
+2409,Robertsfors,kommunsekreterareharrieth.lindberg@robertsfors.se,other,Robertsfors förvaltning,http://www.robertsfors.se/kommunochpolitik/kontakterkommunochpolitik.1138.html,contact_page
+2409,Robertsfors,kanslikommun@robertsfors.se,other,,http://www.robertsfors.se/kommunochpolitik/varorganisationochverksamhet/offentligahandlingarocharkiv.1085.html,contact_page
+2417,Norsjö,info@norsjo.se,central,,https://www.norsjo.se/,contact_page
+2417,Norsjö,kommunikator@norsjo.se,other,,https://www.norsjo.se/,contact_page
+2417,Norsjö,it-chef0918-14042joel.soderberg@norsjo.se,other,,https://www.norsjo.se/kontakt,contact_page
+2418,Malå,kommunstyrelsen@mala.se,central,,http://www.mala.se/,contact_page
+2418,Malå,utbildningsnamnden@mala.se,utbildning,,http://www.mala.se/,contact_page
+2418,Malå,it@mala.se,it_digitalisering,,http://www.mala.se/kommun-och-politik/kontakt-och-organisationsbeskrivning/it-enheten/,contact_page
+2418,Malå,utbildningskontoret@mala.se,other,,http://www.mala.se/kommun-och-politik/kontakt-och-organisationsbeskrivning/utbildningsavdelningen/,contact_page
+2422,Sorsele,kommun@sorsele.se,central,,http://www.sorsele.se/,pattern_match
+2425,Dorotea,95peter.ahlqvist@dorotea.se,upphandling,,http://www.dorotea.se/naringsliv/driva-foretag/upphandling-och-inkop/pagaende-och-kommande-upphandlingar/,contact_page
+2425,Dorotea,info@dorotea.se,central,,http://www.dorotea.se/kommun-och-politik/kontakta-oss/,pattern_match
+2460,Vännäs,vannas.kommun@vannas.se,utbildning,,https://www.vannas.se/,contact_page
+2460,Vännäs,kommunikation@vannas.se,other,,https://www.vannas.se/kommun-och-politik/kontakt/gemensamma-e-postlador,contact_page
+2460,Vännäs,barn.utbildningsnamnden@vannas.se,other,,https://www.vannas.se/kommun-och-politik/kontakt/gemensamma-e-postlador,contact_page
+2460,Vännäs,emelie.johansson2@vannas.se,utbildning,Kontakta Barn- och utbildningsförvaltningen,https://www.vannas.se/barn-och-utbildning/kontakta-barn--och-utbildningsforvaltningen,contact_page
+2462,Vilhelmina,info@vilhelmina.se,central,,http://www.vilhelmina.se/,pattern_match
+2463,Åsele,kommun@asele.se,central,,http://www.asele.se/kommun-och-politik/kontaktuppgifter/,contact_page
+2480,Umeå,e-post    umea.kommun@umea.se,central,,http://www.umea.se/,contact_page
+2480,Umeå,umea.kommun@umea.se,central,,http://www.umea.se/,contact_page
+2480,Umeå,stdochverksamhetsservice@grupper.umea.se,gymnasie,,http://www.umea.se/kommunochpolitik/politikochdemokrati/dialogochsynpunkter.4.88db09b1724ee319ca46d.html,contact_page
+2480,Umeå,ksdiarium@umea.se,utbildning,"Nämnder, kontaktuppgifter",http://www.umea.se/kommunochpolitik/politikochdemokrati/dialogochsynpunkter/namnderkontaktuppgifter.4.88db09b1724ee319ca487.html,contact_page
+2480,Umeå,bndiarium@umea.se,utbildning,"Nämnder, kontaktuppgifter",http://www.umea.se/kommunochpolitik/politikochdemokrati/dialogochsynpunkter/namnderkontaktuppgifter.4.88db09b1724ee319ca487.html,contact_page
+2480,Umeå,ifnamnden@umea.se,utbildning,"Nämnder, kontaktuppgifter",http://www.umea.se/kommunochpolitik/politikochdemokrati/dialogochsynpunkter/namnderkontaktuppgifter.4.88db09b1724ee319ca487.html,contact_page
+2480,Umeå,annika.lind.3@umea.se,utbildning,"Nämnder, kontaktuppgifter",http://www.umea.se/kommunochpolitik/politikochdemokrati/dialogochsynpunkter/namnderkontaktuppgifter.4.88db09b1724ee319ca487.html,contact_page
+2480,Umeå,marie.sandstrom.2@umea.se,utbildning,"Nämnder, kontaktuppgifter",http://www.umea.se/kommunochpolitik/politikochdemokrati/dialogochsynpunkter/namnderkontaktuppgifter.4.88db09b1724ee319ca487.html,contact_page
+2480,Umeå,aldrenamnden@umea.se,utbildning,"Nämnder, kontaktuppgifter",http://www.umea.se/kommunochpolitik/politikochdemokrati/dialogochsynpunkter/namnderkontaktuppgifter.4.88db09b1724ee319ca487.html,contact_page
+2480,Umeå,ulrika.e.persson@umea.se,utbildning,"Nämnder, kontaktuppgifter",http://www.umea.se/kommunochpolitik/politikochdemokrati/dialogochsynpunkter/namnderkontaktuppgifter.4.88db09b1724ee319ca487.html,contact_page
+2480,Umeå,35marie.sandstrom.2@umea.se,utbildning,"Nämnder, kontaktuppgifter",http://www.umea.se/kommunochpolitik/politikochdemokrati/dialogochsynpunkter/namnderkontaktuppgifter.4.88db09b1724ee319ca487.html,contact_page
+2480,Umeå,58aldrenamnden@umea.se,utbildning,"Nämnder, kontaktuppgifter",http://www.umea.se/kommunochpolitik/politikochdemokrati/dialogochsynpunkter/namnderkontaktuppgifter.4.88db09b1724ee319ca487.html,contact_page
+2480,Umeå,33ulrika.e.persson@umea.se,utbildning,"Nämnder, kontaktuppgifter",http://www.umea.se/kommunochpolitik/politikochdemokrati/dialogochsynpunkter/namnderkontaktuppgifter.4.88db09b1724ee319ca487.html,contact_page
+2480,Umeå,inkop@umea.se,upphandling,,http://www.umea.se/jobbochforetagande/upphandlingochinkop/hurmanfakturerarkommunen.4.88db09b1724ee319ca5de.html,contact_page
+2480,Umeå,umeabrandforsvar@umea.se,gymnasie,Personalnämnd,http://www.umea.se/registrator,contact_page
+2480,Umeå,utbildningskontoret@umea.se,gymnasie,Personalnämnd,http://www.umea.se/registrator,contact_page
+2480,Umeå,tndiarium@umea.se,gymnasie,Personalnämnd,http://www.umea.se/registrator,contact_page
+2480,Umeå,val@umea.se,gymnasie,Personalnämnd,http://www.umea.se/registrator,contact_page
+2480,Umeå,overformyndarenheten@umea.se,gymnasie,Personalnämnd,http://www.umea.se/registrator,contact_page
+2480,Umeå,handlingar.kommunstyrelsenksdiarium@umea.se,gymnasie,Personalnämnd,http://www.umea.se/registrator,contact_page
+2480,Umeå,mndenval@umea.se,gymnasie,Personalnämnd,http://www.umea.se/registrator,contact_page
+2480,Umeå,mndenaldrenamnden@umea.se,gymnasie,Personalnämnd,http://www.umea.se/registrator,contact_page
+2480,Umeå,mndenoverformyndarenheten@umea.se,gymnasie,Personalnämnd,http://www.umea.se/registrator,contact_page
+2481,Lycksele,kommun@lycksele.se,central,,http://www.lycksele.se/kommun/kommun-och-politik/organisation/kommunens-bolag/,contact_page
+2505,Arvidsjaur,kommun@arvidsjaur.se,central,,https://www.arvidsjaur.se/,pattern_match
+2505,Arvidsjaur,medborgarservice@arvidsjaur.se,central,,https://www.arvidsjaur.se/kommunpolitik/kommunensorganisation/stodenheter/medborgarservice.818.html,contact_page
+2506,Arjeplog,kommun@arjeplog.se,central,,http://www.arjeplog.se/,pattern_match
+2506,Arjeplog,medborgarservice@arjeplog.se,central,,http://www.arjeplog.se/kontakt/,contact_page
+2510,Jokkmokk,kommun@jokkmokk.se,central,,http://www.jokkmokk.se/,pattern_match
+2510,Jokkmokk,ekonomi@jokkmokk.se,upphandling,,http://www.jokkmokk.se/kommun-och-politik/ekonomi-och-upphandling/,contact_page
+2510,Jokkmokk,infocenter@jokkmokk.se,other,,http://www.jokkmokk.se/kontakta-oss/,contact_page
+2510,Jokkmokk,kommunikation@jokkmokk.se,other,,http://www.jokkmokk.se/kontakta-oss/,contact_page
+2513,Överkalix,kommun@overkalix.se,central,,http://www.overkalix.se/,pattern_match
+2513,Överkalix,e-post.kommun@overkalix.se,central,,http://www.overkalix.se/kommun-och-politik/politik-och-organisation/medborgarforslag/,contact_page
+2514,Kalix,kommun@kalix.se,central,,http://www.kalix.se/,pattern_match
+2518,Övertorneå,kommun@overtornea.se,central,,http://www.overtornea.se/,pattern_match
+2518,Övertorneå,kontakt@overtornea.se,central,,http://www.overtornea.se/kontakt,contact_page
+2521,Pajala,kommun@pajala.se,central,,http://www.pajala.se/,pattern_match
+2521,Pajala,kommunalteknik@pajala.se,other,,http://www.pajala.se/kontakta-oss/,contact_page
+2521,Pajala,upphandling@pajala.se,upphandling,,http://www.pajala.se/arbete-och-naringsliv/upphandling-och-inkop/inkopssamordnare/,contact_page
+2560,Älvsbyn,kommunen@alvsbyn.se,central,,http://www.alvsbyn.se/,pattern_match
+2560,Älvsbyn,vux@alvsbyn.se,vuxenutbildning,,https://www.alvsbyn.se/utbildning/kompetenscentrum/vuxenutbildning/kontakta-vuxenutbildningen/,contact_page
+2560,Älvsbyn,kansliet@alvsbyn.se,other,,https://www.alvsbyn.se/kommun-och-politik/organisation/kommunchefens-stab/kansli/,contact_page
+2580,Luleå,lulea.kommun@lulea.se,central,,http://www.lulea.se/,pattern_match
+2580,Luleå,17.00.lulea.kommun@lulea.se,central,,http://www.lulea.se/kommun--politik/kontakta-lulea-kommun.html,contact_page
+2580,Luleå,ekonomicenterekonomicenter@lulea.se,upphandling,,http://www.lulea.se/naringsliv/upphandling-och-inkop/att-fakturera-lulea-kommun.html,contact_page
+2581,Piteå,kommun@pitea.se,central,,http://www.pitea.se/Kontakta/Pitea-kommun/,pattern_match
+2581,Piteå,ek@pitea.se,upphandling,,http://www.pitea.se/Medborgarservice/Upphandlingar/till-dig-som-ar-leverantor-till-pitea-kommun/,contact_page
+2582,Boden,kommunen@boden.se,central,,http://www.boden.se/,contact_page
+2583,Haparanda,kommunen@haparanda.se,central,,http://www.haparanda.se/,contact_page
+2583,Haparanda,faktura@haparanda.se,utbildning,Förvaltningschef socialförvaltningen,http://www.haparanda.se/kontakt,contact_page
+2584,Kiruna,kommun@kiruna.se,central,,https://kiruna.se/,pattern_match
+2584,Kiruna,kommunsekreterare@kiruna.se,utbildning,Kontakt nämnderna,https://kiruna.se/ovrigt/kontakta-oss.html,contact_page
+2584,Kiruna,omsorg@kiruna.se,utbildning,Kontakt nämnderna,https://kiruna.se/ovrigt/kontakta-oss.html,contact_page
+2584,Kiruna,miljo@kiruna.se,utbildning,Kontakt nämnderna,https://kiruna.se/ovrigt/kontakta-oss.html,contact_page
+2584,Kiruna,kultur-utbildning@kiruna.se,utbildning,Kontakt nämnderna,https://kiruna.se/ovrigt/kontakta-oss.html,contact_page
+2584,Kiruna,overformyndarexpeditionen@kiruna.se,utbildning,Kontakt nämnderna,https://kiruna.se/ovrigt/kontakta-oss.html,contact_page
+2584,Kiruna,valnamnd@kiruna.se,utbildning,Kontakt nämnderna,https://kiruna.se/ovrigt/kontakta-oss.html,contact_page
+2584,Kiruna,bygglov@kiruna.se,utbildning,Kontakt nämnderna,https://kiruna.se/ovrigt/kontakta-oss.html,contact_page
+2584,Kiruna,ofn@kiruna.se,utbildning,Kontakt nämnderna,https://kiruna.se/ovrigt/kontakta-oss.html,contact_page
+2584,Kiruna,integration@kiruna.se,utbildning,Kontakt nämnderna,https://kiruna.se/ovrigt/kontakta-oss.html,contact_page
+2584,Kiruna,info@tvab.kiruna.se,utbildning,Kontakt nämnderna,https://kiruna.se/ovrigt/kontakta-oss.html,contact_page
