@@ -55,14 +55,14 @@
       },
       {
         "email": "fakturaskanning@osteraker.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "https://www.osteraker.se/jobbforetagande/upphandlingochinkop/faktureringsinformation.4.367d658917909e8fc2b70eb.html",
         "found_via": "contact_page"
       },
       {
         "email": "ekonomi@osteraker.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "https://www.osteraker.se/jobbforetagande/upphandlingochinkop/faktureringsinformation.4.367d658917909e8fc2b70eb.html",
         "found_via": "contact_page"
@@ -96,7 +96,7 @@
       },
       {
         "email": "dataskyddsombud@varmdo.se",
-        "role": "vuxenutbildning",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "https://www.varmdo.se/kommunochpolitik/insynochdialog/lamnasynpunkterforslagellerklagomal.4.18c983316e0536cb18deeba.html",
         "found_via": "contact_page"
@@ -137,7 +137,7 @@
       },
       {
         "email": "dataskydd@jarfalla.se",
-        "role": "vuxenutbildning",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "http://www.jarfalla.se/kommunochpolitik/insynochrattssakerhet/hanteringavpersonuppgifter.4.6835195e1641249152313a94.html",
         "found_via": "contact_page"
@@ -214,35 +214,28 @@
       },
       {
         "email": "lisa.ringbom.axner@jarfalla.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Kommun­styrelse­förvaltningen",
         "source_url": "http://www.jarfalla.se/kommunochpolitik/forvaltningarochtjanstemannaorganisation.4.640dac6b1300db73e7c800022040.html",
         "found_via": "contact_page"
       },
       {
         "email": "happy.arenvall.hilmarsdottir@jarfalla.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Kommun­styrelse­förvaltningen",
         "source_url": "http://www.jarfalla.se/kommunochpolitik/forvaltningarochtjanstemannaorganisation.4.640dac6b1300db73e7c800022040.html",
         "found_via": "contact_page"
       },
       {
         "email": "anna.waldman.haapaniemi@jarfalla.se",
-        "role": "utbildning",
-        "forvaltning_namn": "Kommun­styrelse­förvaltningen",
-        "source_url": "http://www.jarfalla.se/kommunochpolitik/forvaltningarochtjanstemannaorganisation.4.640dac6b1300db73e7c800022040.html",
-        "found_via": "contact_page"
-      },
-      {
-        "email": "johanna.karlsson3@jarfalla.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Kommun­styrelse­förvaltningen",
         "source_url": "http://www.jarfalla.se/kommunochpolitik/forvaltningarochtjanstemannaorganisation.4.640dac6b1300db73e7c800022040.html",
         "found_via": "contact_page"
       },
       {
         "email": "amanda.touman.redstorm@jarfalla.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Kommun­styrelse­förvaltningen",
         "source_url": "http://www.jarfalla.se/kommunochpolitik/forvaltningarochtjanstemannaorganisation.4.640dac6b1300db73e7c800022040.html",
         "found_via": "contact_page"
@@ -331,7 +324,7 @@
       },
       {
         "email": "barn-utbildning@huddinge.se",
-        "role": "other",
+        "role": "utbildning",
         "forvaltning_namn": null,
         "source_url": "https://www.huddinge.se/organisation-och-styrning/ansvar-och-organisation/behandling-av-personuppgifter-enligt-gdpr",
         "found_via": "contact_page"
@@ -344,7 +337,7 @@
         "found_via": "contact_page"
       }
     ],
-    "confidence": "medium",
+    "confidence": "high",
     "notes": null,
     "verified_at": "2026-05-17"
   },
@@ -358,7 +351,7 @@
     "contacts": [
       {
         "email": "medborgarcenter@botkyrka.se",
-        "role": "vuxenutbildning",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "http://www.botkyrka.se/",
         "found_via": "pattern_match"
@@ -482,7 +475,7 @@
       },
       {
         "email": "utbildningsforvaltningen@haninge.se",
-        "role": "other",
+        "role": "utbildning",
         "forvaltning_namn": "Kommunstyrelsen och nämnder",
         "source_url": "http://www.haninge.se/kommun-och-politik/politik-och-organisation/organisation/kommunstyrelsen-och-namnder/",
         "found_via": "contact_page"
@@ -563,20 +556,6 @@
         "found_via": "contact_page"
       },
       {
-        "email": "sussanne.persson2@upplands-bro.se",
-        "role": "gymnasie",
-        "forvaltning_namn": "Gymnasie- och arbetslivsnämnden",
-        "source_url": "https://www.upplands-bro.se/kommun-och-politik/politik-och-demokrati/namnder/gymnasie--och-arbetslivsnamnden.html",
-        "found_via": "contact_page"
-      },
-      {
-        "email": "ines.riveraazua2@upplands-bro.se",
-        "role": "utbildning",
-        "forvaltning_namn": "Utbildningsnämnden",
-        "source_url": "https://www.upplands-bro.se/kommun-och-politik/politik-och-demokrati/namnder/utbildningsnamnden.html",
-        "found_via": "contact_page"
-      },
-      {
         "email": "katarina.schierenbeckljungqvist@upplands-bro.se",
         "role": "utbildning",
         "forvaltning_namn": "Utbildningsnämnden",
@@ -585,7 +564,7 @@
       },
       {
         "email": "ekonomi.fragor@upplands-bro.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "https://www.upplands-bro.se/foretagare-och-naringsliv/upphandling.html",
         "found_via": "contact_page"
@@ -646,14 +625,14 @@
     "contacts": [
       {
         "email": "redovisning@taby.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "http://www.taby.se/naringsliv-och-arbete/etablera-utveckla-och-upphandla/inkop-och-upphandling/faktura-till-taby-kommun",
         "found_via": "contact_page"
       },
       {
         "email": "upphandlingen@taby.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "http://www.taby.se/naringsliv-och-arbete/etablera-utveckla-och-upphandla/inkop-och-upphandling",
         "found_via": "contact_page"
@@ -713,7 +692,7 @@
       },
       {
         "email": "proceedosupport@sollentuna.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "https://www.sollentuna.se/jobb--foretagande/upphandling-och-inkop/fakturering/",
         "found_via": "contact_page"
@@ -786,7 +765,7 @@
       },
       {
         "email": "nackainkop@nacka.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "https://www.nacka.se/medarbetare/inkop-och-upphandling/kontakta-inkop-och-upphandling/",
         "found_via": "contact_page"
@@ -1096,111 +1075,48 @@
       },
       {
         "email": "petterssonberedskapssamordnarealva.pettersson@heby.se",
-        "role": "utbildning",
-        "forvaltning_namn": "Förvaltningar och verksamhet",
-        "source_url": "http://www.heby.se/organisation-plats-och-politik/kommunens-organisation/forvaltningar-och-verksamhet",
-        "found_via": "contact_page"
-      },
-      {
-        "email": "67camilla.rojeras@heby.se",
-        "role": "utbildning",
-        "forvaltning_namn": "Förvaltningar och verksamhet",
-        "source_url": "http://www.heby.se/organisation-plats-och-politik/kommunens-organisation/forvaltningar-och-verksamhet",
-        "found_via": "contact_page"
-      },
-      {
-        "email": "21bo.stromquist@heby.se",
-        "role": "utbildning",
-        "forvaltning_namn": "Förvaltningar och verksamhet",
-        "source_url": "http://www.heby.se/organisation-plats-och-politik/kommunens-organisation/forvaltningar-och-verksamhet",
-        "found_via": "contact_page"
-      },
-      {
-        "email": "90maria.rosen@heby.se",
-        "role": "utbildning",
-        "forvaltning_namn": "Förvaltningar och verksamhet",
-        "source_url": "http://www.heby.se/organisation-plats-och-politik/kommunens-organisation/forvaltningar-och-verksamhet",
-        "found_via": "contact_page"
-      },
-      {
-        "email": "53mina.hagenvall@heby.se",
-        "role": "utbildning",
-        "forvaltning_namn": "Förvaltningar och verksamhet",
-        "source_url": "http://www.heby.se/organisation-plats-och-politik/kommunens-organisation/forvaltningar-och-verksamhet",
-        "found_via": "contact_page"
-      },
-      {
-        "email": "0224-36015ulrika.axelsson@heby.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Förvaltningar och verksamhet",
         "source_url": "http://www.heby.se/organisation-plats-och-politik/kommunens-organisation/forvaltningar-och-verksamhet",
         "found_via": "contact_page"
       },
       {
         "email": "kostchef0224-36174mikael.sandin@heby.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Förvaltningar och verksamhet",
         "source_url": "http://www.heby.se/organisation-plats-och-politik/kommunens-organisation/forvaltningar-och-verksamhet",
         "found_via": "contact_page"
       },
       {
         "email": "nd0224-36087mauro.pliscovaz@heby.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Förvaltningar och verksamhet",
         "source_url": "http://www.heby.se/organisation-plats-och-politik/kommunens-organisation/forvaltningar-och-verksamhet",
         "found_via": "contact_page"
       },
       {
-        "email": "carola.eriksson1@heby.se",
-        "role": "utbildning",
-        "forvaltning_namn": "Vård- och omsorgsnämnden",
-        "source_url": "http://www.heby.se/organisation-plats-och-politik/demokrati-dialog-och-inflytande/hitta-din-politiker",
-        "found_via": "contact_page"
-      },
-      {
-        "email": "per.moller2@heby.se",
-        "role": "utbildning",
-        "forvaltning_namn": "Vård- och omsorgsnämnden",
-        "source_url": "http://www.heby.se/organisation-plats-och-politik/demokrati-dialog-och-inflytande/hitta-din-politiker",
-        "found_via": "contact_page"
-      },
-      {
         "email": "ewa.westling.olzon@heby.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Vård- och omsorgsnämnden",
         "source_url": "http://www.heby.se/organisation-plats-och-politik/demokrati-dialog-och-inflytande/hitta-din-politiker",
         "found_via": "contact_page"
       },
       {
         "email": "maria.flink.opoku@heby.se",
-        "role": "utbildning",
-        "forvaltning_namn": "Vård- och omsorgsnämnden",
-        "source_url": "http://www.heby.se/organisation-plats-och-politik/demokrati-dialog-och-inflytande/hitta-din-politiker",
-        "found_via": "contact_page"
-      },
-      {
-        "email": "leif.nilsson2@heby.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Vård- och omsorgsnämnden",
         "source_url": "http://www.heby.se/organisation-plats-och-politik/demokrati-dialog-och-inflytande/hitta-din-politiker",
         "found_via": "contact_page"
       },
       {
         "email": "patrik.spanning.vesterlund@heby.se",
-        "role": "utbildning",
-        "forvaltning_namn": "Vård- och omsorgsnämnden",
-        "source_url": "http://www.heby.se/organisation-plats-och-politik/demokrati-dialog-och-inflytande/hitta-din-politiker",
-        "found_via": "contact_page"
-      },
-      {
-        "email": "kerstin.karlsson1@heby.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Vård- och omsorgsnämnden",
         "source_url": "http://www.heby.se/organisation-plats-och-politik/demokrati-dialog-och-inflytande/hitta-din-politiker",
         "found_via": "contact_page"
       }
     ],
-    "confidence": "medium",
+    "confidence": "low",
     "notes": null,
     "verified_at": "2026-05-17"
   },
@@ -1255,28 +1171,28 @@
       },
       {
         "email": "godkannandehuvudmanubf@uppsala.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "http://www.uppsala.se/foretag-och-naringsliv/upphandling-och-leverantor/starta-forskola/",
         "found_via": "contact_page"
       },
       {
         "email": "omsorgsresor@uppsala.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "http://www.uppsala.se/foretag-och-naringsliv/upphandling-och-leverantor/valfrihetssystemen-bli-utforare/bli-utforare-av-daglig-verksamhet/",
         "found_via": "contact_page"
       },
       {
         "email": "dagligverksamhet@uppsala.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "http://www.uppsala.se/foretag-och-naringsliv/upphandling-och-leverantor/valfrihetssystemen-bli-utforare/bli-utforare-av-daglig-verksamhet/",
         "found_via": "contact_page"
       },
       {
         "email": "lov@uppsala.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "http://www.uppsala.se/foretag-och-naringsliv/upphandling-och-leverantor/valfrihetssystemen-bli-utforare/bli-utforare-av-vard-och-omsorgsboende/",
         "found_via": "contact_page"
@@ -1297,13 +1213,13 @@
       },
       {
         "email": "utbildningsforvaltningen@uppsala.se",
-        "role": "other",
+        "role": "utbildning",
         "forvaltning_namn": "Kontaktuppgifter till kommunens nämnder",
         "source_url": "http://www.uppsala.se/kommun-och-politik/arkiv-och-allmanna-handlingar/allmanna-handlingar-och-diarium/",
         "found_via": "contact_page"
       }
     ],
-    "confidence": "medium",
+    "confidence": "high",
     "notes": null,
     "verified_at": "2026-05-17"
   },
@@ -1404,7 +1320,7 @@
     "contacts": [
       {
         "email": "kundservice@nykoping.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "https://nykoping.se/",
         "found_via": "pattern_match"
@@ -1445,7 +1361,7 @@
         "found_via": "contact_page"
       }
     ],
-    "confidence": "high",
+    "confidence": "medium",
     "notes": null,
     "verified_at": "2026-05-17"
   },
@@ -1527,7 +1443,7 @@
       },
       {
         "email": "supportekonomiochinkop@katrineholm.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "https://www.katrineholm.se/foretag-och-naringsliv/upphandling-och-inkop/skicka-faktura-till-kommunen.html",
         "found_via": "contact_page"
@@ -1554,77 +1470,77 @@
       },
       {
         "email": "kommunledningskontor@eskilstuna.se",
-        "role": "gymnasie",
+        "role": "other",
         "forvaltning_namn": "Kontaktuppgifter till nämndernas förvaltningar",
         "source_url": "http://www.eskilstuna.se/kommun-och-politik/ta-del-av-beslut/diarium/namndernas-forvaltningar",
         "found_via": "contact_page"
       },
       {
         "email": "arbetsmarknads-vuxenutbildningsforvaltningen@eskilstuna.se",
-        "role": "gymnasie",
+        "role": "other",
         "forvaltning_namn": "Kontaktuppgifter till nämndernas förvaltningar",
         "source_url": "http://www.eskilstuna.se/kommun-och-politik/ta-del-av-beslut/diarium/namndernas-forvaltningar",
         "found_via": "contact_page"
       },
       {
         "email": "barn-utbildningsforvaltningen@eskilstuna.se",
-        "role": "gymnasie",
+        "role": "utbildning",
         "forvaltning_namn": "Kontaktuppgifter till nämndernas förvaltningar",
         "source_url": "http://www.eskilstuna.se/kommun-och-politik/ta-del-av-beslut/diarium/namndernas-forvaltningar",
         "found_via": "contact_page"
       },
       {
         "email": "kultur-fritidsforvaltningen@eskilstuna.se",
-        "role": "gymnasie",
+        "role": "other",
         "forvaltning_namn": "Kontaktuppgifter till nämndernas förvaltningar",
         "source_url": "http://www.eskilstuna.se/kommun-och-politik/ta-del-av-beslut/diarium/namndernas-forvaltningar",
         "found_via": "contact_page"
       },
       {
         "email": "samhallsbyggnad@eskilstuna.se",
-        "role": "gymnasie",
+        "role": "other",
         "forvaltning_namn": "Kontaktuppgifter till nämndernas förvaltningar",
         "source_url": "http://www.eskilstuna.se/kommun-och-politik/ta-del-av-beslut/diarium/namndernas-forvaltningar",
         "found_via": "contact_page"
       },
       {
         "email": "serviceforvaltningen@eskilstuna.se",
-        "role": "gymnasie",
+        "role": "other",
         "forvaltning_namn": "Kontaktuppgifter till nämndernas förvaltningar",
         "source_url": "http://www.eskilstuna.se/kommun-och-politik/ta-del-av-beslut/diarium/namndernas-forvaltningar",
         "found_via": "contact_page"
       },
       {
         "email": "socialforvaltningen@eskilstuna.se",
-        "role": "gymnasie",
+        "role": "other",
         "forvaltning_namn": "Kontaktuppgifter till nämndernas förvaltningar",
         "source_url": "http://www.eskilstuna.se/kommun-och-politik/ta-del-av-beslut/diarium/namndernas-forvaltningar",
         "found_via": "contact_page"
       },
       {
         "email": "torshalla-stads-namnd@eskilstuna.se",
-        "role": "gymnasie",
+        "role": "other",
         "forvaltning_namn": "Kontaktuppgifter till nämndernas förvaltningar",
         "source_url": "http://www.eskilstuna.se/kommun-och-politik/ta-del-av-beslut/diarium/namndernas-forvaltningar",
         "found_via": "contact_page"
       },
       {
         "email": "valnamnden@eskilstuna.se",
-        "role": "gymnasie",
+        "role": "other",
         "forvaltning_namn": "Kontaktuppgifter till nämndernas förvaltningar",
         "source_url": "http://www.eskilstuna.se/kommun-och-politik/ta-del-av-beslut/diarium/namndernas-forvaltningar",
         "found_via": "contact_page"
       },
       {
         "email": "vard-omsorgsforvaltningen@eskilstuna.se",
-        "role": "gymnasie",
+        "role": "other",
         "forvaltning_namn": "Kontaktuppgifter till nämndernas förvaltningar",
         "source_url": "http://www.eskilstuna.se/kommun-och-politik/ta-del-av-beslut/diarium/namndernas-forvaltningar",
         "found_via": "contact_page"
       },
       {
         "email": "overformyndarkontoret@eskilstuna.se",
-        "role": "gymnasie",
+        "role": "other",
         "forvaltning_namn": "Kontaktuppgifter till nämndernas förvaltningar",
         "source_url": "http://www.eskilstuna.se/kommun-och-politik/ta-del-av-beslut/diarium/namndernas-forvaltningar",
         "found_via": "contact_page"
@@ -1658,7 +1574,7 @@
       },
       {
         "email": "fakturacentralen@strangnas.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "https://www.strangnas.se/arbete-och-foretagande/upphandling-och-inkop/e-handel-e-faktura",
         "found_via": "contact_page"
@@ -1739,85 +1655,22 @@
         "found_via": "contact_page"
       },
       {
-        "email": "54anngela.sundback@odeshog.se",
-        "role": "utbildning",
-        "forvaltning_namn": "Barn- och utbildningsnämnden",
-        "source_url": "http://www.odeshog.se/kommunochpolitik/kommunensorganisation/namnder/barnochutbildningsnamnden.4.78ae827d1605526e94b61825.html",
-        "found_via": "contact_page"
-      },
-      {
-        "email": "64peter.johansson@odeshog.se",
-        "role": "utbildning",
-        "forvaltning_namn": "Barn- och utbildningsnämnden",
-        "source_url": "http://www.odeshog.se/kommunochpolitik/kommunensorganisation/namnder/barnochutbildningsnamnden.4.78ae827d1605526e94b61825.html",
-        "found_via": "contact_page"
-      },
-      {
         "email": "rvaltningenbarnochutbildningsnamnden@odeshog.se",
-        "role": "vuxenutbildning",
-        "forvaltning_namn": "Kontakta bildningsförvaltningen",
-        "source_url": "http://www.odeshog.se/kommunochpolitik/kontaktaoss/kontaktabildningsforvaltningen.106.3318e6f4194ac9ecf0bb3e0.html",
-        "found_via": "contact_page"
-      },
-      {
-        "email": "12cathrin.castensson@odeshog.se",
-        "role": "vuxenutbildning",
+        "role": "other",
         "forvaltning_namn": "Kontakta bildningsförvaltningen",
         "source_url": "http://www.odeshog.se/kommunochpolitik/kontaktaoss/kontaktabildningsforvaltningen.106.3318e6f4194ac9ecf0bb3e0.html",
         "found_via": "contact_page"
       },
       {
         "email": "skolskjutssamordnarebarnochutbildningsnamnden@odeshog.se",
-        "role": "vuxenutbildning",
-        "forvaltning_namn": "Kontakta bildningsförvaltningen",
-        "source_url": "http://www.odeshog.se/kommunochpolitik/kontaktaoss/kontaktabildningsforvaltningen.106.3318e6f4194ac9ecf0bb3e0.html",
-        "found_via": "contact_page"
-      },
-      {
-        "email": "81richard.olofsson@utb.odeshog.se",
-        "role": "vuxenutbildning",
-        "forvaltning_namn": "Kontakta bildningsförvaltningen",
-        "source_url": "http://www.odeshog.se/kommunochpolitik/kontaktaoss/kontaktabildningsforvaltningen.106.3318e6f4194ac9ecf0bb3e0.html",
-        "found_via": "contact_page"
-      },
-      {
-        "email": "63jenny.aakula@utb.odeshog.se",
-        "role": "vuxenutbildning",
+        "role": "other",
         "forvaltning_namn": "Kontakta bildningsförvaltningen",
         "source_url": "http://www.odeshog.se/kommunochpolitik/kontaktaoss/kontaktabildningsforvaltningen.106.3318e6f4194ac9ecf0bb3e0.html",
         "found_via": "contact_page"
       },
       {
         "email": "aiv@odeshog.se",
-        "role": "vuxenutbildning",
-        "forvaltning_namn": "Kontakta kommunledningsförvaltningen",
-        "source_url": "http://www.odeshog.se/kommunochpolitik/kontaktaoss/kontaktakommunledningsforvaltningen.106.3318e6f4194ac9ecf0bb409.html",
-        "found_via": "contact_page"
-      },
-      {
-        "email": "08mersiha.karisik@odeshog.se",
-        "role": "vuxenutbildning",
-        "forvaltning_namn": "Kontakta kommunledningsförvaltningen",
-        "source_url": "http://www.odeshog.se/kommunochpolitik/kontaktaoss/kontaktakommunledningsforvaltningen.106.3318e6f4194ac9ecf0bb409.html",
-        "found_via": "contact_page"
-      },
-      {
-        "email": "60annika.brandin@odeshog.se",
-        "role": "vuxenutbildning",
-        "forvaltning_namn": "Kontakta kommunledningsförvaltningen",
-        "source_url": "http://www.odeshog.se/kommunochpolitik/kontaktaoss/kontaktakommunledningsforvaltningen.106.3318e6f4194ac9ecf0bb409.html",
-        "found_via": "contact_page"
-      },
-      {
-        "email": "09rebecca.olovsson@odeshog.se",
-        "role": "vuxenutbildning",
-        "forvaltning_namn": "Kontakta kommunledningsförvaltningen",
-        "source_url": "http://www.odeshog.se/kommunochpolitik/kontaktaoss/kontaktakommunledningsforvaltningen.106.3318e6f4194ac9ecf0bb409.html",
-        "found_via": "contact_page"
-      },
-      {
-        "email": "42jenny.carlsson@odeshog.se",
-        "role": "vuxenutbildning",
+        "role": "other",
         "forvaltning_namn": "Kontakta kommunledningsförvaltningen",
         "source_url": "http://www.odeshog.se/kommunochpolitik/kontaktaoss/kontaktakommunledningsforvaltningen.106.3318e6f4194ac9ecf0bb409.html",
         "found_via": "contact_page"
@@ -1827,13 +1680,6 @@
         "role": "utbildning",
         "forvaltning_namn": "Behandling av personuppgifter - Barn- och utbildningsnämnden",
         "source_url": "http://www.odeshog.se/kommunochpolitik/personuppgifterochdataskydd/behandlingavpersonuppgifterikommunen/behandlingavpersonuppgifterbarnochutbildningsnamnden.4.6a91930d17cbcc51c6d216d0.html",
-        "found_via": "contact_page"
-      },
-      {
-        "email": "24markus.tollin@odeshog.se",
-        "role": "upphandling",
-        "forvaltning_namn": null,
-        "source_url": "http://www.odeshog.se/jobbochforetagande/upphandlingochinkop.4.1d2711b015e13c528de30e3e.html",
         "found_via": "contact_page"
       }
     ],
@@ -1877,22 +1723,15 @@
         "found_via": "contact_page"
       },
       {
-        "email": "212000-0399kinda@kinda.se",
-        "role": "upphandling",
-        "forvaltning_namn": null,
-        "source_url": "http://www.kinda.se/",
-        "found_via": "contact_page"
-      },
-      {
         "email": "upphandling-inkop@kinda.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "http://www.kinda.se/kommunochpolitik/upphandlingochinkop.4.590ab7dd19c88eb9a378234b.html",
         "found_via": "contact_page"
       },
       {
         "email": "ekonomi@kinda.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "http://www.kinda.se/kommunochpolitik/upphandlingochinkop/fakturatillkindakommun.106.6fd7474419c891adb54e0071.html",
         "found_via": "contact_page"
@@ -1966,20 +1805,6 @@
         "found_via": "pattern_match"
       },
       {
-        "email": "56rikard.spalle@atvidaberg.se",
-        "role": "utbildning",
-        "forvaltning_namn": "Förvaltningar, nämnder och utskott",
-        "source_url": "http://www.atvidaberg.se/kommun-och-politik/kommunens-organisation/forvaltningar-namnder-och-utskott",
-        "found_via": "contact_page"
-      },
-      {
-        "email": "26kristina.cleber@atvidaberg.se",
-        "role": "utbildning",
-        "forvaltning_namn": "Förvaltningar, nämnder och utskott",
-        "source_url": "http://www.atvidaberg.se/kommun-och-politik/kommunens-organisation/forvaltningar-namnder-och-utskott",
-        "found_via": "contact_page"
-      },
-      {
         "email": "kommun@atvidaberg.se",
         "role": "central",
         "forvaltning_namn": null,
@@ -1988,48 +1813,20 @@
       },
       {
         "email": "kompetenscenter@atvidaberg.se",
-        "role": "vuxenutbildning",
+        "role": "utbildning",
         "forvaltning_namn": "Kontakta utbildnings­förvaltningen",
         "source_url": "http://www.atvidaberg.se/kommun-och-politik/kontakt/kontakta-utbildningsforvaltningen",
         "found_via": "contact_page"
       },
       {
         "email": "skolskjuts@atvidaberg.se",
-        "role": "vuxenutbildning",
-        "forvaltning_namn": "Kontakta utbildnings­förvaltningen",
-        "source_url": "http://www.atvidaberg.se/kommun-och-politik/kontakt/kontakta-utbildningsforvaltningen",
-        "found_via": "contact_page"
-      },
-      {
-        "email": "03fredrik.gustafsson@atvidaberg.se",
-        "role": "vuxenutbildning",
-        "forvaltning_namn": "Kontakta utbildnings­förvaltningen",
-        "source_url": "http://www.atvidaberg.se/kommun-och-politik/kontakt/kontakta-utbildningsforvaltningen",
-        "found_via": "contact_page"
-      },
-      {
-        "email": "51kompetenscenter@atvidaberg.se",
-        "role": "vuxenutbildning",
-        "forvaltning_namn": "Kontakta utbildnings­förvaltningen",
-        "source_url": "http://www.atvidaberg.se/kommun-och-politik/kontakt/kontakta-utbildningsforvaltningen",
-        "found_via": "contact_page"
-      },
-      {
-        "email": "38malin.henriksson@atvidaberg.se",
-        "role": "vuxenutbildning",
+        "role": "utbildning",
         "forvaltning_namn": "Kontakta utbildnings­förvaltningen",
         "source_url": "http://www.atvidaberg.se/kommun-och-politik/kontakt/kontakta-utbildningsforvaltningen",
         "found_via": "contact_page"
       },
       {
         "email": "servicebostad@atvidaberg.se",
-        "role": "central",
-        "forvaltning_namn": "Kontakta vård- och omsorgs­förvaltningen",
-        "source_url": "http://www.atvidaberg.se/kommun-och-politik/kontakt/kontakta-vard--och-omsorgsforvaltningen",
-        "found_via": "contact_page"
-      },
-      {
-        "email": "32servicebostad@atvidaberg.se",
         "role": "central",
         "forvaltning_namn": "Kontakta vård- och omsorgs­förvaltningen",
         "source_url": "http://www.atvidaberg.se/kommun-och-politik/kontakt/kontakta-vard--och-omsorgsforvaltningen",
@@ -2097,7 +1894,7 @@
       },
       {
         "email": "utbildningsforvaltningen@linkoping.se",
-        "role": "other",
+        "role": "utbildning",
         "forvaltning_namn": null,
         "source_url": "http://www.linkoping.se/kontakt/lamna-synpunkt-eller-klagomal",
         "found_via": "contact_page"
@@ -2117,7 +1914,7 @@
         "found_via": "contact_page"
       }
     ],
-    "confidence": "medium",
+    "confidence": "high",
     "notes": null,
     "verified_at": "2026-05-17"
   },
@@ -2151,7 +1948,7 @@
     "contacts": [
       {
         "email": "kommun@soderkoping.se",
-        "role": "vuxenutbildning",
+        "role": "central",
         "forvaltning_namn": null,
         "source_url": "http://www.soderkoping.se/",
         "found_via": "pattern_match"
@@ -2171,7 +1968,7 @@
         "found_via": "contact_page"
       }
     ],
-    "confidence": "high",
+    "confidence": "medium",
     "notes": null,
     "verified_at": "2026-05-17"
   },
@@ -2252,14 +2049,14 @@
     "contacts": [
       {
         "email": "info@aneby.se",
-        "role": "utbildning",
+        "role": "central",
         "forvaltning_namn": null,
         "source_url": "http://www.aneby.se/",
         "found_via": "contact_page"
       },
       {
         "email": "e-postinfo@aneby.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "http://www.aneby.se/",
         "found_via": "contact_page"
@@ -2359,20 +2156,20 @@
       },
       {
         "email": "dataskyddsombud@gislaved.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Kommunledning och kommunstyrelseförvaltning",
         "source_url": "http://www.gislaved.se/sidfot/mer-kontaktuppgifter/kommunledning-och-kommunstyrelseforvaltning",
         "found_via": "contact_page"
       },
       {
         "email": "info@gislaved.se",
-        "role": "utbildning",
+        "role": "central",
         "forvaltning_namn": "Kommunledning och kommunstyrelseförvaltning",
         "source_url": "http://www.gislaved.se/sidfot/mer-kontaktuppgifter/kommunledning-och-kommunstyrelseforvaltning",
         "found_via": "contact_page"
       }
     ],
-    "confidence": "high",
+    "confidence": "medium",
     "notes": null,
     "verified_at": "2026-05-17"
   },
@@ -2421,7 +2218,7 @@
       },
       {
         "email": "ekonomi@vaggeryd.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "http://www.vaggeryd.se/naringsliv-och-arbete/upphandling/e-faktura.html",
         "found_via": "contact_page"
@@ -2502,50 +2299,36 @@
         "found_via": "contact_page"
       },
       {
-        "email": "kenneth.johansson1@nassjo.se",
-        "role": "utbildning",
-        "forvaltning_namn": "Barn- och utbildningsförvaltningen",
-        "source_url": "http://www.nassjo.se/kommun-och-politik/kommun/kommunens-organisation.html",
-        "found_via": "contact_page"
-      },
-      {
-        "email": "johanssonkenneth.johansson1@nassjo.se",
-        "role": "utbildning",
-        "forvaltning_namn": "Barn- och utbildningsförvaltningen",
-        "source_url": "http://www.nassjo.se/kommun-och-politik/kommun/kommunens-organisation.html",
-        "found_via": "contact_page"
-      },
-      {
         "email": "bukontoret@nassjo.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Nämnder",
         "source_url": "http://www.nassjo.se/kommun-och-politik/politik/sa-styrs-kommunen/namnder.html",
         "found_via": "contact_page"
       },
       {
         "email": "samhallsplaneringskontoret@nassjo.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Nämnder",
         "source_url": "http://www.nassjo.se/kommun-och-politik/politik/sa-styrs-kommunen/namnder.html",
         "found_via": "contact_page"
       },
       {
         "email": "tekniska@nassjo.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Nämnder",
         "source_url": "http://www.nassjo.se/kommun-och-politik/politik/sa-styrs-kommunen/namnder.html",
         "found_via": "contact_page"
       },
       {
         "email": "overformyndaren@nassjo.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Nämnder",
         "source_url": "http://www.nassjo.se/kommun-och-politik/politik/sa-styrs-kommunen/namnder.html",
         "found_via": "contact_page"
       },
       {
         "email": "nster.samhallsplaneringskontoret@nassjo.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Nämnder",
         "source_url": "http://www.nassjo.se/kommun-och-politik/politik/sa-styrs-kommunen/namnder.html",
         "found_via": "contact_page"
@@ -2577,7 +2360,7 @@
     "contacts": [
       {
         "email": "kommun@savsjo.se",
-        "role": "utbildning",
+        "role": "central",
         "forvaltning_namn": null,
         "source_url": "http://www.savsjo.se/",
         "found_via": "contact_page"
@@ -2598,21 +2381,21 @@
       },
       {
         "email": "miljobygg@savsjo.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Förvaltningar",
         "source_url": "http://www.savsjo.se/kommun-och-politik/forvaltningar-och-bolag/forvaltningar.html",
         "found_via": "contact_page"
       },
       {
         "email": "tekniska@savsjo.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Förvaltningar",
         "source_url": "http://www.savsjo.se/kommun-och-politik/forvaltningar-och-bolag/forvaltningar.html",
         "found_via": "contact_page"
       },
       {
         "email": "ekonomi@savsjo.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "http://www.savsjo.se/kommun-och-politik/ekonomi-och-upphandling/budget-och-verksamhetsplan.html",
         "found_via": "contact_page"
@@ -2622,13 +2405,6 @@
         "role": "upphandling",
         "forvaltning_namn": null,
         "source_url": "http://www.savsjo.se/kommun-och-politik/ekonomi-och-upphandling/upphandlingar-och-inkop/aktuella-upphandlingar.html",
-        "found_via": "contact_page"
-      },
-      {
-        "email": "43jorgen.frej@savsjo.se",
-        "role": "upphandling",
-        "forvaltning_namn": null,
-        "source_url": "http://www.savsjo.se/kommun-och-politik/ekonomi-och-upphandling/upphandlingar-och-inkop/hoglandets-affarsstrategiska-rad.html",
         "found_via": "contact_page"
       },
       {
@@ -2686,7 +2462,7 @@
       },
       {
         "email": "barn-utbildningssektorn@eksjo.se",
-        "role": "other",
+        "role": "utbildning",
         "forvaltning_namn": "Förvaltningens organisation",
         "source_url": "http://www.eksjo.se/kommun-och-politik/organisationen/forvaltningens-organisation",
         "found_via": "contact_page"
@@ -2713,7 +2489,7 @@
         "found_via": "contact_page"
       }
     ],
-    "confidence": "medium",
+    "confidence": "high",
     "notes": null,
     "verified_at": "2026-05-17"
   },
@@ -2857,7 +2633,7 @@
     "contacts": [
       {
         "email": "kommunen@tingsryd.se",
-        "role": "vuxenutbildning",
+        "role": "central",
         "forvaltning_namn": null,
         "source_url": "https://tingsryd.se/",
         "found_via": "pattern_match"
@@ -2871,7 +2647,7 @@
       },
       {
         "email": "barn.utbildning@tingsryd.se",
-        "role": "other",
+        "role": "utbildning",
         "forvaltning_namn": "Förvaltningar",
         "source_url": "https://tingsryd.se/kommun-och-politik/kontakt/",
         "found_via": "contact_page"
@@ -3146,13 +2922,6 @@
         "found_via": "contact_page"
       },
       {
-        "email": "victor.karlsson2@monsteras.se",
-        "role": "utbildning",
-        "forvaltning_namn": "Barn- och utbildningsnämnden",
-        "source_url": "https://www.monsteras.se/kommun-och-politik/kommunens-organisation/namnder/barn-och-utbildningsnamnden/",
-        "found_via": "contact_page"
-      },
-      {
         "email": "jakob.olsson.bergstrand@monsteras.se",
         "role": "utbildning",
         "forvaltning_namn": "Barn- och utbildningsnämnden",
@@ -3161,14 +2930,14 @@
       },
       {
         "email": "ef@monsteras.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "https://www.monsteras.se/jobb-och-foretagande/upphandling-och-inkop/leverantorsfaktura/",
         "found_via": "contact_page"
       },
       {
         "email": "ekonomi.info@monsteras.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "https://www.monsteras.se/jobb-och-foretagande/upphandling-och-inkop/leverantorsfaktura/",
         "found_via": "contact_page"
@@ -3290,7 +3059,7 @@
       },
       {
         "email": "ekonomi@oskarshamn.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "http://www.oskarshamn.se/mer-om-kommunen/ekonomi-och-finans/upphandling-och-inkop/leverantorsfakturor/",
         "found_via": "contact_page"
@@ -3317,28 +3086,28 @@
       },
       {
         "email": "upphandlingsenheten@vastervik.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "http://www.vastervik.se/Jobb-och-foretagande/Upphandling-och-inkop/",
         "found_via": "contact_page"
       },
       {
         "email": "e-handel@vastervik.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "http://www.vastervik.se/Jobb-och-foretagande/Upphandling-och-inkop/e-handel/",
         "found_via": "contact_page"
       },
       {
         "email": "ekonomi.kundtjanst@vastervik.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "http://www.vastervik.se/Jobb-och-foretagande/Upphandling-och-inkop/e-handel/",
         "found_via": "contact_page"
       },
       {
         "email": "naringsliv@vastervik.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "http://www.vastervik.se/Jobb-och-foretagande/Starta-driva-och-utveckla-foretag/pa-gang-for-naringslivet/upphandlingsskola-kommunen-som-kund--en-strategisk-mojlighet/",
         "found_via": "contact_page"
@@ -3523,7 +3292,7 @@
       },
       {
         "email": "fakturasupport@olofstrom.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "http://www.olofstrom.se/naringsliv-och-arbete/upphandling-och-inkop/hur-man-fakturerar-kommunen",
         "found_via": "contact_page"
@@ -3543,7 +3312,7 @@
     "contacts": [
       {
         "email": "kundservice@karlskrona.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "https://www.karlskrona.se/",
         "found_via": "pattern_match"
@@ -3557,14 +3326,14 @@
       },
       {
         "email": "rekryteringshubb@karlskrona.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "https://www.karlskrona.se/naringsliv/rekrytering-och-kompetens/tjanster-for-arbetsgivare/socialt-foretagande-och-upphandlingar/",
         "found_via": "contact_page"
       },
       {
         "email": "upphandlingsenheten@karlskrona.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "https://www.karlskrona.se/naringsliv/upphandling-och-ink%C3%B6p/att-lamna-anbud/",
         "found_via": "contact_page"
@@ -3836,7 +3605,7 @@
       },
       {
         "email": "pscentralenupphandling@ostragoinge.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "http://www.ostragoinge.se/jobb-och-foretagande/inkop-och-upphandling",
         "found_via": "contact_page"
@@ -3944,7 +3713,7 @@
       },
       {
         "email": "ehandel@lomma.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "https://lomma.se/jobbochforetagande/upphandlingochinkop/fakturerakommunen.1243.html",
         "found_via": "contact_page"
@@ -3971,14 +3740,14 @@
       },
       {
         "email": "naringsliv@svedala.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "http://www.svedala.se/arbeta/naringsliv/inkop-och-upphandling-foretag/",
         "found_via": "contact_page"
       },
       {
         "email": "fakturacentralen@svedala.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "http://www.svedala.se/arbeta/upphandling-och-inkop/e-faktura-leverantor/",
         "found_via": "contact_page"
@@ -4053,7 +3822,7 @@
       },
       {
         "email": "ekonomisupport@sjobo.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "http://www.sjobo.se/naringsliv-och-foretag/upphandling-och-inkop/skicka-faktura-till-sjobo-kommun.html",
         "found_via": "contact_page"
@@ -4080,7 +3849,7 @@
       },
       {
         "email": "ekonomi@horby.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "https://www.horby.se/naringsliv-och-arbete/inkop-och-upphandling/",
         "found_via": "contact_page"
@@ -4128,35 +3897,35 @@
       },
       {
         "email": "socialnamnd@hoor.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Kontaktuppgifter till verksamheter och nämnder",
         "source_url": "https://www.hoor.se/kommunen/kontakt/kontaktuppgifter-till-verksamheter-och-namnder/",
         "found_via": "contact_page"
       },
       {
         "email": "kaf@hoor.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Kontaktuppgifter till verksamheter och nämnder",
         "source_url": "https://www.hoor.se/kommunen/kontakt/kontaktuppgifter-till-verksamheter-och-namnder/",
         "found_via": "contact_page"
       },
       {
         "email": "tillstands-tillsynsnamnd@hoor.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Kontaktuppgifter till verksamheter och nämnder",
         "source_url": "https://www.hoor.se/kommunen/kontakt/kontaktuppgifter-till-verksamheter-och-namnder/",
         "found_via": "contact_page"
       },
       {
         "email": "samhallsbyggnad@hoor.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Kontaktuppgifter till verksamheter och nämnder",
         "source_url": "https://www.hoor.se/kommunen/kontakt/kontaktuppgifter-till-verksamheter-och-namnder/",
         "found_via": "contact_page"
       },
       {
         "email": "rtjskanemitt@hoor.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Kontaktuppgifter till verksamheter och nämnder",
         "source_url": "https://www.hoor.se/kommunen/kontakt/kontaktuppgifter-till-verksamheter-och-namnder/",
         "found_via": "contact_page"
@@ -4244,7 +4013,7 @@
       },
       {
         "email": "arbeteochvalfard@osby.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Kontakta förvaltningarna",
         "source_url": "http://www.osby.se/kontakt/kontakta-forvaltningarna.html",
         "found_via": "contact_page"
@@ -4258,28 +4027,28 @@
       },
       {
         "email": "kansliet@osby.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Kontakta förvaltningarna",
         "source_url": "http://www.osby.se/kontakt/kontakta-forvaltningarna.html",
         "found_via": "contact_page"
       },
       {
         "email": "hon@osby.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Kontakta förvaltningarna",
         "source_url": "http://www.osby.se/kontakt/kontakta-forvaltningarna.html",
         "found_via": "contact_page"
       },
       {
         "email": "samhallsbyggnad@osby.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Kontakta förvaltningarna",
         "source_url": "http://www.osby.se/kontakt/kontakta-forvaltningarna.html",
         "found_via": "contact_page"
       },
       {
         "email": "miljobygg@osby.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Kontakta förvaltningarna",
         "source_url": "http://www.osby.se/kontakt/kontakta-forvaltningarna.html",
         "found_via": "contact_page"
@@ -4339,7 +4108,7 @@
     "contacts": [
       {
         "email": "kommun@astorp.se",
-        "role": "utbildning",
+        "role": "central",
         "forvaltning_namn": null,
         "source_url": "http://www.astorp.se/",
         "found_via": "pattern_match"
@@ -4366,7 +4135,7 @@
       },
       {
         "email": "ehandel@bastad.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "http://www.bastad.se/jobb-och-foretagande/upphandling-och-inkop/fakturera-kommunen.html",
         "found_via": "contact_page"
@@ -4487,7 +4256,7 @@
       },
       {
         "email": "kommunkansli@hoganas.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "http://www.hoganas.se/foretagande--naringsliv/etablera-och-utveckla/upphandling.html",
         "found_via": "contact_page"
@@ -4581,7 +4350,7 @@
       },
       {
         "email": "e-faktura@kristianstad.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "http://www.kristianstad.se/jobbochforetagande/upphandlingochinkop/hurmanfakturerarkommunen.1031.html",
         "found_via": "contact_page"
@@ -4615,7 +4384,7 @@
       },
       {
         "email": "naringsliv@simrishamn.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "http://www.simrishamn.se/naringsliv-och-upphandling",
         "found_via": "contact_page"
@@ -4629,14 +4398,14 @@
       },
       {
         "email": "ekr@simrishamn.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "http://www.simrishamn.se/naringsliv-och-upphandling/radgivning-stod-och-finansiering",
         "found_via": "contact_page"
       },
       {
         "email": "ekonomi@simrishamn.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "http://www.simrishamn.se/naringsliv-och-upphandling/upphandling/e-faktura",
         "found_via": "contact_page"
@@ -4702,13 +4471,6 @@
         "found_via": "contact_page"
       },
       {
-        "email": "65lon@hassleholm.se",
-        "role": "utbildning",
-        "forvaltning_namn": "Barn- och utbildningsförvaltningen",
-        "source_url": "https://www.hassleholm.se/kommun-och-politik/kontakt/besoksadresser-besokstider-och-postadresser",
-        "found_via": "contact_page"
-      },
-      {
         "email": "kommunikation@hassleholm.se",
         "role": "other",
         "forvaltning_namn": null,
@@ -4737,41 +4499,20 @@
       },
       {
         "email": "kommunikation@hylte.se",
-        "role": "utbildning",
-        "forvaltning_namn": "Kommunledningsförvaltningen",
-        "source_url": "http://www.hylte.se/kommun-och-politik/press--och-informationsmaterial",
-        "found_via": "contact_page"
-      },
-      {
-        "email": "94kristin.engholm@hylte.se",
-        "role": "utbildning",
-        "forvaltning_namn": "Kommunledningsförvaltningen",
-        "source_url": "http://www.hylte.se/kommun-och-politik/press--och-informationsmaterial",
-        "found_via": "contact_page"
-      },
-      {
-        "email": "57rebecka.merkel@hylte.se",
-        "role": "utbildning",
-        "forvaltning_namn": "Kommunledningsförvaltningen",
-        "source_url": "http://www.hylte.se/kommun-och-politik/press--och-informationsmaterial",
-        "found_via": "contact_page"
-      },
-      {
-        "email": "37philip.norrman@hylte.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Kommunledningsförvaltningen",
         "source_url": "http://www.hylte.se/kommun-och-politik/press--och-informationsmaterial",
         "found_via": "contact_page"
       },
       {
         "email": "mndsekreterare072-3967036rebecca.lorentzon@hylte.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Kommunledningsförvaltningen",
         "source_url": "http://www.hylte.se/kommun-och-politik/press--och-informationsmaterial",
         "found_via": "contact_page"
       }
     ],
-    "confidence": "high",
+    "confidence": "medium",
     "notes": null,
     "verified_at": "2026-05-17"
   },
@@ -4785,13 +4526,13 @@
     "contacts": [
       {
         "email": "direkt@halmstad.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "http://www.halmstad.se/",
         "found_via": "pattern_match"
       }
     ],
-    "confidence": "medium",
+    "confidence": "low",
     "notes": null,
     "verified_at": "2026-05-17"
   },
@@ -4826,14 +4567,14 @@
       },
       {
         "email": "upphandlingsenheten@laholm.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "http://www.laholm.se/jobb-och-foretagande/upphandling-och-inkop/upphandlingar",
         "found_via": "contact_page"
       },
       {
         "email": "portalen.ekonomi@laholm.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "http://www.laholm.se/jobb-och-foretagande/upphandling-och-inkop/hur-du-fakturerar-kommunen",
         "found_via": "contact_page"
@@ -4847,21 +4588,21 @@
       },
       {
         "email": "kommunstyrelsen@laholm.se",
-        "role": "utbildning",
+        "role": "central",
         "forvaltning_namn": "Förvaltningar och nämnder",
         "source_url": "http://www.laholm.se/kommun-och-politik/kommunens-organisation/forvaltningar-och-namnder",
         "found_via": "contact_page"
       },
       {
         "email": "samhallsbyggnadsnamnden@laholm.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Förvaltningar och nämnder",
         "source_url": "http://www.laholm.se/kommun-och-politik/kommunens-organisation/forvaltningar-och-namnder",
         "found_via": "contact_page"
       },
       {
         "email": "socialnamnden@laholm.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Förvaltningar och nämnder",
         "source_url": "http://www.laholm.se/kommun-och-politik/kommunens-organisation/forvaltningar-och-namnder",
         "found_via": "contact_page"
@@ -4939,7 +4680,7 @@
       },
       {
         "email": "fakturacentralen@harryda.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "http://www.harryda.se/foretagande/upphandlingochinkop/fakturerakommunen.4.1439a0061817fd1d9403f5c.html",
         "found_via": "contact_page"
@@ -5371,15 +5112,8 @@
         "found_via": "contact_page"
       },
       {
-        "email": "06daniel.aronsson@bollebygd.se",
-        "role": "upphandling",
-        "forvaltning_namn": null,
-        "source_url": "https://www.bollebygd.se/naringslivocharbete/upphandlingochinkop.4.4b88096f14fb4d9accd2b0d0.html",
-        "found_via": "contact_page"
-      },
-      {
         "email": "ekonomi@bollebygd.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "https://www.bollebygd.se/naringslivocharbete/upphandlingochinkop/fakturaochefaktura.106.20bfba7e17a31ff03a5e2f84.html",
         "found_via": "contact_page"
@@ -5437,16 +5171,9 @@
         "forvaltning_namn": null,
         "source_url": "http://www.essunga.se/",
         "found_via": "contact_page"
-      },
-      {
-        "email": "agneta.andersson3@essunga.se",
-        "role": "utbildning",
-        "forvaltning_namn": "Bygg- och miljönämnden",
-        "source_url": "http://www.essunga.se/kommun--politik/kommunens-organisation.html",
-        "found_via": "contact_page"
       }
     ],
-    "confidence": "high",
+    "confidence": "medium",
     "notes": null,
     "verified_at": "2026-05-17"
   },
@@ -5518,13 +5245,6 @@
         "role": "other",
         "forvaltning_namn": null,
         "source_url": "https://gullspang.se/kontakt-felanmalan-och-e-forslag/kontakt-och-oppettider",
-        "found_via": "contact_page"
-      },
-      {
-        "email": "48johan.hellman@gullspang.se",
-        "role": "upphandling",
-        "forvaltning_namn": null,
-        "source_url": "https://gullspang.se/jobb-och-foretagande/upphandling-och-inkop/att-lamna-anbud",
         "found_via": "contact_page"
       }
     ],
@@ -5730,7 +5450,7 @@
     "contacts": [
       {
         "email": "kommun@vara.se",
-        "role": "utbildning",
+        "role": "central",
         "forvaltning_namn": null,
         "source_url": "https://www.vara.se/",
         "found_via": "pattern_match"
@@ -5771,13 +5491,13 @@
       },
       {
         "email": "utbildningkulturfritid@gotene.se",
-        "role": "other",
+        "role": "utbildning",
         "forvaltning_namn": null,
         "source_url": "https://www.gotene.se/kommunochpolitik/omkommunen/kontaktaoss.6.html",
         "found_via": "contact_page"
       }
     ],
-    "confidence": "medium",
+    "confidence": "high",
     "notes": null,
     "verified_at": "2026-05-17"
   },
@@ -5893,7 +5613,7 @@
       },
       {
         "email": "efakturainfo@molndal.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "http://www.molndal.se/jobb-och-naringsliv/naringsliv/upphandling-och-inkop/fakturera-kommunen",
         "found_via": "contact_page"
@@ -5913,7 +5633,7 @@
     "contacts": [
       {
         "email": "naringsliv@kungalv.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "https://www.kungalv.se/foretagande/nyhetsbrev-naringsliv2/nyhetsbrev-naringsliv-december-2023/informationskvall-om-offentliga-upphandlingar/",
         "found_via": "pattern_match"
@@ -5941,7 +5661,7 @@
       },
       {
         "email": "upphandlingsenhetenupphandling@kungalv.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "https://www.kungalv.se/foretagande/upphandling/ny-e-tjanst/",
         "found_via": "contact_page"
@@ -5961,7 +5681,7 @@
     "contacts": [
       {
         "email": "kommun@lysekil.se",
-        "role": "vuxenutbildning",
+        "role": "central",
         "forvaltning_namn": null,
         "source_url": "http://www.lysekil.se/",
         "found_via": "contact_page"
@@ -6021,13 +5741,6 @@
         "found_via": "contact_page"
       },
       {
-        "email": "2bun@stromstad.se",
-        "role": "utbildning",
-        "forvaltning_namn": "Barn- och utbildningsnämnden",
-        "source_url": "http://www.stromstad.se/kommunochpolitik/motenhandlingarochprotokoll/barnochutbildningsnamnden.4.3fed02301498a2c0998bcea.html",
-        "found_via": "contact_page"
-      },
-      {
         "email": "ks@stromstad.se",
         "role": "central",
         "forvaltning_namn": null,
@@ -6056,69 +5769,69 @@
       },
       {
         "email": "barnutbildning@vanersborg.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Telefonnummer och e-post till förvaltningar",
         "source_url": "http://www.vanersborg.se/kommun-och-politik/kontakta-kommunen",
         "found_via": "contact_page"
       },
       {
         "email": "kulturfritid@vanersborg.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Telefonnummer och e-post till förvaltningar",
         "source_url": "http://www.vanersborg.se/kommun-och-politik/kontakta-kommunen",
         "found_via": "contact_page"
       },
       {
         "email": "byggnad@vanersborg.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Telefonnummer och e-post till förvaltningar",
         "source_url": "http://www.vanersborg.se/kommun-och-politik/kontakta-kommunen",
         "found_via": "contact_page"
       },
       {
         "email": "miljo@vanersborg.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Telefonnummer och e-post till förvaltningar",
         "source_url": "http://www.vanersborg.se/kommun-och-politik/kontakta-kommunen",
         "found_via": "contact_page"
       },
       {
         "email": "social@vanersborg.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Telefonnummer och e-post till förvaltningar",
         "source_url": "http://www.vanersborg.se/kommun-och-politik/kontakta-kommunen",
         "found_via": "contact_page"
       },
       {
         "email": "overformyndar@vanersborg.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Telefonnummer och e-post till förvaltningar",
         "source_url": "http://www.vanersborg.se/kommun-och-politik/kontakta-kommunen",
         "found_via": "contact_page"
       },
       {
         "email": "biblioteket@vanersborg.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Telefonnummer och e-post till förvaltningar",
         "source_url": "http://www.vanersborg.se/kommun-och-politik/kontakta-kommunen",
         "found_via": "contact_page"
       },
       {
         "email": "kommunikation@vanersborg.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Telefonnummer och e-post till förvaltningar",
         "source_url": "http://www.vanersborg.se/kommun-och-politik/kontakta-kommunen",
         "found_via": "contact_page"
       },
       {
         "email": "webbredaktionen@vanersborg.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Telefonnummer och e-post till förvaltningar",
         "source_url": "http://www.vanersborg.se/kommun-och-politik/kontakta-kommunen",
         "found_via": "contact_page"
       }
     ],
-    "confidence": "high",
+    "confidence": "medium",
     "notes": null,
     "verified_at": "2026-05-17"
   },
@@ -6153,7 +5866,7 @@
       },
       {
         "email": "ekonomikontoret@trollhattan.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "https://www.trollhattan.se/startsida/jobbochforetagande/upphandling/e-faktura/",
         "found_via": "contact_page"
@@ -6173,7 +5886,7 @@
     "contacts": [
       {
         "email": "kommunstyrelsen@alingsas.se",
-        "role": "utbildning",
+        "role": "central",
         "forvaltning_namn": null,
         "source_url": "https://www.alingsas.se/",
         "found_via": "pattern_match"
@@ -6193,7 +5906,7 @@
         "found_via": "contact_page"
       }
     ],
-    "confidence": "high",
+    "confidence": "medium",
     "notes": null,
     "verified_at": "2026-05-16"
   },
@@ -6300,7 +6013,7 @@
     "contacts": [
       {
         "email": "kommun@lidkoping.se",
-        "role": "utbildning",
+        "role": "central",
         "forvaltning_namn": null,
         "source_url": "https://lidkoping.se/",
         "found_via": "pattern_match"
@@ -6328,13 +6041,13 @@
       },
       {
         "email": "naringsliv@lidkoping.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "https://lidkoping.se/foretag-naringsliv-och-exploatering/inkopscentralen-vastra-skaraborg-icv6/upphandlingsplan-vastra-skaraborg",
         "found_via": "contact_page"
       }
     ],
-    "confidence": "high",
+    "confidence": "medium",
     "notes": null,
     "verified_at": "2026-05-17"
   },
@@ -6464,20 +6177,13 @@
       },
       {
         "email": "barn.utbildning@tidaholm.se",
-        "role": "other",
-        "forvaltning_namn": null,
-        "source_url": "http://www.tidaholm.se/kontaktaoss.1214.html",
-        "found_via": "contact_page"
-      },
-      {
-        "email": "05barn.utbildning@tidaholm.se",
-        "role": "other",
+        "role": "utbildning",
         "forvaltning_namn": null,
         "source_url": "http://www.tidaholm.se/kontaktaoss.1214.html",
         "found_via": "contact_page"
       }
     ],
-    "confidence": "medium",
+    "confidence": "high",
     "notes": null,
     "verified_at": "2026-05-17"
   },
@@ -6572,7 +6278,7 @@
     "contacts": [
       {
         "email": "torsby.kommun@torsby.se",
-        "role": "utbildning",
+        "role": "central",
         "forvaltning_namn": "Nämnder och bolag",
         "source_url": "http://www.torsby.se/nykontaktaossfunktion/namnderochbolag.4.1f3a3f84162b424002fd5fab.html",
         "found_via": "contact_page"
@@ -6586,49 +6292,49 @@
       },
       {
         "email": "kln@torsby.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Nämnder och bolag",
         "source_url": "http://www.torsby.se/nykontaktaossfunktion/namnderochbolag.4.1f3a3f84162b424002fd5fab.html",
         "found_via": "contact_page"
       },
       {
         "email": "mbr@torsby.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Nämnder och bolag",
         "source_url": "http://www.torsby.se/nykontaktaossfunktion/namnderochbolag.4.1f3a3f84162b424002fd5fab.html",
         "found_via": "contact_page"
       },
       {
         "email": "sn@torsby.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Nämnder och bolag",
         "source_url": "http://www.torsby.se/nykontaktaossfunktion/namnderochbolag.4.1f3a3f84162b424002fd5fab.html",
         "found_via": "contact_page"
       },
       {
         "email": "valn@torsby.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Nämnder och bolag",
         "source_url": "http://www.torsby.se/nykontaktaossfunktion/namnderochbolag.4.1f3a3f84162b424002fd5fab.html",
         "found_via": "contact_page"
       },
       {
         "email": "ofn@torsby.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Nämnder och bolag",
         "source_url": "http://www.torsby.se/nykontaktaossfunktion/namnderochbolag.4.1f3a3f84162b424002fd5fab.html",
         "found_via": "contact_page"
       },
       {
         "email": "kpr@torsby.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Nämnder och bolag",
         "source_url": "http://www.torsby.se/nykontaktaossfunktion/namnderochbolag.4.1f3a3f84162b424002fd5fab.html",
         "found_via": "contact_page"
       },
       {
         "email": "ktr@torsby.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Nämnder och bolag",
         "source_url": "http://www.torsby.se/nykontaktaossfunktion/namnderochbolag.4.1f3a3f84162b424002fd5fab.html",
         "found_via": "contact_page"
@@ -6746,16 +6452,9 @@
         "forvaltning_namn": null,
         "source_url": "https://www.grums.se/",
         "found_via": "pattern_match"
-      },
-      {
-        "email": "17gustav.hagerskog@grums.se",
-        "role": "gymnasie",
-        "forvaltning_namn": null,
-        "source_url": "https://www.grums.se/kommunpolitik/kommunensorganisation/forvaltningsorganisation/sektorutbildningochfritid.11205.html",
-        "found_via": "contact_page"
       }
     ],
-    "confidence": "medium",
+    "confidence": "low",
     "notes": null,
     "verified_at": "2026-05-17"
   },
@@ -6849,13 +6548,13 @@
       },
       {
         "email": "skolnamnden@kristinehamn.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Skolnämnden",
         "source_url": "http://www.kristinehamn.se/kommun-och-politik/kommunens-organisation/namnder-och-forvaltningar/skolnamnden/",
         "found_via": "contact_page"
       }
     ],
-    "confidence": "high",
+    "confidence": "medium",
     "notes": null,
     "verified_at": "2026-05-17"
   },
@@ -6943,28 +6642,14 @@
       },
       {
         "email": "barn.utbildning@saffle.se",
-        "role": "other",
-        "forvaltning_namn": null,
-        "source_url": "https://www.saffle.se/kommun-och-politik/blandat/kontaktcenter.html",
-        "found_via": "contact_page"
-      },
-      {
-        "email": "90barn.utbildning@saffle.se",
-        "role": "other",
-        "forvaltning_namn": null,
-        "source_url": "https://www.saffle.se/kommun-och-politik/blandat/kontaktcenter.html",
-        "found_via": "contact_page"
-      },
-      {
-        "email": "erika.andersson2@saffle.se",
         "role": "utbildning",
-        "forvaltning_namn": "Barn- och utbildningsförvaltning",
-        "source_url": "https://www.saffle.se/kommun-och-politik/press-och-kommunikation/kontaktvagar.html",
+        "forvaltning_namn": null,
+        "source_url": "https://www.saffle.se/kommun-och-politik/blandat/kontaktcenter.html",
         "found_via": "contact_page"
       },
       {
         "email": "arkivet@saffle.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "https://www.saffle.se/kommun-och-politik/kommunens-organisation/kommunala-bolag/safflebostader-ab/om-oss.html",
         "found_via": "contact_page"
@@ -7065,13 +6750,13 @@
       },
       {
         "email": "skoladministration@degerfors.se",
-        "role": "other",
+        "role": "utbildning",
         "forvaltning_namn": null,
         "source_url": "http://www.degerfors.se/kommun-och-politik/kommunens-organisation/kontakta-oss.html",
         "found_via": "contact_page"
       }
     ],
-    "confidence": "medium",
+    "confidence": "high",
     "notes": null,
     "verified_at": "2026-05-17"
   },
@@ -7179,27 +6864,20 @@
       },
       {
         "email": "elin.fennander.sahlberg@askersund.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Kontakta förvaltningarna",
         "source_url": "https://www.askersund.se/kommun--politik/kontakta-askersunds-kommun/kontakta-forvaltningarna",
         "found_via": "contact_page"
       },
       {
         "email": "ekonomikontoret@askersund.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "https://www.askersund.se/naringsliv--arbete/upphandling-och-inkop/e-faktura-fran-foretag-till-kommunen",
         "found_via": "contact_page"
-      },
-      {
-        "email": "per.johansson2@askersund.se",
-        "role": "upphandling",
-        "forvaltning_namn": null,
-        "source_url": "https://www.askersund.se/naringsliv--arbete/upphandling-och-inkop",
-        "found_via": "contact_page"
       }
     ],
-    "confidence": "high",
+    "confidence": "medium",
     "notes": null,
     "verified_at": "2026-05-16"
   },
@@ -7267,7 +6945,7 @@
       },
       {
         "email": "barn.utbildningsforvaltningen@lindesberg.se",
-        "role": "other",
+        "role": "utbildning",
         "forvaltning_namn": null,
         "source_url": "https://www.lindesberg.se/kommun-och-politik/kontakta-oss",
         "found_via": "contact_page"
@@ -7281,14 +6959,14 @@
       },
       {
         "email": "fakturasupport@lindesberg.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "https://www.lindesberg.se/jobb-och-foretagande/upphandling-och-inkop/fakturera-lindesbergs-kommun",
         "found_via": "contact_page"
       },
       {
         "email": "leverantorsfaktura@lindesberg.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "https://www.lindesberg.se/jobb-och-foretagande/upphandling-och-inkop/fakturera-lindesbergs-kommun",
         "found_via": "contact_page"
@@ -7301,7 +6979,7 @@
         "found_via": "pattern_match"
       }
     ],
-    "confidence": "medium",
+    "confidence": "high",
     "notes": null,
     "verified_at": "2026-05-17"
   },
@@ -7342,7 +7020,7 @@
     "contacts": [
       {
         "email": "kommunen@surahammar.se",
-        "role": "utbildning",
+        "role": "central",
         "forvaltning_namn": null,
         "source_url": "http://www.surahammar.se/",
         "found_via": "pattern_match"
@@ -7417,27 +7095,27 @@
       },
       {
         "email": "naringslivsenheten@hallstahammar.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "http://www.hallstahammar.se/organisation-och-politik/lagar-regler-och-dokument-som-styr-kommunen/offentlig-upphandling",
         "found_via": "contact_page"
       },
       {
         "email": "upphanlding@hallstahammar.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "http://www.hallstahammar.se/organisation-och-politik/lagar-regler-och-dokument-som-styr-kommunen/offentlig-upphandling",
         "found_via": "contact_page"
       },
       {
         "email": "asa.oberg.thorstenson@hallstahammar.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Kommunens förvaltningar, bolag och förbund",
         "source_url": "http://www.hallstahammar.se/organisation-och-politik/kommunens-forvaltningar-bolag-och-forbund",
         "found_via": "contact_page"
       }
     ],
-    "confidence": "high",
+    "confidence": "medium",
     "notes": null,
     "verified_at": "2026-05-17"
   },
@@ -7478,7 +7156,7 @@
     "contacts": [
       {
         "email": "kontaktcenter@vasteras.se",
-        "role": "utbildning",
+        "role": "central",
         "forvaltning_namn": null,
         "source_url": "http://www.vasteras.se/",
         "found_via": "contact_page"
@@ -7492,14 +7170,14 @@
       },
       {
         "email": "kontaktaupphandling@vasteras.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "http://www.vasteras.se/naringsliv-och-arbete/upphandling-och-inkop/for-dig-som-ar-eller-vill-bli-leverantor.html",
         "found_via": "contact_page"
       },
       {
         "email": "ehandelsupport@vasteras.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "http://www.vasteras.se/naringsliv-och-arbete/upphandling-och-inkop/e-handel-e-faktura.html",
         "found_via": "contact_page"
@@ -7519,13 +7197,13 @@
     "contacts": [
       {
         "email": "kommun.info@sala.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "http://www.sala.se/",
         "found_via": "pattern_match"
       }
     ],
-    "confidence": "medium",
+    "confidence": "low",
     "notes": null,
     "verified_at": "2026-05-17"
   },
@@ -7574,21 +7252,21 @@
       },
       {
         "email": "fakturor@fagersta.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "http://www.fagersta.se/foretag--upphandling/fakturor/skicka-faktura",
         "found_via": "contact_page"
       },
       {
         "email": "kund@fagersta.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "http://www.fagersta.se/foretag--upphandling/fakturor/ta-emot-faktura",
         "found_via": "contact_page"
       },
       {
         "email": "naringsliv@fagersta.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "http://www.fagersta.se/foretag--upphandling/foretag/foretagsbesok",
         "found_via": "contact_page"
@@ -7615,28 +7293,28 @@
       },
       {
         "email": "miljo@koping.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "http://www.koping.se/foretagare--naringsliv/upphandling-tillstand-och-tillsyn/tillstand-regler-och-tillsyn/tobak-e-cigaretter-tobaksfria-nikotinprodukter-folkol-och-receptfria-lakemedel.html",
         "found_via": "contact_page"
       },
       {
         "email": "samhallsbyggnad@koping.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "http://www.koping.se/foretagare--naringsliv/upphandling-tillstand-och-tillsyn/tillstand-regler-och-tillsyn/saneringsintyg-for-fartyg.html",
         "found_via": "contact_page"
       },
       {
         "email": "bygglov@koping.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "http://www.koping.se/foretagare--naringsliv/upphandling-tillstand-och-tillsyn/tillstand-regler-och-tillsyn/bygglov.html",
         "found_via": "contact_page"
       },
       {
         "email": "retag.0221-25347bygglov@koping.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "http://www.koping.se/foretagare--naringsliv/upphandling-tillstand-och-tillsyn/tillstand-regler-och-tillsyn/bygglov.html",
         "found_via": "contact_page"
@@ -7698,13 +7376,6 @@
         "role": "other",
         "forvaltning_namn": "Kontakta nämndkansliet",
         "source_url": "https://www.malung-salen.se/kommun-och-politik/kontakta-namndkansliet",
-        "found_via": "contact_page"
-      },
-      {
-        "email": "78mats.johansson@malung-salen.se",
-        "role": "upphandling",
-        "forvaltning_namn": null,
-        "source_url": "https://www.malung-salen.se/naringsliv-foretag-och-jobb/upphandling-och-inkop",
         "found_via": "contact_page"
       }
     ],
@@ -7790,42 +7461,42 @@
       },
       {
         "email": "mark.plan@rattvik.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Stab- och serviceförvaltning",
         "source_url": "http://www.rattvik.se/kommun-och-politik/kontakta-oss.html",
         "found_via": "contact_page"
       },
       {
         "email": "miljo.bygg@rattvik.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Stab- och serviceförvaltning",
         "source_url": "http://www.rattvik.se/kommun-och-politik/kontakta-oss.html",
         "found_via": "contact_page"
       },
       {
         "email": "kultur@rattvik.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Stab- och serviceförvaltning",
         "source_url": "http://www.rattvik.se/kommun-och-politik/kontakta-oss.html",
         "found_via": "contact_page"
       },
       {
         "email": "bibliotek@rattvik.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Stab- och serviceförvaltning",
         "source_url": "http://www.rattvik.se/kommun-och-politik/kontakta-oss.html",
         "found_via": "contact_page"
       },
       {
         "email": "fritid@rattvik.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Stab- och serviceförvaltning",
         "source_url": "http://www.rattvik.se/kommun-och-politik/kontakta-oss.html",
         "found_via": "contact_page"
       },
       {
         "email": "sociala@rattvik.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Stab- och serviceförvaltning",
         "source_url": "http://www.rattvik.se/kommun-och-politik/kontakta-oss.html",
         "found_via": "contact_page"
@@ -7884,13 +7555,6 @@
         "forvaltning_namn": null,
         "source_url": "http://www.orsa.se/",
         "found_via": "pattern_match"
-      },
-      {
-        "email": "andreas.larsson1@orsa.se",
-        "role": "upphandling",
-        "forvaltning_namn": null,
-        "source_url": "http://www.orsa.se/naringsliv-och-arbete/inkop-och-upphandling/elektroniska-fakturor-e-faktura.html",
-        "found_via": "contact_page"
       }
     ],
     "confidence": "medium",
@@ -7914,7 +7578,7 @@
       },
       {
         "email": "nnqvistkontaktuppgifterlevfaktura@alvdalen.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "http://www.alvdalen.se/naringsliv-och-arbete/inkop-och-upphandling/elektroniska-fakturor-e-fakturor.html",
         "found_via": "contact_page"
@@ -8137,7 +7801,7 @@
       },
       {
         "email": "redovisning@avesta.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "https://www.avesta.se/naringsliv-och-arbete/upphandling-och-inkop/fakturor-till-avesta-kommun/",
         "found_via": "contact_page"
@@ -8157,7 +7821,7 @@
     "contacts": [
       {
         "email": "info@ludvika.se",
-        "role": "utbildning",
+        "role": "central",
         "forvaltning_namn": null,
         "source_url": "https://www.ludvika.se/",
         "found_via": "pattern_match"
@@ -8184,7 +7848,7 @@
         "found_via": "contact_page"
       }
     ],
-    "confidence": "high",
+    "confidence": "medium",
     "notes": null,
     "verified_at": "2026-05-17"
   },
@@ -8205,13 +7869,13 @@
       },
       {
         "email": "utbildningochkultur@ockelbo.se",
-        "role": "other",
+        "role": "utbildning",
         "forvaltning_namn": null,
         "source_url": "https://ockelbo.se/kontakta-oss",
         "found_via": "contact_page"
       }
     ],
-    "confidence": "medium",
+    "confidence": "high",
     "notes": null,
     "verified_at": "2026-05-17"
   },
@@ -8276,44 +7940,9 @@
         "forvaltning_namn": null,
         "source_url": "http://www.nordanstig.se/",
         "found_via": "pattern_match"
-      },
-      {
-        "email": "85lars.larsson@nordanstig.se",
-        "role": "utbildning",
-        "forvaltning_namn": "Förvaltning",
-        "source_url": "http://www.nordanstig.se/startsida/sidor/kommun-och-politik/forvaltning.html",
-        "found_via": "contact_page"
-      },
-      {
-        "email": "18ulrika.segervald@nordanstig.se",
-        "role": "utbildning",
-        "forvaltning_namn": "Förvaltning",
-        "source_url": "http://www.nordanstig.se/startsida/sidor/kommun-och-politik/forvaltning.html",
-        "found_via": "contact_page"
-      },
-      {
-        "email": "08lena.kahre@nordanstig.se",
-        "role": "utbildning",
-        "forvaltning_namn": "Förvaltning",
-        "source_url": "http://www.nordanstig.se/startsida/sidor/kommun-och-politik/forvaltning.html",
-        "found_via": "contact_page"
-      },
-      {
-        "email": "64karin.henningsson@nordanstig.se",
-        "role": "utbildning",
-        "forvaltning_namn": "Förvaltning",
-        "source_url": "http://www.nordanstig.se/startsida/sidor/kommun-och-politik/forvaltning.html",
-        "found_via": "contact_page"
-      },
-      {
-        "email": "77gunilla.voxlin@nordanstig.se",
-        "role": "utbildning",
-        "forvaltning_namn": "Förvaltning",
-        "source_url": "http://www.nordanstig.se/startsida/sidor/kommun-och-politik/forvaltning.html",
-        "found_via": "contact_page"
       }
     ],
-    "confidence": "high",
+    "confidence": "medium",
     "notes": null,
     "verified_at": "2026-05-17"
   },
@@ -8393,14 +8022,14 @@
       },
       {
         "email": "barn-utbildningsnamnden@soderhamn.se",
-        "role": "other",
+        "role": "utbildning",
         "forvaltning_namn": "Kontakta nämnder (registrator, kansli)",
         "source_url": "http://www.soderhamn.se/sidor/kommun-och-politik/kundtjanst-kontakt.html",
         "found_via": "contact_page"
       },
       {
         "email": "ehandel@soderhamn.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": "Film från DIGG – Myndigheten för digital förvaltning",
         "source_url": "http://www.soderhamn.se/underwebbar/naringsliv/upphandling-och-inkop/e-handel-och-fakturering/e-faktura.html",
         "found_via": "contact_page"
@@ -8413,7 +8042,7 @@
         "found_via": "contact_page"
       }
     ],
-    "confidence": "medium",
+    "confidence": "high",
     "notes": null,
     "verified_at": "2026-05-17"
   },
@@ -8461,7 +8090,7 @@
       },
       {
         "email": "fakturacentralen@hudiksvall.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "http://www.hudiksvall.se/Sidor/Tillvaxt-och-naringsliv/Upphandling-och-inkop/Leverantor-till-kommunen.html",
         "found_via": "contact_page"
@@ -8582,7 +8211,7 @@
       },
       {
         "email": "sscleverantor@sundsvall.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "http://www.sundsvall.se/kommun/jobb-och-foretagande/upphandling-och-inkop/hur-du-fakturerar-kommunen",
         "found_via": "contact_page"
@@ -8644,7 +8273,7 @@
       },
       {
         "email": "ekonomikontoret.kommunen@kramfors.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "http://www.kramfors.se/naringsliv--arbete/upphandling-och-inkop/elektroniska-fakturor.html",
         "found_via": "contact_page"
@@ -8698,7 +8327,7 @@
       },
       {
         "email": "cfg@ornskoldsvik.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "https://www.ornskoldsvik.se/foretagsservice/upphandling-och-inkop/fakturera-kommunen-och-de-kommunala-bolagen",
         "found_via": "contact_page"
@@ -8732,42 +8361,42 @@
       },
       {
         "email": "naringsliv@ragunda.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "https://www.ragunda.se/naringslivochupphandling/startadrivaochutveckla.798.html",
         "found_via": "contact_page"
       },
       {
         "email": "kundcenter@ragunda.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "https://www.ragunda.se/naringslivochupphandling/startadrivaochutveckla.798.html",
         "found_via": "contact_page"
       },
       {
         "email": "k.naringsliv@ragunda.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "https://www.ragunda.se/naringslivochupphandling/ragundakommunsnaringsliv.792.html",
         "found_via": "contact_page"
       },
       {
         "email": "utvecklingsenhetennaringsliv@ragunda.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "https://www.ragunda.se/naringslivochupphandling/expansionochetableringiragundakommun.796.html",
         "found_via": "contact_page"
       },
       {
         "email": "bygg.miljo@ragunda.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "https://www.ragunda.se/naringslivochupphandling/forsaljningavtobakochliknandeprodukter.3838.html",
         "found_via": "contact_page"
       },
       {
         "email": "upphandlingssamordnare@ragunda.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "https://www.ragunda.se/naringslivochupphandling/nyheternaringslivochupphandling/nyhetsarkiv/inbjudantillupphandlingstraff.5234.html",
         "found_via": "contact_page"
@@ -8895,20 +8524,20 @@
       },
       {
         "email": "thor.kruse.een@are.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Förvaltningschefer",
         "source_url": "http://www.are.se/kommun-och-politik/kontakta-oss/ta-kontakt-med-tjanstepersoner",
         "found_via": "contact_page"
       },
       {
         "email": "malin.andersson.7@are.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Förvaltningschefer",
         "source_url": "http://www.are.se/kommun-och-politik/kontakta-oss/ta-kontakt-med-tjanstepersoner",
         "found_via": "contact_page"
       }
     ],
-    "confidence": "high",
+    "confidence": "medium",
     "notes": null,
     "verified_at": "2026-05-17"
   },
@@ -8963,7 +8592,7 @@
       },
       {
         "email": "barn.utbildning@herjedalen.se",
-        "role": "other",
+        "role": "utbildning",
         "forvaltning_namn": null,
         "source_url": "https://www.herjedalen.se/ovrigt-sokbart/kontakta-harjedalens-kommun.html",
         "found_via": "contact_page"
@@ -8983,7 +8612,7 @@
         "found_via": "contact_page"
       }
     ],
-    "confidence": "medium",
+    "confidence": "high",
     "notes": null,
     "verified_at": "2026-05-17"
   },
@@ -8997,56 +8626,56 @@
     "contacts": [
       {
         "email": "magnus.o.andersson@ostersund.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Förvaltningar",
         "source_url": "http://www.ostersund.se/kommun-och-politik/kommunens-organisation/forvaltningar.html",
         "found_via": "contact_page"
       },
       {
         "email": "cecilia.lindhe.nadjalin@ostersund.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Förvaltningar",
         "source_url": "http://www.ostersund.se/kommun-och-politik/kommunens-organisation/forvaltningar.html",
         "found_via": "contact_page"
       },
       {
         "email": "anna.i.backlund@ostersund.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Förvaltningar",
         "source_url": "http://www.ostersund.se/kommun-och-politik/kommunens-organisation/forvaltningar.html",
         "found_via": "contact_page"
       },
       {
         "email": "eva.m.larsson@ostersund.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Förvaltningar",
         "source_url": "http://www.ostersund.se/kommun-och-politik/kommunens-organisation/forvaltningar.html",
         "found_via": "contact_page"
       },
       {
         "email": "camilla.wiktorsson.sand@ostersund.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Förvaltningar",
         "source_url": "http://www.ostersund.se/kommun-och-politik/kommunens-organisation/forvaltningar.html",
         "found_via": "contact_page"
       },
       {
         "email": "christina.von.leitgeb@ostersund.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Förvaltningar",
         "source_url": "http://www.ostersund.se/kommun-och-politik/kommunens-organisation/forvaltningar.html",
         "found_via": "contact_page"
       },
       {
         "email": "tobias.1.johansson@ostersund.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Förvaltningar",
         "source_url": "http://www.ostersund.se/kommun-och-politik/kommunens-organisation/forvaltningar.html",
         "found_via": "contact_page"
       },
       {
         "email": "eva.lek.jansson@ostersund.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Förvaltningar",
         "source_url": "http://www.ostersund.se/kommun-och-politik/kommunens-organisation/forvaltningar.html",
         "found_via": "contact_page"
@@ -9060,13 +8689,13 @@
       },
       {
         "email": "kommunarkivet@ostersund.se",
-        "role": "vuxenutbildning",
+        "role": "central",
         "forvaltning_namn": null,
         "source_url": "http://www.ostersund.se/kommun-och-politik/diarium-och-arkiv/kommunarkivet.html",
         "found_via": "contact_page"
       }
     ],
-    "confidence": "medium",
+    "confidence": "high",
     "notes": null,
     "verified_at": "2026-05-17"
   },
@@ -9092,21 +8721,21 @@
     "contacts": [
       {
         "email": "kommunen@bjurholm.se",
-        "role": "utbildning",
+        "role": "central",
         "forvaltning_namn": null,
         "source_url": "https://www.bjurholm.se/",
         "found_via": "contact_page"
       },
       {
         "email": "per-olof.t.bylund@bjurholm.se",
-        "role": "it_digitalisering",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "https://www.bjurholm.se/kommun-och-politik/kommun/forvaltningsorganisation/kommunstyrelsens-verksamheter",
         "found_via": "contact_page"
       },
       {
         "email": "veronica.t.bylund@bjurholm.se",
-        "role": "it_digitalisering",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "https://www.bjurholm.se/kommun-och-politik/kommun/forvaltningsorganisation/kommunstyrelsens-verksamheter",
         "found_via": "contact_page"
@@ -9256,7 +8885,7 @@
       },
       {
         "email": "utbildningskontoret@mala.se",
-        "role": "other",
+        "role": "utbildning",
         "forvaltning_namn": null,
         "source_url": "http://www.mala.se/kommun-och-politik/kontakt-och-organisationsbeskrivning/utbildningsavdelningen/",
         "found_via": "contact_page"
@@ -9307,13 +8936,6 @@
     "diarium_url": null,
     "contacts": [
       {
-        "email": "95peter.ahlqvist@dorotea.se",
-        "role": "upphandling",
-        "forvaltning_namn": null,
-        "source_url": "http://www.dorotea.se/naringsliv/driva-foretag/upphandling-och-inkop/pagaende-och-kommande-upphandlingar/",
-        "found_via": "contact_page"
-      },
-      {
         "email": "info@dorotea.se",
         "role": "central",
         "forvaltning_namn": null,
@@ -9335,7 +8957,7 @@
     "contacts": [
       {
         "email": "vannas.kommun@vannas.se",
-        "role": "utbildning",
+        "role": "central",
         "forvaltning_namn": null,
         "source_url": "https://www.vannas.se/",
         "found_via": "contact_page"
@@ -9349,20 +8971,13 @@
       },
       {
         "email": "barn.utbildningsnamnden@vannas.se",
-        "role": "other",
+        "role": "utbildning",
         "forvaltning_namn": null,
         "source_url": "https://www.vannas.se/kommun-och-politik/kontakt/gemensamma-e-postlador",
         "found_via": "contact_page"
-      },
-      {
-        "email": "emelie.johansson2@vannas.se",
-        "role": "utbildning",
-        "forvaltning_namn": "Kontakta Barn- och utbildningsförvaltningen",
-        "source_url": "https://www.vannas.se/barn-och-utbildning/kontakta-barn--och-utbildningsforvaltningen",
-        "found_via": "contact_page"
       }
     ],
-    "confidence": "medium",
+    "confidence": "high",
     "notes": null,
     "verified_at": "2026-05-17"
   },
@@ -9430,77 +9045,56 @@
       },
       {
         "email": "stdochverksamhetsservice@grupper.umea.se",
-        "role": "gymnasie",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "http://www.umea.se/kommunochpolitik/politikochdemokrati/dialogochsynpunkter.4.88db09b1724ee319ca46d.html",
         "found_via": "contact_page"
       },
       {
         "email": "ksdiarium@umea.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Nämnder, kontaktuppgifter",
         "source_url": "http://www.umea.se/kommunochpolitik/politikochdemokrati/dialogochsynpunkter/namnderkontaktuppgifter.4.88db09b1724ee319ca487.html",
         "found_via": "contact_page"
       },
       {
         "email": "bndiarium@umea.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Nämnder, kontaktuppgifter",
         "source_url": "http://www.umea.se/kommunochpolitik/politikochdemokrati/dialogochsynpunkter/namnderkontaktuppgifter.4.88db09b1724ee319ca487.html",
         "found_via": "contact_page"
       },
       {
         "email": "ifnamnden@umea.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Nämnder, kontaktuppgifter",
         "source_url": "http://www.umea.se/kommunochpolitik/politikochdemokrati/dialogochsynpunkter/namnderkontaktuppgifter.4.88db09b1724ee319ca487.html",
         "found_via": "contact_page"
       },
       {
         "email": "annika.lind.3@umea.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Nämnder, kontaktuppgifter",
         "source_url": "http://www.umea.se/kommunochpolitik/politikochdemokrati/dialogochsynpunkter/namnderkontaktuppgifter.4.88db09b1724ee319ca487.html",
         "found_via": "contact_page"
       },
       {
         "email": "marie.sandstrom.2@umea.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Nämnder, kontaktuppgifter",
         "source_url": "http://www.umea.se/kommunochpolitik/politikochdemokrati/dialogochsynpunkter/namnderkontaktuppgifter.4.88db09b1724ee319ca487.html",
         "found_via": "contact_page"
       },
       {
         "email": "aldrenamnden@umea.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Nämnder, kontaktuppgifter",
         "source_url": "http://www.umea.se/kommunochpolitik/politikochdemokrati/dialogochsynpunkter/namnderkontaktuppgifter.4.88db09b1724ee319ca487.html",
         "found_via": "contact_page"
       },
       {
         "email": "ulrika.e.persson@umea.se",
-        "role": "utbildning",
-        "forvaltning_namn": "Nämnder, kontaktuppgifter",
-        "source_url": "http://www.umea.se/kommunochpolitik/politikochdemokrati/dialogochsynpunkter/namnderkontaktuppgifter.4.88db09b1724ee319ca487.html",
-        "found_via": "contact_page"
-      },
-      {
-        "email": "35marie.sandstrom.2@umea.se",
-        "role": "utbildning",
-        "forvaltning_namn": "Nämnder, kontaktuppgifter",
-        "source_url": "http://www.umea.se/kommunochpolitik/politikochdemokrati/dialogochsynpunkter/namnderkontaktuppgifter.4.88db09b1724ee319ca487.html",
-        "found_via": "contact_page"
-      },
-      {
-        "email": "58aldrenamnden@umea.se",
-        "role": "utbildning",
-        "forvaltning_namn": "Nämnder, kontaktuppgifter",
-        "source_url": "http://www.umea.se/kommunochpolitik/politikochdemokrati/dialogochsynpunkter/namnderkontaktuppgifter.4.88db09b1724ee319ca487.html",
-        "found_via": "contact_page"
-      },
-      {
-        "email": "33ulrika.e.persson@umea.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Nämnder, kontaktuppgifter",
         "source_url": "http://www.umea.se/kommunochpolitik/politikochdemokrati/dialogochsynpunkter/namnderkontaktuppgifter.4.88db09b1724ee319ca487.html",
         "found_via": "contact_page"
@@ -9514,63 +9108,63 @@
       },
       {
         "email": "umeabrandforsvar@umea.se",
-        "role": "gymnasie",
+        "role": "other",
         "forvaltning_namn": "Personalnämnd",
         "source_url": "http://www.umea.se/registrator",
         "found_via": "contact_page"
       },
       {
         "email": "utbildningskontoret@umea.se",
-        "role": "gymnasie",
+        "role": "utbildning",
         "forvaltning_namn": "Personalnämnd",
         "source_url": "http://www.umea.se/registrator",
         "found_via": "contact_page"
       },
       {
         "email": "tndiarium@umea.se",
-        "role": "gymnasie",
+        "role": "other",
         "forvaltning_namn": "Personalnämnd",
         "source_url": "http://www.umea.se/registrator",
         "found_via": "contact_page"
       },
       {
         "email": "val@umea.se",
-        "role": "gymnasie",
+        "role": "other",
         "forvaltning_namn": "Personalnämnd",
         "source_url": "http://www.umea.se/registrator",
         "found_via": "contact_page"
       },
       {
         "email": "overformyndarenheten@umea.se",
-        "role": "gymnasie",
+        "role": "other",
         "forvaltning_namn": "Personalnämnd",
         "source_url": "http://www.umea.se/registrator",
         "found_via": "contact_page"
       },
       {
         "email": "handlingar.kommunstyrelsenksdiarium@umea.se",
-        "role": "gymnasie",
+        "role": "other",
         "forvaltning_namn": "Personalnämnd",
         "source_url": "http://www.umea.se/registrator",
         "found_via": "contact_page"
       },
       {
         "email": "mndenval@umea.se",
-        "role": "gymnasie",
+        "role": "other",
         "forvaltning_namn": "Personalnämnd",
         "source_url": "http://www.umea.se/registrator",
         "found_via": "contact_page"
       },
       {
         "email": "mndenaldrenamnden@umea.se",
-        "role": "gymnasie",
+        "role": "other",
         "forvaltning_namn": "Personalnämnd",
         "source_url": "http://www.umea.se/registrator",
         "found_via": "contact_page"
       },
       {
         "email": "mndenoverformyndarenheten@umea.se",
-        "role": "gymnasie",
+        "role": "other",
         "forvaltning_namn": "Personalnämnd",
         "source_url": "http://www.umea.se/registrator",
         "found_via": "contact_page"
@@ -9683,7 +9277,7 @@
       },
       {
         "email": "ekonomi@jokkmokk.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "http://www.jokkmokk.se/kommun-och-politik/ekonomi-och-upphandling/",
         "found_via": "contact_page"
@@ -9877,15 +9471,8 @@
         "found_via": "pattern_match"
       },
       {
-        "email": "17.00.lulea.kommun@lulea.se",
-        "role": "central",
-        "forvaltning_namn": null,
-        "source_url": "http://www.lulea.se/kommun--politik/kontakta-lulea-kommun.html",
-        "found_via": "contact_page"
-      },
-      {
         "email": "ekonomicenterekonomicenter@lulea.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "http://www.lulea.se/naringsliv/upphandling-och-inkop/att-fakturera-lulea-kommun.html",
         "found_via": "contact_page"
@@ -9912,7 +9499,7 @@
       },
       {
         "email": "ek@pitea.se",
-        "role": "upphandling",
+        "role": "other",
         "forvaltning_namn": null,
         "source_url": "http://www.pitea.se/Medborgarservice/Upphandlingar/till-dig-som-ar-leverantor-till-pitea-kommun/",
         "found_via": "contact_page"
@@ -9959,13 +9546,13 @@
       },
       {
         "email": "faktura@haparanda.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Förvaltningschef socialförvaltningen",
         "source_url": "http://www.haparanda.se/kontakt",
         "found_via": "contact_page"
       }
     ],
-    "confidence": "high",
+    "confidence": "medium",
     "notes": null,
     "verified_at": "2026-05-17"
   },
@@ -9986,76 +9573,76 @@
       },
       {
         "email": "kommunsekreterare@kiruna.se",
-        "role": "utbildning",
+        "role": "central",
         "forvaltning_namn": "Kontakt nämnderna",
         "source_url": "https://kiruna.se/ovrigt/kontakta-oss.html",
         "found_via": "contact_page"
       },
       {
         "email": "omsorg@kiruna.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Kontakt nämnderna",
         "source_url": "https://kiruna.se/ovrigt/kontakta-oss.html",
         "found_via": "contact_page"
       },
       {
         "email": "miljo@kiruna.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Kontakt nämnderna",
         "source_url": "https://kiruna.se/ovrigt/kontakta-oss.html",
         "found_via": "contact_page"
       },
       {
         "email": "kultur-utbildning@kiruna.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Kontakt nämnderna",
         "source_url": "https://kiruna.se/ovrigt/kontakta-oss.html",
         "found_via": "contact_page"
       },
       {
         "email": "overformyndarexpeditionen@kiruna.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Kontakt nämnderna",
         "source_url": "https://kiruna.se/ovrigt/kontakta-oss.html",
         "found_via": "contact_page"
       },
       {
         "email": "valnamnd@kiruna.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Kontakt nämnderna",
         "source_url": "https://kiruna.se/ovrigt/kontakta-oss.html",
         "found_via": "contact_page"
       },
       {
         "email": "bygglov@kiruna.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Kontakt nämnderna",
         "source_url": "https://kiruna.se/ovrigt/kontakta-oss.html",
         "found_via": "contact_page"
       },
       {
         "email": "ofn@kiruna.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Kontakt nämnderna",
         "source_url": "https://kiruna.se/ovrigt/kontakta-oss.html",
         "found_via": "contact_page"
       },
       {
         "email": "integration@kiruna.se",
-        "role": "utbildning",
+        "role": "other",
         "forvaltning_namn": "Kontakt nämnderna",
         "source_url": "https://kiruna.se/ovrigt/kontakta-oss.html",
         "found_via": "contact_page"
       },
       {
         "email": "info@tvab.kiruna.se",
-        "role": "utbildning",
+        "role": "central",
         "forvaltning_namn": "Kontakt nämnderna",
         "source_url": "https://kiruna.se/ovrigt/kontakta-oss.html",
         "found_via": "contact_page"
       }
     ],
-    "confidence": "high",
+    "confidence": "medium",
     "notes": null,
     "verified_at": "2026-05-17"
   }

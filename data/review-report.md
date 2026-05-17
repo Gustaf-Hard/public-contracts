@@ -1,6 +1,6 @@
 Review report — 2026-05-17
 
-Kommuner needing review: 218
+Kommuner needing review: 221
 
 ## Upplands Väsby (medium) — 0114
   Website: http://www.upplandsvasby.se
@@ -17,22 +17,14 @@ Kommuner needing review: 218
   Found:
     - servicecenter@osteraker.se  [central]  https://www.osteraker.se/
     - kommunikationsenheten@osteraker.se  [other]  https://www.osteraker.se/ovrigt/kontaktaoss/teletaltexttelefoniochandrastodnardukontaktaross.4.367d658917909e8fc2b5280.html
-    - fakturaskanning@osteraker.se  [upphandling]  https://www.osteraker.se/jobbforetagande/upphandlingochinkop/faktureringsinformation.4.367d658917909e8fc2b70eb.html
-    - ekonomi@osteraker.se  [upphandling]  https://www.osteraker.se/jobbforetagande/upphandlingochinkop/faktureringsinformation.4.367d658917909e8fc2b70eb.html
+    - fakturaskanning@osteraker.se  [other]  https://www.osteraker.se/jobbforetagande/upphandlingochinkop/faktureringsinformation.4.367d658917909e8fc2b70eb.html
+    - ekonomi@osteraker.se  [other]  https://www.osteraker.se/jobbforetagande/upphandlingochinkop/faktureringsinformation.4.367d658917909e8fc2b70eb.html
     - kommunarkivet@osteraker.se  [central]  https://www.osteraker.se/diarium
-
-## Huddinge (medium) — 0126
-  Website: https://www.huddinge.se
-  Found:
-    - servicecenter@huddinge.se  [central]  https://www.huddinge.se/
-    - kommunikation@huddinge.se  [other]  https://www.huddinge.se/organisation-och-styrning/nyheter-press-och-webb-tv/pressrum
-    - barn-utbildning@huddinge.se  [other]  https://www.huddinge.se/organisation-och-styrning/ansvar-och-organisation/behandling-av-personuppgifter-enligt-gdpr
-    - ksf.registrator@huddinge.se  [central]  https://www.huddinge.se/organisation-och-styrning/ansvar-och-organisation/behandling-av-personuppgifter-enligt-gdpr
 
 ## Botkyrka (medium) — 0127
   Website: http://www.botkyrka.se
   Found:
-    - medborgarcenter@botkyrka.se  [vuxenutbildning]  http://www.botkyrka.se/
+    - medborgarcenter@botkyrka.se  [other]  http://www.botkyrka.se/
     - upphandling@botkyrka.se  [upphandling]  http://www.botkyrka.se/naringsliv-och-foretag/upphandlingar-och-inkop
     - it-support@botkyrka.se  [vuxenutbildning]  http://www.botkyrka.se/jobb-och-vuxenutbildning/jobba-hos-oss/vara-verksamheter/vard--och-omsorgsforvaltningen/timvikarie-hos-vard--och-omsorgsforvaltningen
     - sbf@botkyrka.se  [vuxenutbildning]  http://www.botkyrka.se/jobb-och-vuxenutbildning/jobba-hos-oss/vara-verksamheter/samhallsbyggnadsforvaltningen
@@ -44,7 +36,7 @@ Kommuner needing review: 218
     - gymnasieocharbetsmarknad@haninge.se  [other]  http://www.haninge.se/kontakta-oss/
     - inkop@haninge.se  [upphandling]  http://www.haninge.se/kommun-och-politik/politik-och-organisation/ekonomi-och-budget/faktura-och-rakning/
     - kansliet@haninge.se  [other]  http://www.haninge.se/kommun-och-politik/politik-och-organisation/organisation/politikerportal/
-    - utbildningsforvaltningen@haninge.se  [other]  http://www.haninge.se/kommun-och-politik/politik-och-organisation/organisation/kommunstyrelsen-och-namnder/
+    - utbildningsforvaltningen@haninge.se  [utbildning]  http://www.haninge.se/kommun-och-politik/politik-och-organisation/organisation/kommunstyrelsen-och-namnder/
     - barnochutbildning@haninge.se  [utbildning]  http://www.haninge.se/kommun-och-politik/politik-och-organisation/organisation/forvaltningar/
     - registratorhaningekommun@haninge.se  [other]  http://www.haninge.se/kommun-och-politik/politik-och-organisation/organisation/forvaltningar/
 
@@ -64,8 +56,8 @@ Kommuner needing review: 218
 ## Täby (low) — 0160
   Website: http://www.taby.se
   Found:
-    - redovisning@taby.se  [upphandling]  http://www.taby.se/naringsliv-och-arbete/etablera-utveckla-och-upphandla/inkop-och-upphandling/faktura-till-taby-kommun
-    - upphandlingen@taby.se  [upphandling]  http://www.taby.se/naringsliv-och-arbete/etablera-utveckla-och-upphandla/inkop-och-upphandling
+    - redovisning@taby.se  [other]  http://www.taby.se/naringsliv-och-arbete/etablera-utveckla-och-upphandla/inkop-och-upphandling/faktura-till-taby-kommun
+    - upphandlingen@taby.se  [other]  http://www.taby.se/naringsliv-och-arbete/etablera-utveckla-och-upphandla/inkop-och-upphandling
 
 ## Danderyd (low) — 0162
   Website: http://www.danderyd.se
@@ -88,7 +80,7 @@ Kommuner needing review: 218
   Found:
     - info@nacka.se  [central]  https://www.nacka.se/
     - registrator@nacka.se  [central]  https://www.nacka.se/kommun--politik/kontakta-oss/
-    - nackainkop@nacka.se  [upphandling]  https://www.nacka.se/medarbetare/inkop-och-upphandling/kontakta-inkop-och-upphandling/
+    - nackainkop@nacka.se  [other]  https://www.nacka.se/medarbetare/inkop-och-upphandling/kontakta-inkop-och-upphandling/
 
 ## Solna (low) — 0184
   Website: http://www.solna.se
@@ -131,44 +123,22 @@ Kommuner needing review: 218
   Found:
     - kommun@habo.se  [central]  http://www.habo.se/
 
-## Heby (medium) — 0331
+## Heby (low) — 0331
   Website: http://www.heby.se
   Found:
     - information@heby.se  [other]  http://www.heby.se/
-    - petterssonberedskapssamordnarealva.pettersson@heby.se  [utbildning]  http://www.heby.se/organisation-plats-och-politik/kommunens-organisation/forvaltningar-och-verksamhet
-    - 67camilla.rojeras@heby.se  [utbildning]  http://www.heby.se/organisation-plats-och-politik/kommunens-organisation/forvaltningar-och-verksamhet
-    - 21bo.stromquist@heby.se  [utbildning]  http://www.heby.se/organisation-plats-och-politik/kommunens-organisation/forvaltningar-och-verksamhet
-    - 90maria.rosen@heby.se  [utbildning]  http://www.heby.se/organisation-plats-och-politik/kommunens-organisation/forvaltningar-och-verksamhet
-    - 53mina.hagenvall@heby.se  [utbildning]  http://www.heby.se/organisation-plats-och-politik/kommunens-organisation/forvaltningar-och-verksamhet
-    - 0224-36015ulrika.axelsson@heby.se  [utbildning]  http://www.heby.se/organisation-plats-och-politik/kommunens-organisation/forvaltningar-och-verksamhet
-    - kostchef0224-36174mikael.sandin@heby.se  [utbildning]  http://www.heby.se/organisation-plats-och-politik/kommunens-organisation/forvaltningar-och-verksamhet
-    - nd0224-36087mauro.pliscovaz@heby.se  [utbildning]  http://www.heby.se/organisation-plats-och-politik/kommunens-organisation/forvaltningar-och-verksamhet
-    - carola.eriksson1@heby.se  [utbildning]  http://www.heby.se/organisation-plats-och-politik/demokrati-dialog-och-inflytande/hitta-din-politiker
-    - per.moller2@heby.se  [utbildning]  http://www.heby.se/organisation-plats-och-politik/demokrati-dialog-och-inflytande/hitta-din-politiker
-    - ewa.westling.olzon@heby.se  [utbildning]  http://www.heby.se/organisation-plats-och-politik/demokrati-dialog-och-inflytande/hitta-din-politiker
-    - maria.flink.opoku@heby.se  [utbildning]  http://www.heby.se/organisation-plats-och-politik/demokrati-dialog-och-inflytande/hitta-din-politiker
-    - leif.nilsson2@heby.se  [utbildning]  http://www.heby.se/organisation-plats-och-politik/demokrati-dialog-och-inflytande/hitta-din-politiker
-    - patrik.spanning.vesterlund@heby.se  [utbildning]  http://www.heby.se/organisation-plats-och-politik/demokrati-dialog-och-inflytande/hitta-din-politiker
-    - kerstin.karlsson1@heby.se  [utbildning]  http://www.heby.se/organisation-plats-och-politik/demokrati-dialog-och-inflytande/hitta-din-politiker
+    - petterssonberedskapssamordnarealva.pettersson@heby.se  [other]  http://www.heby.se/organisation-plats-och-politik/kommunens-organisation/forvaltningar-och-verksamhet
+    - kostchef0224-36174mikael.sandin@heby.se  [other]  http://www.heby.se/organisation-plats-och-politik/kommunens-organisation/forvaltningar-och-verksamhet
+    - nd0224-36087mauro.pliscovaz@heby.se  [other]  http://www.heby.se/organisation-plats-och-politik/kommunens-organisation/forvaltningar-och-verksamhet
+    - ewa.westling.olzon@heby.se  [other]  http://www.heby.se/organisation-plats-och-politik/demokrati-dialog-och-inflytande/hitta-din-politiker
+    - maria.flink.opoku@heby.se  [other]  http://www.heby.se/organisation-plats-och-politik/demokrati-dialog-och-inflytande/hitta-din-politiker
+    - patrik.spanning.vesterlund@heby.se  [other]  http://www.heby.se/organisation-plats-och-politik/demokrati-dialog-och-inflytande/hitta-din-politiker
 
 ## Tierp (medium) — 0360
   Website: https://www.tierp.se/
   Found:
     - medborgarservice@tierp.se  [central]  https://www.tierp.se/tierp.se/kommun-och-politik/kommunfakta/dina-rattigheter-som-nationell-minoritet/finskt-forvaltningsomrade/suomen-kielen-hallintoalue.html
     - kommunstyrelsen@tierp.se  [central]  https://www.tierp.se/tierp.se/kommun-och-politik/kommunens-organisation/kommunstyrelsen.html
-
-## Uppsala (medium) — 0380
-  Website: http://www.uppsala.se
-  Found:
-    - uppsala.kommun@uppsala.se  [central]  http://www.uppsala.se/
-    - upphandling@uppsala.se  [upphandling]  http://www.uppsala.se/foretag-och-naringsliv/upphandling-och-leverantor/
-    - godkannandehuvudmanubf@uppsala.se  [upphandling]  http://www.uppsala.se/foretag-och-naringsliv/upphandling-och-leverantor/starta-forskola/
-    - omsorgsresor@uppsala.se  [upphandling]  http://www.uppsala.se/foretag-och-naringsliv/upphandling-och-leverantor/valfrihetssystemen-bli-utforare/bli-utforare-av-daglig-verksamhet/
-    - dagligverksamhet@uppsala.se  [upphandling]  http://www.uppsala.se/foretag-och-naringsliv/upphandling-och-leverantor/valfrihetssystemen-bli-utforare/bli-utforare-av-daglig-verksamhet/
-    - lov@uppsala.se  [upphandling]  http://www.uppsala.se/foretag-och-naringsliv/upphandling-och-leverantor/valfrihetssystemen-bli-utforare/bli-utforare-av-vard-och-omsorgsboende/
-    - kommunledningskontoret@uppsala.se  [other]  http://www.uppsala.se/kommun-och-politik/organisation/ledning/kommunfullmaktige/
-    - kommunrevisionen@uppsala.se  [other]  http://www.uppsala.se/kommun-och-politik/organisation/ledning/kommunfullmaktige/kommunrevisionen/
-    - utbildningsforvaltningen@uppsala.se  [other]  http://www.uppsala.se/kommun-och-politik/arkiv-och-allmanna-handlingar/allmanna-handlingar-och-diarium/
 
 ## Enköping (medium) — 0381
   Website: https://enkoping.se
@@ -191,6 +161,16 @@ Kommuner needing review: 218
   Found:
     - gnesta.kommun@gnesta.se  [central]  http://www.gnesta.se/
 
+## Nyköping (medium) — 0480
+  Website: https://nykoping.se
+  Found:
+    - kundservice@nykoping.se  [other]  https://nykoping.se/
+    - kommun@nykoping.se  [central]  https://nykoping.se/kommun--politik/hallbar-utveckling-i-nykopings-kommun/program-for-effektiv-organisation/
+    - registrator.klk@nykoping.se  [central]  https://nykoping.se/kommun--politik/arenden-och-handlingar/diarium/
+    - upphandling@nykoping.se  [upphandling]  https://nykoping.se/naringsliv--arbete/upphandling-och-inkop/
+    - info.kommunfastigheter@nykoping.se  [other]  https://nykoping.se/kommun--politik/sa-styrs-kommunen/kontakta-kommunen/
+    - infomaster@nykoping.se  [other]  https://nykoping.se/kommun--politik/sa-styrs-kommunen/kontakta-kommunen/
+
 ## Oxelösund (medium) — 0481
   Website: http://www.oxelosund.se
   Found:
@@ -208,14 +188,14 @@ Kommuner needing review: 218
     - kommunen@katrineholm.se  [central]  https://www.katrineholm.se/
     - kontaktcenter@katrineholm.se  [central]  https://www.katrineholm.se/kommun-och-politik/kontakta-oss.html
     - kommunledningsforvaltning@katrineholm.se  [other]  https://www.katrineholm.se/kommun-och-politik/kontakta-oss.html
-    - supportekonomiochinkop@katrineholm.se  [upphandling]  https://www.katrineholm.se/foretag-och-naringsliv/upphandling-och-inkop/skicka-faktura-till-kommunen.html
+    - supportekonomiochinkop@katrineholm.se  [other]  https://www.katrineholm.se/foretag-och-naringsliv/upphandling-och-inkop/skicka-faktura-till-kommunen.html
 
 ## Strängnäs (medium) — 0486
   Website: https://www.strangnas.se/
   Found:
     - kontaktcenter@strangnas.se  [central]  https://www.strangnas.se/
     - vuxen@strangnas.se  [other]  https://www.strangnas.se/kontakt
-    - fakturacentralen@strangnas.se  [upphandling]  https://www.strangnas.se/arbete-och-foretagande/upphandling-och-inkop/e-handel-e-faktura
+    - fakturacentralen@strangnas.se  [other]  https://www.strangnas.se/arbete-och-foretagande/upphandling-och-inkop/e-handel-e-faktura
     - inkop@strangnas.se  [upphandling]  https://www.strangnas.se/arbete-och-foretagande/upphandling-och-inkop/e-handel-e-faktura
     - kommun@strangnas.se  [central]  https://www.strangnas.se/kommun-och-politik/overklaga-beslut-rattssakerhet/personuppgifter-i-strangnas-kommun
     - kommunstyrelsen@strangnas.se  [central]  https://www.strangnas.se/kommun-och-politik/kommunens-organisation/kommunstyrelsen
@@ -235,9 +215,8 @@ Kommuner needing review: 218
   Website: http://www.kinda.se
   Found:
     - kinda@kinda.se  [central]  http://www.kinda.se/
-    - 212000-0399kinda@kinda.se  [upphandling]  http://www.kinda.se/
-    - upphandling-inkop@kinda.se  [upphandling]  http://www.kinda.se/kommunochpolitik/upphandlingochinkop.4.590ab7dd19c88eb9a378234b.html
-    - ekonomi@kinda.se  [upphandling]  http://www.kinda.se/kommunochpolitik/upphandlingochinkop/fakturatillkindakommun.106.6fd7474419c891adb54e0071.html
+    - upphandling-inkop@kinda.se  [other]  http://www.kinda.se/kommunochpolitik/upphandlingochinkop.4.590ab7dd19c88eb9a378234b.html
+    - ekonomi@kinda.se  [other]  http://www.kinda.se/kommunochpolitik/upphandlingochinkop/fakturatillkindakommun.106.6fd7474419c891adb54e0071.html
     - kontaktcenter@kinda.se  [central]  http://www.kinda.se/naringslivocharbete/naringsliv/kontaktaoss.4.4e22b7941927054aecb35e.html
 
 ## Finspång (medium) — 0562
@@ -250,18 +229,17 @@ Kommuner needing review: 218
   Found:
     - kommun@valdemarsvik.se  [central]  http://www.valdemarsvik.se/
 
-## Linköping (medium) — 0580
-  Website: http://www.linkoping.se
-  Found:
-    - kontakt@linkoping.se  [central]  http://www.linkoping.se/
-    - utbildningsforvaltningen@linkoping.se  [other]  http://www.linkoping.se/kontakt/lamna-synpunkt-eller-klagomal
-    - kommunstyrelsensdiarium@linkoping.se  [other]  http://www.linkoping.se/kommun-och-politik/overklaga-beslut-rattssakerhet/kommunens-behandling-av-personuppgifter
-    - kanslioverformyndarenheten@linkoping.se  [other]  http://www.linkoping.se/kommun-och-politik/overklaga-beslut-rattssakerhet/kommunens-behandling-av-personuppgifter/behandling-av-personuppgifter-pa-verksamhetsstod-och-service
-
 ## Norrköping (medium) — 0581
   Website: http://www.norrkoping.se
   Found:
     - kontakt@norrkoping.se  [central]  http://www.norrkoping.se/
+
+## Söderköping (medium) — 0582
+  Website: http://www.soderkoping.se
+  Found:
+    - kommun@soderkoping.se  [central]  http://www.soderkoping.se/
+    - anders.lennart.senestad@soderkoping.se  [central]  http://www.soderkoping.se/kontakter/kommunens-revisorer/
+    - kommunstyrelsen@soderkoping.se  [central]  http://www.soderkoping.se/kommun-politik/om-kommunen/e-diarium/
 
 ## Motala (medium) — 0583
   Website: http://www.motala.se
@@ -276,8 +254,8 @@ Kommuner needing review: 218
 ## Aneby (medium) — 0604
   Website: http://www.aneby.se
   Found:
-    - info@aneby.se  [utbildning]  http://www.aneby.se/
-    - e-postinfo@aneby.se  [utbildning]  http://www.aneby.se/
+    - info@aneby.se  [central]  http://www.aneby.se/
+    - e-postinfo@aneby.se  [other]  http://www.aneby.se/
 
 ## Gnosjö (low) — 0617
   Website: http://www.gnosjo.se
@@ -289,6 +267,13 @@ Kommuner needing review: 218
   Found:
     - kommun@mullsjo.se  [central]  http://www.mullsjo.se/
     - infocenter@mullsjo.se  [other]  http://www.mullsjo.se/ovrigt/kontakta-oss
+
+## Gislaved (medium) — 0662
+  Website: http://www.gislaved.se
+  Found:
+    - kommunen@gislaved.se  [central]  http://www.gislaved.se/
+    - dataskyddsombud@gislaved.se  [other]  http://www.gislaved.se/sidfot/mer-kontaktuppgifter/kommunledning-och-kommunstyrelseforvaltning
+    - info@gislaved.se  [central]  http://www.gislaved.se/sidfot/mer-kontaktuppgifter/kommunledning-och-kommunstyrelseforvaltning
 
 ## Jönköping (medium) — 0680
   Website: http://www.jonkoping.se
@@ -303,17 +288,6 @@ Kommuner needing review: 218
 ## Vetlanda (low) — 0685
   Website: https://kommun.vetlanda.se/
   No contacts found.
-
-## Eksjö (medium) — 0686
-  Website: http://www.eksjo.se
-  Found:
-    - kommun@eksjo.se  [central]  http://www.eksjo.se/
-    - upphandling@eksjo.se  [upphandling]  http://www.eksjo.se/kommun-och-politik/organisationen/forvaltningens-organisation
-    - kommunikation@eksjo.se  [other]  http://www.eksjo.se/kommun-och-politik/organisationen/forvaltningens-organisation
-    - barn-utbildningssektorn@eksjo.se  [other]  http://www.eksjo.se/kommun-och-politik/organisationen/forvaltningens-organisation
-    - kommunfastigheter@eksjo.se  [other]  http://www.eksjo.se/kommun-och-politik/organisationen/bolag-kommunagda
-    - kansli@eksjo.se  [central]  http://www.eksjo.se/kommun-och-politik/politik-och-paverkan/kommunfullmaktige-namnder-utskott-styrelser-och-revision/kommunstyrelsen
-    - kommunrevisionen@eksjo.se  [other]  http://www.eksjo.se/kommun-och-politik/politik-och-paverkan/kommunfullmaktige-namnder-utskott-styrelser-och-revision/kommunrevisionen
 
 ## Tranås (medium) — 0687
   Website: http://www.tranas.se
@@ -392,16 +366,16 @@ Kommuner needing review: 218
     - servicecenter@oskarshamn.se  [central]  http://www.oskarshamn.se/
     - kommunen@oskarshamn.se  [central]  http://www.oskarshamn.se/
     - kommunstyrelsen@oskarshamn.se  [central]  http://www.oskarshamn.se/mer-om-kommunen/politik-och-forvaltning/paverka/e-forslag/
-    - ekonomi@oskarshamn.se  [upphandling]  http://www.oskarshamn.se/mer-om-kommunen/ekonomi-och-finans/upphandling-och-inkop/leverantorsfakturor/
+    - ekonomi@oskarshamn.se  [other]  http://www.oskarshamn.se/mer-om-kommunen/ekonomi-och-finans/upphandling-och-inkop/leverantorsfakturor/
 
 ## Västervik (medium) — 0883
   Website: http://www.vastervik.se
   Found:
     - kommun@vastervik.se  [central]  http://www.vastervik.se/
-    - upphandlingsenheten@vastervik.se  [upphandling]  http://www.vastervik.se/Jobb-och-foretagande/Upphandling-och-inkop/
-    - e-handel@vastervik.se  [upphandling]  http://www.vastervik.se/Jobb-och-foretagande/Upphandling-och-inkop/e-handel/
-    - ekonomi.kundtjanst@vastervik.se  [upphandling]  http://www.vastervik.se/Jobb-och-foretagande/Upphandling-och-inkop/e-handel/
-    - naringsliv@vastervik.se  [upphandling]  http://www.vastervik.se/Jobb-och-foretagande/Starta-driva-och-utveckla-foretag/pa-gang-for-naringslivet/upphandlingsskola-kommunen-som-kund--en-strategisk-mojlighet/
+    - upphandlingsenheten@vastervik.se  [other]  http://www.vastervik.se/Jobb-och-foretagande/Upphandling-och-inkop/
+    - e-handel@vastervik.se  [other]  http://www.vastervik.se/Jobb-och-foretagande/Upphandling-och-inkop/e-handel/
+    - ekonomi.kundtjanst@vastervik.se  [other]  http://www.vastervik.se/Jobb-och-foretagande/Upphandling-och-inkop/e-handel/
+    - naringsliv@vastervik.se  [other]  http://www.vastervik.se/Jobb-och-foretagande/Starta-driva-och-utveckla-foretag/pa-gang-for-naringslivet/upphandlingsskola-kommunen-som-kund--en-strategisk-mojlighet/
 
 ## Borgholm (medium) — 0885
   Website: http://www.borgholm.se
@@ -426,10 +400,10 @@ Kommuner needing review: 218
 ## Karlskrona (medium) — 1080
   Website: https://www.karlskrona.se/
   Found:
-    - kundservice@karlskrona.se  [upphandling]  https://www.karlskrona.se/
+    - kundservice@karlskrona.se  [other]  https://www.karlskrona.se/
     - karlskrona.kommun@karlskrona.se  [central]  https://www.karlskrona.se/kommun-och-politik/kontakt-och-dialog/
-    - rekryteringshubb@karlskrona.se  [upphandling]  https://www.karlskrona.se/naringsliv/rekrytering-och-kompetens/tjanster-for-arbetsgivare/socialt-foretagande-och-upphandlingar/
-    - upphandlingsenheten@karlskrona.se  [upphandling]  https://www.karlskrona.se/naringsliv/upphandling-och-ink%C3%B6p/att-lamna-anbud/
+    - rekryteringshubb@karlskrona.se  [other]  https://www.karlskrona.se/naringsliv/rekrytering-och-kompetens/tjanster-for-arbetsgivare/socialt-foretagande-och-upphandlingar/
+    - upphandlingsenheten@karlskrona.se  [other]  https://www.karlskrona.se/naringsliv/upphandling-och-ink%C3%B6p/att-lamna-anbud/
     - kommunikation@karlskrona.se  [other]  https://www.karlskrona.se/kommun-och-politik/kontakt-och-dialog/sociala-medier/regler-i-vara-sociala-medier/
     - kommunledningsforvaltningen@karlskrona.se  [other]  https://www.karlskrona.se/kommun-och-politik/sa-fungerar-kommunen/organisation/
 
@@ -471,7 +445,7 @@ Kommuner needing review: 218
     - kontakt@ostragoinge.se  [central]  http://www.ostragoinge.se/
     - kommunikation@ostragoinge.se  [other]  http://www.ostragoinge.se/ovrigt/kontakt-och-oppettider
     - upphandling@ostragoinge.se  [upphandling]  http://www.ostragoinge.se/jobb-och-foretagande/inkop-och-upphandling/fakturera-kommunen
-    - pscentralenupphandling@ostragoinge.se  [upphandling]  http://www.ostragoinge.se/jobb-och-foretagande/inkop-och-upphandling
+    - pscentralenupphandling@ostragoinge.se  [other]  http://www.ostragoinge.se/jobb-och-foretagande/inkop-och-upphandling
 
 ## Örkelljunga (medium) — 1257
   Website: http://www.orkelljunga.se
@@ -487,14 +461,14 @@ Kommuner needing review: 218
   Website: https://lomma.se
   Found:
     - info@lomma.se  [central]  https://lomma.se/
-    - ehandel@lomma.se  [upphandling]  https://lomma.se/jobbochforetagande/upphandlingochinkop/fakturerakommunen.1243.html
+    - ehandel@lomma.se  [other]  https://lomma.se/jobbochforetagande/upphandlingochinkop/fakturerakommunen.1243.html
 
 ## Svedala (medium) — 1263
   Website: http://www.svedala.se
   Found:
     - kommunen@svedala.se  [central]  http://www.svedala.se/
-    - naringsliv@svedala.se  [upphandling]  http://www.svedala.se/arbeta/naringsliv/inkop-och-upphandling-foretag/
-    - fakturacentralen@svedala.se  [upphandling]  http://www.svedala.se/arbeta/upphandling-och-inkop/e-faktura-leverantor/
+    - naringsliv@svedala.se  [other]  http://www.svedala.se/arbeta/naringsliv/inkop-och-upphandling-foretag/
+    - fakturacentralen@svedala.se  [other]  http://www.svedala.se/arbeta/upphandling-och-inkop/e-faktura-leverantor/
     - kommunikation@svedala.se  [other]  http://www.svedala.se/paverka/kommun/press--och-kommunikation/pressrum/
     - registrator.ks@svedala.se  [central]  http://www.svedala.se/paverka/kommun/kommunens-organisation/kommunstyrelsen/
 
@@ -509,13 +483,13 @@ Kommuner needing review: 218
   Website: http://www.sjobo.se
   Found:
     - kommun@sjobo.se  [central]  http://www.sjobo.se/
-    - ekonomisupport@sjobo.se  [upphandling]  http://www.sjobo.se/naringsliv-och-foretag/upphandling-och-inkop/skicka-faktura-till-sjobo-kommun.html
+    - ekonomisupport@sjobo.se  [other]  http://www.sjobo.se/naringsliv-och-foretag/upphandling-och-inkop/skicka-faktura-till-sjobo-kommun.html
 
 ## Hörby (medium) — 1266
   Website: https://www.horby.se/
   Found:
     - kommunen@horby.se  [central]  https://www.horby.se/
-    - ekonomi@horby.se  [upphandling]  https://www.horby.se/naringsliv-och-arbete/inkop-och-upphandling/
+    - ekonomi@horby.se  [other]  https://www.horby.se/naringsliv-och-arbete/inkop-och-upphandling/
     - upphandling@horby.se  [upphandling]  https://www.horby.se/naringsliv-och-arbete/inkop-och-upphandling/
     - arkivet@horby.se  [other]  https://www.horby.se/kommun-och-politik/arenden-och-handlingar/
 
@@ -537,13 +511,13 @@ Kommuner needing review: 218
 ## Åstorp (medium) — 1277
   Website: http://www.astorp.se
   Found:
-    - kommun@astorp.se  [utbildning]  http://www.astorp.se/
+    - kommun@astorp.se  [central]  http://www.astorp.se/
 
 ## Båstad (medium) — 1278
   Website: http://www.bastad.se
   Found:
     - bastads.kommun@bastad.se  [central]  http://www.bastad.se/
-    - ehandel@bastad.se  [upphandling]  http://www.bastad.se/jobb-och-foretagande/upphandling-och-inkop/fakturera-kommunen.html
+    - ehandel@bastad.se  [other]  http://www.bastad.se/jobb-och-foretagande/upphandling-och-inkop/fakturera-kommunen.html
 
 ## Malmö (medium) — 1280
   Website: http://www.malmo.se
@@ -571,7 +545,7 @@ Kommuner needing review: 218
   Website: http://www.hoganas.se
   Found:
     - kommunen@hoganas.se  [central]  http://www.hoganas.se/
-    - kommunkansli@hoganas.se  [upphandling]  http://www.hoganas.se/foretagande--naringsliv/etablera-och-utveckla/upphandling.html
+    - kommunkansli@hoganas.se  [other]  http://www.hoganas.se/foretagande--naringsliv/etablera-och-utveckla/upphandling.html
 
 ## Eslöv (medium) — 1285
   Website: http://www.eslov.se
@@ -593,19 +567,26 @@ Kommuner needing review: 218
   Website: http://www.simrishamn.se
   Found:
     - kontakt@simrishamn.se  [central]  http://www.simrishamn.se/
-    - naringsliv@simrishamn.se  [upphandling]  http://www.simrishamn.se/naringsliv-och-upphandling
+    - naringsliv@simrishamn.se  [other]  http://www.simrishamn.se/naringsliv-och-upphandling
     - upphandling@simrishamn.se  [upphandling]  http://www.simrishamn.se/naringsliv-och-upphandling
-    - ekr@simrishamn.se  [upphandling]  http://www.simrishamn.se/naringsliv-och-upphandling/radgivning-stod-och-finansiering
-    - ekonomi@simrishamn.se  [upphandling]  http://www.simrishamn.se/naringsliv-och-upphandling/upphandling/e-faktura
+    - ekr@simrishamn.se  [other]  http://www.simrishamn.se/naringsliv-och-upphandling/radgivning-stod-och-finansiering
+    - ekonomi@simrishamn.se  [other]  http://www.simrishamn.se/naringsliv-och-upphandling/upphandling/e-faktura
 
 ## Ängelholm (low) — 1292
   Website: http://www.angelholm.se
   No contacts found.
 
-## Halmstad (medium) — 1380
+## Hylte (medium) — 1315
+  Website: http://www.hylte.se
+  Found:
+    - kommunen@hylte.se  [central]  http://www.hylte.se/
+    - kommunikation@hylte.se  [other]  http://www.hylte.se/kommun-och-politik/press--och-informationsmaterial
+    - mndsekreterare072-3967036rebecca.lorentzon@hylte.se  [other]  http://www.hylte.se/kommun-och-politik/press--och-informationsmaterial
+
+## Halmstad (low) — 1380
   Website: http://www.halmstad.se
   Found:
-    - direkt@halmstad.se  [utbildning]  http://www.halmstad.se/
+    - direkt@halmstad.se  [other]  http://www.halmstad.se/
 
 ## Falkenberg (low) — 1382
   Website: https://kommun.falkenberg.se/
@@ -693,8 +674,7 @@ Kommuner needing review: 218
   Website: https://www.bollebygd.se/
   Found:
     - kommunen@bollebygd.se  [central]  https://www.bollebygd.se/
-    - 06daniel.aronsson@bollebygd.se  [upphandling]  https://www.bollebygd.se/naringslivocharbete/upphandlingochinkop.4.4b88096f14fb4d9accd2b0d0.html
-    - ekonomi@bollebygd.se  [upphandling]  https://www.bollebygd.se/naringslivocharbete/upphandlingochinkop/fakturaochefaktura.106.20bfba7e17a31ff03a5e2f84.html
+    - ekonomi@bollebygd.se  [other]  https://www.bollebygd.se/naringslivocharbete/upphandlingochinkop/fakturaochefaktura.106.20bfba7e17a31ff03a5e2f84.html
 
 ## Grästorp (medium) — 1444
   Website: http://www.grastorp.se
@@ -703,6 +683,11 @@ Kommuner needing review: 218
     - kansli@grastorp.se  [central]  http://www.grastorp.se/kommun-och-politik/politisk-organisation/for-fortroendevalda.html
     - medborgarkontoret@grastorp.se  [other]  http://www.grastorp.se/kommun-och-politik/kontakta-kommunen.html
 
+## Essunga (medium) — 1445
+  Website: http://www.essunga.se
+  Found:
+    - kommun@essunga.se  [central]  http://www.essunga.se/
+
 ## Gullspång (medium) — 1447
   Website: https://gullspang.se
   Found:
@@ -710,7 +695,6 @@ Kommuner needing review: 218
     - skoladmin@gullspang.se  [other]  https://gullspang.se/forskola-skola-och-utbildning/kontakta-oss
     - kommun@gullspang.se  [central]  https://gullspang.se/kontakt-felanmalan-och-e-forslag/kontakt-och-oppettider
     - kommunkansliinfo@gullspang.se  [other]  https://gullspang.se/kontakt-felanmalan-och-e-forslag/kontakt-och-oppettider
-    - 48johan.hellman@gullspang.se  [upphandling]  https://gullspang.se/jobb-och-foretagande/upphandling-och-inkop/att-lamna-anbud
 
 ## Tranemo (medium) — 1452
   Website: https://www.tranemo.se
@@ -750,15 +734,7 @@ Kommuner needing review: 218
 ## Vara (medium) — 1470
   Website: https://www.vara.se
   Found:
-    - kommun@vara.se  [utbildning]  https://www.vara.se/
-
-## Götene (medium) — 1471
-  Website: https://www.gotene.se
-  Found:
-    - gotene.kommun@gotene.se  [central]  https://www.gotene.se/
-    - gotene.kommun@gotene.sewww.gotene.se  [central]  https://www.gotene.se/
-    - kommunstyrelsen@gotene.se  [central]  https://www.gotene.se/kommunochpolitik/omkommunen/kontaktaoss.6.html
-    - utbildningkulturfritid@gotene.se  [other]  https://www.gotene.se/kommunochpolitik/omkommunen/kontaktaoss.6.html
+    - kommun@vara.se  [central]  https://www.vara.se/
 
 ## Töreboda (medium) — 1473
   Website: https://toreboda.se
@@ -777,27 +753,48 @@ Kommuner needing review: 218
   Found:
     - kontakt@molndal.se  [central]  http://www.molndal.se/
     - mpab@mpab.molndal.se  [central]  http://www.molndal.se/kommun-och-politik/insyn-och-paverkan/diarium
-    - efakturainfo@molndal.se  [upphandling]  http://www.molndal.se/jobb-och-naringsliv/naringsliv/upphandling-och-inkop/fakturera-kommunen
+    - efakturainfo@molndal.se  [other]  http://www.molndal.se/jobb-och-naringsliv/naringsliv/upphandling-och-inkop/fakturera-kommunen
 
 ## Kungälv (medium) — 1482
   Website: https://www.kungalv.se
   Found:
-    - naringsliv@kungalv.se  [upphandling]  https://www.kungalv.se/foretagande/nyhetsbrev-naringsliv2/nyhetsbrev-naringsliv-december-2023/informationskvall-om-offentliga-upphandlingar/
+    - naringsliv@kungalv.se  [other]  https://www.kungalv.se/foretagande/nyhetsbrev-naringsliv2/nyhetsbrev-naringsliv-december-2023/informationskvall-om-offentliga-upphandlingar/
     - kommun@kungalv.se  [central]  https://www.kungalv.se/kommun--politik/organisation/vara-kommunalrad/
     - kontaktstod@kungalv.se  [other]  https://www.kungalv.se/omsorg--hjalp/funktionsnedsattning/kontaktperson/
     - upphandling@kungalv.se  [upphandling]  https://www.kungalv.se/foretagande/upphandling/
-    - upphandlingsenhetenupphandling@kungalv.se  [upphandling]  https://www.kungalv.se/foretagande/upphandling/ny-e-tjanst/
+    - upphandlingsenhetenupphandling@kungalv.se  [other]  https://www.kungalv.se/foretagande/upphandling/ny-e-tjanst/
 
 ## Lysekil (medium) — 1484
   Website: http://www.lysekil.se
   Found:
-    - kommun@lysekil.se  [vuxenutbildning]  http://www.lysekil.se/
+    - kommun@lysekil.se  [central]  http://www.lysekil.se/
     - kommunikation@lysekil.se  [other]  http://www.lysekil.se/kommun-och-politik/kommunens-organisation/kontaktcenter
 
 ## Uddevalla (medium) — 1485
   Website: https://www.uddevalla.se/
   Found:
     - kommunen@uddevalla.se  [central]  https://www.uddevalla.se/
+
+## Vänersborg (medium) — 1487
+  Website: http://www.vanersborg.se
+  Found:
+    - kommun@vanersborg.se  [central]  http://www.vanersborg.se/
+    - barnutbildning@vanersborg.se  [other]  http://www.vanersborg.se/kommun-och-politik/kontakta-kommunen
+    - kulturfritid@vanersborg.se  [other]  http://www.vanersborg.se/kommun-och-politik/kontakta-kommunen
+    - byggnad@vanersborg.se  [other]  http://www.vanersborg.se/kommun-och-politik/kontakta-kommunen
+    - miljo@vanersborg.se  [other]  http://www.vanersborg.se/kommun-och-politik/kontakta-kommunen
+    - social@vanersborg.se  [other]  http://www.vanersborg.se/kommun-och-politik/kontakta-kommunen
+    - overformyndar@vanersborg.se  [other]  http://www.vanersborg.se/kommun-och-politik/kontakta-kommunen
+    - biblioteket@vanersborg.se  [other]  http://www.vanersborg.se/kommun-och-politik/kontakta-kommunen
+    - kommunikation@vanersborg.se  [other]  http://www.vanersborg.se/kommun-och-politik/kontakta-kommunen
+    - webbredaktionen@vanersborg.se  [other]  http://www.vanersborg.se/kommun-och-politik/kontakta-kommunen
+
+## Alingsås (medium) — 1489
+  Website: https://www.alingsas.se/
+  Found:
+    - kommunstyrelsen@alingsas.se  [central]  https://www.alingsas.se/
+    - kultur.utbildning@alingsas.se  [other]  https://www.alingsas.se/kontakta-alingsas-kommun/
+    - kommunarkivet@alingsas.se  [central]  https://www.alingsas.se/kommun-och-politik/diarium-och-arkiv/
 
 ## Borås (medium) — 1490
   Website: https://www.boras.se
@@ -822,6 +819,15 @@ Kommuner needing review: 218
   Notes: homepage status 404
   No contacts found.
 
+## Lidköping (medium) — 1494
+  Website: https://lidkoping.se
+  Found:
+    - kommun@lidkoping.se  [central]  https://lidkoping.se/
+    - kommunstyrelsen@lidkoping.se  [central]  https://lidkoping.se/kommun-och-politik/politik-och-demokrati/namndbeslut-i-korthet
+    - kommunikation@lidkoping.se  [other]  https://lidkoping.se/kommun-och-politik/pressinformation-och-presskontakt
+    - upphandling@lidkoping.se  [upphandling]  https://lidkoping.se/foretag-naringsliv-och-exploatering/inkopscentralen-vastra-skaraborg-icv6/upphandlingsplan-vastra-skaraborg
+    - naringsliv@lidkoping.se  [other]  https://lidkoping.se/foretag-naringsliv-och-exploatering/inkopscentralen-vastra-skaraborg-icv6/upphandlingsplan-vastra-skaraborg
+
 ## Skara (medium) — 1495
   Website: https://www.skara.se
   Found:
@@ -840,16 +846,6 @@ Kommuner needing review: 218
   Found:
     - kommunen@hjo.se  [central]  http://www.hjo.se/
     - kontaktcenter@hjo.se  [central]  http://www.hjo.se/kommun--politik/kontakta-hjo-kommun/
-
-## Tidaholm (medium) — 1498
-  Website: http://www.tidaholm.se
-  Found:
-    - kommun@tidaholm.se  [central]  http://www.tidaholm.se/
-    - kontaktcenter@tidaholm.se  [central]  http://www.tidaholm.se/kontaktaoss.1214.html
-    - tidaholms.kommun@tidaholm.se  [central]  http://www.tidaholm.se/kontaktaoss.1214.html
-    - kommunikation@tidaholm.se  [other]  http://www.tidaholm.se/kontaktaoss.1214.html
-    - barn.utbildning@tidaholm.se  [other]  http://www.tidaholm.se/kontaktaoss.1214.html
-    - 05barn.utbildning@tidaholm.se  [other]  http://www.tidaholm.se/kontaktaoss.1214.html
 
 ## Kil (medium) — 1715
   Website: http://www.kil.se
@@ -883,11 +879,10 @@ Kommuner needing review: 218
   Found:
     - kommun@forshaga.se  [central]  http://www.forshaga.se/
 
-## Grums (medium) — 1764
+## Grums (low) — 1764
   Website: https://www.grums.se/
   Found:
     - kommunstyrelse@grums.se  [other]  https://www.grums.se/
-    - 17gustav.hagerskog@grums.se  [gymnasie]  https://www.grums.se/kommunpolitik/kommunensorganisation/forvaltningsorganisation/sektorutbildningochfritid.11205.html
 
 ## Årjäng (medium) — 1765
   Website: http://www.arjang.se
@@ -903,6 +898,14 @@ Kommuner needing review: 218
   Website: https://karlstad.se
   Found:
     - kommunarkivet@karlstad.se  [central]  https://karlstad.se/kommun-och-politik/diarium-arkiv-och-sekretess/kommunarkivet
+
+## Kristinehamn (medium) — 1781
+  Website: http://www.kristinehamn.se
+  Found:
+    - kommunen@kristinehamn.se  [central]  http://www.kristinehamn.se/
+    - kommunikation@kristinehamn.se  [other]  http://www.kristinehamn.se/kommun-och-politik/kommunens-organisation/sa-jobbar-vi-med-olika-fragor/oversattning-av-hemsidan/
+    - kommunrevision@kristinehamn.se  [other]  http://www.kristinehamn.se/kommun-och-politik/kommunens-organisation/kommunrevisionen/
+    - skolnamnden@kristinehamn.se  [other]  http://www.kristinehamn.se/kommun-och-politik/kommunens-organisation/namnder-och-forvaltningar/skolnamnden/
 
 ## Filipstad (medium) — 1782
   Website: http://www.filipstad.se
@@ -936,13 +939,6 @@ Kommuner needing review: 218
     - kommun@hallsberg.se  [central]  http://www.hallsberg.se/
     - kommunikation@hallsberg.se  [other]  https://www.hallsberg.se/organisation-och-styrning/press.html
 
-## Degerfors (medium) — 1862
-  Website: http://www.degerfors.se
-  Found:
-    - kommun@degerfors.se  [central]  http://www.degerfors.se/naringsliv-och-arbete/upphandlingar-och-inkop.html
-    - kommunikation@degerfors.se  [other]  http://www.degerfors.se/kommun-och-politik/kommunens-organisation/kontakta-oss.html
-    - skoladministration@degerfors.se  [other]  http://www.degerfors.se/kommun-och-politik/kommunens-organisation/kontakta-oss.html
-
 ## Hällefor (medium) — 1863
   Website: https://www.hellefors.se/
   Found:
@@ -964,6 +960,13 @@ Kommuner needing review: 218
     - servicecenter@kumla.se  [central]  http://www.kumla.se/
     - inkop@kumla.se  [upphandling]  https://www.kumla.se/naringsliv-och-arbetsmarknad/upphandling-e-handel-och-inkop.html
 
+## Askersund (medium) — 1882
+  Website: https://www.askersund.se/
+  Found:
+    - kommun@askersund.se  [central]  https://www.askersund.se/
+    - elin.fennander.sahlberg@askersund.se  [other]  https://www.askersund.se/kommun--politik/kontakta-askersunds-kommun/kontakta-forvaltningarna
+    - ekonomikontoret@askersund.se  [other]  https://www.askersund.se/naringsliv--arbete/upphandling-och-inkop/e-faktura-fran-foretag-till-kommunen
+
 ## Karlskoga (medium) — 1883
   Website: http://www.karlskoga.se
   Found:
@@ -975,16 +978,6 @@ Kommuner needing review: 218
   Found:
     - nora.kommun@nora.se  [central]  http://www.nora.se/
 
-## Lindesberg (medium) — 1885
-  Website: https://www.lindesberg.se/
-  Found:
-    - kommun@lindesberg.se  [central]  https://www.lindesberg.se/kommun-och-politik/kontakta-oss
-    - barn.utbildningsforvaltningen@lindesberg.se  [other]  https://www.lindesberg.se/kommun-och-politik/kontakta-oss
-    - kommunkommun@lindesberg.se  [other]  https://www.lindesberg.se/kommun-och-politik/diarium-arkiv-och-sekretess/arenden-och-handlingar
-    - fakturasupport@lindesberg.se  [upphandling]  https://www.lindesberg.se/jobb-och-foretagande/upphandling-och-inkop/fakturera-lindesbergs-kommun
-    - leverantorsfaktura@lindesberg.se  [upphandling]  https://www.lindesberg.se/jobb-och-foretagande/upphandling-och-inkop/fakturera-lindesbergs-kommun
-    - upphandling@lindesberg.se  [upphandling]  https://www.lindesberg.se/jobb-och-foretagande/upphandling-och-inkop/aktuella-kommunovergripande-upphandlingar
-
 ## Skinnskatteberg (medium) — 1904
   Website: http://www.skinnskatteberg.se
   Found:
@@ -994,7 +987,7 @@ Kommuner needing review: 218
 ## Surahammar (medium) — 1907
   Website: http://www.surahammar.se
   Found:
-    - kommunen@surahammar.se  [utbildning]  http://www.surahammar.se/
+    - kommunen@surahammar.se  [central]  http://www.surahammar.se/
 
 ## Kungsör (medium) — 1960
   Website: http://www.kungsor.se
@@ -1002,6 +995,16 @@ Kommuner needing review: 218
     - info@kungsor.se  [central]  http://www.kungsor.se/
     - info@kfab.kungsor.se  [central]  http://www.kungsor.se/kommun-och-politik/kontakt-och-dialog/kontakt-och-oppettider.html
     - kommunikation@kungsor.se  [other]  http://www.kungsor.se/kommun-och-politik/kommunkontakt-kungsor.html
+
+## Hallstahammar (medium) — 1961
+  Website: http://www.hallstahammar.se
+  Found:
+    - kommunstyrelsen@hallstahammar.se  [central]  http://www.hallstahammar.se/organisation-och-politik/lagar-regler-och-dokument-som-styr-kommunen/att-overklaga-ett-beslut
+    - kommun@hallstahammar.se  [central]  http://www.hallstahammar.se/organisation-och-politik/lagar-regler-och-dokument-som-styr-kommunen/offentlighet-och-sekretess
+    - upphandling@hallstahammar.se  [upphandling]  http://www.hallstahammar.se/organisation-och-politik/lagar-regler-och-dokument-som-styr-kommunen/offentlig-upphandling
+    - naringslivsenheten@hallstahammar.se  [other]  http://www.hallstahammar.se/organisation-och-politik/lagar-regler-och-dokument-som-styr-kommunen/offentlig-upphandling
+    - upphanlding@hallstahammar.se  [other]  http://www.hallstahammar.se/organisation-och-politik/lagar-regler-och-dokument-som-styr-kommunen/offentlig-upphandling
+    - asa.oberg.thorstenson@hallstahammar.se  [other]  http://www.hallstahammar.se/organisation-och-politik/kommunens-forvaltningar-bolag-och-forbund
 
 ## Norberg (medium) — 1962
   Website: http://www.norberg.se
@@ -1012,24 +1015,24 @@ Kommuner needing review: 218
 ## Västerås (medium) — 1980
   Website: http://www.vasteras.se
   Found:
-    - kontaktcenter@vasteras.se  [utbildning]  http://www.vasteras.se/
+    - kontaktcenter@vasteras.se  [central]  http://www.vasteras.se/
     - upphandling@vasteras.se  [upphandling]  http://www.vasteras.se/naringsliv-och-arbete/upphandling-och-inkop/for-dig-som-ar-eller-vill-bli-leverantor.html
-    - kontaktaupphandling@vasteras.se  [upphandling]  http://www.vasteras.se/naringsliv-och-arbete/upphandling-och-inkop/for-dig-som-ar-eller-vill-bli-leverantor.html
-    - ehandelsupport@vasteras.se  [upphandling]  http://www.vasteras.se/naringsliv-och-arbete/upphandling-och-inkop/e-handel-e-faktura.html
+    - kontaktaupphandling@vasteras.se  [other]  http://www.vasteras.se/naringsliv-och-arbete/upphandling-och-inkop/for-dig-som-ar-eller-vill-bli-leverantor.html
+    - ehandelsupport@vasteras.se  [other]  http://www.vasteras.se/naringsliv-och-arbete/upphandling-och-inkop/e-handel-e-faktura.html
 
-## Sala (medium) — 1981
+## Sala (low) — 1981
   Website: http://www.sala.se
   Found:
-    - kommun.info@sala.se  [utbildning]  http://www.sala.se/
+    - kommun.info@sala.se  [other]  http://www.sala.se/
 
 ## Köping (medium) — 1983
   Website: http://www.koping.se
   Found:
     - kopings.kommun@koping.se  [central]  http://www.koping.se/
-    - miljo@koping.se  [upphandling]  http://www.koping.se/foretagare--naringsliv/upphandling-tillstand-och-tillsyn/tillstand-regler-och-tillsyn/tobak-e-cigaretter-tobaksfria-nikotinprodukter-folkol-och-receptfria-lakemedel.html
-    - samhallsbyggnad@koping.se  [upphandling]  http://www.koping.se/foretagare--naringsliv/upphandling-tillstand-och-tillsyn/tillstand-regler-och-tillsyn/saneringsintyg-for-fartyg.html
-    - bygglov@koping.se  [upphandling]  http://www.koping.se/foretagare--naringsliv/upphandling-tillstand-och-tillsyn/tillstand-regler-och-tillsyn/bygglov.html
-    - retag.0221-25347bygglov@koping.se  [upphandling]  http://www.koping.se/foretagare--naringsliv/upphandling-tillstand-och-tillsyn/tillstand-regler-och-tillsyn/bygglov.html
+    - miljo@koping.se  [other]  http://www.koping.se/foretagare--naringsliv/upphandling-tillstand-och-tillsyn/tillstand-regler-och-tillsyn/tobak-e-cigaretter-tobaksfria-nikotinprodukter-folkol-och-receptfria-lakemedel.html
+    - samhallsbyggnad@koping.se  [other]  http://www.koping.se/foretagare--naringsliv/upphandling-tillstand-och-tillsyn/tillstand-regler-och-tillsyn/saneringsintyg-for-fartyg.html
+    - bygglov@koping.se  [other]  http://www.koping.se/foretagare--naringsliv/upphandling-tillstand-och-tillsyn/tillstand-regler-och-tillsyn/bygglov.html
+    - retag.0221-25347bygglov@koping.se  [other]  http://www.koping.se/foretagare--naringsliv/upphandling-tillstand-och-tillsyn/tillstand-regler-och-tillsyn/bygglov.html
 
 ## Arboga (medium) — 1984
   Website: https://www.arboga.se
@@ -1045,7 +1048,6 @@ Kommuner needing review: 218
   Found:
     - kommun@malung-salen.se  [central]  https://www.malung-salen.se/
     - arkivavdelningen@malung-salen.se  [other]  https://www.malung-salen.se/kommun-och-politik/kontakta-namndkansliet
-    - 78mats.johansson@malung-salen.se  [upphandling]  https://www.malung-salen.se/naringsliv-foretag-och-jobb/upphandling-och-inkop
 
 ## Gagnef (medium) — 2026
   Website: http://www.gagnef.se
@@ -1056,13 +1058,12 @@ Kommuner needing review: 218
   Website: http://www.orsa.se
   Found:
     - orsa.kommun@orsa.se  [central]  http://www.orsa.se/
-    - andreas.larsson1@orsa.se  [upphandling]  http://www.orsa.se/naringsliv-och-arbete/inkop-och-upphandling/elektroniska-fakturor-e-faktura.html
 
 ## Älvdalen (medium) — 2039
   Website: http://www.alvdalen.se
   Found:
     - kommun@alvdalen.se  [central]  http://www.alvdalen.se/
-    - nnqvistkontaktuppgifterlevfaktura@alvdalen.se  [upphandling]  http://www.alvdalen.se/naringsliv-och-arbete/inkop-och-upphandling/elektroniska-fakturor-e-fakturor.html
+    - nnqvistkontaktuppgifterlevfaktura@alvdalen.se  [other]  http://www.alvdalen.se/naringsliv-och-arbete/inkop-och-upphandling/elektroniska-fakturor-e-fakturor.html
 
 ## Smedjebacken (medium) — 2061
   Website: http://www.smedjebacken.se
@@ -1086,11 +1087,13 @@ Kommuner needing review: 218
   Found:
     - kommun@hedemora.se  [central]  http://www.hedemora.se/
 
-## Ockelbo (medium) — 2101
-  Website: https://ockelbo.se/
+## Ludvika (medium) — 2085
+  Website: https://www.ludvika.se/
   Found:
-    - kommun@ockelbo.se  [central]  https://ockelbo.se/
-    - utbildningochkultur@ockelbo.se  [other]  https://ockelbo.se/kontakta-oss
+    - info@ludvika.se  [central]  https://www.ludvika.se/
+    - rvaltningensocial.utbildning@ludvika.se  [other]  https://www.ludvika.se/barn-och-utbildning/forskola-och-fritidshem/forskolorna/sunnansjo-forskola-solangen/kontaktuppgifter---solangens-forskola
+    - kommuninfo@ludvika.se  [central]  https://www.ludvika.se/jobb-och-foretagande/upphandlingar
+    - social.utbildning@ludvika.se  [other]  https://www.ludvika.se/omsorg-och-hjalp/vill-du-hjalpa/bli-familjehem-jourhem-kontaktperson-eller-kontaktfamilj
 
 ## Hofors (medium) — 2104
   Website: http://www.hofors.se
@@ -1102,6 +1105,11 @@ Kommuner needing review: 218
   Website: https://www.ovanaker.se/
   Found:
     - kommun@ovanaker.se  [central]  https://www.ovanaker.se/
+
+## Nordanstig (medium) — 2132
+  Website: http://www.nordanstig.se
+  Found:
+    - kommun@nordanstig.se  [central]  http://www.nordanstig.se/
 
 ## Ljusdal (medium) — 2161
   Website: http://www.ljusdal.se
@@ -1119,14 +1127,6 @@ Kommuner needing review: 218
     - medborgarservice@sandviken.se  [central]  https://sandviken.se/
     - kommun@sandviken.se  [central]  https://sandviken.se/kommunochpolitik/kontaktaoss/kontaktuppgiftertillverksamheter.30008.html
 
-## Söderhamn (medium) — 2182
-  Website: http://www.soderhamn.se
-  Found:
-    - kommunstyrelsen@soderhamn.se  [central]  http://www.soderhamn.se/sidor/kommun-och-politik/kundtjanst-kontakt.html
-    - barn-utbildningsnamnden@soderhamn.se  [other]  http://www.soderhamn.se/sidor/kommun-och-politik/kundtjanst-kontakt.html
-    - ehandel@soderhamn.se  [upphandling]  http://www.soderhamn.se/underwebbar/naringsliv/upphandling-och-inkop/e-handel-och-fakturering/e-faktura.html
-    - kommunrevisionen@soderhamn.se  [other]  http://www.soderhamn.se/sidor/kommun-och-politik/organisation/revisorer.html
-
 ## Bollnäs (medium) — 2183
   Website: http://www.bollnas.se
   Found:
@@ -1137,7 +1137,7 @@ Kommuner needing review: 218
   Website: http://www.hudiksvall.se
   Found:
     - kommun@hudiksvall.se  [central]  http://www.hudiksvall.se/Sidor/Kommun-och-politik/Kontakta-kommunen.html
-    - fakturacentralen@hudiksvall.se  [upphandling]  http://www.hudiksvall.se/Sidor/Tillvaxt-och-naringsliv/Upphandling-och-inkop/Leverantor-till-kommunen.html
+    - fakturacentralen@hudiksvall.se  [other]  http://www.hudiksvall.se/Sidor/Tillvaxt-och-naringsliv/Upphandling-och-inkop/Leverantor-till-kommunen.html
 
 ## Ånge (low) — 2260
   Website: http://www.ange.se
@@ -1152,7 +1152,7 @@ Kommuner needing review: 218
   Website: http://www.sundsvall.se
   Found:
     - kontakt@sundsvall.se  [central]  http://www.sundsvall.se/
-    - sscleverantor@sundsvall.se  [upphandling]  http://www.sundsvall.se/kommun/jobb-och-foretagande/upphandling-och-inkop/hur-du-fakturerar-kommunen
+    - sscleverantor@sundsvall.se  [other]  http://www.sundsvall.se/kommun/jobb-och-foretagande/upphandling-och-inkop/hur-du-fakturerar-kommunen
     - kommunstyrelsen@sundsvall.se  [central]  http://www.sundsvall.se/kommun/kommun-och-politik/politik-och-demokrati/dialog-och-synpunkter/kontakta-politiker-fortroendemannaregister
     - skolan@sundsvall.se  [other]  http://www.sundsvall.se/kommun/kommun-och-politik/overklaga-beslut-rattssakerhet/behandling-av-personuppgifter
 
@@ -1163,7 +1163,7 @@ Kommuner needing review: 218
     - kommunarkivet@kramfors.se  [central]  http://www.kramfors.se/kommun--demokrati/arkiv-och-diarium.html
     - registrator@kramfors.se  [central]  http://www.kramfors.se/kommun--demokrati/arkiv-och-diarium.html
     - diariumregistrator@kramfors.se  [other]  http://www.kramfors.se/kommun--demokrati/arkiv-och-diarium.html
-    - ekonomikontoret.kommunen@kramfors.se  [upphandling]  http://www.kramfors.se/naringsliv--arbete/upphandling-och-inkop/elektroniska-fakturor.html
+    - ekonomikontoret.kommunen@kramfors.se  [other]  http://www.kramfors.se/naringsliv--arbete/upphandling-och-inkop/elektroniska-fakturor.html
     - upphandling@kramfors.se  [upphandling]  http://www.kramfors.se/naringsliv--arbete/upphandling-och-inkop.html
 
 ## Sollefteå (medium) — 2283
@@ -1175,19 +1175,19 @@ Kommuner needing review: 218
   Website: http://www.ornskoldsvik.se
   Found:
     - kontaktcenter@ornskoldsvik.se  [central]  http://www.ornskoldsvik.se/
-    - cfg@ornskoldsvik.se  [upphandling]  https://www.ornskoldsvik.se/foretagsservice/upphandling-och-inkop/fakturera-kommunen-och-de-kommunala-bolagen
+    - cfg@ornskoldsvik.se  [other]  https://www.ornskoldsvik.se/foretagsservice/upphandling-och-inkop/fakturera-kommunen-och-de-kommunala-bolagen
     - upphandling@ornskoldsvik.se  [upphandling]  https://www.ornskoldsvik.se/foretagsservice/upphandling-och-inkop/aktuella-upphandlingar
 
 ## Ragunda (medium) — 2303
   Website: https://www.ragunda.se/
   Found:
     - kommun@ragunda.se  [central]  https://www.ragunda.se/
-    - naringsliv@ragunda.se  [upphandling]  https://www.ragunda.se/naringslivochupphandling/startadrivaochutveckla.798.html
-    - kundcenter@ragunda.se  [upphandling]  https://www.ragunda.se/naringslivochupphandling/startadrivaochutveckla.798.html
-    - k.naringsliv@ragunda.se  [upphandling]  https://www.ragunda.se/naringslivochupphandling/ragundakommunsnaringsliv.792.html
-    - utvecklingsenhetennaringsliv@ragunda.se  [upphandling]  https://www.ragunda.se/naringslivochupphandling/expansionochetableringiragundakommun.796.html
-    - bygg.miljo@ragunda.se  [upphandling]  https://www.ragunda.se/naringslivochupphandling/forsaljningavtobakochliknandeprodukter.3838.html
-    - upphandlingssamordnare@ragunda.se  [upphandling]  https://www.ragunda.se/naringslivochupphandling/nyheternaringslivochupphandling/nyhetsarkiv/inbjudantillupphandlingstraff.5234.html
+    - naringsliv@ragunda.se  [other]  https://www.ragunda.se/naringslivochupphandling/startadrivaochutveckla.798.html
+    - kundcenter@ragunda.se  [other]  https://www.ragunda.se/naringslivochupphandling/startadrivaochutveckla.798.html
+    - k.naringsliv@ragunda.se  [other]  https://www.ragunda.se/naringslivochupphandling/ragundakommunsnaringsliv.792.html
+    - utvecklingsenhetennaringsliv@ragunda.se  [other]  https://www.ragunda.se/naringslivochupphandling/expansionochetableringiragundakommun.796.html
+    - bygg.miljo@ragunda.se  [other]  https://www.ragunda.se/naringslivochupphandling/forsaljningavtobakochliknandeprodukter.3838.html
+    - upphandlingssamordnare@ragunda.se  [other]  https://www.ragunda.se/naringslivochupphandling/nyheternaringslivochupphandling/nyhetsarkiv/inbjudantillupphandlingstraff.5234.html
     - kommundirektor@ragunda.se  [other]  https://www.ragunda.se/kundcenter/kontaktaoss.1369.html
     - skolchef@ragunda.se  [other]  https://www.ragunda.se/kundcenter/kontaktaoss.1369.html
     - kansli@ragunda.se  [central]  https://www.ragunda.se/kundcenter/kontaktaoss.1369.html
@@ -1210,34 +1210,19 @@ Kommuner needing review: 218
   Website: http://www.stromsund.se
   No contacts found.
 
+## Åre (medium) — 2321
+  Website: http://www.are.se
+  Found:
+    - kontaktcenter@are.se  [central]  http://www.are.se/
+    - thor.kruse.een@are.se  [other]  http://www.are.se/kommun-och-politik/kontakta-oss/ta-kontakt-med-tjanstepersoner
+    - malin.andersson.7@are.se  [other]  http://www.are.se/kommun-och-politik/kontakta-oss/ta-kontakt-med-tjanstepersoner
+
 ## Berg (medium) — 2326
   Website: https://www.berg.se
   Found:
     - bergs.kommun@berg.se  [utbildning]  https://www.berg.se/
     - e-postbergs.kommun@berg.se  [utbildning]  https://www.berg.se/
     - kommunikation@berg.se  [other]  https://www.berg.se/om-webbplatsen/kontakta-bergs-kommun
-
-## Härjedalen (medium) — 2361
-  Website: https://www.herjedalen.se/
-  Found:
-    - kommun@herjedalen.se  [central]  https://www.herjedalen.se/
-    - barn.utbildning@herjedalen.se  [other]  https://www.herjedalen.se/ovrigt-sokbart/kontakta-harjedalens-kommun.html
-    - info.harjegardar@herjedalen.se  [other]  https://www.herjedalen.se/ovrigt-sokbart/kontakta-harjedalens-kommun.html
-    - kommunikation@herjedalen.se  [other]  https://www.herjedalen.se/ovrigt-sokbart/kontakta-harjedalens-kommun.html
-
-## Östersund (medium) — 2380
-  Website: http://www.ostersund.se
-  Found:
-    - magnus.o.andersson@ostersund.se  [utbildning]  http://www.ostersund.se/kommun-och-politik/kommunens-organisation/forvaltningar.html
-    - cecilia.lindhe.nadjalin@ostersund.se  [utbildning]  http://www.ostersund.se/kommun-och-politik/kommunens-organisation/forvaltningar.html
-    - anna.i.backlund@ostersund.se  [utbildning]  http://www.ostersund.se/kommun-och-politik/kommunens-organisation/forvaltningar.html
-    - eva.m.larsson@ostersund.se  [utbildning]  http://www.ostersund.se/kommun-och-politik/kommunens-organisation/forvaltningar.html
-    - camilla.wiktorsson.sand@ostersund.se  [utbildning]  http://www.ostersund.se/kommun-och-politik/kommunens-organisation/forvaltningar.html
-    - christina.von.leitgeb@ostersund.se  [utbildning]  http://www.ostersund.se/kommun-och-politik/kommunens-organisation/forvaltningar.html
-    - tobias.1.johansson@ostersund.se  [utbildning]  http://www.ostersund.se/kommun-och-politik/kommunens-organisation/forvaltningar.html
-    - eva.lek.jansson@ostersund.se  [utbildning]  http://www.ostersund.se/kommun-och-politik/kommunens-organisation/forvaltningar.html
-    - gdpr@ostersund.se  [utbildning]  http://www.ostersund.se/barn-och-utbildning/barn--och-utbildningsnamndens-behandling-av-personuppgifter.html
-    - kommunarkivet@ostersund.se  [vuxenutbildning]  http://www.ostersund.se/kommun-och-politik/diarium-och-arkiv/kommunarkivet.html
 
 ## Nordmaling (low) — 2401
   Website: http://www.nordmaling.se
@@ -1247,9 +1232,9 @@ Kommuner needing review: 218
 ## Bjurholm (medium) — 2403
   Website: https://www.bjurholm.se/
   Found:
-    - kommunen@bjurholm.se  [utbildning]  https://www.bjurholm.se/
-    - per-olof.t.bylund@bjurholm.se  [it_digitalisering]  https://www.bjurholm.se/kommun-och-politik/kommun/forvaltningsorganisation/kommunstyrelsens-verksamheter
-    - veronica.t.bylund@bjurholm.se  [it_digitalisering]  https://www.bjurholm.se/kommun-och-politik/kommun/forvaltningsorganisation/kommunstyrelsens-verksamheter
+    - kommunen@bjurholm.se  [central]  https://www.bjurholm.se/
+    - per-olof.t.bylund@bjurholm.se  [other]  https://www.bjurholm.se/kommun-och-politik/kommun/forvaltningsorganisation/kommunstyrelsens-verksamheter
+    - veronica.t.bylund@bjurholm.se  [other]  https://www.bjurholm.se/kommun-och-politik/kommun/forvaltningsorganisation/kommunstyrelsens-verksamheter
 
 ## Robertsfors (medium) — 2409
   Website: http://www.robertsfors.se
@@ -1278,16 +1263,7 @@ Kommuner needing review: 218
 ## Dorotea (medium) — 2425
   Website: http://www.dorotea.se
   Found:
-    - 95peter.ahlqvist@dorotea.se  [upphandling]  http://www.dorotea.se/naringsliv/driva-foretag/upphandling-och-inkop/pagaende-och-kommande-upphandlingar/
     - info@dorotea.se  [central]  http://www.dorotea.se/kommun-och-politik/kontakta-oss/
-
-## Vännäs (medium) — 2460
-  Website: https://www.vannas.se
-  Found:
-    - vannas.kommun@vannas.se  [utbildning]  https://www.vannas.se/
-    - kommunikation@vannas.se  [other]  https://www.vannas.se/kommun-och-politik/kontakt/gemensamma-e-postlador
-    - barn.utbildningsnamnden@vannas.se  [other]  https://www.vannas.se/kommun-och-politik/kontakt/gemensamma-e-postlador
-    - emelie.johansson2@vannas.se  [utbildning]  https://www.vannas.se/barn-och-utbildning/kontakta-barn--och-utbildningsforvaltningen
 
 ## Vilhelmina (medium) — 2462
   Website: http://www.vilhelmina.se
@@ -1324,7 +1300,7 @@ Kommuner needing review: 218
   Website: http://www.jokkmokk.se
   Found:
     - kommun@jokkmokk.se  [central]  http://www.jokkmokk.se/
-    - ekonomi@jokkmokk.se  [upphandling]  http://www.jokkmokk.se/kommun-och-politik/ekonomi-och-upphandling/
+    - ekonomi@jokkmokk.se  [other]  http://www.jokkmokk.se/kommun-och-politik/ekonomi-och-upphandling/
     - infocenter@jokkmokk.se  [other]  http://www.jokkmokk.se/kontakta-oss/
     - kommunikation@jokkmokk.se  [other]  http://www.jokkmokk.se/kontakta-oss/
 
@@ -1361,16 +1337,36 @@ Kommuner needing review: 218
   Website: http://www.lulea.se
   Found:
     - lulea.kommun@lulea.se  [central]  http://www.lulea.se/
-    - 17.00.lulea.kommun@lulea.se  [central]  http://www.lulea.se/kommun--politik/kontakta-lulea-kommun.html
-    - ekonomicenterekonomicenter@lulea.se  [upphandling]  http://www.lulea.se/naringsliv/upphandling-och-inkop/att-fakturera-lulea-kommun.html
+    - ekonomicenterekonomicenter@lulea.se  [other]  http://www.lulea.se/naringsliv/upphandling-och-inkop/att-fakturera-lulea-kommun.html
 
 ## Piteå (medium) — 2581
   Website: http://www.pitea.se
   Found:
     - kommun@pitea.se  [central]  http://www.pitea.se/Kontakta/Pitea-kommun/
-    - ek@pitea.se  [upphandling]  http://www.pitea.se/Medborgarservice/Upphandlingar/till-dig-som-ar-leverantor-till-pitea-kommun/
+    - ek@pitea.se  [other]  http://www.pitea.se/Medborgarservice/Upphandlingar/till-dig-som-ar-leverantor-till-pitea-kommun/
 
 ## Boden (medium) — 2582
   Website: http://www.boden.se
   Found:
     - kommunen@boden.se  [central]  http://www.boden.se/
+
+## Haparanda (medium) — 2583
+  Website: http://www.haparanda.se
+  Found:
+    - kommunen@haparanda.se  [central]  http://www.haparanda.se/
+    - faktura@haparanda.se  [other]  http://www.haparanda.se/kontakt
+
+## Kiruna (medium) — 2584
+  Website: https://kiruna.se
+  Found:
+    - kommun@kiruna.se  [central]  https://kiruna.se/
+    - kommunsekreterare@kiruna.se  [central]  https://kiruna.se/ovrigt/kontakta-oss.html
+    - omsorg@kiruna.se  [other]  https://kiruna.se/ovrigt/kontakta-oss.html
+    - miljo@kiruna.se  [other]  https://kiruna.se/ovrigt/kontakta-oss.html
+    - kultur-utbildning@kiruna.se  [other]  https://kiruna.se/ovrigt/kontakta-oss.html
+    - overformyndarexpeditionen@kiruna.se  [other]  https://kiruna.se/ovrigt/kontakta-oss.html
+    - valnamnd@kiruna.se  [other]  https://kiruna.se/ovrigt/kontakta-oss.html
+    - bygglov@kiruna.se  [other]  https://kiruna.se/ovrigt/kontakta-oss.html
+    - ofn@kiruna.se  [other]  https://kiruna.se/ovrigt/kontakta-oss.html
+    - integration@kiruna.se  [other]  https://kiruna.se/ovrigt/kontakta-oss.html
+    - info@tvab.kiruna.se  [central]  https://kiruna.se/ovrigt/kontakta-oss.html
