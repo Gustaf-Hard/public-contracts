@@ -9,10 +9,7 @@ const ROLE_KEYWORDS = [
     'digitaliseringsforvaltning', 'digitaliseringsförvaltning',
     'it och digital', 'digital transformation', 'digitalisering',
   ]],
-  ['upphandling', [
-    'upphandlingsforvaltning', 'upphandlingsförvaltning',
-    'upphandlingsenhet', 'upphandlingskontor', 'upphandling',
-  ]],
+  ['upphandling', ['upphandlingsforvaltning', 'upphandlingsförvaltning', 'upphandlingsenhet', 'upphandlingskontor', 'upphandlingsavdelning']],
   ['utbildning', [
     'utbildningsforvaltning', 'utbildningsförvaltning',
     'barn- och utbildning', 'barn och utbildning',

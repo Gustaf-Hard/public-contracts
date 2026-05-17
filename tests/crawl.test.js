@@ -73,4 +73,28 @@ describe('crawlKommun', () => {
     expect(record.contacts).toEqual([]);
     expect(record.confidence).toBe('low');
   });
+
+  it('rejects emails on look-alike domains via the cross-domain filter', async () => {
+    const html = `
+      <html><body>
+        <a href="mailto:registrator@vasteras.se">good</a>
+        <a href="mailto:malicious@xvasteras.se">lookalike</a>
+        <a href="mailto:registrator@sub.vasteras.se">subdomain</a>
+      </body></html>
+    `;
+    const pages = { 'https://vasteras.se/': html, 'https://vasteras.se/kontakt': html };
+    const fakeFetch = async (url) => {
+      if (pages[url]) return { ok: true, status: 200, text: async () => pages[url] };
+      return { ok: false, status: 404, text: async () => '' };
+    };
+    const seed = {
+      kommun_kod: '1980', kommun_namn: 'Västerås', lan: 'X', org_nr: null,
+      webbplats: 'https://vasteras.se',
+    };
+    const record = await crawlKommun(seed, { fetch: fakeFetch, today: '2026-05-17' });
+    const emails = record.contacts.map((c) => c.email).sort();
+    expect(emails).toContain('registrator@vasteras.se');
+    expect(emails).toContain('registrator@sub.vasteras.se'); // legitimate subdomain passes cross-domain filter
+    expect(emails).not.toContain('malicious@xvasteras.se'); // look-alike rejected
+  });
 });

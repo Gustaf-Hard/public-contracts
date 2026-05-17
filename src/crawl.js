@@ -42,7 +42,7 @@ const FUNCTIONAL_EMAIL_WORDS = new Set([
   'ekonomi', 'hr', 'personal', 'juridik', 'miljo', 'plan', 'bygg',
 ]);
 
-function isPersonalEmail(email) {
+export function isPersonalEmail(email) {
   const local = email.split('@')[0].toLowerCase();
   // Must contain exactly one dot to match firstname.lastname pattern
   const dotParts = local.split('.');
@@ -55,7 +55,7 @@ function isPersonalEmail(email) {
   return true;
 }
 
-function isValidEmail(email) {
+export function isValidEmail(email) {
   const parts = email.split('@');
   if (parts.length !== 2) return false;
   const [local, domain] = parts;
@@ -234,7 +234,7 @@ export async function crawlKommun(seed, { fetch = (u, o) => politeFetch(u, o), t
       if (isPersonalEmail(email)) continue;
       // Filter out cross-domain emails (e.g. arvika.se emails on eda.se pages)
       const emailDomain = email.split('@')[1]?.toLowerCase() ?? '';
-      if (!emailDomain.endsWith(homeDomain)) continue;
+      if (emailDomain !== homeDomain && !emailDomain.endsWith('.' + homeDomain)) continue;
       if (seenEmails.has(email)) continue;
       seenEmails.add(email);
       const role = classifyRole({ ...ctx, email });
