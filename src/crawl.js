@@ -48,10 +48,16 @@ export function isPersonalEmail(email) {
   const dotParts = local.split('.');
   if (dotParts.length !== 2) return false;
   const [first, last] = dotParts;
-  // Each part must be 2-20 characters, letters and hyphens only
-  if (!/^[a-z-]{2,20}$/.test(first) || !/^[a-z-]{2,20}$/.test(last)) return false;
+  // Reject if the first part starts with a digit (catches phone+name concatenations like "0224-36015ulrika")
+  if (/^\d/.test(first)) return true;
+  // Strip trailing digit sequence from each part before the alphabetic check,
+  // so "karlsson3" is treated the same as "karlsson".
+  const firstAlpha = first.replace(/\d+$/, '');
+  const lastAlpha = last.replace(/\d+$/, '');
+  // Each part (after stripping digits) must be 2-20 characters, letters and hyphens only
+  if (!/^[a-z-]{2,20}$/.test(firstAlpha) || !/^[a-z-]{2,20}$/.test(lastAlpha)) return false;
   // Neither part should be a known functional/role word
-  if (FUNCTIONAL_EMAIL_WORDS.has(first) || FUNCTIONAL_EMAIL_WORDS.has(last)) return false;
+  if (FUNCTIONAL_EMAIL_WORDS.has(firstAlpha) || FUNCTIONAL_EMAIL_WORDS.has(lastAlpha)) return false;
   return true;
 }
 
@@ -76,6 +82,8 @@ export function isValidEmail(email) {
   }
   // Reject if local part looks garbled (leading zeros like "00kommunen")
   if (/^0+[a-z]/i.test(local)) return false;
+  // Reject if local part starts with any digit (catches org-number prefixes and garbled phone+name patterns)
+  if (/^\d/.test(local)) return false;
   return true;
 }
 

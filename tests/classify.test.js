@@ -48,6 +48,37 @@ describe('classifyRole', () => {
     expect(classifyRole(ctx({ url: 'https://k.se/kultur', email: 'kultur@k.se' }))).toBe('other');
   });
 
+  it('classifies utbildning from utbildningsforvaltningen email (no page context)', () => {
+    expect(classifyRole(ctx({ email: 'utbildningsforvaltningen@haninge.se' }))).toBe('utbildning');
+    expect(classifyRole(ctx({ email: 'utbildningsforvaltningen@linkoping.se' }))).toBe('utbildning');
+  });
+
+  it('classifies utbildning from barn-utbildning email variants (no page context)', () => {
+    expect(classifyRole(ctx({ email: 'barn-utbildning@huddinge.se' }))).toBe('utbildning');
+    expect(classifyRole(ctx({ email: 'barn-utbildning@tidaholm.se' }))).toBe('utbildning');
+    expect(classifyRole(ctx({ email: 'barn-utbildning@eksjo.se' }))).toBe('utbildning');
+  });
+
+  it('classifies utbildning from utbildningkulturfritid email (no page context)', () => {
+    expect(classifyRole(ctx({ email: 'utbildningkulturfritid@gotene.se' }))).toBe('utbildning');
+  });
+
+  it('classifies utbildning from barn-utbildningsnamnden email (no page context)', () => {
+    expect(classifyRole(ctx({ email: 'barn-utbildningsnamnden@soderhamn.se' }))).toBe('utbildning');
+  });
+
+  it('classifies utbildning from utbildningskontoret email (no page context)', () => {
+    expect(classifyRole(ctx({ email: 'utbildningskontoret@k.se' }))).toBe('utbildning');
+  });
+
+  it('classifies utbildning from skoladministration email (no page context)', () => {
+    expect(classifyRole(ctx({ email: 'skoladministration@k.se' }))).toBe('utbildning');
+  });
+
+  it('classifies utbildning from skolforvaltning email (no page context)', () => {
+    expect(classifyRole(ctx({ email: 'skolforvaltning@k.se' }))).toBe('utbildning');
+  });
+
   it('prefers förvaltning context over central email pattern', () => {
     expect(
       classifyRole(

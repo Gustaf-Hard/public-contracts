@@ -34,4 +34,14 @@ describe('isPersonalEmail', () => {
   it('does not flag single-component locals', () => {
     expect(isPersonalEmail('bun@kommun.se')).toBe(false);
   });
+  it('flags personal emails with trailing digit suffixes', () => {
+    expect(isPersonalEmail('camilla.rojeras1@heby.se')).toBe(true);
+    expect(isPersonalEmail('per.moller2@heby.se')).toBe(true);
+    expect(isPersonalEmail('johanna.karlsson3@jarfalla.se')).toBe(true);
+  });
+  it('flags emails starting with digits (phone+name concatenation)', () => {
+    // expose isValidEmail rejecting these would also be acceptable;
+    // either way, they must not survive the personal-email + valid-email pipeline
+    expect(isPersonalEmail('0224-36015ulrika.axelsson@heby.se')).toBe(true);
+  });
 });

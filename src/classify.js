@@ -27,7 +27,7 @@ const CENTRAL_EMAIL_RE = /^(registrator|registratur|diariet|diarium|kommunstyrel
 const CENTRAL_EMAIL_DOTPATTERN_RE = /^registrator[-_.]|[._-](registrator|kommun|kansli|diarium|kommunledning)@|stad@/i;
 
 // Email local-part patterns that indicate education role
-const UTBILDNING_EMAIL_RE = /^(utbildning|skola|grundskola|grundskolenamnden|forskolenamnden|barnochutbildning|bun|buf|barnochungdom|barn\.och|utbildningsnamnden)@/i;
+const UTBILDNING_EMAIL_RE = /^(utbildning[a-z]*|skola|skoladministration|skolforvaltning|skolförvaltning|grundskola|grundskolenamnden|forskolenamnden|barnochutbildning|barn-utbildning[a-z-]*|barn\.utbildning[a-z]*|barn-och-utbildning|barnochungdom|barn\.och|utbildningsnamnden|utbildningsforvaltning(en)?|utbildningskontor(et)?|utbildningsnamnd(en)?|utbildningsnämnd(en)?|bun|buf)@/i;
 
 // Email local-part patterns for gymnasie
 const GYMNASIE_EMAIL_RE = /^(gymnasie|gymn|gymnasienamnden)@/i;
