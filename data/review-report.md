@@ -1,4 +1,4 @@
-Review report — 2026-05-17
+Review report — 2026-05-18
 
 Kommuner needing review: 221
 

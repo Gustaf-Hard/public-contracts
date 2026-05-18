@@ -5,7 +5,8 @@
     "lan": "Västra Götalands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Ale_kommun",
     "webbplats": "http://www.ale.se",
-    "org_nr": "212000-1439"
+    "org_nr": "212000-1439",
+    "folkmangd": 32620
   },
   {
     "kommun_kod": "1489",
@@ -13,7 +14,8 @@
     "lan": "Västra Götalands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Alingsås_kommun",
     "webbplats": "https://www.alingsas.se/",
-    "org_nr": "212000-1553"
+    "org_nr": "212000-1553",
+    "folkmangd": 42861
   },
   {
     "kommun_kod": "0764",
@@ -21,7 +23,8 @@
     "lan": "Kronobergs län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Alvesta_kommun",
     "webbplats": "http://www.alvesta.se",
-    "org_nr": "212000-0639"
+    "org_nr": "212000-0639",
+    "folkmangd": 19687
   },
   {
     "kommun_kod": "0604",
@@ -29,7 +32,8 @@
     "lan": "Jönköpings län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Aneby_kommun",
     "webbplats": "http://www.aneby.se",
-    "org_nr": "212000-0498"
+    "org_nr": "212000-0498",
+    "folkmangd": 6851
   },
   {
     "kommun_kod": "1984",
@@ -37,7 +41,8 @@
     "lan": "Västmanlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Arboga_kommun",
     "webbplats": "https://www.arboga.se",
-    "org_nr": "212000-2122"
+    "org_nr": "212000-2122",
+    "folkmangd": 13929
   },
   {
     "kommun_kod": "2506",
@@ -45,7 +50,8 @@
     "lan": "Norrbottens län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Arjeplogs_kommun",
     "webbplats": "http://www.arjeplog.se",
-    "org_nr": "212000-2668"
+    "org_nr": "212000-2668",
+    "folkmangd": 2570
   },
   {
     "kommun_kod": "2505",
@@ -53,7 +59,8 @@
     "lan": "Norrbottens län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Arvidsjaurs_kommun",
     "webbplats": "https://www.arvidsjaur.se/",
-    "org_nr": "212000-2650"
+    "org_nr": "212000-2650",
+    "folkmangd": 6026
   },
   {
     "kommun_kod": "1784",
@@ -61,7 +68,8 @@
     "lan": "Värmlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Arvika_kommun",
     "webbplats": "http://www.arvika.se",
-    "org_nr": "212000-1892"
+    "org_nr": "212000-1892",
+    "folkmangd": 25408
   },
   {
     "kommun_kod": "1882",
@@ -69,7 +77,8 @@
     "lan": "Örebro län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Askersunds_kommun",
     "webbplats": "https://www.askersund.se/",
-    "org_nr": "212000-1983"
+    "org_nr": "212000-1983",
+    "folkmangd": 11382
   },
   {
     "kommun_kod": "2084",
@@ -77,7 +86,8 @@
     "lan": "Dalarnas län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Avesta_kommun",
     "webbplats": "https://www.avesta.se",
-    "org_nr": "212000-2262"
+    "org_nr": "212000-2262",
+    "folkmangd": 22366
   },
   {
     "kommun_kod": "1460",
@@ -85,7 +95,8 @@
     "lan": "Västra Götalands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Bengtsfors_kommun",
     "webbplats": "http://www.bengtsfors.se",
-    "org_nr": "212000-1470"
+    "org_nr": "212000-1470",
+    "folkmangd": 8955
   },
   {
     "kommun_kod": "2326",
@@ -93,7 +104,8 @@
     "lan": "Jämtlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Bergs_kommun",
     "webbplats": "https://www.berg.se",
-    "org_nr": "212000-2502"
+    "org_nr": "212000-2502",
+    "folkmangd": 7085
   },
   {
     "kommun_kod": "2403",
@@ -101,7 +113,8 @@
     "lan": "Västerbottens län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Bjurholms_kommun",
     "webbplats": "https://www.bjurholm.se/",
-    "org_nr": "212000-2833"
+    "org_nr": "212000-2833",
+    "folkmangd": 2327
   },
   {
     "kommun_kod": "1260",
@@ -109,7 +122,8 @@
     "lan": "Skåne län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Bjuvs_kommun",
     "webbplats": "http://www.bjuv.se",
-    "org_nr": "212000-1041"
+    "org_nr": "212000-1041",
+    "folkmangd": 16052
   },
   {
     "kommun_kod": "2582",
@@ -117,7 +131,8 @@
     "lan": "Norrbottens län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Bodens_kommun",
     "webbplats": "http://www.boden.se",
-    "org_nr": "212000-2767"
+    "org_nr": "212000-2767",
+    "folkmangd": 28624
   },
   {
     "kommun_kod": "1443",
@@ -125,7 +140,8 @@
     "lan": "Västra Götalands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Bollebygds_kommun",
     "webbplats": "https://www.bollebygd.se/",
-    "org_nr": "212000-2973"
+    "org_nr": "212000-2973",
+    "folkmangd": 9784
   },
   {
     "kommun_kod": "2183",
@@ -133,7 +149,8 @@
     "lan": "Gävleborgs län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Bollnäs_kommun",
     "webbplats": "http://www.bollnas.se",
-    "org_nr": "212000-2361"
+    "org_nr": "212000-2361",
+    "folkmangd": 26018
   },
   {
     "kommun_kod": "0885",
@@ -141,7 +158,8 @@
     "lan": "Kalmar län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Borgholms_kommun",
     "webbplats": "http://www.borgholm.se",
-    "org_nr": "212000-0795"
+    "org_nr": "212000-0795",
+    "folkmangd": 10626
   },
   {
     "kommun_kod": "2081",
@@ -149,7 +167,8 @@
     "lan": "Dalarnas län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Borlänge_kommun",
     "webbplats": "http://www.borlange.se",
-    "org_nr": "212000-2239"
+    "org_nr": "212000-2239",
+    "folkmangd": 51354
   },
   {
     "kommun_kod": "1490",
@@ -157,7 +176,8 @@
     "lan": "Västra Götalands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Borås_kommun",
     "webbplats": "https://www.boras.se",
-    "org_nr": "212000-1561"
+    "org_nr": "212000-1561",
+    "folkmangd": 115238
   },
   {
     "kommun_kod": "0127",
@@ -165,7 +185,8 @@
     "lan": "Stockholms län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Botkyrka_kommun",
     "webbplats": "http://www.botkyrka.se",
-    "org_nr": "212000-2882"
+    "org_nr": "212000-2882",
+    "folkmangd": 96750
   },
   {
     "kommun_kod": "0560",
@@ -173,7 +194,8 @@
     "lan": "Östergötlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Boxholms_kommun",
     "webbplats": "http://www.boxholm.se",
-    "org_nr": "212000-0407"
+    "org_nr": "212000-0407",
+    "folkmangd": 5451
   },
   {
     "kommun_kod": "1272",
@@ -181,7 +203,8 @@
     "lan": "Skåne län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Bromölla_kommun",
     "webbplats": "https://www.bromolla.se/",
-    "org_nr": "212000-0894"
+    "org_nr": "212000-0894",
+    "folkmangd": 12497
   },
   {
     "kommun_kod": "2305",
@@ -189,7 +212,8 @@
     "lan": "Jämtlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Bräcke_kommun",
     "webbplats": "http://www.bracke.se",
-    "org_nr": "212000-2460"
+    "org_nr": "212000-2460",
+    "folkmangd": 5950
   },
   {
     "kommun_kod": "1231",
@@ -197,7 +221,8 @@
     "lan": "Skåne län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Burlövs_kommun",
     "webbplats": "https://burlov.se",
-    "org_nr": "212000-1025"
+    "org_nr": "212000-1025",
+    "folkmangd": 20444
   },
   {
     "kommun_kod": "1278",
@@ -205,7 +230,8 @@
     "lan": "Skåne län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Båstads_kommun",
     "webbplats": "http://www.bastad.se",
-    "org_nr": "212000-0944"
+    "org_nr": "212000-0944",
+    "folkmangd": 16046
   },
   {
     "kommun_kod": "1438",
@@ -213,7 +239,8 @@
     "lan": "Västra Götalands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Dals-Eds_kommun",
     "webbplats": "http://www.dalsed.se",
-    "org_nr": "212000-1413"
+    "org_nr": "212000-1413",
+    "folkmangd": 4571
   },
   {
     "kommun_kod": "0162",
@@ -221,7 +248,8 @@
     "lan": "Stockholms län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Danderyds_kommun",
     "webbplats": "http://www.danderyd.se",
-    "org_nr": "212000-0126"
+    "org_nr": "212000-0126",
+    "folkmangd": 32500
   },
   {
     "kommun_kod": "1862",
@@ -229,7 +257,8 @@
     "lan": "Örebro län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Degerfors_kommun",
     "webbplats": "http://www.degerfors.se",
-    "org_nr": "212000-1934"
+    "org_nr": "212000-1934",
+    "folkmangd": 9237
   },
   {
     "kommun_kod": "2425",
@@ -237,7 +266,8 @@
     "lan": "Västerbottens län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Dorotea_kommun",
     "webbplats": "http://www.dorotea.se",
-    "org_nr": "212000-2809"
+    "org_nr": "212000-2809",
+    "folkmangd": 2241
   },
   {
     "kommun_kod": "1730",
@@ -245,7 +275,8 @@
     "lan": "Värmlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Eda_kommun",
     "webbplats": "http://www.eda.se",
-    "org_nr": "212000-1769"
+    "org_nr": "212000-1769",
+    "folkmangd": 8289
   },
   {
     "kommun_kod": "0125",
@@ -253,7 +284,8 @@
     "lan": "Stockholms län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Ekerö_kommun",
     "webbplats": "http://www.ekero.se",
-    "org_nr": "212000-0050"
+    "org_nr": "212000-0050",
+    "folkmangd": 29062
   },
   {
     "kommun_kod": "0686",
@@ -261,7 +293,8 @@
     "lan": "Jönköpings län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Eksjö_kommun",
     "webbplats": "http://www.eksjo.se",
-    "org_nr": "212000-0589"
+    "org_nr": "212000-0589",
+    "folkmangd": 17660
   },
   {
     "kommun_kod": "0862",
@@ -269,7 +302,8 @@
     "lan": "Kalmar län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Emmaboda_kommun",
     "webbplats": "https://www.emmaboda.se",
-    "org_nr": "212000-0738"
+    "org_nr": "212000-0738",
+    "folkmangd": 8807
   },
   {
     "kommun_kod": "0381",
@@ -277,7 +311,8 @@
     "lan": "Uppsala län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Enköpings_kommun",
     "webbplats": "https://enkoping.se",
-    "org_nr": "212000-0282"
+    "org_nr": "212000-0282",
+    "folkmangd": 48804
   },
   {
     "kommun_kod": "0484",
@@ -285,7 +320,8 @@
     "lan": "Södermanlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Eskilstuna_kommun",
     "webbplats": "http://www.eskilstuna.se",
-    "org_nr": "212000-0357"
+    "org_nr": "212000-0357",
+    "folkmangd": 106789
   },
   {
     "kommun_kod": "1285",
@@ -293,7 +329,8 @@
     "lan": "Skåne län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Eslövs_kommun",
     "webbplats": "http://www.eslov.se",
-    "org_nr": "212000-1173"
+    "org_nr": "212000-1173",
+    "folkmangd": 35126
   },
   {
     "kommun_kod": "1445",
@@ -301,7 +338,8 @@
     "lan": "Västra Götalands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Essunga_kommun",
     "webbplats": "http://www.essunga.se",
-    "org_nr": "212000-2916"
+    "org_nr": "212000-2916",
+    "folkmangd": 5559
   },
   {
     "kommun_kod": "1982",
@@ -309,7 +347,8 @@
     "lan": "Västmanlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Fagersta_kommun",
     "webbplats": "http://www.fagersta.se",
-    "org_nr": "212000-2106"
+    "org_nr": "212000-2106",
+    "folkmangd": 12915
   },
   {
     "kommun_kod": "1382",
@@ -317,7 +356,8 @@
     "lan": "Hallands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Falkenbergs_kommun",
     "webbplats": "https://kommun.falkenberg.se/",
-    "org_nr": "212000-1231"
+    "org_nr": "212000-1231",
+    "folkmangd": 47321
   },
   {
     "kommun_kod": "1499",
@@ -325,7 +365,8 @@
     "lan": "Västra Götalands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Falköpings_kommun",
     "webbplats": "http://www.falkoping.se",
-    "org_nr": "212000-1744"
+    "org_nr": "212000-1744",
+    "folkmangd": 32794
   },
   {
     "kommun_kod": "2080",
@@ -333,7 +374,8 @@
     "lan": "Dalarnas län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Falu_kommun",
     "webbplats": "https://www.falun.se/",
-    "org_nr": "212000-2221"
+    "org_nr": "212000-2221",
+    "folkmangd": 59974
   },
   {
     "kommun_kod": "1782",
@@ -341,7 +383,8 @@
     "lan": "Värmlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Filipstads_kommun",
     "webbplats": "http://www.filipstad.se",
-    "org_nr": "212000-1876"
+    "org_nr": "212000-1876",
+    "folkmangd": 9625
   },
   {
     "kommun_kod": "0562",
@@ -349,7 +392,8 @@
     "lan": "Östergötlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Finspångs_kommun",
     "webbplats": "http://www.finspang.se",
-    "org_nr": "212000-0423"
+    "org_nr": "212000-0423",
+    "folkmangd": 21502
   },
   {
     "kommun_kod": "0482",
@@ -357,7 +401,8 @@
     "lan": "Södermanlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Flens_kommun",
     "webbplats": "https://flen.se",
-    "org_nr": "212000-0332"
+    "org_nr": "212000-0332",
+    "folkmangd": 15095
   },
   {
     "kommun_kod": "1763",
@@ -365,7 +410,8 @@
     "lan": "Värmlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Forshaga_kommun",
     "webbplats": "http://www.forshaga.se",
-    "org_nr": "212000-1819"
+    "org_nr": "212000-1819",
+    "folkmangd": 11439
   },
   {
     "kommun_kod": "1439",
@@ -373,7 +419,8 @@
     "lan": "Västra Götalands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Färgelanda_kommun",
     "webbplats": "http://www.fargelanda.se",
-    "org_nr": "212000-1421"
+    "org_nr": "212000-1421",
+    "folkmangd": 6288
   },
   {
     "kommun_kod": "2026",
@@ -381,7 +428,8 @@
     "lan": "Dalarnas län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Gagnefs_kommun",
     "webbplats": "http://www.gagnef.se",
-    "org_nr": "212000-2155"
+    "org_nr": "212000-2155",
+    "folkmangd": 10307
   },
   {
     "kommun_kod": "0662",
@@ -389,7 +437,8 @@
     "lan": "Jönköpings län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Gislaveds_kommun",
     "webbplats": "http://www.gislaved.se",
-    "org_nr": "212000-0514"
+    "org_nr": "212000-0514",
+    "folkmangd": 28641
   },
   {
     "kommun_kod": "0461",
@@ -397,7 +446,8 @@
     "lan": "Södermanlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Gnesta_kommun",
     "webbplats": "http://www.gnesta.se",
-    "org_nr": "212000-2965"
+    "org_nr": "212000-2965",
+    "folkmangd": 11343
   },
   {
     "kommun_kod": "0617",
@@ -405,7 +455,8 @@
     "lan": "Jönköpings län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Gnosjö_kommun",
     "webbplats": "http://www.gnosjo.se",
-    "org_nr": "212000-0506"
+    "org_nr": "212000-0506",
+    "folkmangd": 9010
   },
   {
     "kommun_kod": "0980",
@@ -413,7 +464,8 @@
     "lan": "Gotlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Gotlands_kommun",
     "webbplats": "http://www.gotland.se",
-    "org_nr": "212000-0803"
+    "org_nr": "212000-0803",
+    "folkmangd": 60852
   },
   {
     "kommun_kod": "1764",
@@ -421,7 +473,8 @@
     "lan": "Värmlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Grums_kommun",
     "webbplats": "https://www.grums.se/",
-    "org_nr": "212000-1827"
+    "org_nr": "212000-1827",
+    "folkmangd": 8854
   },
   {
     "kommun_kod": "1444",
@@ -429,7 +482,8 @@
     "lan": "Västra Götalands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Grästorps_kommun",
     "webbplats": "http://www.grastorp.se",
-    "org_nr": "212000-1595"
+    "org_nr": "212000-1595",
+    "folkmangd": 5602
   },
   {
     "kommun_kod": "1447",
@@ -437,7 +491,8 @@
     "lan": "Västra Götalands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Gullspångs_kommun",
     "webbplats": "https://gullspang.se",
-    "org_nr": "212000-1637"
+    "org_nr": "212000-1637",
+    "folkmangd": 4949
   },
   {
     "kommun_kod": "2523",
@@ -445,7 +500,8 @@
     "lan": "Norrbottens län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Gällivare_kommun",
     "webbplats": "http://www.gellivare.se",
-    "org_nr": "212000-2726"
+    "org_nr": "212000-2726",
+    "folkmangd": 17135
   },
   {
     "kommun_kod": "2180",
@@ -453,7 +509,8 @@
     "lan": "Gävleborgs län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Gävle_kommun",
     "webbplats": "http://www.gavle.se",
-    "org_nr": "212000-2338"
+    "org_nr": "212000-2338",
+    "folkmangd": 104108
   },
   {
     "kommun_kod": "1480",
@@ -461,7 +518,8 @@
     "lan": "Västra Götalands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Göteborgs_kommun",
     "webbplats": "http://www.goteborg.se",
-    "org_nr": "212000-1355"
+    "org_nr": "212000-1355",
+    "folkmangd": 613278
   },
   {
     "kommun_kod": "1471",
@@ -469,7 +527,8 @@
     "lan": "Västra Götalands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Götene_kommun",
     "webbplats": "https://www.gotene.se",
-    "org_nr": "212000-1652"
+    "org_nr": "212000-1652",
+    "folkmangd": 13223
   },
   {
     "kommun_kod": "0643",
@@ -477,7 +536,8 @@
     "lan": "Jönköpings län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Habo_kommun",
     "webbplats": "http://www.habokommun.se",
-    "org_nr": "212000-1611"
+    "org_nr": "212000-1611",
+    "folkmangd": 13511
   },
   {
     "kommun_kod": "1783",
@@ -485,7 +545,8 @@
     "lan": "Värmlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Hagfors_kommun",
     "webbplats": "http://www.hagfors.se",
-    "org_nr": "212000-1884"
+    "org_nr": "212000-1884",
+    "folkmangd": 11324
   },
   {
     "kommun_kod": "1861",
@@ -493,7 +554,8 @@
     "lan": "Örebro län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Hallsbergs_kommun",
     "webbplats": "http://www.hallsberg.se",
-    "org_nr": "212000-1926"
+    "org_nr": "212000-1926",
+    "folkmangd": 16082
   },
   {
     "kommun_kod": "1961",
@@ -501,7 +563,8 @@
     "lan": "Västmanlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Hallstahammars_kommun",
     "webbplats": "http://www.hallstahammar.se",
-    "org_nr": "212000-2064"
+    "org_nr": "212000-2064",
+    "folkmangd": 16600
   },
   {
     "kommun_kod": "1380",
@@ -509,7 +572,8 @@
     "lan": "Hallands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Halmstads_kommun",
     "webbplats": "http://www.halmstad.se",
-    "org_nr": "212000-1215"
+    "org_nr": "212000-1215",
+    "folkmangd": 106315
   },
   {
     "kommun_kod": "1761",
@@ -517,7 +581,8 @@
     "lan": "Värmlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Hammarö_kommun",
     "webbplats": "https://www.hammaro.se/",
-    "org_nr": "212000-1793"
+    "org_nr": "212000-1793",
+    "folkmangd": 16932
   },
   {
     "kommun_kod": "0136",
@@ -525,7 +590,8 @@
     "lan": "Stockholms län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Haninge_kommun",
     "webbplats": "http://www.haninge.se",
-    "org_nr": "212000-0084"
+    "org_nr": "212000-0084",
+    "folkmangd": 101408
   },
   {
     "kommun_kod": "2583",
@@ -533,7 +599,8 @@
     "lan": "Norrbottens län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Haparanda_kommun",
     "webbplats": "http://www.haparanda.se",
-    "org_nr": "212000-2775"
+    "org_nr": "212000-2775",
+    "folkmangd": 9027
   },
   {
     "kommun_kod": "0331",
@@ -541,7 +608,8 @@
     "lan": "Uppsala län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Heby_kommun",
     "webbplats": "http://www.heby.se",
-    "org_nr": "212000-2049"
+    "org_nr": "212000-2049",
+    "folkmangd": 14275
   },
   {
     "kommun_kod": "2083",
@@ -549,7 +617,8 @@
     "lan": "Dalarnas län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Hedemora_kommun",
     "webbplats": "http://www.hedemora.se",
-    "org_nr": "212000-2254"
+    "org_nr": "212000-2254",
+    "folkmangd": 15025
   },
   {
     "kommun_kod": "1283",
@@ -557,7 +626,8 @@
     "lan": "Skåne län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Helsingborgs_kommun",
     "webbplats": "http://www.helsingborg.se",
-    "org_nr": "212000-1157"
+    "org_nr": "212000-1157",
+    "folkmangd": 152776
   },
   {
     "kommun_kod": "1466",
@@ -565,7 +635,8 @@
     "lan": "Västra Götalands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Herrljunga_kommun",
     "webbplats": "http://www.herrljunga.se",
-    "org_nr": "212000-1520"
+    "org_nr": "212000-1520",
+    "folkmangd": 9509
   },
   {
     "kommun_kod": "1497",
@@ -573,7 +644,8 @@
     "lan": "Västra Götalands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Hjo_kommun",
     "webbplats": "http://www.hjo.se",
-    "org_nr": "212000-1728"
+    "org_nr": "212000-1728",
+    "folkmangd": 9322
   },
   {
     "kommun_kod": "2104",
@@ -581,7 +653,8 @@
     "lan": "Gävleborgs län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Hofors_kommun",
     "webbplats": "http://www.hofors.se",
-    "org_nr": "212000-2296"
+    "org_nr": "212000-2296",
+    "folkmangd": 9138
   },
   {
     "kommun_kod": "0126",
@@ -589,7 +662,8 @@
     "lan": "Stockholms län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Huddinge_kommun",
     "webbplats": "https://www.huddinge.se",
-    "org_nr": "212000-0068"
+    "org_nr": "212000-0068",
+    "folkmangd": 114686
   },
   {
     "kommun_kod": "2184",
@@ -597,7 +671,8 @@
     "lan": "Gävleborgs län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Hudiksvalls_kommun",
     "webbplats": "http://www.hudiksvall.se",
-    "org_nr": "212000-2379"
+    "org_nr": "212000-2379",
+    "folkmangd": 37341
   },
   {
     "kommun_kod": "0860",
@@ -605,7 +680,8 @@
     "lan": "Kalmar län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Hultsfreds_kommun",
     "webbplats": "http://www.hultsfred.se",
-    "org_nr": "212000-0712"
+    "org_nr": "212000-0712",
+    "folkmangd": 13484
   },
   {
     "kommun_kod": "1315",
@@ -613,7 +689,8 @@
     "lan": "Hallands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Hylte_kommun",
     "webbplats": "http://www.hylte.se",
-    "org_nr": "212000-1207"
+    "org_nr": "212000-1207",
+    "folkmangd": 10094
   },
   {
     "kommun_kod": "0305",
@@ -621,7 +698,8 @@
     "lan": "Uppsala län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Håbo_kommun",
     "webbplats": "http://www.habo.se",
-    "org_nr": "212000-0241"
+    "org_nr": "212000-0241",
+    "folkmangd": 23252
   },
   {
     "kommun_kod": "1863",
@@ -629,7 +707,8 @@
     "lan": "Örebro län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Hällefors_kommun",
     "webbplats": "https://www.hellefors.se/",
-    "org_nr": "212000-1942"
+    "org_nr": "212000-1942",
+    "folkmangd": 6269
   },
   {
     "kommun_kod": "2361",
@@ -637,7 +716,8 @@
     "lan": "Jämtlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Härjedalens_kommun",
     "webbplats": "https://www.herjedalen.se/",
-    "org_nr": "212000-2510"
+    "org_nr": "212000-2510",
+    "folkmangd": 10117
   },
   {
     "kommun_kod": "2280",
@@ -645,7 +725,8 @@
     "lan": "Västernorrlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Härnösands_kommun",
     "webbplats": "https://www.harnosand.se",
-    "org_nr": "212000-2403"
+    "org_nr": "212000-2403",
+    "folkmangd": 24348
   },
   {
     "kommun_kod": "1401",
@@ -653,7 +734,8 @@
     "lan": "Västra Götalands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Härryda_kommun",
     "webbplats": "http://www.harryda.se",
-    "org_nr": "212000-1264"
+    "org_nr": "212000-1264",
+    "folkmangd": 40011
   },
   {
     "kommun_kod": "1293",
@@ -661,7 +743,8 @@
     "lan": "Skåne län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Hässleholms_kommun",
     "webbplats": "http://www.hassleholm.se",
-    "org_nr": "212000-0985"
+    "org_nr": "212000-0985",
+    "folkmangd": 51915
   },
   {
     "kommun_kod": "1284",
@@ -669,7 +752,8 @@
     "lan": "Skåne län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Höganäs_kommun",
     "webbplats": "http://www.hoganas.se",
-    "org_nr": "212000-1165"
+    "org_nr": "212000-1165",
+    "folkmangd": 28489
   },
   {
     "kommun_kod": "0821",
@@ -677,7 +761,8 @@
     "lan": "Kalmar län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Högsby_kommun",
     "webbplats": "http://www.hogsby.se",
-    "org_nr": "212000-0688"
+    "org_nr": "212000-0688",
+    "folkmangd": 5134
   },
   {
     "kommun_kod": "1266",
@@ -685,7 +770,8 @@
     "lan": "Skåne län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Hörby_kommun",
     "webbplats": "https://www.horby.se/",
-    "org_nr": "212000-1108"
+    "org_nr": "212000-1108",
+    "folkmangd": 15559
   },
   {
     "kommun_kod": "1267",
@@ -693,7 +779,8 @@
     "lan": "Skåne län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Höörs_kommun",
     "webbplats": "http://www.hoor.se",
-    "org_nr": "212000-1116"
+    "org_nr": "212000-1116",
+    "folkmangd": 17680
   },
   {
     "kommun_kod": "2510",
@@ -701,7 +788,8 @@
     "lan": "Norrbottens län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Jokkmokks_kommun",
     "webbplats": "http://www.jokkmokk.se",
-    "org_nr": "212000-2676"
+    "org_nr": "212000-2676",
+    "folkmangd": 4695
   },
   {
     "kommun_kod": "0123",
@@ -709,7 +797,8 @@
     "lan": "Stockholms län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Järfälla_kommun",
     "webbplats": "http://www.jarfalla.se",
-    "org_nr": "212000-0043"
+    "org_nr": "212000-0043",
+    "folkmangd": 90180
   },
   {
     "kommun_kod": "0680",
@@ -717,7 +806,8 @@
     "lan": "Jönköpings län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Jönköpings_kommun",
     "webbplats": "http://www.jonkoping.se",
-    "org_nr": "212000-0530"
+    "org_nr": "212000-0530",
+    "folkmangd": 148152
   },
   {
     "kommun_kod": "2514",
@@ -725,7 +815,8 @@
     "lan": "Norrbottens län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Kalix_kommun",
     "webbplats": "http://www.kalix.se",
-    "org_nr": "212000-2692"
+    "org_nr": "212000-2692",
+    "folkmangd": 15252
   },
   {
     "kommun_kod": "0880",
@@ -733,7 +824,8 @@
     "lan": "Kalmar län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Kalmar_kommun",
     "webbplats": "https://kalmar.se",
-    "org_nr": "212000-0746"
+    "org_nr": "212000-0746",
+    "folkmangd": 73068
   },
   {
     "kommun_kod": "1446",
@@ -741,7 +833,8 @@
     "lan": "Västra Götalands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Karlsborgs_kommun",
     "webbplats": "https://www.karlsborg.se",
-    "org_nr": "212000-1629"
+    "org_nr": "212000-1629",
+    "folkmangd": 7047
   },
   {
     "kommun_kod": "1082",
@@ -749,7 +842,8 @@
     "lan": "Blekinge län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Karlshamns_kommun",
     "webbplats": "http://www.karlshamn.se",
-    "org_nr": "212000-0845"
+    "org_nr": "212000-0845",
+    "folkmangd": 31642
   },
   {
     "kommun_kod": "1883",
@@ -757,7 +851,8 @@
     "lan": "Örebro län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Karlskoga_kommun",
     "webbplats": "http://www.karlskoga.se",
-    "org_nr": "212000-1991"
+    "org_nr": "212000-1991",
+    "folkmangd": 30128
   },
   {
     "kommun_kod": "1080",
@@ -765,7 +860,8 @@
     "lan": "Blekinge län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Karlskrona_kommun",
     "webbplats": "https://www.karlskrona.se/",
-    "org_nr": "212000-0829"
+    "org_nr": "212000-0829",
+    "folkmangd": 66021
   },
   {
     "kommun_kod": "1780",
@@ -773,7 +869,8 @@
     "lan": "Värmlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Karlstads_kommun",
     "webbplats": "https://karlstad.se",
-    "org_nr": "212000-1850"
+    "org_nr": "212000-1850",
+    "folkmangd": 99007
   },
   {
     "kommun_kod": "0483",
@@ -781,7 +878,8 @@
     "lan": "Södermanlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Katrineholms_kommun",
     "webbplats": "https://www.katrineholm.se",
-    "org_nr": "212000-0340"
+    "org_nr": "212000-0340",
+    "folkmangd": 33984
   },
   {
     "kommun_kod": "1715",
@@ -789,7 +887,8 @@
     "lan": "Värmlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Kils_kommun",
     "webbplats": "http://www.kil.se",
-    "org_nr": "212000-1751"
+    "org_nr": "212000-1751",
+    "folkmangd": 12024
   },
   {
     "kommun_kod": "0513",
@@ -797,7 +896,8 @@
     "lan": "Östergötlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Kinda_kommun",
     "webbplats": "http://www.kinda.se",
-    "org_nr": "212000-0399"
+    "org_nr": "212000-0399",
+    "folkmangd": 9924
   },
   {
     "kommun_kod": "2584",
@@ -805,7 +905,8 @@
     "lan": "Norrbottens län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Kiruna_kommun",
     "webbplats": "https://kiruna.se",
-    "org_nr": "212000-2783"
+    "org_nr": "212000-2783",
+    "folkmangd": 22402
   },
   {
     "kommun_kod": "1276",
@@ -813,7 +914,8 @@
     "lan": "Skåne län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Klippans_kommun",
     "webbplats": "http://www.klippan.se",
-    "org_nr": "212000-0928"
+    "org_nr": "212000-0928",
+    "folkmangd": 17713
   },
   {
     "kommun_kod": "0330",
@@ -821,7 +923,8 @@
     "lan": "Uppsala län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Knivsta_kommun",
     "webbplats": "http://www.knivsta.se",
-    "org_nr": "212000-3013"
+    "org_nr": "212000-3013",
+    "folkmangd": 21733
   },
   {
     "kommun_kod": "2282",
@@ -829,7 +932,8 @@
     "lan": "Västernorrlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Kramfors_kommun",
     "webbplats": "http://www.kramfors.se",
-    "org_nr": "212000-2429"
+    "org_nr": "212000-2429",
+    "folkmangd": 17390
   },
   {
     "kommun_kod": "1290",
@@ -837,7 +941,8 @@
     "lan": "Skåne län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Kristianstads_kommun",
     "webbplats": "http://www.kristianstad.se",
-    "org_nr": "212000-0951"
+    "org_nr": "212000-0951",
+    "folkmangd": 85908
   },
   {
     "kommun_kod": "1781",
@@ -845,7 +950,8 @@
     "lan": "Värmlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Kristinehamns_kommun",
     "webbplats": "http://www.kristinehamn.se",
-    "org_nr": "212000-1868"
+    "org_nr": "212000-1868",
+    "folkmangd": 23590
   },
   {
     "kommun_kod": "2309",
@@ -853,7 +959,8 @@
     "lan": "Jämtlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Krokoms_kommun",
     "webbplats": "http://www.krokom.se",
-    "org_nr": "212000-2478"
+    "org_nr": "212000-2478",
+    "folkmangd": 15795
   },
   {
     "kommun_kod": "1881",
@@ -861,7 +968,8 @@
     "lan": "Örebro län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Kumla_kommun",
     "webbplats": "http://www.kumla.se",
-    "org_nr": "212000-1975"
+    "org_nr": "212000-1975",
+    "folkmangd": 22665
   },
   {
     "kommun_kod": "1384",
@@ -869,7 +977,8 @@
     "lan": "Hallands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Kungsbacka_kommun",
     "webbplats": "http://www.kungsbacka.se",
-    "org_nr": "212000-1256"
+    "org_nr": "212000-1256",
+    "folkmangd": 86332
   },
   {
     "kommun_kod": "1960",
@@ -877,7 +986,8 @@
     "lan": "Västmanlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Kungsörs_kommun",
     "webbplats": "http://www.kungsor.se",
-    "org_nr": "212000-2056"
+    "org_nr": "212000-2056",
+    "folkmangd": 8550
   },
   {
     "kommun_kod": "1482",
@@ -885,7 +995,8 @@
     "lan": "Västra Götalands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Kungälvs_kommun",
     "webbplats": "https://www.kungalv.se",
-    "org_nr": "212000-1371"
+    "org_nr": "212000-1371",
+    "folkmangd": 50496
   },
   {
     "kommun_kod": "1261",
@@ -893,7 +1004,8 @@
     "lan": "Skåne län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Kävlinge_kommun",
     "webbplats": "http://www.kavlinge.se",
-    "org_nr": "212000-1058"
+    "org_nr": "212000-1058",
+    "folkmangd": 32655
   },
   {
     "kommun_kod": "1983",
@@ -901,7 +1013,8 @@
     "lan": "Västmanlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Köpings_kommun",
     "webbplats": "http://www.koping.se",
-    "org_nr": "212000-2114"
+    "org_nr": "212000-2114",
+    "folkmangd": 25610
   },
   {
     "kommun_kod": "1381",
@@ -909,7 +1022,8 @@
     "lan": "Hallands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Laholms_kommun",
     "webbplats": "http://www.laholm.se",
-    "org_nr": "212000-1223"
+    "org_nr": "212000-1223",
+    "folkmangd": 26565
   },
   {
     "kommun_kod": "1282",
@@ -917,7 +1031,8 @@
     "lan": "Skåne län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Landskrona_kommun",
     "webbplats": "http://www.landskrona.se",
-    "org_nr": "212000-1140"
+    "org_nr": "212000-1140",
+    "folkmangd": 47571
   },
   {
     "kommun_kod": "1860",
@@ -925,7 +1040,8 @@
     "lan": "Örebro län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Laxå_kommun",
     "webbplats": "http://www.laxa.se",
-    "org_nr": "212000-1918"
+    "org_nr": "212000-1918",
+    "folkmangd": 5397
   },
   {
     "kommun_kod": "1814",
@@ -933,7 +1049,8 @@
     "lan": "Örebro län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Lekebergs_kommun",
     "webbplats": "http://www.lekeberg.se",
-    "org_nr": "212000-2981"
+    "org_nr": "212000-2981",
+    "folkmangd": 8608
   },
   {
     "kommun_kod": "2029",
@@ -941,7 +1058,8 @@
     "lan": "Dalarnas län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Leksands_kommun",
     "webbplats": "http://www.leksand.se",
-    "org_nr": "212000-2163"
+    "org_nr": "212000-2163",
+    "folkmangd": 16167
   },
   {
     "kommun_kod": "1441",
@@ -949,7 +1067,8 @@
     "lan": "Västra Götalands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Lerums_kommun",
     "webbplats": "http://www.lerum.se",
-    "org_nr": "212000-1447"
+    "org_nr": "212000-1447",
+    "folkmangd": 43752
   },
   {
     "kommun_kod": "0761",
@@ -957,7 +1076,8 @@
     "lan": "Kronobergs län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Lessebo_kommun",
     "webbplats": "http://www.lessebo.se",
-    "org_nr": "212000-0613"
+    "org_nr": "212000-0613",
+    "folkmangd": 8115
   },
   {
     "kommun_kod": "0186",
@@ -965,7 +1085,8 @@
     "lan": "Stockholms län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Lidingö_kommun",
     "webbplats": "https://www.lidingo.se/",
-    "org_nr": "212000-0191"
+    "org_nr": "212000-0191",
+    "folkmangd": 48369
   },
   {
     "kommun_kod": "1494",
@@ -973,7 +1094,8 @@
     "lan": "Västra Götalands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Lidköpings_kommun",
     "webbplats": "https://lidkoping.se",
-    "org_nr": "212000-1694"
+    "org_nr": "212000-1694",
+    "folkmangd": 40359
   },
   {
     "kommun_kod": "1462",
@@ -981,7 +1103,8 @@
     "lan": "Västra Götalands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Lilla_Edets_kommun",
     "webbplats": "http://www.lillaedet.se",
-    "org_nr": "212000-1496"
+    "org_nr": "212000-1496",
+    "folkmangd": 14398
   },
   {
     "kommun_kod": "1885",
@@ -989,7 +1112,8 @@
     "lan": "Örebro län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Lindesbergs_kommun",
     "webbplats": "https://www.lindesberg.se/",
-    "org_nr": "212000-2015"
+    "org_nr": "212000-2015",
+    "folkmangd": 23014
   },
   {
     "kommun_kod": "0580",
@@ -997,7 +1121,8 @@
     "lan": "Östergötlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Linköpings_kommun",
     "webbplats": "http://www.linkoping.se",
-    "org_nr": "212000-0449"
+    "org_nr": "212000-0449",
+    "folkmangd": 168714
   },
   {
     "kommun_kod": "0781",
@@ -1005,7 +1130,8 @@
     "lan": "Kronobergs län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Ljungby_kommun",
     "webbplats": "http://www.ljungby.se",
-    "org_nr": "212000-0670"
+    "org_nr": "212000-0670",
+    "folkmangd": 28132
   },
   {
     "kommun_kod": "2161",
@@ -1013,7 +1139,8 @@
     "lan": "Gävleborgs län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Ljusdals_kommun",
     "webbplats": "http://www.ljusdal.se",
-    "org_nr": "212000-2320"
+    "org_nr": "212000-2320",
+    "folkmangd": 18377
   },
   {
     "kommun_kod": "1864",
@@ -1021,7 +1148,8 @@
     "lan": "Örebro län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Ljusnarsbergs_kommun",
     "webbplats": "https://www.ljusnarsberg.se/",
-    "org_nr": "212000-1959"
+    "org_nr": "212000-1959",
+    "folkmangd": 4290
   },
   {
     "kommun_kod": "1262",
@@ -1029,7 +1157,8 @@
     "lan": "Skåne län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Lomma_kommun",
     "webbplats": "https://lomma.se",
-    "org_nr": "212000-1066"
+    "org_nr": "212000-1066",
+    "folkmangd": 24677
   },
   {
     "kommun_kod": "2085",
@@ -1037,7 +1166,8 @@
     "lan": "Dalarnas län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Ludvika_kommun",
     "webbplats": "https://www.ludvika.se/",
-    "org_nr": "212000-2270"
+    "org_nr": "212000-2270",
+    "folkmangd": 26812
   },
   {
     "kommun_kod": "2580",
@@ -1045,7 +1175,8 @@
     "lan": "Norrbottens län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Luleå_kommun",
     "webbplats": "http://www.lulea.se",
-    "org_nr": "212000-2742"
+    "org_nr": "212000-2742",
+    "folkmangd": 80304
   },
   {
     "kommun_kod": "1281",
@@ -1053,7 +1184,8 @@
     "lan": "Skåne län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Lunds_kommun",
     "webbplats": "https://www.lund.se",
-    "org_nr": "212000-1132"
+    "org_nr": "212000-1132",
+    "folkmangd": 132333
   },
   {
     "kommun_kod": "2481",
@@ -1061,7 +1193,8 @@
     "lan": "Västerbottens län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Lycksele_kommun",
     "webbplats": "http://www.lycksele.se",
-    "org_nr": "212000-2635"
+    "org_nr": "212000-2635",
+    "folkmangd": 12159
   },
   {
     "kommun_kod": "1484",
@@ -1069,7 +1202,8 @@
     "lan": "Västra Götalands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Lysekils_kommun",
     "webbplats": "http://www.lysekil.se",
-    "org_nr": "212000-1389"
+    "org_nr": "212000-1389",
+    "folkmangd": 13796
   },
   {
     "kommun_kod": "1280",
@@ -1077,7 +1211,8 @@
     "lan": "Skåne län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Malmö_kommun",
     "webbplats": "http://www.malmo.se",
-    "org_nr": "212000-1124"
+    "org_nr": "212000-1124",
+    "folkmangd": 367924
   },
   {
     "kommun_kod": "2023",
@@ -1085,7 +1220,8 @@
     "lan": "Dalarnas län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Malung-Sälens_kommun",
     "webbplats": "https://www.malung-salen.se",
-    "org_nr": "212000-2148"
+    "org_nr": "212000-2148",
+    "folkmangd": 10192
   },
   {
     "kommun_kod": "2418",
@@ -1093,7 +1229,8 @@
     "lan": "Västerbottens län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Malå_kommun",
     "webbplats": "http://www.mala.se",
-    "org_nr": "212000-2866"
+    "org_nr": "212000-2866",
+    "folkmangd": 2902
   },
   {
     "kommun_kod": "1493",
@@ -1101,7 +1238,8 @@
     "lan": "Västra Götalands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Mariestads_kommun",
     "webbplats": "https://mariestad.se/Mariestads-kommun.html",
-    "org_nr": "212000-1686"
+    "org_nr": "212000-1686",
+    "folkmangd": 24421
   },
   {
     "kommun_kod": "1463",
@@ -1109,7 +1247,8 @@
     "lan": "Västra Götalands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Marks_kommun",
     "webbplats": "http://www.mark.se",
-    "org_nr": "212000-1504"
+    "org_nr": "212000-1504",
+    "folkmangd": 35134
   },
   {
     "kommun_kod": "0767",
@@ -1117,7 +1256,8 @@
     "lan": "Kronobergs län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Markaryds_kommun",
     "webbplats": "http://www.markaryd.se",
-    "org_nr": "212000-0654"
+    "org_nr": "212000-0654",
+    "folkmangd": 9862
   },
   {
     "kommun_kod": "1461",
@@ -1125,7 +1265,8 @@
     "lan": "Västra Götalands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Melleruds_kommun",
     "webbplats": "https://www.mellerud.se/",
-    "org_nr": "212000-1488"
+    "org_nr": "212000-1488",
+    "folkmangd": 9038
   },
   {
     "kommun_kod": "0586",
@@ -1133,7 +1274,8 @@
     "lan": "Östergötlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Mjölby_kommun",
     "webbplats": "http://www.mjolby.se",
-    "org_nr": "212000-0480"
+    "org_nr": "212000-0480",
+    "folkmangd": 28823
   },
   {
     "kommun_kod": "2062",
@@ -1141,7 +1283,8 @@
     "lan": "Dalarnas län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Mora_kommun",
     "webbplats": "https://morakommun.se",
-    "org_nr": "212000-2213"
+    "org_nr": "212000-2213",
+    "folkmangd": 20419
   },
   {
     "kommun_kod": "0583",
@@ -1149,7 +1292,8 @@
     "lan": "Östergötlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Motala_kommun",
     "webbplats": "http://www.motala.se",
-    "org_nr": "212000-2817"
+    "org_nr": "212000-2817",
+    "folkmangd": 43131
   },
   {
     "kommun_kod": "0642",
@@ -1157,7 +1301,8 @@
     "lan": "Jönköpings län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Mullsjö_kommun",
     "webbplats": "http://www.mullsjo.se",
-    "org_nr": "212000-1603"
+    "org_nr": "212000-1603",
+    "folkmangd": 7546
   },
   {
     "kommun_kod": "1430",
@@ -1165,7 +1310,8 @@
     "lan": "Västra Götalands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Munkedals_kommun",
     "webbplats": "http://www.munkedal.se",
-    "org_nr": "212000-1330"
+    "org_nr": "212000-1330",
+    "folkmangd": 10272
   },
   {
     "kommun_kod": "1762",
@@ -1173,7 +1319,8 @@
     "lan": "Värmlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Munkfors_kommun",
     "webbplats": "http://www.munkfors.se",
-    "org_nr": "212000-1801"
+    "org_nr": "212000-1801",
+    "folkmangd": 3637
   },
   {
     "kommun_kod": "1481",
@@ -1181,7 +1328,8 @@
     "lan": "Västra Götalands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Mölndals_kommun",
     "webbplats": "http://www.molndal.se",
-    "org_nr": "212000-1363"
+    "org_nr": "212000-1363",
+    "folkmangd": 72128
   },
   {
     "kommun_kod": "0861",
@@ -1189,7 +1337,8 @@
     "lan": "Kalmar län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Mönsterås_kommun",
     "webbplats": "http://www.monsteras.se",
-    "org_nr": "212000-0720"
+    "org_nr": "212000-0720",
+    "folkmangd": 12978
   },
   {
     "kommun_kod": "0840",
@@ -1197,7 +1346,8 @@
     "lan": "Kalmar län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Mörbylånga_kommun",
     "webbplats": "http://www.morbylanga.se",
-    "org_nr": "212000-0704"
+    "org_nr": "212000-0704",
+    "folkmangd": 16306
   },
   {
     "kommun_kod": "0182",
@@ -1205,7 +1355,8 @@
     "lan": "Stockholms län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Nacka_kommun",
     "webbplats": "https://www.nacka.se/",
-    "org_nr": "212000-0167"
+    "org_nr": "212000-0167",
+    "folkmangd": 113730
   },
   {
     "kommun_kod": "1884",
@@ -1213,7 +1364,8 @@
     "lan": "Örebro län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Nora_kommun",
     "webbplats": "http://www.nora.se",
-    "org_nr": "212000-2007"
+    "org_nr": "212000-2007",
+    "folkmangd": 10603
   },
   {
     "kommun_kod": "1962",
@@ -1221,7 +1373,8 @@
     "lan": "Västmanlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Norbergs_kommun",
     "webbplats": "http://www.norberg.se",
-    "org_nr": "212000-2072"
+    "org_nr": "212000-2072",
+    "folkmangd": 5351
   },
   {
     "kommun_kod": "2132",
@@ -1229,7 +1382,8 @@
     "lan": "Gävleborgs län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Nordanstigs_kommun",
     "webbplats": "http://www.nordanstig.se",
-    "org_nr": "212000-2312"
+    "org_nr": "212000-2312",
+    "folkmangd": 9284
   },
   {
     "kommun_kod": "2401",
@@ -1237,7 +1391,8 @@
     "lan": "Västerbottens län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Nordmalings_kommun",
     "webbplats": "http://www.nordmaling.se",
-    "org_nr": "212000-2536"
+    "org_nr": "212000-2536",
+    "folkmangd": 6905
   },
   {
     "kommun_kod": "0581",
@@ -1245,7 +1400,8 @@
     "lan": "Östergötlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Norrköpings_kommun",
     "webbplats": "http://www.norrkoping.se",
-    "org_nr": "212000-0456"
+    "org_nr": "212000-0456",
+    "folkmangd": 144904
   },
   {
     "kommun_kod": "0188",
@@ -1253,7 +1409,8 @@
     "lan": "Stockholms län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Norrtälje_kommun",
     "webbplats": "http://www.norrtalje.se",
-    "org_nr": "212000-0217"
+    "org_nr": "212000-0217",
+    "folkmangd": 66832
   },
   {
     "kommun_kod": "2417",
@@ -1261,7 +1418,8 @@
     "lan": "Västerbottens län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Norsjö_kommun",
     "webbplats": "https://www.norsjo.se/",
-    "org_nr": "212000-2858"
+    "org_nr": "212000-2858",
+    "folkmangd": 3811
   },
   {
     "kommun_kod": "0881",
@@ -1269,7 +1427,8 @@
     "lan": "Kalmar län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Nybro_kommun",
     "webbplats": "http://www.nybro.se",
-    "org_nr": "212000-0753"
+    "org_nr": "212000-0753",
+    "folkmangd": 19803
   },
   {
     "kommun_kod": "0140",
@@ -1277,7 +1436,8 @@
     "lan": "Stockholms län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Nykvarns_kommun",
     "webbplats": "http://www.nykvarn.se",
-    "org_nr": "212000-2999"
+    "org_nr": "212000-2999",
+    "folkmangd": 12384
   },
   {
     "kommun_kod": "0480",
@@ -1285,7 +1445,8 @@
     "lan": "Södermanlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Nyköpings_kommun",
     "webbplats": "https://nykoping.se",
-    "org_nr": "212000-2940"
+    "org_nr": "212000-2940",
+    "folkmangd": 58310
   },
   {
     "kommun_kod": "0192",
@@ -1293,7 +1454,8 @@
     "lan": "Stockholms län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Nynäshamns_kommun",
     "webbplats": "http://www.nynashamn.se",
-    "org_nr": "212000-0233"
+    "org_nr": "212000-0233",
+    "folkmangd": 30610
   },
   {
     "kommun_kod": "0682",
@@ -1301,7 +1463,8 @@
     "lan": "Jönköpings län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Nässjö_kommun",
     "webbplats": "http://www.nassjo.se",
-    "org_nr": "212000-0548"
+    "org_nr": "212000-0548",
+    "folkmangd": 31474
   },
   {
     "kommun_kod": "2101",
@@ -1309,7 +1472,8 @@
     "lan": "Gävleborgs län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Ockelbo_kommun",
     "webbplats": "https://ockelbo.se/",
-    "org_nr": "212000-2288"
+    "org_nr": "212000-2288",
+    "folkmangd": 5715
   },
   {
     "kommun_kod": "1060",
@@ -1317,7 +1481,8 @@
     "lan": "Blekinge län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Olofströms_kommun",
     "webbplats": "http://www.olofstrom.se",
-    "org_nr": "212000-0811"
+    "org_nr": "212000-0811",
+    "folkmangd": 12844
   },
   {
     "kommun_kod": "2034",
@@ -1325,7 +1490,8 @@
     "lan": "Dalarnas län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Orsa_kommun",
     "webbplats": "http://www.orsa.se",
-    "org_nr": "212000-2189"
+    "org_nr": "212000-2189",
+    "folkmangd": 6902
   },
   {
     "kommun_kod": "1421",
@@ -1333,7 +1499,8 @@
     "lan": "Västra Götalands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Orusts_kommun",
     "webbplats": "http://www.orust.se",
-    "org_nr": "212000-1314"
+    "org_nr": "212000-1314",
+    "folkmangd": 15363
   },
   {
     "kommun_kod": "1273",
@@ -1341,7 +1508,8 @@
     "lan": "Skåne län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Osby_kommun",
     "webbplats": "http://www.osby.se",
-    "org_nr": "212000-0902"
+    "org_nr": "212000-0902",
+    "folkmangd": 12861
   },
   {
     "kommun_kod": "0882",
@@ -1349,7 +1517,8 @@
     "lan": "Kalmar län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Oskarshamns_kommun",
     "webbplats": "http://www.oskarshamn.se",
-    "org_nr": "212000-0761"
+    "org_nr": "212000-0761",
+    "folkmangd": 26762
   },
   {
     "kommun_kod": "2121",
@@ -1357,7 +1526,8 @@
     "lan": "Gävleborgs län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Ovanåkers_kommun",
     "webbplats": "https://www.ovanaker.se/",
-    "org_nr": "212000-2304"
+    "org_nr": "212000-2304",
+    "folkmangd": 11272
   },
   {
     "kommun_kod": "0481",
@@ -1365,7 +1535,8 @@
     "lan": "Södermanlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Oxelösunds_kommun",
     "webbplats": "http://www.oxelosund.se",
-    "org_nr": "212000-0324"
+    "org_nr": "212000-0324",
+    "folkmangd": 11962
   },
   {
     "kommun_kod": "2521",
@@ -1373,7 +1544,8 @@
     "lan": "Norrbottens län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Pajala_kommun",
     "webbplats": "http://www.pajala.se",
-    "org_nr": "212000-2718"
+    "org_nr": "212000-2718",
+    "folkmangd": 5706
   },
   {
     "kommun_kod": "1402",
@@ -1381,7 +1553,8 @@
     "lan": "Västra Götalands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Partille_kommun",
     "webbplats": "http://www.partille.se",
-    "org_nr": "212000-1272"
+    "org_nr": "212000-1272",
+    "folkmangd": 41164
   },
   {
     "kommun_kod": "1275",
@@ -1389,7 +1562,8 @@
     "lan": "Skåne län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Perstorps_kommun",
     "webbplats": "http://www.perstorp.se",
-    "org_nr": "212000-0910"
+    "org_nr": "212000-0910",
+    "folkmangd": 7115
   },
   {
     "kommun_kod": "2581",
@@ -1397,7 +1571,8 @@
     "lan": "Norrbottens län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Piteå_kommun",
     "webbplats": "http://www.pitea.se",
-    "org_nr": "212000-2759"
+    "org_nr": "212000-2759",
+    "folkmangd": 42184
   },
   {
     "kommun_kod": "2303",
@@ -1405,7 +1580,8 @@
     "lan": "Jämtlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Ragunda_kommun",
     "webbplats": "https://www.ragunda.se/",
-    "org_nr": "212000-2452"
+    "org_nr": "212000-2452",
+    "folkmangd": 5152
   },
   {
     "kommun_kod": "2409",
@@ -1413,7 +1589,8 @@
     "lan": "Västerbottens län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Robertsfors_kommun",
     "webbplats": "http://www.robertsfors.se",
-    "org_nr": "212000-2551"
+    "org_nr": "212000-2551",
+    "folkmangd": 6595
   },
   {
     "kommun_kod": "1081",
@@ -1421,7 +1598,8 @@
     "lan": "Blekinge län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Ronneby_kommun",
     "webbplats": "http://www.ronneby.se",
-    "org_nr": "212000-0837"
+    "org_nr": "212000-0837",
+    "folkmangd": 28708
   },
   {
     "kommun_kod": "2031",
@@ -1429,7 +1607,8 @@
     "lan": "Dalarnas län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Rättviks_kommun",
     "webbplats": "http://www.rattvik.se",
-    "org_nr": "212000-2171"
+    "org_nr": "212000-2171",
+    "folkmangd": 10978
   },
   {
     "kommun_kod": "1981",
@@ -1437,7 +1616,8 @@
     "lan": "Västmanlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Sala_kommun",
     "webbplats": "http://www.sala.se",
-    "org_nr": "212000-2098"
+    "org_nr": "212000-2098",
+    "folkmangd": 22600
   },
   {
     "kommun_kod": "0128",
@@ -1445,7 +1625,8 @@
     "lan": "Stockholms län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Salems_kommun",
     "webbplats": "http://www.salem.se",
-    "org_nr": "212000-2874"
+    "org_nr": "212000-2874",
+    "folkmangd": 17370
   },
   {
     "kommun_kod": "2181",
@@ -1453,7 +1634,8 @@
     "lan": "Gävleborgs län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Sandvikens_kommun",
     "webbplats": "https://sandviken.se",
-    "org_nr": "212000-2346"
+    "org_nr": "212000-2346",
+    "folkmangd": 38033
   },
   {
     "kommun_kod": "0191",
@@ -1461,7 +1643,8 @@
     "lan": "Stockholms län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Sigtuna_kommun",
     "webbplats": "http://www.sigtuna.se",
-    "org_nr": "212000-0225"
+    "org_nr": "212000-0225",
+    "folkmangd": 53365
   },
   {
     "kommun_kod": "1291",
@@ -1469,7 +1652,8 @@
     "lan": "Skåne län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Simrishamns_kommun",
     "webbplats": "http://www.simrishamn.se",
-    "org_nr": "212000-0969"
+    "org_nr": "212000-0969",
+    "folkmangd": 18779
   },
   {
     "kommun_kod": "1265",
@@ -1477,7 +1661,8 @@
     "lan": "Skåne län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Sjöbo_kommun",
     "webbplats": "http://www.sjobo.se",
-    "org_nr": "212000-1090"
+    "org_nr": "212000-1090",
+    "folkmangd": 19397
   },
   {
     "kommun_kod": "1495",
@@ -1485,7 +1670,8 @@
     "lan": "Västra Götalands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Skara_kommun",
     "webbplats": "https://www.skara.se",
-    "org_nr": "212000-1702"
+    "org_nr": "212000-1702",
+    "folkmangd": 18753
   },
   {
     "kommun_kod": "2482",
@@ -1493,7 +1679,8 @@
     "lan": "Västerbottens län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Skellefteå_kommun",
     "webbplats": "http://www.skelleftea.se",
-    "org_nr": "212000-2643"
+    "org_nr": "212000-2643",
+    "folkmangd": 75405
   },
   {
     "kommun_kod": "1904",
@@ -1501,7 +1688,8 @@
     "lan": "Västmanlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Skinnskattebergs_kommun",
     "webbplats": "http://www.skinnskatteberg.se",
-    "org_nr": "212000-2023"
+    "org_nr": "212000-2023",
+    "folkmangd": 4234
   },
   {
     "kommun_kod": "1264",
@@ -1509,7 +1697,8 @@
     "lan": "Skåne län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Skurups_kommun",
     "webbplats": "http://www.skurup.se",
-    "org_nr": "212000-1082"
+    "org_nr": "212000-1082",
+    "folkmangd": 17139
   },
   {
     "kommun_kod": "1496",
@@ -1517,7 +1706,8 @@
     "lan": "Västra Götalands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Skövde_kommun",
     "webbplats": "https://www.skovde.se",
-    "org_nr": "212000-1710"
+    "org_nr": "212000-1710",
+    "folkmangd": 58272
   },
   {
     "kommun_kod": "2061",
@@ -1525,7 +1715,8 @@
     "lan": "Dalarnas län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Smedjebackens_kommun",
     "webbplats": "http://www.smedjebacken.se",
-    "org_nr": "212000-2205"
+    "org_nr": "212000-2205",
+    "folkmangd": 10758
   },
   {
     "kommun_kod": "2283",
@@ -1533,7 +1724,8 @@
     "lan": "Västernorrlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Sollefteå_kommun",
     "webbplats": "http://www.solleftea.se",
-    "org_nr": "212000-2437"
+    "org_nr": "212000-2437",
+    "folkmangd": 18138
   },
   {
     "kommun_kod": "0163",
@@ -1541,7 +1733,8 @@
     "lan": "Stockholms län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Sollentuna_kommun",
     "webbplats": "https://www.sollentuna.se/",
-    "org_nr": "212000-0134"
+    "org_nr": "212000-0134",
+    "folkmangd": 78033
   },
   {
     "kommun_kod": "0184",
@@ -1549,7 +1742,8 @@
     "lan": "Stockholms län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Solna_kommun",
     "webbplats": "http://www.solna.se",
-    "org_nr": "212000-0183"
+    "org_nr": "212000-0183",
+    "folkmangd": 86435
   },
   {
     "kommun_kod": "2422",
@@ -1557,7 +1751,8 @@
     "lan": "Västerbottens län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Sorsele_kommun",
     "webbplats": "http://www.sorsele.se",
-    "org_nr": "212000-2585"
+    "org_nr": "212000-2585",
+    "folkmangd": 2362
   },
   {
     "kommun_kod": "1427",
@@ -1565,7 +1760,8 @@
     "lan": "Västra Götalands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Sotenäs_kommun",
     "webbplats": "http://www.sotenas.se",
-    "org_nr": "212000-1322"
+    "org_nr": "212000-1322",
+    "folkmangd": 9036
   },
   {
     "kommun_kod": "1230",
@@ -1573,7 +1769,8 @@
     "lan": "Skåne län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Staffanstorps_kommun",
     "webbplats": "http://www.staffanstorp.se",
-    "org_nr": "212000-1017"
+    "org_nr": "212000-1017",
+    "folkmangd": 27482
   },
   {
     "kommun_kod": "1415",
@@ -1581,7 +1778,8 @@
     "lan": "Västra Götalands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Stenungsunds_kommun",
     "webbplats": "https://www.stenungsund.se/",
-    "org_nr": "212000-1298"
+    "org_nr": "212000-1298",
+    "folkmangd": 27854
   },
   {
     "kommun_kod": "0180",
@@ -1589,7 +1787,8 @@
     "lan": "Stockholms län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Stockholms_kommun",
     "webbplats": "https://start.stockholm",
-    "org_nr": "212000-0142"
+    "org_nr": "212000-0142",
+    "folkmangd": 999239
   },
   {
     "kommun_kod": "1760",
@@ -1597,7 +1796,8 @@
     "lan": "Värmlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Storfors_kommun",
     "webbplats": "http://www.storfors.se",
-    "org_nr": "212000-1785"
+    "org_nr": "212000-1785",
+    "folkmangd": 3777
   },
   {
     "kommun_kod": "2421",
@@ -1605,7 +1805,8 @@
     "lan": "Västerbottens län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Storumans_kommun",
     "webbplats": "http://www.storuman.se",
-    "org_nr": "212000-2577"
+    "org_nr": "212000-2577",
+    "folkmangd": 5543
   },
   {
     "kommun_kod": "0486",
@@ -1613,7 +1814,8 @@
     "lan": "Södermanlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Strängnäs_kommun",
     "webbplats": "https://www.strangnas.se/",
-    "org_nr": "212000-0365"
+    "org_nr": "212000-0365",
+    "folkmangd": 39387
   },
   {
     "kommun_kod": "1486",
@@ -1621,7 +1823,8 @@
     "lan": "Västra Götalands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Strömstads_kommun",
     "webbplats": "http://www.stromstad.se",
-    "org_nr": "212000-1405"
+    "org_nr": "212000-1405",
+    "folkmangd": 13557
   },
   {
     "kommun_kod": "2313",
@@ -1629,7 +1832,8 @@
     "lan": "Jämtlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Strömsunds_kommun",
     "webbplats": "http://www.stromsund.se",
-    "org_nr": "212000-2486"
+    "org_nr": "212000-2486",
+    "folkmangd": 10904
   },
   {
     "kommun_kod": "0183",
@@ -1637,7 +1841,8 @@
     "lan": "Stockholms län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Sundbybergs_kommun",
     "webbplats": "http://www.sundbyberg.se",
-    "org_nr": "212000-0175"
+    "org_nr": "212000-0175",
+    "folkmangd": 57000
   },
   {
     "kommun_kod": "2281",
@@ -1645,7 +1850,8 @@
     "lan": "Västernorrlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Sundsvalls_kommun",
     "webbplats": "http://www.sundsvall.se",
-    "org_nr": "212000-2411"
+    "org_nr": "212000-2411",
+    "folkmangd": 98962
   },
   {
     "kommun_kod": "1766",
@@ -1653,7 +1859,8 @@
     "lan": "Värmlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Sunne_kommun",
     "webbplats": "http://www.sunne.se",
-    "org_nr": "212000-1843"
+    "org_nr": "212000-1843",
+    "folkmangd": 13354
   },
   {
     "kommun_kod": "1907",
@@ -1661,7 +1868,8 @@
     "lan": "Västmanlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Surahammars_kommun",
     "webbplats": "http://www.surahammar.se",
-    "org_nr": "212000-2031"
+    "org_nr": "212000-2031",
+    "folkmangd": 9733
   },
   {
     "kommun_kod": "1214",
@@ -1669,7 +1877,8 @@
     "lan": "Skåne län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Svalövs_kommun",
     "webbplats": "http://www.svalov.se",
-    "org_nr": "212000-0993"
+    "org_nr": "212000-0993",
+    "folkmangd": 14474
   },
   {
     "kommun_kod": "1263",
@@ -1677,7 +1886,8 @@
     "lan": "Skåne län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Svedala_kommun",
     "webbplats": "http://www.svedala.se",
-    "org_nr": "212000-1074"
+    "org_nr": "212000-1074",
+    "folkmangd": 23714
   },
   {
     "kommun_kod": "1465",
@@ -1685,7 +1895,8 @@
     "lan": "Västra Götalands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Svenljunga_kommun",
     "webbplats": "https://www.svenljunga.se",
-    "org_nr": "212000-1512"
+    "org_nr": "212000-1512",
+    "folkmangd": 10616
   },
   {
     "kommun_kod": "1785",
@@ -1693,7 +1904,8 @@
     "lan": "Värmlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Säffle_kommun",
     "webbplats": "https://www.saffle.se/",
-    "org_nr": "212000-1900"
+    "org_nr": "212000-1900",
+    "folkmangd": 14756
   },
   {
     "kommun_kod": "2082",
@@ -1701,7 +1913,8 @@
     "lan": "Dalarnas län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Säters_kommun",
     "webbplats": "http://www.sater.se",
-    "org_nr": "212000-2247"
+    "org_nr": "212000-2247",
+    "folkmangd": 11222
   },
   {
     "kommun_kod": "0684",
@@ -1709,7 +1922,8 @@
     "lan": "Jönköpings län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Sävsjö_kommun",
     "webbplats": "http://www.savsjo.se",
-    "org_nr": "212000-0563"
+    "org_nr": "212000-0563",
+    "folkmangd": 11531
   },
   {
     "kommun_kod": "2182",
@@ -1717,7 +1931,8 @@
     "lan": "Gävleborgs län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Söderhamns_kommun",
     "webbplats": "http://www.soderhamn.se",
-    "org_nr": "212000-2353"
+    "org_nr": "212000-2353",
+    "folkmangd": 24163
   },
   {
     "kommun_kod": "0582",
@@ -1725,7 +1940,8 @@
     "lan": "Östergötlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Söderköpings_kommun",
     "webbplats": "http://www.soderkoping.se",
-    "org_nr": "212000-0464"
+    "org_nr": "212000-0464",
+    "folkmangd": 14741
   },
   {
     "kommun_kod": "0181",
@@ -1733,7 +1949,8 @@
     "lan": "Stockholms län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Södertälje_kommun",
     "webbplats": "http://www.sodertalje.se",
-    "org_nr": "212000-0159"
+    "org_nr": "212000-0159",
+    "folkmangd": 102772
   },
   {
     "kommun_kod": "1083",
@@ -1741,7 +1958,8 @@
     "lan": "Blekinge län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Sölvesborgs_kommun",
     "webbplats": "http://www.solvesborg.se",
-    "org_nr": "212000-0852"
+    "org_nr": "212000-0852",
+    "folkmangd": 17405
   },
   {
     "kommun_kod": "1435",
@@ -1749,7 +1967,8 @@
     "lan": "Västra Götalands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Tanums_kommun",
     "webbplats": "https://www.tanum.se",
-    "org_nr": "212000-1348"
+    "org_nr": "212000-1348",
+    "folkmangd": 12677
   },
   {
     "kommun_kod": "1472",
@@ -1757,7 +1976,8 @@
     "lan": "Västra Götalands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Tibro_kommun",
     "webbplats": "http://www.tibro.se",
-    "org_nr": "212000-1660"
+    "org_nr": "212000-1660",
+    "folkmangd": 11326
   },
   {
     "kommun_kod": "1498",
@@ -1765,7 +1985,8 @@
     "lan": "Västra Götalands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Tidaholms_kommun",
     "webbplats": "http://www.tidaholm.se",
-    "org_nr": "212000-1736"
+    "org_nr": "212000-1736",
+    "folkmangd": 12736
   },
   {
     "kommun_kod": "0360",
@@ -1773,7 +1994,8 @@
     "lan": "Uppsala län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Tierps_kommun",
     "webbplats": "https://www.tierp.se/",
-    "org_nr": "212000-0266"
+    "org_nr": "212000-0266",
+    "folkmangd": 21028
   },
   {
     "kommun_kod": "2262",
@@ -1781,7 +2003,8 @@
     "lan": "Västernorrlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Timrå_kommun",
     "webbplats": "http://www.timra.se",
-    "org_nr": "212000-2395"
+    "org_nr": "212000-2395",
+    "folkmangd": 17465
   },
   {
     "kommun_kod": "0763",
@@ -1789,7 +2012,8 @@
     "lan": "Kronobergs län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Tingsryds_kommun",
     "webbplats": "https://tingsryd.se",
-    "org_nr": "212000-0621"
+    "org_nr": "212000-0621",
+    "folkmangd": 11896
   },
   {
     "kommun_kod": "1419",
@@ -1797,7 +2021,8 @@
     "lan": "Västra Götalands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Tjörns_kommun",
     "webbplats": "https://tjorn.se",
-    "org_nr": "212000-1306"
+    "org_nr": "212000-1306",
+    "folkmangd": 16003
   },
   {
     "kommun_kod": "1270",
@@ -1805,7 +2030,8 @@
     "lan": "Skåne län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Tomelilla_kommun",
     "webbplats": "http://www.tomelilla.se",
-    "org_nr": "212000-0886"
+    "org_nr": "212000-0886",
+    "folkmangd": 13669
   },
   {
     "kommun_kod": "1737",
@@ -1813,7 +2039,8 @@
     "lan": "Värmlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Torsby_kommun",
     "webbplats": "http://www.torsby.se",
-    "org_nr": "212000-1777"
+    "org_nr": "212000-1777",
+    "folkmangd": 11278
   },
   {
     "kommun_kod": "0834",
@@ -1821,7 +2048,8 @@
     "lan": "Kalmar län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Torsås_kommun",
     "webbplats": "https://www.torsas.se/",
-    "org_nr": "212000-0696"
+    "org_nr": "212000-0696",
+    "folkmangd": 6919
   },
   {
     "kommun_kod": "1452",
@@ -1829,7 +2057,8 @@
     "lan": "Västra Götalands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Tranemo_kommun",
     "webbplats": "https://www.tranemo.se",
-    "org_nr": "212000-1462"
+    "org_nr": "212000-1462",
+    "folkmangd": 11873
   },
   {
     "kommun_kod": "0687",
@@ -1837,7 +2066,8 @@
     "lan": "Jönköpings län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Tranås_kommun",
     "webbplats": "http://www.tranas.se",
-    "org_nr": "212000-0597"
+    "org_nr": "212000-0597",
+    "folkmangd": 18555
   },
   {
     "kommun_kod": "1287",
@@ -1845,7 +2075,8 @@
     "lan": "Skåne län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Trelleborgs_kommun",
     "webbplats": "http://www.trelleborg.se",
-    "org_nr": "212000-1199"
+    "org_nr": "212000-1199",
+    "folkmangd": 47405
   },
   {
     "kommun_kod": "1488",
@@ -1853,7 +2084,8 @@
     "lan": "Västra Götalands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Trollhättans_kommun",
     "webbplats": "https://www.trollhattan.se/",
-    "org_nr": "212000-1546"
+    "org_nr": "212000-1546",
+    "folkmangd": 59265
   },
   {
     "kommun_kod": "0488",
@@ -1861,7 +2093,8 @@
     "lan": "Södermanlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Trosa_kommun",
     "webbplats": "https://www.trosa.se/",
-    "org_nr": "212000-2957"
+    "org_nr": "212000-2957",
+    "folkmangd": 14900
   },
   {
     "kommun_kod": "0138",
@@ -1869,7 +2102,8 @@
     "lan": "Stockholms län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Tyresö_kommun",
     "webbplats": "https://www.tyreso.se/",
-    "org_nr": "212000-0092"
+    "org_nr": "212000-0092",
+    "folkmangd": 49645
   },
   {
     "kommun_kod": "0160",
@@ -1877,7 +2111,8 @@
     "lan": "Stockholms län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Täby_kommun",
     "webbplats": "http://www.taby.se",
-    "org_nr": "212000-0118"
+    "org_nr": "212000-0118",
+    "folkmangd": 78514
   },
   {
     "kommun_kod": "1473",
@@ -1885,7 +2120,8 @@
     "lan": "Västra Götalands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Töreboda_kommun",
     "webbplats": "https://toreboda.se",
-    "org_nr": "212000-1678"
+    "org_nr": "212000-1678",
+    "folkmangd": 9093
   },
   {
     "kommun_kod": "1485",
@@ -1893,7 +2129,8 @@
     "lan": "Västra Götalands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Uddevalla_kommun",
     "webbplats": "https://www.uddevalla.se/",
-    "org_nr": "212000-1397"
+    "org_nr": "212000-1397",
+    "folkmangd": 56744
   },
   {
     "kommun_kod": "1491",
@@ -1901,7 +2138,8 @@
     "lan": "Västra Götalands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Ulricehamns_kommun",
     "webbplats": "https://www.ulricehamn.se",
-    "org_nr": "212000-1579"
+    "org_nr": "212000-1579",
+    "folkmangd": 24954
   },
   {
     "kommun_kod": "2480",
@@ -1909,7 +2147,8 @@
     "lan": "Västerbottens län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Umeå_kommun",
     "webbplats": "http://www.umea.se",
-    "org_nr": "212000-2627"
+    "org_nr": "212000-2627",
+    "folkmangd": 135273
   },
   {
     "kommun_kod": "0114",
@@ -1917,7 +2156,8 @@
     "lan": "Stockholms län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Upplands_Väsby_kommun",
     "webbplats": "http://www.upplandsvasby.se",
-    "org_nr": "212000-0019"
+    "org_nr": "212000-0019",
+    "folkmangd": 50495
   },
   {
     "kommun_kod": "0139",
@@ -1925,7 +2165,8 @@
     "lan": "Stockholms län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Upplands-Bro_kommun",
     "webbplats": "https://www.upplands-bro.se",
-    "org_nr": "212000-0100"
+    "org_nr": "212000-0100",
+    "folkmangd": 33333
   },
   {
     "kommun_kod": "0380",
@@ -1933,7 +2174,8 @@
     "lan": "Uppsala län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Uppsala_kommun",
     "webbplats": "http://www.uppsala.se",
-    "org_nr": "212000-3005"
+    "org_nr": "212000-3005",
+    "folkmangd": 249726
   },
   {
     "kommun_kod": "0760",
@@ -1941,7 +2183,8 @@
     "lan": "Kronobergs län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Uppvidinge_kommun",
     "webbplats": "http://www.uppvidinge.se",
-    "org_nr": "212000-0605"
+    "org_nr": "212000-0605",
+    "folkmangd": 8911
   },
   {
     "kommun_kod": "0584",
@@ -1949,7 +2192,8 @@
     "lan": "Östergötlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Vadstena_kommun",
     "webbplats": "http://www.vadstena.se",
-    "org_nr": "212000-2825"
+    "org_nr": "212000-2825",
+    "folkmangd": 7484
   },
   {
     "kommun_kod": "0665",
@@ -1957,7 +2201,8 @@
     "lan": "Jönköpings län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Vaggeryds_kommun",
     "webbplats": "http://www.vaggeryd.se",
-    "org_nr": "212000-0522"
+    "org_nr": "212000-0522",
+    "folkmangd": 14943
   },
   {
     "kommun_kod": "0563",
@@ -1965,7 +2210,8 @@
     "lan": "Östergötlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Valdemarsviks_kommun",
     "webbplats": "http://www.valdemarsvik.se",
-    "org_nr": "212000-0431"
+    "org_nr": "212000-0431",
+    "folkmangd": 7526
   },
   {
     "kommun_kod": "0115",
@@ -1973,7 +2219,8 @@
     "lan": "Stockholms län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Vallentuna_kommun",
     "webbplats": "http://www.vallentuna.se",
-    "org_nr": "212000-0027"
+    "org_nr": "212000-0027",
+    "folkmangd": 35361
   },
   {
     "kommun_kod": "2021",
@@ -1981,7 +2228,8 @@
     "lan": "Dalarnas län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Vansbro_kommun",
     "webbplats": "http://www.vansbro.se",
-    "org_nr": "212000-2130"
+    "org_nr": "212000-2130",
+    "folkmangd": 6741
   },
   {
     "kommun_kod": "1470",
@@ -1989,7 +2237,8 @@
     "lan": "Västra Götalands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Vara_kommun",
     "webbplats": "https://www.vara.se",
-    "org_nr": "212000-2924"
+    "org_nr": "212000-2924",
+    "folkmangd": 16011
   },
   {
     "kommun_kod": "1383",
@@ -1997,7 +2246,8 @@
     "lan": "Hallands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Varbergs_kommun",
     "webbplats": "https://www.varberg.se",
-    "org_nr": "212000-1249"
+    "org_nr": "212000-1249",
+    "folkmangd": 69460
   },
   {
     "kommun_kod": "0187",
@@ -2005,7 +2255,8 @@
     "lan": "Stockholms län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Vaxholms_kommun",
     "webbplats": "http://www.vaxholm.se",
-    "org_nr": "212000-2908"
+    "org_nr": "212000-2908",
+    "folkmangd": 11636
   },
   {
     "kommun_kod": "1233",
@@ -2013,7 +2264,8 @@
     "lan": "Skåne län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Vellinge_kommun",
     "webbplats": "http://www.vellinge.se",
-    "org_nr": "212000-1033"
+    "org_nr": "212000-1033",
+    "folkmangd": 37833
   },
   {
     "kommun_kod": "0685",
@@ -2021,7 +2273,8 @@
     "lan": "Jönköpings län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Vetlanda_kommun",
     "webbplats": "https://kommun.vetlanda.se/",
-    "org_nr": "212000-0571"
+    "org_nr": "212000-0571",
+    "folkmangd": 27313
   },
   {
     "kommun_kod": "2462",
@@ -2029,7 +2282,8 @@
     "lan": "Västerbottens län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Vilhelmina_kommun",
     "webbplats": "http://www.vilhelmina.se",
-    "org_nr": "212000-2601"
+    "org_nr": "212000-2601",
+    "folkmangd": 6172
   },
   {
     "kommun_kod": "0884",
@@ -2037,7 +2291,8 @@
     "lan": "Kalmar län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Vimmerby_kommun",
     "webbplats": "http://www.vimmerby.se",
-    "org_nr": "212000-0787"
+    "org_nr": "212000-0787",
+    "folkmangd": 15327
   },
   {
     "kommun_kod": "2404",
@@ -2045,7 +2300,8 @@
     "lan": "Västerbottens län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Vindelns_kommun",
     "webbplats": "http://www.vindeln.se",
-    "org_nr": "212000-2544"
+    "org_nr": "212000-2544",
+    "folkmangd": 5421
   },
   {
     "kommun_kod": "0428",
@@ -2053,7 +2309,8 @@
     "lan": "Södermanlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Vingåkers_kommun",
     "webbplats": "http://www.vingaker.se",
-    "org_nr": "212000-0308"
+    "org_nr": "212000-0308",
+    "folkmangd": 8666
   },
   {
     "kommun_kod": "1442",
@@ -2061,7 +2318,8 @@
     "lan": "Västra Götalands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Vårgårda_kommun",
     "webbplats": "https://www.vargarda.se/",
-    "org_nr": "212000-1454"
+    "org_nr": "212000-1454",
+    "folkmangd": 12472
   },
   {
     "kommun_kod": "1487",
@@ -2069,7 +2327,8 @@
     "lan": "Västra Götalands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Vänersborgs_kommun",
     "webbplats": "http://www.vanersborg.se",
-    "org_nr": "212000-1538"
+    "org_nr": "212000-1538",
+    "folkmangd": 40078
   },
   {
     "kommun_kod": "2460",
@@ -2077,7 +2336,8 @@
     "lan": "Västerbottens län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Vännäs_kommun",
     "webbplats": "https://www.vannas.se",
-    "org_nr": "212000-2841"
+    "org_nr": "212000-2841",
+    "folkmangd": 9225
   },
   {
     "kommun_kod": "0120",
@@ -2085,7 +2345,8 @@
     "lan": "Stockholms län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Värmdö_kommun",
     "webbplats": "http://www.varmdo.se",
-    "org_nr": "212000-0035"
+    "org_nr": "212000-0035",
+    "folkmangd": 46601
   },
   {
     "kommun_kod": "0683",
@@ -2093,7 +2354,8 @@
     "lan": "Jönköpings län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Värnamo_kommun",
     "webbplats": "https://kommun.varnamo.se",
-    "org_nr": "212000-0555"
+    "org_nr": "212000-0555",
+    "folkmangd": 34534
   },
   {
     "kommun_kod": "0883",
@@ -2101,7 +2363,8 @@
     "lan": "Kalmar län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Västerviks_kommun",
     "webbplats": "http://www.vastervik.se",
-    "org_nr": "212000-0779"
+    "org_nr": "212000-0779",
+    "folkmangd": 36269
   },
   {
     "kommun_kod": "1980",
@@ -2109,7 +2372,8 @@
     "lan": "Västmanlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Västerås_kommun",
     "webbplats": "http://www.vasteras.se",
-    "org_nr": "212000-2080"
+    "org_nr": "212000-2080",
+    "folkmangd": 161240
   },
   {
     "kommun_kod": "0780",
@@ -2117,7 +2381,8 @@
     "lan": "Kronobergs län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Växjö_kommun",
     "webbplats": "https://www.vaxjo.se/",
-    "org_nr": "212000-0662"
+    "org_nr": "212000-0662",
+    "folkmangd": 98940
   },
   {
     "kommun_kod": "0512",
@@ -2125,7 +2390,8 @@
     "lan": "Östergötlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Ydre_kommun",
     "webbplats": "http://www.ydre.se",
-    "org_nr": "212000-0381"
+    "org_nr": "212000-0381",
+    "folkmangd": 3619
   },
   {
     "kommun_kod": "1286",
@@ -2133,7 +2399,8 @@
     "lan": "Skåne län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Ystads_kommun",
     "webbplats": "https://www.ystad.se/",
-    "org_nr": "212000-1181"
+    "org_nr": "212000-1181",
+    "folkmangd": 32188
   },
   {
     "kommun_kod": "1492",
@@ -2141,7 +2408,8 @@
     "lan": "Västra Götalands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Åmåls_kommun",
     "webbplats": "http://www.amal.se",
-    "org_nr": "212000-1587"
+    "org_nr": "212000-1587",
+    "folkmangd": 11679
   },
   {
     "kommun_kod": "2260",
@@ -2149,7 +2417,8 @@
     "lan": "Västernorrlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Ånge_kommun",
     "webbplats": "http://www.ange.se",
-    "org_nr": "212000-2387"
+    "org_nr": "212000-2387",
+    "folkmangd": 9000
   },
   {
     "kommun_kod": "2321",
@@ -2157,7 +2426,8 @@
     "lan": "Jämtlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Åre_kommun",
     "webbplats": "http://www.are.se",
-    "org_nr": "212000-2494"
+    "org_nr": "212000-2494",
+    "folkmangd": 12770
   },
   {
     "kommun_kod": "1765",
@@ -2165,7 +2435,8 @@
     "lan": "Värmlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Årjängs_kommun",
     "webbplats": "http://www.arjang.se",
-    "org_nr": "212000-1835"
+    "org_nr": "212000-1835",
+    "folkmangd": 9734
   },
   {
     "kommun_kod": "2463",
@@ -2173,7 +2444,8 @@
     "lan": "Västerbottens län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Åsele_kommun",
     "webbplats": "http://www.asele.se",
-    "org_nr": "212000-2791"
+    "org_nr": "212000-2791",
+    "folkmangd": 2683
   },
   {
     "kommun_kod": "1277",
@@ -2181,7 +2453,8 @@
     "lan": "Skåne län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Åstorps_kommun",
     "webbplats": "http://www.astorp.se",
-    "org_nr": "212000-0936"
+    "org_nr": "212000-0936",
+    "folkmangd": 16491
   },
   {
     "kommun_kod": "0561",
@@ -2189,7 +2462,8 @@
     "lan": "Östergötlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Åtvidabergs_kommun",
     "webbplats": "http://www.atvidaberg.se",
-    "org_nr": "212000-0415"
+    "org_nr": "212000-0415",
+    "folkmangd": 11490
   },
   {
     "kommun_kod": "0765",
@@ -2197,7 +2471,8 @@
     "lan": "Kronobergs län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Älmhults_kommun",
     "webbplats": "http://www.almhult.se",
-    "org_nr": "212000-0647"
+    "org_nr": "212000-0647",
+    "folkmangd": 17579
   },
   {
     "kommun_kod": "2039",
@@ -2205,7 +2480,8 @@
     "lan": "Dalarnas län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Älvdalens_kommun",
     "webbplats": "http://www.alvdalen.se",
-    "org_nr": "212000-2197"
+    "org_nr": "212000-2197",
+    "folkmangd": 6831
   },
   {
     "kommun_kod": "0319",
@@ -2213,7 +2489,8 @@
     "lan": "Uppsala län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Älvkarleby_kommun",
     "webbplats": "http://www.alvkarleby.se",
-    "org_nr": "212000-0258"
+    "org_nr": "212000-0258",
+    "folkmangd": 9573
   },
   {
     "kommun_kod": "2560",
@@ -2221,7 +2498,8 @@
     "lan": "Norrbottens län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Älvsbyns_kommun",
     "webbplats": "http://www.alvsbyn.se",
-    "org_nr": "212000-2734"
+    "org_nr": "212000-2734",
+    "folkmangd": 7815
   },
   {
     "kommun_kod": "1292",
@@ -2229,7 +2507,8 @@
     "lan": "Skåne län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Ängelholms_kommun",
     "webbplats": "http://www.angelholm.se",
-    "org_nr": "212000-0977"
+    "org_nr": "212000-0977",
+    "folkmangd": 45159
   },
   {
     "kommun_kod": "1407",
@@ -2237,7 +2516,8 @@
     "lan": "Västra Götalands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Öckerö_kommun",
     "webbplats": "http://www.ockero.se",
-    "org_nr": "212000-1280"
+    "org_nr": "212000-1280",
+    "folkmangd": 12863
   },
   {
     "kommun_kod": "0509",
@@ -2245,7 +2525,8 @@
     "lan": "Östergötlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Ödeshögs_kommun",
     "webbplats": "http://www.odeshog.se",
-    "org_nr": "212000-0373"
+    "org_nr": "212000-0373",
+    "folkmangd": 5221
   },
   {
     "kommun_kod": "1880",
@@ -2253,7 +2534,8 @@
     "lan": "Örebro län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Örebro_kommun",
     "webbplats": "https://www.orebro.se",
-    "org_nr": "212000-1967"
+    "org_nr": "212000-1967",
+    "folkmangd": 160687
   },
   {
     "kommun_kod": "1257",
@@ -2261,7 +2543,8 @@
     "lan": "Skåne län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Örkelljunga_kommun",
     "webbplats": "http://www.orkelljunga.se",
-    "org_nr": "212000-0878"
+    "org_nr": "212000-0878",
+    "folkmangd": 10293
   },
   {
     "kommun_kod": "2284",
@@ -2269,7 +2552,8 @@
     "lan": "Västernorrlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Örnsköldsviks_kommun",
     "webbplats": "http://www.ornskoldsvik.se",
-    "org_nr": "212000-2445"
+    "org_nr": "212000-2445",
+    "folkmangd": 55338
   },
   {
     "kommun_kod": "2380",
@@ -2277,7 +2561,8 @@
     "lan": "Jämtlands län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Östersunds_kommun",
     "webbplats": "http://www.ostersund.se",
-    "org_nr": "212000-2528"
+    "org_nr": "212000-2528",
+    "folkmangd": 64963
   },
   {
     "kommun_kod": "0117",
@@ -2285,7 +2570,8 @@
     "lan": "Stockholms län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Österåkers_kommun",
     "webbplats": "https://www.osteraker.se/",
-    "org_nr": "212000-2890"
+    "org_nr": "212000-2890",
+    "folkmangd": 49943
   },
   {
     "kommun_kod": "0382",
@@ -2293,7 +2579,8 @@
     "lan": "Uppsala län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Östhammars_kommun",
     "webbplats": "http://www.osthammar.se",
-    "org_nr": "212000-0290"
+    "org_nr": "212000-0290",
+    "folkmangd": 22181
   },
   {
     "kommun_kod": "1256",
@@ -2301,7 +2588,8 @@
     "lan": "Skåne län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Östra_Göinge_kommun",
     "webbplats": "http://www.ostragoinge.se",
-    "org_nr": "212000-0860"
+    "org_nr": "212000-0860",
+    "folkmangd": 13718
   },
   {
     "kommun_kod": "2513",
@@ -2309,7 +2597,8 @@
     "lan": "Norrbottens län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Överkalix_kommun",
     "webbplats": "http://www.overkalix.se",
-    "org_nr": "212000-2684"
+    "org_nr": "212000-2684",
+    "folkmangd": 3183
   },
   {
     "kommun_kod": "2518",
@@ -2317,6 +2606,7 @@
     "lan": "Norrbottens län",
     "wikipedia_url": "https://sv.wikipedia.org/wiki/Övertorneå_kommun",
     "webbplats": "http://www.overtornea.se",
-    "org_nr": "212000-2700"
+    "org_nr": "212000-2700",
+    "folkmangd": 3995
   }
 ]
