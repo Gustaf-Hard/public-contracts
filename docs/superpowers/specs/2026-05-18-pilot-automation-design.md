@@ -11,6 +11,15 @@ Prove that the dispatch + reply + follow-up loop can run autonomously for **five
 
 This pilot does **not** parse contracts. PDFs land in a folder; structured extraction (leverantör / produkt / värde / avtalsperiod) is v2.
 
+## Two-stage rollout
+
+To minimise blast radius before any real kommun is contacted, the v1 pilot runs in two stages:
+
+- **Stage 0 — Rehearsal**: bot communicates with a synthetic "Testkommun" controlled by the project owner. The owner plays the registrator from a separate Gmail account (`mediagraf-test-kommun@gmail.com`) and walks through six scripted scenarios that exercise every state transition, template, and escalation path. No real kommun is involved.
+- **Stage 1 — Live pilot**: only after every Stage 0 scenario passes, the same bot is pointed at the five real kommuner listed below. The flip between stages is a config change, not a code change.
+
+Stage 0 is detailed in its own section near the end of this spec.
+
 ## Pilot kommuner
 
 Selected from `data/municipalities.json` as the five smallest `confidence: high` kommuner:
@@ -377,6 +386,28 @@ SLACK_INTERACTIVITY_PUBLIC_URL=   # ngrok URL while pilot is running
 
 The OAuth client is registered in Google Cloud Console once (you'll need to verify the OAuth consent screen for personal Gmail). The Slack app is registered at api.slack.com/apps. Setup steps documented in the plan.
 
+A second file `data/pilot-overrides.json` (committed — no secrets in it) selects which kommuner the pilot acts on:
+
+```json
+{
+  "active_pilot_kommun_kods": ["9999"],
+  "rehearsal_kommuner": [
+    {
+      "kommun_kod": "9999",
+      "kommun_namn": "Testkommun",
+      "lan": "Testlän",
+      "folkmangd": 0,
+      "contacts": [
+        { "role": "central",     "email": "mediagraf-test-kommun@gmail.com" },
+        { "role": "utbildning",  "email": "mediagraf-test-kommun@gmail.com" }
+      ]
+    }
+  ]
+}
+```
+
+`pilot-init.js` and the daemon honour `active_pilot_kommun_kods` as a whitelist. When it contains `9999`, the bot picks the kommun definition from `rehearsal_kommuner`; otherwise it picks the kommun from `data/municipalities.json`. The Stage 0 → Stage 1 transition is a one-line edit (`["9999"]` → `["2418","1438","0509","2404","0560"]`) followed by a daemon restart.
+
 ## Risks and mitigations
 
 | Risk | Mitigation |
@@ -387,6 +418,80 @@ The OAuth client is registered in Google Cloud Console once (you'll need to veri
 | ngrok URL changes (free tier) and Slack interactivity breaks | Daemon re-prints the current ngrok URL on startup; you update the Slack app's URL once per session — or pay $8/mo for static ngrok |
 | Gmail OAuth token expires while you're away | Use offline refresh tokens (standard); auth flow only required once |
 | PDFs are scanned images that we can't parse later | Pilot doesn't parse — defer to v2. Storing the source PDF preserves the option. |
+
+## Stage 0 — Rehearsal against synthetic kommun
+
+Before the bot ever sends an email to a real kommun, run the entire pipeline against a synthetic "Testkommun" (kod `9999`). You play the registrator from a separate Gmail account (`mediagraf-test-kommun@gmail.com`); the bot doesn't know it's not a real kommun. The purpose is to exercise every state-machine transition, every template, and the Slack escalation flow with zero blast radius.
+
+### Setup
+
+1. Create a new Gmail account `mediagraf-test-kommun@gmail.com`. Log in via a separate browser profile (Chrome / Firefox container) so you don't confuse it with your normal inbox.
+2. Set `data/pilot-overrides.json` `active_pilot_kommun_kods` to `["9999"]` and confirm `rehearsal_kommuner` contains the synthetic kommun as shown in the Configuration section.
+3. Start the daemon as you would in live mode.
+
+### Clock-skew override
+
+For follow-up timing tests, the daemon accepts a `PILOT_CLOCK_OFFSET_DAYS` env var (default `0`) that artificially advances "now" by N days. This lets us validate 7-/10-/14-day follow-up rules in a single afternoon instead of waiting weeks. The override is rejected when `active_pilot_kommun_kods` contains any kod other than `9999` — it must not be possible to clock-skew the live pilot.
+
+### Six scripted scenarios
+
+Run through these in order from the test Gmail account. After each scenario, inspect `data/pilot.db` (e.g. `sqlite3 data/pilot.db "select state, state_changed_at from conversations"`) to confirm the expected transitions happened.
+
+**Scenario A — Happy path (no clarification needed)**
+1. Trigger: `node scripts/pilot-init.js`. Bot sends T-INITIAL to `mediagraf-test-kommun@gmail.com` (both `central` and `utbildning` roles — two separate threads).
+2. From the test account, reply on the `utbildning` thread with: *"Tack för din begäran. Ärendenummer: K9999001. Vi återkommer."*
+   - **Expected:** classifier `auto_ack`, state `SENT → ACK_RECEIVED`, `arendenummer = "K9999001"` saved.
+3. Reply with a small dummy PDF attached and body *"Hej! Här kommer ett avtal med Skolon. Med vänlig hälsning, Test Registrator."*
+   - **Expected:** classifier `delivery`, state `ACK_RECEIVED → DELIVERING`, PDF saved to `data/contracts/9999/`, T-RECEIPT sent automatically.
+4. Set `PILOT_CLOCK_OFFSET_DAYS=14` and tick the daemon.
+   - **Expected:** T-FOLLOWUP-CLOSE sent automatically.
+5. Reply *"Detta var samtliga avtal vi har."*
+   - **Expected:** classifier `dead_end` (specifically the "samtliga avtal" closer), state `DELIVERING → DONE`.
+
+**Scenario B — Clarification round-trip**
+1. Re-run `pilot-init` for a fresh conversation (or reset DB).
+2. Reply auto-ack as in Scenario A.
+3. Reply: *"Kan du precisera vilken tidsperiod du önskar? Och om du vill ha alla avtal eller bara aktiva?"*
+   - **Expected:** classifier `clarification`, state `ACK_RECEIVED → AWAITING_PRECISION`, bot auto-sends T-PRECISION on next tick.
+4. Reply with PDF attachment.
+   - **Expected:** state `AWAITING_PRECISION → DELIVERING`.
+
+**Scenario C — Dead-end straight from the start**
+1. Reply to T-INITIAL with: *"Vi har tyvärr inga avtal av detta slag i vår verksamhet."*
+   - **Expected:** classifier `dead_end`, state `SENT → DEAD_END`, no further outbound.
+
+**Scenario D — Silent kommun → follow-up nudge**
+1. Don't reply to T-INITIAL.
+2. Set `PILOT_CLOCK_OFFSET_DAYS=7` and tick the daemon.
+   - **Expected:** T-FOLLOWUP-NUDGE sent.
+3. Reply auto-ack belatedly.
+   - **Expected:** state `SENT → ACK_RECEIVED`, follow-up counter reset to 0.
+
+**Scenario E — Ambiguous reply → Slack escalation**
+1. Reply to T-INITIAL with something the classifier shouldn't recognise: *"Hej, kan du ringa mig på 070-1234567 så pratar vi om detta?"*
+   - **Expected:** classifier `unknown` (no signals above threshold), state → `NEEDS_HUMAN`, Slack message posted to the configured channel with Approve / Edit / Skip buttons and the bot's draft reply.
+2. In Slack, click **Edit**, type a reply: *"Tack, men jag föredrar att vi håller kommunikationen via e-post."*, submit.
+   - **Expected:** Slack interactivity webhook fires → daemon receives payload → outbound mail sent → state `NEEDS_HUMAN → SENT` (or back to whatever state it was in before).
+
+**Scenario F — Multi-batch delivery**
+1. Reply auto-ack.
+2. Reply with PDF #1.
+   - **Expected:** T-RECEIPT sent.
+3. Reply 3 days later (use clock skew) with PDF #2, no body text.
+   - **Expected:** state stays `DELIVERING`, PDF #2 saved, NO second T-RECEIPT (the spec says receipt only on first delivery).
+4. Reply 5 days later with PDF #3 plus *"Detta var samtliga avtal."*
+   - **Expected:** state `DELIVERING → DONE` because the closer pattern matched.
+
+### Stage 0 → Stage 1 gate
+
+Stage 1 (live pilot) must NOT be unlocked until every one of the six scenarios runs through to its expected end state without manual DB intervention. After the gate passes:
+
+1. Reset `data/pilot.db` (delete and let `pilot-init.js` recreate).
+2. Clear `data/contracts/9999/`.
+3. Edit `data/pilot-overrides.json`: set `active_pilot_kommun_kods` to `["2418","1438","0509","2404","0560"]`.
+4. Restart the daemon.
+
+The same code runs both stages — only the config differs.
 
 ## Open questions deferred to v2
 
