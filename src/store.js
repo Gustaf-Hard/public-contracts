@@ -28,6 +28,7 @@ export async function writeSummaryCsv(path, records) {
     lan: r.lan,
     org_nr: r.org_nr,
     webbplats: r.webbplats,
+    folkmangd: r.folkmangd ?? '',
     diarium_url: r.diarium_url ?? '',
     contact_count: r.contacts.length,
     confidence: r.confidence,
@@ -36,7 +37,7 @@ export async function writeSummaryCsv(path, records) {
   }));
   const columns = [
     'kommun_kod', 'kommun_namn', 'lan', 'org_nr', 'webbplats',
-    'diarium_url', 'contact_count', 'confidence', 'verified_at', 'notes',
+    'folkmangd', 'diarium_url', 'contact_count', 'confidence', 'verified_at', 'notes',
   ];
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, await stringifyCsv(rows, columns), 'utf8');

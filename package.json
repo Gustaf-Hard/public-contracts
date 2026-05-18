@@ -9,7 +9,8 @@
     "test:watch": "vitest",
     "seed": "node scripts/01-fetch-seed.js",
     "discover": "node scripts/02-discover-emails.js",
-    "verify": "node scripts/03-verify.js"
+    "verify": "node scripts/03-verify.js",
+    "add-population": "node scripts/05-add-population.js"
   },
   "dependencies": {
     "cheerio": "^1.0.0",

@@ -58,11 +58,24 @@ describe('parseKommunInfobox', () => {
     const info = parseKommunInfobox(fixture('wikipedia-kommun-page.html'));
     expect(info.webbplats).toBe('https://www.vasteras.se');
     expect(info.org_nr).toBe('212000-2080');
+    expect(info.folkmangd).toBe(159064);
   });
 
   it('returns nulls when fields are missing', () => {
     const info = parseKommunInfobox('<html><body></body></html>');
     expect(info.webbplats).toBeNull();
     expect(info.org_nr).toBeNull();
+    expect(info.folkmangd).toBeNull();
+  });
+
+  it('returns folkmangd as null when Folkmängd field is missing or unparseable', () => {
+    expect(parseKommunInfobox('<html><body></body></html>').folkmangd).toBeNull();
+    const garbledHtml = `<table class="infobox"><tr><th>Folkmängd</th><td>(uppgift saknas)</td></tr></table>`;
+    expect(parseKommunInfobox(garbledHtml).folkmangd).toBeNull();
+  });
+
+  it('handles "Befolkning" as an alternate label', () => {
+    const html = `<table class="infobox"><tr><th>Befolkning</th><td>10 234</td></tr></table>`;
+    expect(parseKommunInfobox(html).folkmangd).toBe(10234);
   });
 });

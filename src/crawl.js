@@ -150,6 +150,7 @@ export async function crawlKommun(seed, { fetch = (u, o) => politeFetch(u, o), t
     lan: seed.lan,
     org_nr: seed.org_nr ?? null,
     webbplats: seed.webbplats ?? null,
+    folkmangd: seed.folkmangd ?? null,
     diarium_url: null,
     contacts: [],
     confidence: 'low',

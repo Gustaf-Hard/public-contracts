@@ -16,9 +16,9 @@ npm test
 
 ## Outputs
 
-- `data/seed-municipalities.json` — 290 kommuner with name, län, org.nr, website.
-- `data/municipalities.json` — full records with `contacts[]` per kommun (canonical).
-- `data/municipalities.csv` — one row per kommun, with `contact_count` and `confidence`.
+- `data/seed-municipalities.json` — 290 kommuner with name, län, org.nr, website, and population.
+- `data/municipalities.json` — full records with `contacts[]` per kommun (canonical); each record includes `folkmangd` (population).
+- `data/municipalities.csv` — one row per kommun, with `folkmangd`, `contact_count` and `confidence`.
 - `data/municipalities-contacts.csv` — one row per contact email (long format).
 - `data/review-report.md` — every kommun with `confidence` ≠ `high`, with the source URLs already visited so manual completion is cheap.
 

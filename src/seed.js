@@ -76,7 +76,7 @@ export function parseKommunListPage(html) {
 
 export function parseKommunInfobox(html) {
   const $ = cheerio.load(html);
-  const info = { webbplats: null, org_nr: null };
+  const info = { webbplats: null, org_nr: null, folkmangd: null };
   $('table.infobox tr').each((_, tr) => {
     const label = $(tr).find('th').text().trim().toLowerCase();
     if (label.includes('webbplats')) {
@@ -86,6 +86,21 @@ export function parseKommunInfobox(html) {
     if (label.includes('org.nr') || label.includes('org.nummer') || label.includes('organisationsnummer')) {
       // Strip footnote references like [4] from the text
       info.org_nr = $(tr).find('td').text().trim().replace(/\[\d+\]/g, '').trim();
+    }
+    if (label.includes('folkmängd') || label.includes('befolkning')) {
+      const raw = $(tr).find('td').text();
+      // Strip footnote refs e.g. [1]
+      let cleaned = raw.replace(/\[\d+\]/g, '');
+      // Strip date parentheticals e.g. (2024-12-31)
+      cleaned = cleaned.replace(/\(.*?\)/g, '');
+      // Strip all whitespace including non-breaking space (U+00A0)
+      cleaned = cleaned.replace(/[\s ]/g, '');
+      // Parse digits only
+      const digits = cleaned.replace(/[^\d]/g, '');
+      if (digits.length > 0) {
+        const parsed = parseInt(digits, 10);
+        info.folkmangd = isNaN(parsed) ? null : parsed;
+      }
     }
   });
   return info;
@@ -105,7 +120,7 @@ export async function fetchSeed({ log = () => {} } = {}) {
       const r = await politeFetch(row.wikipedia_url);
       if (!r.ok) {
         log(`  ${row.kommun_namn}: ${r.status}, skipping infobox`);
-        enriched.push({ ...row, webbplats: null, org_nr: null });
+        enriched.push({ ...row, webbplats: null, org_nr: null, folkmangd: null });
         continue;
       }
       const info = parseKommunInfobox(await r.text());
@@ -113,7 +128,7 @@ export async function fetchSeed({ log = () => {} } = {}) {
       log(`  ${row.kommun_namn}: ${info.webbplats ?? '(no website)'}`);
     } catch (e) {
       log(`  ${row.kommun_namn}: error ${e.message}, skipping`);
-      enriched.push({ ...row, webbplats: null, org_nr: null });
+      enriched.push({ ...row, webbplats: null, org_nr: null, folkmangd: null });
     }
   }
   return enriched;

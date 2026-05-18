@@ -23,6 +23,7 @@ const sample = [
     lan: 'Västmanlands län',
     org_nr: '212000-2080',
     webbplats: 'https://www.vasteras.se',
+    folkmangd: 159064,
     diarium_url: null,
     contacts: [
       {
@@ -65,6 +66,8 @@ describe('store', () => {
     expect(csv).toMatch(/1980,Västerås/);
     expect(csv).toMatch(/,high,/);
     expect(csv).toMatch(/,2,/); // contact_count
+    expect(csv).toMatch(/folkmangd/); // column present
+    expect(csv).toMatch(/159064/); // value present
   });
 
   it('writes long-format contacts CSV with one row per contact', async () => {
