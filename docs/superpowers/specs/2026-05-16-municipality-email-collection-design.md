@@ -36,6 +36,7 @@ JSON is the canonical format (`data/municipalities.json`) because each kommun ha
 | `lan` | string | Län the kommun belongs to. |
 | `org_nr` | string | Organisationsnummer (10 digits, with dash). |
 | `webbplats` | URL | Official kommun website. |
+| `folkmangd` | integer \| null | Population from kommun's Wikipedia infobox (Folkmängd); integer or null. |
 | `diarium_url` | URL \| null | Public diarium search page, if one exists. |
 | `contacts` | `Contact[]` | Unbounded list — see below. May be empty (flagged `low`). |
 | `confidence` | enum | `high` (≥1 central + ≥1 education contact on official site), `medium` (some found, gaps), `low` (none found or only patterns inferred). |
