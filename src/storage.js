@@ -57,6 +57,9 @@ CREATE TABLE IF NOT EXISTS escalations (
   status TEXT NOT NULL DEFAULT 'open',
   resolved_at TEXT,
   resolved_text TEXT,
+  classifier_class TEXT,
+  classifier_confidence REAL,
+  previous_state TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_escalations_status ON escalations(status);
@@ -163,12 +166,13 @@ export function openDb(path) {
 
   function recordEscalation(e) {
     const r = db.prepare(`
-      INSERT INTO escalations (conversation_id, message_id, reason, draft_template, draft_subject, draft_body, slack_ts)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO escalations (conversation_id, message_id, reason, draft_template, draft_subject, draft_body, slack_ts, classifier_class, classifier_confidence, previous_state)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       e.conversation_id, e.message_id ?? null, e.reason,
       e.draft_template ?? null, e.draft_subject ?? null, e.draft_body ?? null,
-      e.slack_ts ?? null
+      e.slack_ts ?? null,
+      e.classifier_class ?? null, e.classifier_confidence ?? null, e.previous_state ?? null
     );
     return Number(r.lastInsertRowid);
   }

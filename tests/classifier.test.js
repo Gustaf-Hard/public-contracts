@@ -65,6 +65,16 @@ describe('classify — delivery', () => {
     }));
     expect(r.class).not.toBe('delivery');
   });
+
+  it('classifies PDF-only message (no body words) as delivery via attachment-only threshold', () => {
+    const r = classify(msg({ body: 'Vänliga hälsningar', attachment_count: 1 }));
+    expect(r.class).toBe('delivery');
+  });
+
+  it('classifies bare PDF (empty body) as delivery', () => {
+    const r = classify(msg({ body: '', attachment_count: 1 }));
+    expect(r.class).toBe('delivery');
+  });
 });
 
 describe('classify — dead_end', () => {

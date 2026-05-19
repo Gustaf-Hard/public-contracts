@@ -34,6 +34,7 @@ const DEAD_END_PATTERNS = [
 const ARENDENUMMER_RE = /Ärendenummer\s*[:\-]\s*([Kk]\d{6,})/i;
 
 const THRESHOLD = 0.6;
+const DELIVERY_THRESHOLD = 0.5;
 const MARGIN = 0.2;
 
 function scoreClass(patterns, body) {
@@ -73,6 +74,10 @@ export function classify(message) {
   const extracted = {};
   const arendeMatch = body.match(ARENDENUMMER_RE);
   if (arendeMatch) extracted.arendenummer = arendeMatch[1];
+
+  if (top.cls === 'delivery' && top.score >= DELIVERY_THRESHOLD && (top.score - (second?.score ?? 0)) >= MARGIN) {
+    return { class: 'delivery', confidence: top.score, signals: top.signals, extracted };
+  }
 
   if (top.score < THRESHOLD || (top.score - (second?.score ?? 0)) < MARGIN) {
     return {

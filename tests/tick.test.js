@@ -157,6 +157,8 @@ describe('runTick — inbound processing', () => {
     const esc = db.listOpenEscalations()[0];
     expect(esc.draft_template).toBe('T_PRECISION');
     expect(esc.draft_body).toMatch(/preciserar gärna/);
+    expect(esc.classifier_class).toBe('clarification');
+    expect(esc.classifier_confidence).toBeGreaterThan(0);
     // State transition still happens automatically (bookkeeping)
     expect(db.getConversation(id).state).toBe('AWAITING_PRECISION');
   });
@@ -197,6 +199,7 @@ describe('runTick — inbound processing', () => {
     const escs = db.listOpenEscalations();
     expect(escs).toHaveLength(1);
     expect(escs[0].draft_template).toBe('free_form');
+    expect(escs[0].previous_state).toBe('SENT');
   });
 
   it('does not re-process a message it already saw', async () => {

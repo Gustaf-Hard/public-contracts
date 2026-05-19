@@ -42,7 +42,7 @@ async function dispatchInitial(conv, deps) {
   log?.(`SENT T-INITIAL → ${conv.kommun_namn}/${conv.role}`);
 }
 
-async function escalateWithDraft({ conv, parsedInbound, classification, draftTemplate, reason, deps }) {
+async function escalateWithDraft({ conv, parsedInbound, classification, previousState, draftTemplate, reason, deps }) {
   const { db, slackClient, slackOps, env, log } = deps;
   let subject = '(no subject)';
   let body = '';
@@ -67,6 +67,9 @@ async function escalateWithDraft({ conv, parsedInbound, classification, draftTem
     draft_template: draftTemplate,
     draft_subject: subject,
     draft_body: body,
+    classifier_class: classification?.class ?? null,
+    classifier_confidence: classification?.confidence ?? null,
+    previous_state: previousState ?? null,
   });
 
   if (slackOps && env.SLACK_CHANNEL_ID) {
@@ -144,6 +147,7 @@ export async function runTick(deps) {
       }
 
       // State transition is bookkeeping — happens automatically. Outbound is gated.
+      const previousState = conv.state;
       const patch = {};
       if (classification.extracted?.arendenummer) patch.arendenummer = classification.extracted.arendenummer;
       db.updateConversationState(conv.id, transition.nextState, patch);
@@ -158,6 +162,7 @@ export async function runTick(deps) {
       if (draftTemplate) {
         await escalateWithDraft({
           conv: updated, parsedInbound: parsed, classification,
+          previousState,
           draftTemplate,
           reason: `classifier=${classification.class} confidence=${classification.confidence.toFixed(2)}`,
           deps,
@@ -189,6 +194,7 @@ export async function runDailyFollowup(deps) {
         conv,
         parsedInbound: null,
         classification: null,
+        previousState: conv.state,
         draftTemplate,
         reason,
         deps: { ...deps, daysSinceSend: days },

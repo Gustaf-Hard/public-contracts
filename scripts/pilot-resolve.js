@@ -31,7 +31,7 @@ if (action === 'skip') {
   db.resolveEscalation(escId, { status: 'resolved_skip' });
   db.recordDecision({
     escalation_id: escId, conversation_id: conv.id, conversation_state: conv.state,
-    classifier_class: null, classifier_confidence: null,
+    classifier_class: esc.classifier_class ?? null, classifier_confidence: esc.classifier_confidence ?? null,
     draft_template: esc.draft_template, draft_body: esc.draft_body,
     decision: 'skip', final_body: null,
   });
@@ -68,11 +68,14 @@ if (esc.draft_template === 'T_RECEIPT') patch.receipt_sent = 1;
 if (esc.draft_template === 'T_FOLLOWUP_NUDGE' || esc.draft_template === 'T_FOLLOWUP_CLOSE') {
   patch.followup_count = (conv.followup_count ?? 0) + 1;
 }
-db.updateConversationState(conv.id, conv.state, patch);
+const targetState = (conv.state === 'NEEDS_HUMAN' && esc.draft_template === 'free_form' && esc.previous_state)
+  ? esc.previous_state
+  : conv.state;
+db.updateConversationState(conv.id, targetState, patch);
 db.resolveEscalation(escId, { status: action === 'edit' ? 'resolved_edit' : 'resolved_send', resolved_text: replyText });
 db.recordDecision({
   escalation_id: escId, conversation_id: conv.id, conversation_state: conv.state,
-  classifier_class: null, classifier_confidence: null,
+  classifier_class: esc.classifier_class ?? null, classifier_confidence: esc.classifier_confidence ?? null,
   draft_template: esc.draft_template, draft_body: esc.draft_body,
   decision: action === 'edit' ? 'edit' : 'approve_unmodified',
   final_body: replyText,

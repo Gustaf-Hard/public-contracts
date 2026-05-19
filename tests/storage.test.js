@@ -140,6 +140,25 @@ describe('escalations', () => {
     db.resolveEscalation(eid, { status: 'resolved_send', resolved_text: 'Tack för...' });
     expect(db.listOpenEscalations()).toHaveLength(0);
   });
+
+  it('persists classifier_class, classifier_confidence, previous_state on escalation', () => {
+    const cid = db.createConversation({ kommun_kod: '9999', kommun_namn: 'T', role: 'utbildning', contact_email: 'a@x.se', scheduled_send_at: '2026-05-19T10:00:00Z' });
+    db.recordEscalation({
+      conversation_id: cid,
+      reason: 'unknown classification',
+      draft_template: 'free_form',
+      draft_subject: 'Re: x',
+      draft_body: '(ingen draft)',
+      classifier_class: 'unknown',
+      classifier_confidence: 0.4,
+      previous_state: 'SENT',
+    });
+    const list = db.listOpenEscalations();
+    expect(list).toHaveLength(1);
+    expect(list[0].classifier_class).toBe('unknown');
+    expect(list[0].classifier_confidence).toBeCloseTo(0.4);
+    expect(list[0].previous_state).toBe('SENT');
+  });
 });
 
 describe('decisions', () => {

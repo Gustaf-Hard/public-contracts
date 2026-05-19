@@ -32,11 +32,14 @@ async function sendApprovedReply({ db, gmail, env, conv, esc, finalBody, decisio
   if (esc.draft_template === 'T_FOLLOWUP_NUDGE' || esc.draft_template === 'T_FOLLOWUP_CLOSE') {
     patch.followup_count = (conv.followup_count ?? 0) + 1;
   }
-  db.updateConversationState(conv.id, conv.state, patch);
+  const targetState = (conv.state === 'NEEDS_HUMAN' && esc.draft_template === 'free_form' && esc.previous_state)
+    ? esc.previous_state
+    : conv.state;
+  db.updateConversationState(conv.id, targetState, patch);
   db.resolveEscalation(esc.id, { status: decision === 'edit' ? 'resolved_edit' : 'resolved_send', resolved_text: finalBody });
   db.recordDecision({
     escalation_id: esc.id, conversation_id: conv.id, conversation_state: conv.state,
-    classifier_class: null, classifier_confidence: null,
+    classifier_class: esc.classifier_class ?? null, classifier_confidence: esc.classifier_confidence ?? null,
     draft_template: esc.draft_template, draft_body: esc.draft_body,
     decision, final_body: finalBody,
   });
@@ -120,7 +123,7 @@ export async function startDaemon({ env = process.env, log = console.log } = {})
           db.resolveEscalation(escId, { status: 'resolved_skip' });
           db.recordDecision({
             escalation_id: escId, conversation_id: conv.id, conversation_state: conv.state,
-            classifier_class: null, classifier_confidence: null,
+            classifier_class: esc.classifier_class ?? null, classifier_confidence: esc.classifier_confidence ?? null,
             draft_template: esc.draft_template, draft_body: esc.draft_body,
             decision: 'skip', final_body: null,
           });
