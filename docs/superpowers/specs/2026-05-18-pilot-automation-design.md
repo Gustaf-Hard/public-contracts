@@ -15,7 +15,7 @@ This pilot does **not** parse contracts. PDFs land in a folder; structured extra
 
 To minimise blast radius before any real kommun is contacted, the v1 pilot runs in two stages:
 
-- **Stage 0 — Rehearsal**: bot communicates with a synthetic "Testkommun" controlled by the project owner. The owner plays the registrator from a separate Gmail account (`mediagraf-test-kommun@gmail.com`) and walks through six scripted scenarios that exercise every state transition, template, and escalation path. No real kommun is involved.
+- **Stage 0 — Rehearsal**: bot communicates with a synthetic "Testkommun" controlled by the project owner. The owner plays the registrator from a separate Gmail account (`gustaf.hard@gmail.com`) and walks through six scripted scenarios that exercise every state transition, template, and escalation path. No real kommun is involved.
 - **Stage 1 — Live pilot**: only after every Stage 0 scenario passes, the same bot is pointed at the five real kommuner listed below. The flip between stages is a config change, not a code change.
 
 Stage 0 is detailed in its own section near the end of this spec.
@@ -390,7 +390,7 @@ The OAuth client is registered in **Google Cloud Console** under a project owned
 
 The Slack app is registered at api.slack.com/apps. Setup steps documented in the plan.
 
-The synthetic "Testkommun" used in Stage 0 keeps `mediagraf-test-kommun@gmail.com` (a plain Gmail account, not on the Workspace) precisely so it's externally addressable and there's no accidental same-Workspace coupling between the bot's sending account and the fake kommun's receiving account.
+The synthetic "Testkommun" used in Stage 0 keeps `gustaf.hard@gmail.com` (a plain Gmail account, not on the Workspace) precisely so it's externally addressable and there's no accidental same-Workspace coupling between the bot's sending account and the fake kommun's receiving account.
 
 A second file `data/pilot-overrides.json` (committed — no secrets in it) selects which kommuner the pilot acts on:
 
@@ -404,8 +404,8 @@ A second file `data/pilot-overrides.json` (committed — no secrets in it) selec
       "lan": "Testlän",
       "folkmangd": 0,
       "contacts": [
-        { "role": "central",     "email": "mediagraf-test-kommun@gmail.com" },
-        { "role": "utbildning",  "email": "mediagraf-test-kommun@gmail.com" }
+        { "role": "central",     "email": "gustaf.hard@gmail.com" },
+        { "role": "utbildning",  "email": "gustaf.hard@gmail.com" }
       ]
     }
   ]
@@ -427,11 +427,11 @@ A second file `data/pilot-overrides.json` (committed — no secrets in it) selec
 
 ## Stage 0 — Rehearsal against synthetic kommun
 
-Before the bot ever sends an email to a real kommun, run the entire pipeline against a synthetic "Testkommun" (kod `9999`). You play the registrator from a separate Gmail account (`mediagraf-test-kommun@gmail.com`); the bot doesn't know it's not a real kommun. The purpose is to exercise every state-machine transition, every template, and the Slack escalation flow with zero blast radius.
+Before the bot ever sends an email to a real kommun, run the entire pipeline against a synthetic "Testkommun" (kod `9999`). You play the registrator from a separate Gmail account (`gustaf.hard@gmail.com`); the bot doesn't know it's not a real kommun. The purpose is to exercise every state-machine transition, every template, and the Slack escalation flow with zero blast radius.
 
 ### Setup
 
-1. Create a new Gmail account `mediagraf-test-kommun@gmail.com`. Log in via a separate browser profile (Chrome / Firefox container) so you don't confuse it with your normal inbox.
+1. The "Testkommun" inbox is your existing personal Gmail account `gustaf.hard@gmail.com`. You'll play the registrator from there. Setup tip: create a Gmail filter that labels anything from `gustaf@mediagraf.se` as `Testkommun` so the rehearsal mail stays visually separated from your normal personal mail.
 2. Set `data/pilot-overrides.json` `active_pilot_kommun_kods` to `["9999"]` and confirm `rehearsal_kommuner` contains the synthetic kommun as shown in the Configuration section.
 3. Start the daemon as you would in live mode.
 
@@ -444,7 +444,7 @@ For follow-up timing tests, the daemon accepts a `PILOT_CLOCK_OFFSET_DAYS` env v
 Run through these in order from the test Gmail account. After each scenario, inspect `data/pilot.db` (e.g. `sqlite3 data/pilot.db "select state, state_changed_at from conversations"`) to confirm the expected transitions happened.
 
 **Scenario A — Happy path (no clarification needed)**
-1. Trigger: `node scripts/pilot-init.js`. Bot sends T-INITIAL to `mediagraf-test-kommun@gmail.com` (both `central` and `utbildning` roles — two separate threads).
+1. Trigger: `node scripts/pilot-init.js`. Bot sends T-INITIAL to `gustaf.hard@gmail.com` (both `central` and `utbildning` roles — two separate threads).
 2. From the test account, reply on the `utbildning` thread with: *"Tack för din begäran. Ärendenummer: K9999001. Vi återkommer."*
    - **Expected:** classifier `auto_ack`, state `SENT → ACK_RECEIVED`, `arendenummer = "K9999001"` saved.
 3. Reply with a small dummy PDF attached and body *"Hej! Här kommer ett avtal med Skolon. Med vänlig hälsning, Test Registrator."*
