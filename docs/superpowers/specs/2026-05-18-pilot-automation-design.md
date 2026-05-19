@@ -20,6 +20,21 @@ To minimise blast radius before any real kommun is contacted, the v1 pilot runs 
 
 Stage 0 is detailed in its own section near the end of this spec.
 
+## Approval-first autonomy model
+
+**v1 is human-in-the-loop for every outbound message except the initial request.** The previous design assumed "the bot is right by default, escalate the unknowns" — but classifier patterns like the bare word *precisera* are too brittle to bet on before we've seen real reply phrasings. The correct model is the inverse: "the bot is wrong by default, promote what proves itself safe."
+
+Concretely:
+
+- **Inbound processing is automatic.** Bot pulls new mail, saves PDFs, records the message, runs the classifier, updates conversation state. Nothing leaves the laptop.
+- **Outbound messages always pause on Slack approval**, except `T-INITIAL` (which is approved by virtue of being the template the owner personally wrote). For every other outbound — `T-PRECISION`, `T-RECEIPT`, `T-FOLLOWUP-NUDGE`, `T-FOLLOWUP-CLOSE`, or a free-form reply for an unclassifiable message — the bot drafts the message and posts it to Slack with **Approve / Edit / Skip** buttons. Nothing gets sent until the human clicks.
+- **The classifier's job is to suggest the right draft**, not to decide on autopilot. Even when the classifier is highly confident, the human still approves before send.
+- **Every decision is logged** to a `decisions` table: which classifier guess, which draft, whether the human approved unmodified / edited / skipped. After the pilot, this log is the basis for deciding which classifier classes are safe to auto-handle in v2.
+
+This trades a small amount of click-time (~30 seconds per inbound reply, ~5 minutes/day at pilot scale) for zero risk of an embarrassing auto-sent wrong reply, and produces the labelled dataset we need to safely automate at 290-kommun scale.
+
+**v2 graduation criterion**: any (classifier_class, conversation_state) pair where the human approved the bot's draft unmodified ≥5 consecutive times AND zero edits during the pilot becomes eligible for promotion to auto-handle. The promotion is a manual config edit — there's no auto-trust algorithm.
+
 ## Pilot kommuner
 
 Selected from `data/municipalities.json` as the five smallest `confidence: high` kommuner:
@@ -38,11 +53,12 @@ Each kommun has a `central` contact AND a `utbildning`-family contact (verified 
 
 - All 10 threads (5 × 2) dispatch their initial request within the 5-day stagger window.
 - ≥3 of 5 kommuner reach `DELIVERING` (at least one contract PDF received) within 4 weeks.
-- ≥80% of incoming replies are handled by the bot without human escalation.
+- ≥80% of suggested drafts are approved unmodified in Slack — these become the v2 auto-handle promotion candidates. (Note: this is a measure of *classifier quality*, not autonomy — every draft is still human-approved in v1.)
 - Zero state loss: bot can be killed and restarted; every conversation resumes correctly from SQLite.
 - Total contracts received ≥10 PDFs across all 5 kommuner.
+- The `decisions` log accumulates ≥30 reviewed drafts across all kommuner — enough sample size to inform v2 auto-promotion decisions.
 
-If those bars are met, scale to all 290 kommuner. If not, iterate on what failed before scaling.
+If those bars are met, scale to all 290 kommuner with selectively auto-handled classes. If not, iterate on what failed before scaling.
 
 ## Out of scope
 
@@ -158,13 +174,31 @@ CREATE TABLE escalations (
   conversation_id INTEGER NOT NULL REFERENCES conversations(id),
   message_id INTEGER REFERENCES messages(id),
   reason TEXT NOT NULL,
-  draft_reply TEXT,                   -- bot's suggested response (or null)
+  draft_subject TEXT,                 -- bot's suggested reply subject
+  draft_body TEXT,                    -- bot's suggested reply body
   slack_ts TEXT,                      -- Slack message timestamp for callback matching
   status TEXT NOT NULL,               -- 'open' | 'resolved_send' | 'resolved_edit' | 'resolved_skip'
   resolved_at TEXT,
   resolved_text TEXT                  -- final outbound text if status was send/edit
 );
+
+CREATE TABLE decisions (
+  id INTEGER PRIMARY KEY,
+  escalation_id INTEGER NOT NULL REFERENCES escalations(id),
+  conversation_id INTEGER NOT NULL REFERENCES conversations(id),
+  conversation_state TEXT NOT NULL,   -- state at time of decision
+  classifier_class TEXT,              -- classifier's guess on the inbound
+  classifier_confidence REAL,
+  draft_template TEXT,                -- 'T_PRECISION' | 'T_RECEIPT' | 'T_FOLLOWUP_NUDGE' | 'T_FOLLOWUP_CLOSE' | 'free_form'
+  draft_body TEXT NOT NULL,
+  decision TEXT NOT NULL,             -- 'approve_unmodified' | 'edit' | 'skip'
+  final_body TEXT,                    -- actual sent body (== draft_body for approve_unmodified, edited body for edit, null for skip)
+  decided_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_decisions_class_state ON decisions(classifier_class, conversation_state, decision);
 ```
+
+The `decisions` index is the v2 promotion query: `SELECT classifier_class, conversation_state, decision, count(*) FROM decisions GROUP BY 1,2,3` shows which (class, state) pairs got unmodified approvals.
 
 ### Gmail integration
 
@@ -214,6 +248,8 @@ Schedule via local `cron` OR `node-cron` inside a long-running `npm run pilot-da
 This lets us watch each kommun's auto-ack pattern before all 5 are in flight — if Malå's auto-ack uses an unusual format, we fix the classifier before Day 2.
 
 ## Reply classifier
+
+**The classifier in v1 is a draft suggestion engine, not a decision engine.** Every classifier output produces a draft that gets posted to Slack for the human to approve. The classifier's quality is measured by how often its drafts get approved unmodified — that's the signal for what's safe to promote to auto-handle in v2.
 
 Goal: classify each inbound message into one of `{auto_ack, clarification, delivery, dead_end, unknown}`. Regex + keyword scoring, **no LLM in v1**.
 
@@ -418,10 +454,11 @@ A second file `data/pilot-overrides.json` (committed — no secrets in it) selec
 
 | Risk | Mitigation |
 |---|---|
-| Classifier mis-categorises a real reply as `unknown` and the bot stalls | Escalation is preferred over silent failure — `unknown` → Slack ping, you decide |
-| A kommun considers the request abusive or asks for fees | The bot detects `dead_end` patterns including "avgift" / "kostnad" / "kan ej lämna ut" — escalates instead of acting |
+| Classifier mis-categorises a real reply and the bot drafts the wrong response | Every draft is approved in Slack before send. Worst case: you edit or skip. No mis-sent emails reach kommuner. |
+| Click fatigue — too many Slack approvals per day | Pilot scale is ~10 inbound replies/week across 5 kommuner. ~5 min/day of attention. If that's too much, classes with high unmodified-approve rates get promoted to auto in v2. |
+| A kommun considers the request abusive or asks for fees | All such replies surface in Slack as drafts you review. You can edit, escalate, or contact the kommun out-of-band. |
 | The bot accidentally double-sends because it polls a message before its own outbound is recorded | All Gmail message IDs (both inbound and outbound) are written to SQLite atomically before the bot considers itself done with that message |
-| ngrok URL changes (free tier) and Slack interactivity breaks | Daemon re-prints the current ngrok URL on startup; you update the Slack app's URL once per session — or pay $8/mo for static ngrok |
+| ngrok URL changes (free tier) and Slack interactivity breaks | Daemon re-prints the current ngrok URL on startup; you update the Slack app's URL once per session — or pay $8/mo for static ngrok. The CLI fallback `pilot-resolve.js` works without Slack. |
 | Gmail OAuth token expires while you're away | Use offline refresh tokens (standard); auth flow only required once |
 | PDFs are scanned images that we can't parse later | Pilot doesn't parse — defer to v2. Storing the source PDF preserves the option. |
 
@@ -443,50 +480,55 @@ For follow-up timing tests, the daemon accepts a `PILOT_CLOCK_OFFSET_DAYS` env v
 
 Run through these in order from the test Gmail account. After each scenario, inspect `data/pilot.db` (e.g. `sqlite3 data/pilot.db "select state, state_changed_at from conversations"`) to confirm the expected transitions happened.
 
+Note: in v1 every outbound reply goes through Slack approval. The scenarios below assume the daemon is running and Slack interactivity is wired. *T-INITIAL* is the only auto-sent message (it's scheduled).
+
 **Scenario A — Happy path (no clarification needed)**
-1. Trigger: `node scripts/pilot-init.js`. Bot sends T-INITIAL to `gustaf.hard@gmail.com` (both `central` and `utbildning` roles — two separate threads).
+1. Trigger: `node scripts/pilot-init.js`. Bot sends T-INITIAL to `gustaf.hard@gmail.com` automatically on schedule (both `central` and `utbildning` roles — two separate threads).
 2. From the test account, reply on the `utbildning` thread with: *"Tack för din begäran. Ärendenummer: K9999001. Vi återkommer."*
-   - **Expected:** classifier `auto_ack`, state `SENT → ACK_RECEIVED`, `arendenummer = "K9999001"` saved.
+   - **Expected:** classifier `auto_ack`, state `SENT → ACK_RECEIVED`, `arendenummer = "K9999001"` saved. No outbound (auto_ack doesn't need a reply). No Slack post.
 3. Reply with a small dummy PDF attached and body *"Hej! Här kommer ett avtal med Skolon. Med vänlig hälsning, Test Registrator."*
-   - **Expected:** classifier `delivery`, state `ACK_RECEIVED → DELIVERING`, PDF saved to `data/contracts/9999/`, T-RECEIPT sent automatically.
-4. Set `PILOT_CLOCK_OFFSET_DAYS=14` and tick the daemon.
-   - **Expected:** T-FOLLOWUP-CLOSE sent automatically.
-5. Reply *"Detta var samtliga avtal vi har."*
+   - **Expected:** classifier `delivery`, state `ACK_RECEIVED → DELIVERING`, PDF saved to `data/contracts/9999/`. Slack post appears with T-RECEIPT draft + Approve/Edit/Skip buttons.
+4. In Slack, click **Approve**.
+   - **Expected:** T-RECEIPT outbound sent to test account, `decisions` row written with `decision = 'approve_unmodified'`, `receipt_sent = 1`.
+5. Set `PILOT_CLOCK_OFFSET_DAYS=14` and trigger the daily follow-up tick.
+   - **Expected:** Slack post appears with T-FOLLOWUP-CLOSE draft.
+6. In Slack, click **Approve**. Then reply *"Detta var samtliga avtal vi har."*
    - **Expected:** classifier `dead_end` (specifically the "samtliga avtal" closer), state `DELIVERING → DONE`.
 
 **Scenario B — Clarification round-trip**
 1. Re-run `pilot-init` for a fresh conversation (or reset DB).
-2. Reply auto-ack as in Scenario A.
+2. Reply auto-ack as in Scenario A. State `SENT → ACK_RECEIVED`, no Slack post.
 3. Reply: *"Kan du precisera vilken tidsperiod du önskar? Och om du vill ha alla avtal eller bara aktiva?"*
-   - **Expected:** classifier `clarification`, state `ACK_RECEIVED → AWAITING_PRECISION`, bot auto-sends T-PRECISION on next tick.
-4. Reply with PDF attachment.
-   - **Expected:** state `AWAITING_PRECISION → DELIVERING`.
+   - **Expected:** classifier `clarification`, state `ACK_RECEIVED → AWAITING_PRECISION`. Slack post appears with T-PRECISION draft.
+4. In Slack, click **Edit**, slightly modify the draft text, submit.
+   - **Expected:** edited reply sent. `decisions` row with `decision = 'edit'` and the edited `final_body`. Conversation stays in `AWAITING_PRECISION`.
+5. Reply with PDF attachment.
+   - **Expected:** state `AWAITING_PRECISION → DELIVERING`. Slack post for T-RECEIPT. Approve it.
 
 **Scenario C — Dead-end straight from the start**
 1. Reply to T-INITIAL with: *"Vi har tyvärr inga avtal av detta slag i vår verksamhet."*
-   - **Expected:** classifier `dead_end`, state `SENT → DEAD_END`, no further outbound.
+   - **Expected:** classifier `dead_end`, state `SENT → DEAD_END`, no further outbound, no Slack post (dead_end is terminal).
 
 **Scenario D — Silent kommun → follow-up nudge**
 1. Don't reply to T-INITIAL.
-2. Set `PILOT_CLOCK_OFFSET_DAYS=7` and tick the daemon.
-   - **Expected:** T-FOLLOWUP-NUDGE sent.
-3. Reply auto-ack belatedly.
-   - **Expected:** state `SENT → ACK_RECEIVED`, follow-up counter reset to 0.
+2. Set `PILOT_CLOCK_OFFSET_DAYS=7` and trigger the daily follow-up tick.
+   - **Expected:** Slack post appears with T-FOLLOWUP-NUDGE draft.
+3. In Slack, click **Approve**. Then reply auto-ack belatedly from the test account.
+   - **Expected:** outbound sent, state `SENT → ACK_RECEIVED`, follow-up counter reset to 0.
 
-**Scenario E — Ambiguous reply → Slack escalation**
+**Scenario E — Ambiguous reply → Slack escalation with no draft**
 1. Reply to T-INITIAL with something the classifier shouldn't recognise: *"Hej, kan du ringa mig på 070-1234567 så pratar vi om detta?"*
-   - **Expected:** classifier `unknown` (no signals above threshold), state → `NEEDS_HUMAN`, Slack message posted to the configured channel with Approve / Edit / Skip buttons and the bot's draft reply.
+   - **Expected:** classifier `unknown` (no signals above threshold), state stays `SENT` (or moves to `NEEDS_HUMAN`). Slack post appears with `draft_body = "(ingen draft — skriv själv)"` placeholder text. The post emphasises this is a `free_form` decision.
 2. In Slack, click **Edit**, type a reply: *"Tack, men jag föredrar att vi håller kommunikationen via e-post."*, submit.
-   - **Expected:** Slack interactivity webhook fires → daemon receives payload → outbound mail sent → state `NEEDS_HUMAN → SENT` (or back to whatever state it was in before).
+   - **Expected:** outbound sent. `decisions` row with `draft_template = 'free_form'`, `decision = 'edit'`, the typed `final_body`. State returns to whatever the natural next state is.
 
 **Scenario F — Multi-batch delivery**
-1. Reply auto-ack.
-2. Reply with PDF #1.
-   - **Expected:** T-RECEIPT sent.
+1. Reply auto-ack. State `SENT → ACK_RECEIVED`, no Slack post.
+2. Reply with PDF #1. Slack post with T-RECEIPT draft → **Approve**. State → `DELIVERING`, `receipt_sent = 1`.
 3. Reply 3 days later (use clock skew) with PDF #2, no body text.
-   - **Expected:** state stays `DELIVERING`, PDF #2 saved, NO second T-RECEIPT (the spec says receipt only on first delivery).
+   - **Expected:** state stays `DELIVERING`, PDF #2 saved, **no Slack post** (the bot skips drafting T-RECEIPT a second time because `receipt_sent = 1`).
 4. Reply 5 days later with PDF #3 plus *"Detta var samtliga avtal."*
-   - **Expected:** state `DELIVERING → DONE` because the closer pattern matched.
+   - **Expected:** state `DELIVERING → DONE` because the closer pattern matched. No Slack post (DONE is terminal).
 
 ### Stage 0 → Stage 1 gate
 
