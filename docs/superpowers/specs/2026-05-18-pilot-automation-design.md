@@ -375,7 +375,7 @@ A new file `.env` (gitignored) holds:
 ```
 GMAIL_OAUTH_CLIENT_ID=
 GMAIL_OAUTH_CLIENT_SECRET=
-GMAIL_USER_EMAIL=gustaf.hard@gmail.com
+GMAIL_USER_EMAIL=gustaf@mediagraf.se
 GMAIL_FROM_NAME=Gustaf Hård af Segerstad
 
 SLACK_BOT_TOKEN=
@@ -384,7 +384,13 @@ SLACK_CHANNEL_ID=
 SLACK_INTERACTIVITY_PUBLIC_URL=   # ngrok URL while pilot is running
 ```
 
-The OAuth client is registered in Google Cloud Console once (you'll need to verify the OAuth consent screen for personal Gmail). The Slack app is registered at api.slack.com/apps. Setup steps documented in the plan.
+The bot's outbound identity is `gustaf@mediagraf.se` — a Google Workspace mailbox on the mediagraf.se domain. Replies from kommuner come back to the same address. Kommuner see a `From: Gustaf Hård af Segerstad <gustaf@mediagraf.se>` header, which reads as a real company contact rather than a personal Gmail.
+
+The OAuth client is registered in **Google Cloud Console** under a project owned by the Mediagraf Workspace. Because mediagraf.se is a Workspace domain you control, you can register the OAuth consent screen as **Internal** (user type = "Internal" in the consent-screen config) — this avoids Google's external-app verification process entirely and the only user who can grant consent is you. Required scopes: `gmail.send`, `gmail.readonly`, `gmail.modify`.
+
+The Slack app is registered at api.slack.com/apps. Setup steps documented in the plan.
+
+The synthetic "Testkommun" used in Stage 0 keeps `mediagraf-test-kommun@gmail.com` (a plain Gmail account, not on the Workspace) precisely so it's externally addressable and there's no accidental same-Workspace coupling between the bot's sending account and the fake kommun's receiving account.
 
 A second file `data/pilot-overrides.json` (committed — no secrets in it) selects which kommuner the pilot acts on:
 
