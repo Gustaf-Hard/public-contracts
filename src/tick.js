@@ -1,0 +1,203 @@
+import { T_INITIAL, T_PRECISION, T_RECEIPT, T_FOLLOWUP_NUDGE, T_FOLLOWUP_CLOSE } from './templates.js';
+import { classify } from './classifier.js';
+import { nextActionForClassification, staleAction } from './conversation.js';
+import { parseInboundMessage } from './gmail.js';
+import { buildEscalationBlocks } from './slack.js';
+import { saveAttachment } from './attachments.js';
+
+const TEMPLATES = { T_INITIAL, T_PRECISION, T_RECEIPT, T_FOLLOWUP_NUDGE, T_FOLLOWUP_CLOSE };
+
+function fromHeader(env) {
+  return `${env.GMAIL_FROM_NAME} <${env.GMAIL_USER_EMAIL}>`;
+}
+
+function tplCtx(conv, env, extra = {}) {
+  return {
+    kommun_namn: conv.kommun_namn,
+    role: conv.role,
+    from_email: env.GMAIL_USER_EMAIL,
+    from_name: env.GMAIL_FROM_NAME,
+    thread_subject: extra.thread_subject ?? 'Begäran om allmänna handlingar – avtal för digitala verktyg',
+    days_since_send: extra.days_since_send ?? 0,
+  };
+}
+
+async function dispatchInitial(conv, deps) {
+  const { db, gmailClient, gmailOps, env, now, log } = deps;
+  const msg = T_INITIAL(tplCtx(conv, env));
+  const sent = await gmailOps.sendMessage(gmailClient.gmail, {
+    from: fromHeader(env), to: conv.contact_email, subject: msg.subject, body: msg.body,
+  });
+  db.updateConversationState(conv.id, 'SENT', {
+    gmail_thread_id: sent.threadId,
+    last_outbound_at: now.toISOString(),
+  });
+  db.recordMessage({
+    conversation_id: conv.id, gmail_message_id: sent.id, direction: 'outbound',
+    from_email: env.GMAIL_USER_EMAIL, to_email: conv.contact_email,
+    subject: msg.subject, body_text: msg.body,
+    classification: null, classification_confidence: null,
+    received_at: now.toISOString(), attachment_count: 0,
+  });
+  log?.(`SENT T-INITIAL → ${conv.kommun_namn}/${conv.role}`);
+}
+
+async function escalateWithDraft({ conv, parsedInbound, classification, draftTemplate, reason, deps }) {
+  const { db, slackClient, slackOps, env, log } = deps;
+  let subject = '(no subject)';
+  let body = '';
+  if (draftTemplate === 'free_form') {
+    const baseSubject = parsedInbound?.subject?.replace(/^Re: /, '') ?? 'Begäran om allmänna handlingar';
+    subject = `Re: ${baseSubject}`;
+    body = '(ingen draft — skriv själv via Edit)';
+  } else if (TEMPLATES[draftTemplate]) {
+    const ctx = tplCtx(conv, env, {
+      thread_subject: parsedInbound?.subject?.replace(/^Re: /, '') ?? undefined,
+      days_since_send: deps.daysSinceSend ?? 0,
+    });
+    const rendered = TEMPLATES[draftTemplate](ctx);
+    subject = rendered.subject;
+    body = rendered.body;
+  }
+
+  const escId = db.recordEscalation({
+    conversation_id: conv.id,
+    message_id: null,
+    reason,
+    draft_template: draftTemplate,
+    draft_subject: subject,
+    draft_body: body,
+  });
+
+  if (slackOps && env.SLACK_CHANNEL_ID) {
+    const blocks = buildEscalationBlocks({
+      escalation_id: escId,
+      kommun_namn: conv.kommun_namn,
+      from_email: parsedInbound?.from ?? '(no inbound — proactive draft)',
+      reply_text: parsedInbound?.body ?? '(no inbound)',
+      draft_reply: `Subject: ${subject}\n\n${body}`,
+      gmail_thread_id: conv.gmail_thread_id ?? '(no thread)',
+    });
+    const posted = await slackOps.postEscalation(slackClient, {
+      channel: env.SLACK_CHANNEL_ID,
+      blocks,
+      fallbackText: `Eskalering: ${conv.kommun_namn} (${draftTemplate})`,
+    });
+    db.raw.prepare('UPDATE escalations SET slack_ts = ? WHERE id = ?').run(posted.ts, escId);
+  }
+  log?.(`ESCALATED (${draftTemplate}) → ${conv.kommun_namn}/${conv.role}: ${reason}`);
+  return escId;
+}
+
+export async function runTick(deps) {
+  const { db, gmailClient, gmailOps, env, now } = deps;
+
+  // 1. Initial dispatch — anything scheduled for now or earlier
+  const dueInitial = db.listConversationsDueForInitialSend(now.toISOString());
+  for (const conv of dueInitial) {
+    await dispatchInitial(conv, deps);
+  }
+
+  // 2. Inbound processing — fetch new messages on tracked threads
+  const active = db.listAllConversations().filter((c) => c.gmail_thread_id);
+  for (const conv of active) {
+    const list = await gmailOps.listInboundQuery(
+      gmailClient.gmail,
+      `to:${env.GMAIL_USER_EMAIL} -from:${env.GMAIL_USER_EMAIL} newer_than:7d`
+    );
+    for (const m of list) {
+      if (db.hasGmailMessageId(m.id)) continue;
+      const full = await gmailOps.getMessage(gmailClient.gmail, m.id);
+      if (!full || full.threadId !== conv.gmail_thread_id) continue;
+      const parsed = parseInboundMessage(full);
+      const classification = classify({
+        from: parsed.from, subject: parsed.subject, body: parsed.body,
+        attachment_count: parsed.attachments.length,
+      });
+      const isCloser = /samtliga avtal/i.test(parsed.body);
+      const transition = nextActionForClassification(conv.state, classification.class, {
+        receipt_sent: !!conv.receipt_sent, is_closer: isCloser,
+      });
+
+      const messageId = db.recordMessage({
+        conversation_id: conv.id, gmail_message_id: m.id, direction: 'inbound',
+        from_email: parsed.from, to_email: parsed.to,
+        subject: parsed.subject, body_text: parsed.body,
+        classification: classification.class, classification_confidence: classification.confidence,
+        received_at: now.toISOString(), attachment_count: parsed.attachments.length,
+      });
+
+      // Save attachments
+      for (const att of parsed.attachments) {
+        if (att.mime_type !== 'application/pdf' && !att.filename?.toLowerCase().endsWith('.pdf')) continue;
+        const buf = await gmailOps.fetchAttachment(gmailClient.gmail, m.id, att.attachment_id);
+        const saved = await saveAttachment(buf, {
+          kommun_kod: conv.kommun_kod, kommun_namn: conv.kommun_namn, role: conv.role,
+          received_at: now.toISOString(), from_email: parsed.from, from_name: null,
+          gmail_message_id: m.id, gmail_thread_id: parsed.gmail_thread_id,
+          subject: parsed.subject, original_filename: att.filename, mime_type: att.mime_type,
+        }, { baseDir: deps.contractsDir });
+        db.recordAttachment({
+          message_id: messageId, filename: att.filename,
+          saved_path: saved.saved_path, mime_type: att.mime_type, size_bytes: saved.size_bytes,
+        });
+      }
+
+      // State transition is bookkeeping — happens automatically. Outbound is gated.
+      const patch = {};
+      if (classification.extracted?.arendenummer) patch.arendenummer = classification.extracted.arendenummer;
+      db.updateConversationState(conv.id, transition.nextState, patch);
+      const updated = db.getConversation(conv.id);
+
+      // Outbound: never auto-sent in v1. Draft a template and escalate to Slack.
+      let draftTemplate = null;
+      if (transition.action === 'send_precision') draftTemplate = 'T_PRECISION';
+      else if (transition.action === 'send_receipt' && !updated.receipt_sent) draftTemplate = 'T_RECEIPT';
+      else if (transition.action === 'escalate') draftTemplate = 'free_form';
+
+      if (draftTemplate) {
+        await escalateWithDraft({
+          conv: updated, parsedInbound: parsed, classification,
+          draftTemplate,
+          reason: `classifier=${classification.class} confidence=${classification.confidence.toFixed(2)}`,
+          deps,
+        });
+      }
+    }
+  }
+}
+
+export async function runDailyFollowup(deps) {
+  const { db, now, log } = deps;
+  const all = db.listAllConversations();
+  for (const conv of all) {
+    const days = daysBetween(new Date(conv.state_changed_at), now);
+    const action = staleAction(conv.state, days, conv.followup_count);
+    if (action === 'none') continue;
+
+    let draftTemplate = null;
+    let reason = `stale ${conv.state} for ${days} days`;
+    if (action === 'send_followup_nudge') draftTemplate = 'T_FOLLOWUP_NUDGE';
+    else if (action === 'send_followup_close') draftTemplate = 'T_FOLLOWUP_CLOSE';
+    else if (action === 'escalate') {
+      reason = `stale ${conv.state} for ${days} days, ${conv.followup_count} nudges already sent`;
+      draftTemplate = 'free_form';
+    }
+
+    if (draftTemplate) {
+      await escalateWithDraft({
+        conv,
+        parsedInbound: null,
+        classification: null,
+        draftTemplate,
+        reason,
+        deps: { ...deps, daysSinceSend: days },
+      });
+      log?.(`FOLLOWUP drafted (${draftTemplate}) → ${conv.kommun_namn}/${conv.role}`);
+    }
+  }
+}
+
+function daysBetween(then, now) {
+  return Math.floor((now.getTime() - then.getTime()) / (1000 * 60 * 60 * 24));
+}
