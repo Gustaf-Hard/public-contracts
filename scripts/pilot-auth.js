@@ -25,9 +25,13 @@ console.log(`If it does not open automatically, visit:\n${authUrl}\n`);
 const opener = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start' : 'xdg-open';
 exec(`${opener} "${authUrl}"`);
 
+const redirectUri = new URL(process.env.GMAIL_OAUTH_REDIRECT_URI);
+const callbackPath = redirectUri.pathname;
+const callbackPort = parseInt(redirectUri.port || '3001', 10);
+
 const server = http.createServer(async (req, res) => {
-  const url = new URL(req.url, `http://localhost:3001`);
-  if (url.pathname !== '/oauth2callback') {
+  const url = new URL(req.url, redirectUri.origin);
+  if (url.pathname !== callbackPath) {
     res.writeHead(404); res.end('not found'); return;
   }
   const code = url.searchParams.get('code');
@@ -46,4 +50,4 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(3001, () => console.log('Listening on http://localhost:3001 for OAuth callback…'));
+server.listen(callbackPort, () => console.log(`Listening on ${redirectUri.origin}${callbackPath} for OAuth callback…`));
