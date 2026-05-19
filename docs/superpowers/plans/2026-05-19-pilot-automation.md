@@ -2,9 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build the autonomous offentlighetsprincipen request-loop bot specified in `docs/superpowers/specs/2026-05-18-pilot-automation-design.md` — Stage 0 (synthetic Testkommun) and Stage 1 (5 real small kommuner), same code, only config differs.
+**Goal:** Build the approval-first offentlighetsprincipen request-loop bot specified in `docs/superpowers/specs/2026-05-18-pilot-automation-design.md` — Stage 0 (synthetic Testkommun) and Stage 1 (5 real small kommuner), same code, only config differs.
 
-**Architecture:** Node.js ESM, extends existing repo. Pure-logic modules (`templates`, `classifier`, `conversation`) tested directly. I/O modules (`gmail`, `slack`, `storage`, `attachments`) take dependency-injected clients so tests run fully offline. A `tick` orchestrator wires them. A long-running `daemon` schedules ticks via `node-cron` and serves the Slack interactivity webhook via Express.
+**Autonomy model (v1):** Every outbound message *except T-INITIAL* is drafted by the bot and posted to Slack for the human to Approve / Edit / Skip before send. State transitions happen automatically (bookkeeping is reversible); only outbound communication is gated. Each decision is logged to a `decisions` table so we can promote classes to auto-handle in v2 based on real unmodified-approval rates.
+
+**Architecture:** Node.js ESM, extends existing repo. Pure-logic modules (`templates`, `classifier`, `conversation`) tested directly. I/O modules (`gmail`, `slack`, `storage`, `attachments`) take dependency-injected clients so tests run fully offline. A `tick` orchestrator wires them. A long-running `daemon` schedules ticks via `node-cron` and serves the Slack interactivity webhook via Express; the webhook handler is where Approve/Edit/Skip actually trigger outbound Gmail sends.
 
 **Tech Stack:** `better-sqlite3` (synchronous, fast, easy to test), `googleapis` (Gmail), `@slack/bolt` (Slack signing + payloads), `express`, `node-cron`, `dotenv`, vitest. No new test framework.
 
@@ -875,19 +877,49 @@ describe('messages', () => {
 });
 
 describe('escalations', () => {
-  it('records and resolves an escalation', () => {
+  it('records and resolves an escalation with subject + body', () => {
     const cid = db.createConversation({ kommun_kod: '9999', kommun_namn: 'T', role: 'central', contact_email: 'a@x.se', scheduled_send_at: '2026-05-19T10:00:00Z' });
     const eid = db.recordEscalation({
       conversation_id: cid,
       message_id: null,
-      reason: 'classifier returned unknown',
-      draft_reply: 'Tack för...',
+      reason: 'classifier returned clarification',
+      draft_template: 'T_PRECISION',
+      draft_subject: 'Re: Begäran',
+      draft_body: 'Tack för...',
       slack_ts: '1234.5678',
     });
     const list = db.listOpenEscalations();
     expect(list).toHaveLength(1);
+    expect(list[0].draft_body).toBe('Tack för...');
+    expect(list[0].draft_template).toBe('T_PRECISION');
     db.resolveEscalation(eid, { status: 'resolved_send', resolved_text: 'Tack för...' });
     expect(db.listOpenEscalations()).toHaveLength(0);
+  });
+});
+
+describe('decisions', () => {
+  it('records a decision tied to an escalation', () => {
+    const cid = db.createConversation({ kommun_kod: '9999', kommun_namn: 'T', role: 'utbildning', contact_email: 'a@x.se', scheduled_send_at: '2026-05-19T10:00:00Z' });
+    const eid = db.recordEscalation({
+      conversation_id: cid, reason: 'r', draft_template: 'T_PRECISION',
+      draft_subject: 'Re: x', draft_body: 'body',
+    });
+    const did = db.recordDecision({
+      escalation_id: eid,
+      conversation_id: cid,
+      conversation_state: 'ACK_RECEIVED',
+      classifier_class: 'clarification',
+      classifier_confidence: 0.85,
+      draft_template: 'T_PRECISION',
+      draft_body: 'body',
+      decision: 'approve_unmodified',
+      final_body: 'body',
+    });
+    expect(did).toBeGreaterThan(0);
+    const list = db.listDecisions();
+    expect(list).toHaveLength(1);
+    expect(list[0].decision).toBe('approve_unmodified');
+    expect(list[0].classifier_class).toBe('clarification');
   });
 });
 ```
@@ -952,7 +984,9 @@ CREATE TABLE IF NOT EXISTS escalations (
   conversation_id INTEGER NOT NULL REFERENCES conversations(id),
   message_id INTEGER REFERENCES messages(id),
   reason TEXT NOT NULL,
-  draft_reply TEXT,
+  draft_template TEXT,
+  draft_subject TEXT,
+  draft_body TEXT,
   slack_ts TEXT,
   status TEXT NOT NULL DEFAULT 'open',
   resolved_at TEXT,
@@ -960,6 +994,21 @@ CREATE TABLE IF NOT EXISTS escalations (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_escalations_status ON escalations(status);
+
+CREATE TABLE IF NOT EXISTS decisions (
+  id INTEGER PRIMARY KEY,
+  escalation_id INTEGER NOT NULL REFERENCES escalations(id),
+  conversation_id INTEGER NOT NULL REFERENCES conversations(id),
+  conversation_state TEXT NOT NULL,
+  classifier_class TEXT,
+  classifier_confidence REAL,
+  draft_template TEXT,
+  draft_body TEXT NOT NULL,
+  decision TEXT NOT NULL,
+  final_body TEXT,
+  decided_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_decisions_class_state ON decisions(classifier_class, conversation_state, decision);
 `;
 
 export function openDb(path) {
@@ -1048,10 +1097,33 @@ export function openDb(path) {
 
   function recordEscalation(e) {
     const r = db.prepare(`
-      INSERT INTO escalations (conversation_id, message_id, reason, draft_reply, slack_ts)
-      VALUES (?, ?, ?, ?, ?)
-    `).run(e.conversation_id, e.message_id ?? null, e.reason, e.draft_reply ?? null, e.slack_ts ?? null);
+      INSERT INTO escalations (conversation_id, message_id, reason, draft_template, draft_subject, draft_body, slack_ts)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      e.conversation_id, e.message_id ?? null, e.reason,
+      e.draft_template ?? null, e.draft_subject ?? null, e.draft_body ?? null,
+      e.slack_ts ?? null
+    );
     return Number(r.lastInsertRowid);
+  }
+
+  function recordDecision(d) {
+    const r = db.prepare(`
+      INSERT INTO decisions (
+        escalation_id, conversation_id, conversation_state,
+        classifier_class, classifier_confidence,
+        draft_template, draft_body, decision, final_body
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      d.escalation_id, d.conversation_id, d.conversation_state,
+      d.classifier_class ?? null, d.classifier_confidence ?? null,
+      d.draft_template ?? null, d.draft_body, d.decision, d.final_body ?? null
+    );
+    return Number(r.lastInsertRowid);
+  }
+
+  function listDecisions() {
+    return db.prepare('SELECT * FROM decisions ORDER BY id').all();
   }
 
   function listOpenEscalations() {
@@ -1091,6 +1163,8 @@ export function openDb(path) {
     listOpenEscalations,
     getEscalationBySlackTs,
     resolveEscalation,
+    recordDecision,
+    listDecisions,
     close,
   };
 }
@@ -1099,7 +1173,7 @@ export function openDb(path) {
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `npx vitest run tests/storage.test.js`
-Expected: 8 passed.
+Expected: 9 passed.
 
 - [ ] **Step 5: Commit**
 
@@ -2024,7 +2098,7 @@ describe('runTick — inbound processing', () => {
     expect(gmail.sendCalls).toHaveLength(0);
   });
 
-  it('classifies clarification and sends T-PRECISION', async () => {
+  it('classifies clarification and posts T-PRECISION DRAFT to Slack (no autosend)', async () => {
     const id = db.createConversation({
       kommun_kod: '9999', kommun_namn: 'Testkommun', role: 'utbildning',
       contact_email: 'gustaf.hard@gmail.com', scheduled_send_at: '2026-05-19T09:00:00Z',
@@ -2055,9 +2129,14 @@ describe('runTick — inbound processing', () => {
       env, contractsDir, now: new Date('2026-05-19T11:00:00Z'),
     });
 
-    expect(gmail.sendCalls).toHaveLength(1);
-    expect(gmail.sendCalls[0].subject).toMatch(/^Re: /);
-    expect(gmail.sendCalls[0].inReplyTo).toBe('<msg-2@x.se>');
+    // No autosend in v1 — only T-INITIAL ships without approval
+    expect(gmail.sendCalls).toHaveLength(0);
+    // Slack post with T-PRECISION draft for human approval
+    expect(slack.posts).toHaveLength(1);
+    const esc = db.listOpenEscalations()[0];
+    expect(esc.draft_template).toBe('T_PRECISION');
+    expect(esc.draft_body).toMatch(/preciserar gärna/);
+    // State transition still happens automatically (bookkeeping)
     expect(db.getConversation(id).state).toBe('AWAITING_PRECISION');
   });
 
@@ -2094,7 +2173,9 @@ describe('runTick — inbound processing', () => {
     expect(gmail.sendCalls).toHaveLength(0);
     expect(slack.posts).toHaveLength(1);
     expect(db.getConversation(id).state).toBe('NEEDS_HUMAN');
-    expect(db.listOpenEscalations()).toHaveLength(1);
+    const escs = db.listOpenEscalations();
+    expect(escs).toHaveLength(1);
+    expect(escs[0].draft_template).toBe('free_form');
   });
 
   it('does not re-process a message it already saw', async () => {
@@ -2138,6 +2219,8 @@ Expected: FAIL.
 
 - [ ] **Step 3: Implement src/tick.js**
 
+> **Design note (v1 approval-first):** every outbound *except T-INITIAL* is drafted by the bot and posted to Slack for the human to approve. There is no autosend path for T-PRECISION / T-RECEIPT / T-FOLLOWUP-NUDGE / T-FOLLOWUP-CLOSE in v1. State transitions still happen automatically based on classifier output — those are bookkeeping and reversible. Only outbound communication is gated.
+
 ```js
 import { T_INITIAL, T_PRECISION, T_RECEIPT, T_FOLLOWUP_NUDGE, T_FOLLOWUP_CLOSE } from './templates.js';
 import { classify } from './classifier.js';
@@ -2145,6 +2228,8 @@ import { nextActionForClassification, staleAction } from './conversation.js';
 import { parseInboundMessage } from './gmail.js';
 import { buildEscalationBlocks } from './slack.js';
 import { saveAttachment } from './attachments.js';
+
+const TEMPLATES = { T_INITIAL, T_PRECISION, T_RECEIPT, T_FOLLOWUP_NUDGE, T_FOLLOWUP_CLOSE };
 
 function fromHeader(env) {
   return `${env.GMAIL_FROM_NAME} <${env.GMAIL_USER_EMAIL}>`;
@@ -2181,102 +2266,51 @@ async function dispatchInitial(conv, { db, gmailClient, gmailOps, env, now, log 
   log?.(`SENT T-INITIAL → ${conv.kommun_namn}/${conv.role}`);
 }
 
-async function dispatchReplyTemplate(conv, template, parsedInbound, { db, gmailClient, gmailOps, env, now, log }) {
-  const ctx = tplCtx(conv, env, { thread_subject: parsedInbound.subject.replace(/^Re: /, '') });
-  const msg = template(ctx);
-  const sent = await gmailOps.sendMessage(gmailClient.gmail, {
-    from: fromHeader(env), to: conv.contact_email,
-    subject: msg.subject, body: msg.body,
-    threadId: conv.gmail_thread_id,
-    inReplyTo: parsedInbound.message_id_header || undefined,
-    references: parsedInbound.references || parsedInbound.message_id_header || undefined,
-  });
-  db.updateConversationState(conv.id, conv.state, { last_outbound_at: now.toISOString() });
-  db.recordMessage({
-    conversation_id: conv.id, gmail_message_id: sent.id, direction: 'outbound',
-    from_email: env.GMAIL_USER_EMAIL, to_email: conv.contact_email,
-    subject: msg.subject, body_text: msg.body,
-    classification: null, classification_confidence: null,
-    received_at: now.toISOString(), attachment_count: 0,
-  });
-  log?.(`SENT reply → ${conv.kommun_namn}/${conv.role}`);
-}
+async function escalateWithDraft({ conv, parsedInbound, classification, draftTemplate, reason, deps }) {
+  const { db, slackClient, slackOps, env, log } = deps;
+  let subject = '(no subject)';
+  let body = '';
+  if (draftTemplate === 'free_form') {
+    const baseSubject = parsedInbound?.subject?.replace(/^Re: /, '') ?? 'Begäran om allmänna handlingar';
+    subject = `Re: ${baseSubject}`;
+    body = '(ingen draft — skriv själv via Edit)';
+  } else if (TEMPLATES[draftTemplate]) {
+    const ctx = tplCtx(conv, env, {
+      thread_subject: parsedInbound?.subject?.replace(/^Re: /, '') ?? undefined,
+      days_since_send: deps.daysSinceSend ?? 0,
+    });
+    const rendered = TEMPLATES[draftTemplate](ctx);
+    subject = rendered.subject;
+    body = rendered.body;
+  }
 
-async function escalate(conv, parsed, classification, draftReply, { db, slackClient, slackOps, env, log }) {
-  const draft = draftReply ?? '';
   const escId = db.recordEscalation({
     conversation_id: conv.id,
-    reason: `classifier returned ${classification.class} (confidence ${classification.confidence.toFixed(2)})`,
-    draft_reply: draft,
+    message_id: null,
+    reason,
+    draft_template: draftTemplate,
+    draft_subject: subject,
+    draft_body: body,
   });
+
   if (slackOps && env.SLACK_CHANNEL_ID) {
     const blocks = buildEscalationBlocks({
       escalation_id: escId,
       kommun_namn: conv.kommun_namn,
-      from_email: parsed.from,
-      reply_text: parsed.body,
-      draft_reply: draft,
-      gmail_thread_id: conv.gmail_thread_id,
+      from_email: parsedInbound?.from ?? '(no inbound — proactive draft)',
+      reply_text: parsedInbound?.body ?? '(no inbound)',
+      draft_reply: `Subject: ${subject}\n\n${body}`,
+      gmail_thread_id: conv.gmail_thread_id ?? '(no thread)',
     });
-    const posted = await slackOps.postEscalation(slackClient, { channel: env.SLACK_CHANNEL_ID, blocks, fallbackText: `Eskalering: ${conv.kommun_namn}` });
-    // update escalation row with slack_ts via direct UPDATE
+    const posted = await slackOps.postEscalation(slackClient, {
+      channel: env.SLACK_CHANNEL_ID,
+      blocks,
+      fallbackText: `Eskalering: ${conv.kommun_namn} (${draftTemplate})`,
+    });
     db.raw.prepare('UPDATE escalations SET slack_ts = ? WHERE id = ?').run(posted.ts, escId);
   }
-  db.updateConversationState(conv.id, 'NEEDS_HUMAN');
-  log?.(`ESCALATED → ${conv.kommun_namn}/${conv.role}: ${classification.class}`);
-}
-
-async function processInboundForConversation(conv, gmMessageId, deps) {
-  const { db, gmailClient, gmailOps, contractsDir, now, log } = deps;
-  if (db.hasGmailMessageId(gmMessageId)) return;
-  const full = await gmailOps.getMessage(gmailClient.gmail, gmMessageId);
-  if (!full) return;
-  const parsed = parseInboundMessage(full);
-  const classification = classify({
-    from: parsed.from, subject: parsed.subject, body: parsed.body,
-    attachment_count: parsed.attachments.length,
-  });
-
-  const isCloser = /samtliga avtal/i.test(parsed.body);
-  const transition = nextActionForClassification(conv.state, classification.class, {
-    receipt_sent: !!conv.receipt_sent,
-    is_closer: isCloser,
-  });
-
-  const messageId = db.recordMessage({
-    conversation_id: conv.id, gmail_message_id: gmMessageId, direction: 'inbound',
-    from_email: parsed.from, to_email: parsed.to,
-    subject: parsed.subject, body_text: parsed.body,
-    classification: classification.class, classification_confidence: classification.confidence,
-    received_at: now.toISOString(), attachment_count: parsed.attachments.length,
-  });
-
-  for (const att of parsed.attachments) {
-    if (att.mime_type !== 'application/pdf' && !att.filename?.toLowerCase().endsWith('.pdf')) continue;
-    const buf = await gmailOps.fetchAttachment(gmailClient.gmail, gmMessageId, att.attachment_id);
-    const saved = await saveAttachment(buf, {
-      kommun_kod: conv.kommun_kod, kommun_namn: conv.kommun_namn, role: conv.role,
-      received_at: now.toISOString(), from_email: parsed.from, from_name: null,
-      gmail_message_id: gmMessageId, gmail_thread_id: parsed.gmail_thread_id,
-      subject: parsed.subject, original_filename: att.filename, mime_type: att.mime_type,
-    }, { baseDir: contractsDir });
-    db.recordAttachment({ message_id: messageId, filename: att.filename, saved_path: saved.saved_path, mime_type: att.mime_type, size_bytes: saved.size_bytes });
-  }
-
-  const patch = {};
-  if (classification.extracted?.arendenummer) patch.arendenummer = classification.extracted.arendenummer;
-  if (transition.action === 'send_receipt') patch.receipt_sent = 1;
-  db.updateConversationState(conv.id, transition.nextState, patch);
-
-  if (transition.action === 'send_precision') {
-    await dispatchReplyTemplate(conv, T_PRECISION, parsed, deps);
-  } else if (transition.action === 'send_receipt') {
-    await dispatchReplyTemplate(conv, T_RECEIPT, parsed, deps);
-  } else if (transition.action === 'escalate') {
-    await escalate(conv, parsed, classification, null, deps);
-  }
-
-  log?.(`PROCESSED inbound for ${conv.kommun_namn}/${conv.role}: ${classification.class} → ${transition.nextState}`);
+  log?.(`ESCALATED (${draftTemplate}) → ${conv.kommun_namn}/${conv.role}: ${reason}`);
+  return escId;
 }
 
 export async function runTick(deps) {
@@ -2325,58 +2359,58 @@ export async function runTick(deps) {
         }, { baseDir: deps.contractsDir });
         db.recordAttachment({ message_id: messageId, filename: att.filename, saved_path: saved.saved_path, mime_type: att.mime_type, size_bytes: saved.size_bytes });
       }
+      // State transition is bookkeeping — happens automatically. Outbound is gated.
       const patch = {};
       if (classification.extracted?.arendenummer) patch.arendenummer = classification.extracted.arendenummer;
-      if (transition.action === 'send_receipt') patch.receipt_sent = 1;
       db.updateConversationState(conv.id, transition.nextState, patch);
       const updated = db.getConversation(conv.id);
-      if (transition.action === 'send_precision') {
-        await dispatchReplyTemplate(updated, T_PRECISION, parsed, deps);
-      } else if (transition.action === 'send_receipt') {
-        await dispatchReplyTemplate(updated, T_RECEIPT, parsed, deps);
-      } else if (transition.action === 'escalate') {
-        await escalate(updated, parsed, classification, null, deps);
+
+      // Outbound: never auto-sent in v1. Draft a template and escalate to Slack.
+      let draftTemplate = null;
+      if (transition.action === 'send_precision') draftTemplate = 'T_PRECISION';
+      else if (transition.action === 'send_receipt' && !updated.receipt_sent) draftTemplate = 'T_RECEIPT';
+      else if (transition.action === 'escalate') draftTemplate = 'free_form';
+
+      if (draftTemplate) {
+        await escalateWithDraft({
+          conv: updated, parsedInbound: parsed, classification,
+          draftTemplate,
+          reason: `classifier=${classification.class} confidence=${classification.confidence.toFixed(2)}`,
+          deps,
+        });
       }
     }
   }
 }
 
 export async function runDailyFollowup(deps) {
-  const { db, gmailClient, gmailOps, env, now, log } = deps;
+  const { db, now, log } = deps;
   const all = db.listAllConversations();
   for (const conv of all) {
     const days = daysBetween(new Date(conv.state_changed_at), now);
     const action = staleAction(conv.state, days, conv.followup_count);
     if (action === 'none') continue;
-    if (action === 'escalate') {
-      db.recordEscalation({
-        conversation_id: conv.id, reason: `stale ${conv.state} after ${days} days (${conv.followup_count} nudges sent)`,
-        draft_reply: null,
-      });
-      db.updateConversationState(conv.id, 'NEEDS_HUMAN');
-      log?.(`STALE-ESCALATED ${conv.kommun_namn}/${conv.role}`);
-      continue;
+
+    let draftTemplate = null;
+    let reason = `stale ${conv.state} for ${days} days`;
+    if (action === 'send_followup_nudge') draftTemplate = 'T_FOLLOWUP_NUDGE';
+    else if (action === 'send_followup_close') draftTemplate = 'T_FOLLOWUP_CLOSE';
+    else if (action === 'escalate') {
+      reason = `stale ${conv.state} for ${days} days, ${conv.followup_count} nudges already sent`;
+      draftTemplate = 'free_form';
     }
-    const template = action === 'send_followup_close' ? T_FOLLOWUP_CLOSE : T_FOLLOWUP_NUDGE;
-    const ctx = tplCtx(conv, env, { thread_subject: 'Begäran om allmänna handlingar – avtal för digitala verktyg', days_since_send: days });
-    const msg = template(ctx);
-    const sent = await gmailOps.sendMessage(gmailClient.gmail, {
-      from: fromHeader(env), to: conv.contact_email,
-      subject: msg.subject, body: msg.body,
-      threadId: conv.gmail_thread_id,
-    });
-    db.updateConversationState(conv.id, conv.state, {
-      last_outbound_at: now.toISOString(),
-      followup_count: conv.followup_count + 1,
-    });
-    db.recordMessage({
-      conversation_id: conv.id, gmail_message_id: sent.id, direction: 'outbound',
-      from_email: env.GMAIL_USER_EMAIL, to_email: conv.contact_email,
-      subject: msg.subject, body_text: msg.body,
-      classification: null, classification_confidence: null,
-      received_at: now.toISOString(), attachment_count: 0,
-    });
-    log?.(`FOLLOWUP sent → ${conv.kommun_namn}/${conv.role}`);
+
+    if (draftTemplate) {
+      await escalateWithDraft({
+        conv,
+        parsedInbound: null,
+        classification: null,
+        draftTemplate,
+        reason,
+        deps: { ...deps, daysSinceSend: days },
+      });
+      log?.(`FOLLOWUP drafted (${draftTemplate}) → ${conv.kommun_namn}/${conv.role}`);
+    }
   }
 }
 
@@ -2384,6 +2418,8 @@ function daysBetween(then, now) {
   return Math.floor((now.getTime() - then.getTime()) / (1000 * 60 * 60 * 24));
 }
 ```
+
+> **Note:** `followup_count` increments only when the human approves the follow-up draft in Slack — that happens in the daemon's interactivity handler (Task 11), not here. Otherwise click-Skip wouldn't reset the count properly.
 
 - [ ] **Step 4: Run test to verify it passes**
 
@@ -2422,6 +2458,38 @@ import { loadOverrides, getEffectiveNow } from './pilot-config.js';
 const TOKEN_PATH = process.env.GMAIL_TOKEN_PATH ?? `${process.env.HOME}/.config/mediagraf/pilot-gmail-token.json`;
 const DB_PATH = process.env.PILOT_DB_PATH ?? 'data/pilot.db';
 const CONTRACTS_DIR = process.env.PILOT_CONTRACTS_DIR ?? 'data/contracts';
+
+async function sendApprovedReply({ db, gmail, env, conv, esc, finalBody, decision }) {
+  const sent = await gmailSend(gmail, {
+    from: `${env.GMAIL_FROM_NAME} <${env.GMAIL_USER_EMAIL}>`,
+    to: conv.contact_email,
+    subject: esc.draft_subject ?? 'Re: Begäran om allmänna handlingar',
+    body: finalBody,
+    threadId: conv.gmail_thread_id,
+  });
+  const nowIso = new Date().toISOString();
+  db.recordMessage({
+    conversation_id: conv.id, gmail_message_id: sent.id, direction: 'outbound',
+    from_email: env.GMAIL_USER_EMAIL, to_email: conv.contact_email,
+    subject: esc.draft_subject ?? 'Re: Begäran om allmänna handlingar', body_text: finalBody,
+    classification: null, classification_confidence: null,
+    received_at: nowIso, attachment_count: 0,
+  });
+  // Side-effects per template type
+  const patch = { last_outbound_at: nowIso };
+  if (esc.draft_template === 'T_RECEIPT') patch.receipt_sent = 1;
+  if (esc.draft_template === 'T_FOLLOWUP_NUDGE' || esc.draft_template === 'T_FOLLOWUP_CLOSE') {
+    patch.followup_count = (conv.followup_count ?? 0) + 1;
+  }
+  db.updateConversationState(conv.id, conv.state, patch);
+  db.resolveEscalation(esc.id, { status: decision === 'edit' ? 'resolved_edit' : 'resolved_send', resolved_text: finalBody });
+  db.recordDecision({
+    escalation_id: esc.id, conversation_id: conv.id, conversation_state: conv.state,
+    classifier_class: null, classifier_confidence: null,
+    draft_template: esc.draft_template, draft_body: esc.draft_body,
+    decision, final_body: finalBody,
+  });
+}
 
 export async function startDaemon({ env = process.env, log = console.log } = {}) {
   const overrides = loadOverrides();
@@ -2494,48 +2562,24 @@ export async function startDaemon({ env = process.env, log = console.log } = {})
         if (!esc) return;
         const conv = db.getConversation(esc.conversation_id);
         if (parsed.action_id === 'esc_approve') {
-          const sent = await gmailSend(gmail, {
-            from: `${env.GMAIL_FROM_NAME} <${env.GMAIL_USER_EMAIL}>`,
-            to: conv.contact_email,
-            subject: `Re: Begäran om allmänna handlingar`,
-            body: esc.draft_reply ?? '',
-            threadId: conv.gmail_thread_id,
-          });
-          db.recordMessage({
-            conversation_id: conv.id, gmail_message_id: sent.id, direction: 'outbound',
-            from_email: env.GMAIL_USER_EMAIL, to_email: conv.contact_email,
-            subject: `Re: Begäran om allmänna handlingar`, body_text: esc.draft_reply ?? '',
-            classification: null, classification_confidence: null,
-            received_at: new Date().toISOString(), attachment_count: 0,
-          });
-          db.updateConversationState(conv.id, 'SENT', { last_outbound_at: new Date().toISOString() });
-          db.resolveEscalation(escId, { status: 'resolved_send', resolved_text: esc.draft_reply });
+          await sendApprovedReply({ db, gmail, env, conv, esc, finalBody: esc.draft_body, decision: 'approve_unmodified' });
         } else if (parsed.action_id === 'esc_edit') {
-          await openEditModal(slack, { trigger_id: parsed.trigger_id, escalation_id: escId, draft_reply: esc.draft_reply });
+          await openEditModal(slack, { trigger_id: parsed.trigger_id, escalation_id: escId, draft_reply: esc.draft_body });
         } else if (parsed.action_id === 'esc_skip') {
           db.resolveEscalation(escId, { status: 'resolved_skip' });
+          db.recordDecision({
+            escalation_id: escId, conversation_id: conv.id, conversation_state: conv.state,
+            classifier_class: null, classifier_confidence: null,
+            draft_template: esc.draft_template, draft_body: esc.draft_body,
+            decision: 'skip', final_body: null,
+          });
         }
       } else if (parsed.type === 'view_submission' && parsed.view?.callback_id === 'esc_edit_modal') {
         const escId = parseInt(parsed.view.private_metadata, 10);
         const text = parsed.view.state.values.reply_input.reply_text.value;
         const esc = db.raw.prepare('SELECT * FROM escalations WHERE id = ?').get(escId);
         const conv = db.getConversation(esc.conversation_id);
-        const sent = await gmailSend(gmail, {
-          from: `${env.GMAIL_FROM_NAME} <${env.GMAIL_USER_EMAIL}>`,
-          to: conv.contact_email,
-          subject: `Re: Begäran om allmänna handlingar`,
-          body: text,
-          threadId: conv.gmail_thread_id,
-        });
-        db.recordMessage({
-          conversation_id: conv.id, gmail_message_id: sent.id, direction: 'outbound',
-          from_email: env.GMAIL_USER_EMAIL, to_email: conv.contact_email,
-          subject: `Re: Begäran om allmänna handlingar`, body_text: text,
-          classification: null, classification_confidence: null,
-          received_at: new Date().toISOString(), attachment_count: 0,
-        });
-        db.updateConversationState(conv.id, 'SENT', { last_outbound_at: new Date().toISOString() });
-        db.resolveEscalation(escId, { status: 'resolved_edit', resolved_text: text });
+        await sendApprovedReply({ db, gmail, env, conv, esc, finalBody: text, decision: 'edit' });
       }
     } catch (e) {
       log(`slack interactivity error: ${e.message}`);
@@ -2756,11 +2800,17 @@ const conv = db.getConversation(esc.conversation_id);
 
 if (action === 'skip') {
   db.resolveEscalation(escId, { status: 'resolved_skip' });
-  console.log(`Escalation ${escId} skipped.`);
+  db.recordDecision({
+    escalation_id: escId, conversation_id: conv.id, conversation_state: conv.state,
+    classifier_class: null, classifier_confidence: null,
+    draft_template: esc.draft_template, draft_body: esc.draft_body,
+    decision: 'skip', final_body: null,
+  });
+  console.log(`Escalation ${escId} skipped (decision logged).`);
   process.exit(0);
 }
 
-const replyText = action === 'edit' ? (text ?? '') : (esc.draft_reply ?? '');
+const replyText = action === 'edit' ? (text ?? '') : (esc.draft_body ?? '');
 if (!replyText) { console.error(`No reply text. Use --text="..." with --action=edit.`); process.exit(1); }
 
 const oauth = buildOAuthClient(process.env);
@@ -2772,21 +2822,34 @@ const gmail = makeGmail(oauth);
 const sent = await sendMessage(gmail, {
   from: `${process.env.GMAIL_FROM_NAME} <${process.env.GMAIL_USER_EMAIL}>`,
   to: conv.contact_email,
-  subject: 'Re: Begäran om allmänna handlingar',
+  subject: esc.draft_subject ?? 'Re: Begäran om allmänna handlingar',
   body: replyText,
   threadId: conv.gmail_thread_id,
 });
+const nowIso = new Date().toISOString();
 db.recordMessage({
   conversation_id: conv.id, gmail_message_id: sent.id, direction: 'outbound',
   from_email: process.env.GMAIL_USER_EMAIL, to_email: conv.contact_email,
-  subject: 'Re: Begäran om allmänna handlingar', body_text: replyText,
+  subject: esc.draft_subject ?? 'Re: Begäran om allmänna handlingar', body_text: replyText,
   classification: null, classification_confidence: null,
-  received_at: new Date().toISOString(), attachment_count: 0,
+  received_at: nowIso, attachment_count: 0,
 });
-db.updateConversationState(conv.id, 'SENT', { last_outbound_at: new Date().toISOString() });
+const patch = { last_outbound_at: nowIso };
+if (esc.draft_template === 'T_RECEIPT') patch.receipt_sent = 1;
+if (esc.draft_template === 'T_FOLLOWUP_NUDGE' || esc.draft_template === 'T_FOLLOWUP_CLOSE') {
+  patch.followup_count = (conv.followup_count ?? 0) + 1;
+}
+db.updateConversationState(conv.id, conv.state, patch);
 db.resolveEscalation(escId, { status: action === 'edit' ? 'resolved_edit' : 'resolved_send', resolved_text: replyText });
+db.recordDecision({
+  escalation_id: escId, conversation_id: conv.id, conversation_state: conv.state,
+  classifier_class: null, classifier_confidence: null,
+  draft_template: esc.draft_template, draft_body: esc.draft_body,
+  decision: action === 'edit' ? 'edit' : 'approve_unmodified',
+  final_body: replyText,
+});
 
-console.log(`Escalation ${escId} resolved (${action}). Sent gmail message ${sent.id}.`);
+console.log(`Escalation ${escId} resolved (${action}). Sent gmail message ${sent.id}. Decision logged.`);
 db.close();
 ```
 
@@ -2921,8 +2984,10 @@ git commit -m "docs(pilot): setup runbook for Google Cloud + Slack + ngrok + Sta
 
 - ✅ Spec coverage:
   - Stage 0/1 toggle → Task 1 (`pilot-overrides.json`) + Task 2 (`resolveActiveKommuner`, `isClockSkewAllowed`).
-  - State machine → Task 6 (`nextActionForClassification`, `staleAction`).
-  - SQLite schema → Task 5 (4 tables match spec).
+  - **Approval-first autonomy model** → Tasks 10 (tick drafts, never autosends except T-INITIAL) + 11 (daemon's Slack handler is where Approve/Edit triggers actual Gmail send and writes a decisions row) + 14 (CLI fallback also records decisions).
+  - **`decisions` table** logging classifier_class + state + draft_template + decision + final_body → Task 5 schema + `recordDecision` helper + dedicated test.
+  - State machine → Task 6 (`nextActionForClassification`, `staleAction`) — unchanged shape; tick.js reinterprets `action` as "draft this template" instead of "send this template".
+  - SQLite schema (5 tables: conversations, messages, attachments, escalations, decisions) → Task 5.
   - Reply classifier with the documented Swedish patterns → Task 4.
   - Five templates → Task 3.
   - Gmail send + read + attachments + threading → Task 8.
@@ -2938,5 +3003,6 @@ git commit -m "docs(pilot): setup runbook for Google Cloud + Slack + ngrok + Sta
 - ✅ Type consistency:
   - Classifier output `{ class, confidence, signals, extracted }` consistent across classifier.js, conversation.js (uses `class`), and tick.js (uses `class` + `confidence`).
   - `nextActionForClassification(state, classification.class, opts)` signature matches usage in tick.js.
-  - DB column names match across storage.js / tick.js (`followup_count`, `receipt_sent`, `arendenummer`, `gmail_thread_id`).
+  - DB column names match across storage.js / tick.js / daemon.js (`followup_count`, `receipt_sent`, `arendenummer`, `gmail_thread_id`, `draft_subject`, `draft_body`, `draft_template`).
   - Template context fields (`kommun_namn`, `role`, `from_email`, `from_name`, `thread_subject`, `days_since_send`) consistent between templates.js tests and tick.js usage.
+  - `recordDecision({ escalation_id, conversation_id, conversation_state, classifier_class, classifier_confidence, draft_template, draft_body, decision, final_body })` signature matches usage in daemon.js and pilot-resolve.js.
