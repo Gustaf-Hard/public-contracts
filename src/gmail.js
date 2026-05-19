@@ -11,16 +11,31 @@ export const parseBase64Url = {
   },
 };
 
-function encodeSubject(s) {
-  // RFC 2047 base64-encode the subject so åäö survive
+function encodeRfc2047(s) {
   return `=?UTF-8?B?${Buffer.from(s, 'utf8').toString('base64')}?=`;
+}
+
+// Encode a header value that may contain a `"Display Name" <email@host>` form.
+// Display name gets RFC 2047 encoded if it has any non-ASCII char; email is left bare.
+function encodeAddress(addr) {
+  const m = addr.match(/^\s*"?([^"<]*?)"?\s*<([^>]+)>\s*$/);
+  if (!m) {
+    // Plain "user@host" — no display name to encode
+    return addr;
+  }
+  const [, displayName, email] = m;
+  const trimmedName = displayName.trim();
+  if (!trimmedName) return `<${email}>`;
+  // ASCII-only fast path
+  if (/^[\x20-\x7e]+$/.test(trimmedName)) return `"${trimmedName}" <${email}>`;
+  return `${encodeRfc2047(trimmedName)} <${email}>`;
 }
 
 export function buildMimeMessage({ from, to, subject, body, inReplyTo, references }) {
   const lines = [
-    `From: ${from}`,
-    `To: ${to}`,
-    `Subject: ${encodeSubject(subject)}`,
+    `From: ${encodeAddress(from)}`,
+    `To: ${encodeAddress(to)}`,
+    `Subject: ${encodeRfc2047(subject)}`,
     'MIME-Version: 1.0',
     'Content-Type: text/plain; charset="UTF-8"',
     'Content-Transfer-Encoding: 8bit',

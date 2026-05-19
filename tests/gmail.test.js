@@ -15,10 +15,39 @@ describe('buildMimeMessage', () => {
     });
     expect(raw).toMatch(/^[A-Za-z0-9_-]+$/);
     const decoded = Buffer.from(raw.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
-    expect(decoded).toMatch(/^From: Gustaf <gustaf@mediagraf.se>/m);
+    expect(decoded).toMatch(/^From: "Gustaf" <gustaf@mediagraf.se>/m);
     expect(decoded).toMatch(/^To: registrator@kommun.se/m);
     expect(decoded).toMatch(/^Subject: =\?UTF-8\?B\?/m); // base64 subject for åäö-safety
     expect(decoded).toMatch(/^Content-Type: text\/plain; charset="UTF-8"/m);
+  });
+
+  it('RFC-2047 encodes non-ASCII display names in From/To headers', () => {
+    const raw = buildMimeMessage({
+      from: 'Gustaf Hård af Segerstad <gustaf@mediagraf.se>',
+      to: 'Test Användare <test@example.se>',
+      subject: 'Subj',
+      body: 'b',
+    });
+    const decoded = Buffer.from(raw.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
+    // From display-name contains å -> must be RFC-2047 encoded
+    expect(decoded).toMatch(/^From: =\?UTF-8\?B\?[A-Za-z0-9+/=]+\?= <gustaf@mediagraf\.se>/m);
+    // To display-name contains å -> same
+    expect(decoded).toMatch(/^To: =\?UTF-8\?B\?[A-Za-z0-9+/=]+\?= <test@example\.se>/m);
+    // The raw bytes for å must NOT appear in the From header line — only in the body
+    const fromLine = decoded.split(/\r?\n/).find((l) => l.startsWith('From:'));
+    expect(fromLine).not.toMatch(/å/);
+  });
+
+  it('passes bare email addresses through unchanged', () => {
+    const raw = buildMimeMessage({
+      from: 'noreply@example.com',
+      to: 'someone@example.com',
+      subject: 'X',
+      body: 'Y',
+    });
+    const decoded = Buffer.from(raw.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
+    expect(decoded).toMatch(/^From: noreply@example\.com$/m);
+    expect(decoded).toMatch(/^To: someone@example\.com$/m);
   });
 
   it('adds threading headers when provided', () => {
