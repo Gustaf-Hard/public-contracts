@@ -2,6 +2,44 @@
 
 One-time setup steps before running Stage 0 rehearsal.
 
+## 0. Domain email authentication (MANDATORY before any test sends)
+
+The pilot bot sends from `gustaf@mediagraf.se` (Google Workspace). Without proper email authentication DNS records on mediagraf.se, **Gmail (and every other mail provider) will silently drop or aggressively spam-filter your outbound messages**. This was the single biggest debugging session on the first setup attempt — fix it before you send a single email.
+
+Workspace auto-publishes the DKIM key for you at `google._domainkey.mediagraf.se`. Verify with:
+
+```bash
+dig +short TXT google._domainkey.mediagraf.se
+```
+
+You must additionally publish two TXT records on mediagraf.se via your DNS provider (one.com for this domain):
+
+| Host | Type | Value |
+|---|---|---|
+| `@` (root) | TXT | `v=spf1 include:_spf.google.com ~all` |
+| `_dmarc` | TXT | `v=DMARC1; p=none; rua=mailto:gustaf@mediagraf.se` |
+
+Set TTL to 3600. After publishing, **expect Google's resolver to cache the negative answer for up to 60 minutes** — Cloudflare (`@1.1.1.1`) will see the new records immediately, but Gmail uses Google's DNS internally and won't refresh until its cache expires. Wait until this command shows the SPF record before testing deliverability:
+
+```bash
+dig +short TXT mediagraf.se @8.8.8.8
+```
+
+## 0a. Google Workspace outbound send limits
+
+Brand-new Workspace domains have very low outbound send caps — often as low as 50 messages/day in the first 1–2 weeks, gradually rising as the domain builds reputation. If you exhaust the limit you'll receive a `mailer-daemon@googlemail.com` bounce: *"You have reached a limit for sending mail. Your message was not sent."* Daily limit refresh is on a ~24-hour rolling window.
+
+**For Stage 0 rehearsal**, plan for ~10 sends total across the day:
+- 2 × T-INITIAL (one per role)
+- ~6 reply approvals through the FSM scenarios
+- a few buffer sends
+
+**For Stage 1 (5 kommuner × 2 roles = 10 conversations)**, ~30–50 sends spread over the 4-week pilot is well under the limit.
+
+**For v2 (290 kommuner)**, you will need either:
+- A 2-week warmup period sending small daily volumes from mediagraf.se before scaling, or
+- A transactional email provider (Postmark, AWS SES, SendGrid) with higher inherent limits + better-managed reputation
+
 ## 1. Google Cloud project + OAuth client
 
 1. Visit https://console.cloud.google.com — sign in as `gustaf@mediagraf.se` (the Workspace admin).
