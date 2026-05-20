@@ -33,6 +33,19 @@ describe('T_INITIAL', () => {
     expect(m.body).toMatch(/inom kommunen/);
     expect(m.body).not.toMatch(/utbildningsförvaltningen/);
   });
+
+  it('includes kommun_namn in the subject (uniqueness signal for spam filters)', () => {
+    const m = T_INITIAL(ctx);
+    expect(m.subject).toContain('Malå kommun');
+    const other = T_INITIAL({ ...ctx, kommun_namn: 'Boxholm' });
+    expect(other.subject).toContain('Boxholm kommun');
+    expect(m.subject).not.toBe(other.subject);
+  });
+
+  it('opens the body with a kommun-specific salutation', () => {
+    const m = T_INITIAL(ctx);
+    expect(m.body).toMatch(/^Hej Malå kommun,/);
+  });
 });
 
 describe('T_PRECISION', () => {
@@ -42,6 +55,11 @@ describe('T_PRECISION', () => {
     expect(m.body).toMatch(/preciserar gärna/);
     expect(m.body).toMatch(/Skolon/);
     expect(m.body).toMatch(/leverantör/);
+  });
+
+  it('opens with a kommun-specific salutation', () => {
+    const m = T_PRECISION(ctx);
+    expect(m.body).toMatch(/^Hej Malå kommun,/);
   });
 });
 

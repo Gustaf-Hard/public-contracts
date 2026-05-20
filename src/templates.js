@@ -2,6 +2,10 @@ function scopeText(role) {
   return role === 'central' ? 'kommunen' : 'utbildningsförvaltningen';
 }
 
+function salutation(kommun_namn) {
+  return kommun_namn ? `Hej ${kommun_namn} kommun,` : 'Hej,';
+}
+
 function signature({ from_name, from_email }) {
   return `Med vänliga hälsningar,\n${from_name}\n${from_email}`;
 }
@@ -9,9 +13,9 @@ function signature({ from_name, from_email }) {
 export function T_INITIAL(ctx) {
   const scope = scopeText(ctx.role);
   return {
-    subject: 'Begäran om allmänna handlingar – avtal för digitala verktyg, lärplattformar och läromedel',
+    subject: `Begäran om allmänna handlingar – ${ctx.kommun_namn} kommun – digitala verktyg, lärplattformar och läromedel`,
     body: [
-      'Hej,',
+      salutation(ctx.kommun_namn),
       '',
       'Jag begär härmed att ta del av allmänna handlingar med stöd av offentlighetsprincipen (2 kap. tryckfrihetsförordningen).',
       '',
@@ -42,7 +46,7 @@ export function T_PRECISION(ctx) {
   return {
     subject: `Re: ${ctx.thread_subject}`,
     body: [
-      'Hej,',
+      salutation(ctx.kommun_namn),
       '',
       'Tack för snabbt svar! Jag preciserar gärna min begäran.',
       '',
@@ -62,7 +66,7 @@ export function T_RECEIPT(ctx) {
   return {
     subject: `Re: ${ctx.thread_subject}`,
     body: [
-      'Hej,',
+      salutation(ctx.kommun_namn),
       '',
       'Tack så mycket för avtalen — jag har tagit emot dem. Är detta samtliga avtal eller är fler på väg?',
       '',
@@ -75,7 +79,7 @@ export function T_FOLLOWUP_NUDGE(ctx) {
   return {
     subject: `Påminnelse: ${ctx.thread_subject}`,
     body: [
-      'Hej,',
+      salutation(ctx.kommun_namn),
       '',
       `Jag vill bara följa upp om min begäran om allmänna handlingar (skickad ${ctx.days_since_send} dagar sedan). Behöver ni ytterligare information från min sida för att kunna behandla ärendet?`,
       '',
@@ -88,7 +92,7 @@ export function T_FOLLOWUP_CLOSE(ctx) {
   return {
     subject: `Re: ${ctx.thread_subject}`,
     body: [
-      'Hej,',
+      salutation(ctx.kommun_namn),
       '',
       'Tack igen för avtalen jag fått. Har ni ytterligare avtal som inte skickats än, eller kan vi betrakta begäran som slutförd från er sida?',
       '',
