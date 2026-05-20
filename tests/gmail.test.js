@@ -6,7 +6,7 @@ import {
 } from '../src/gmail.js';
 
 describe('buildMimeMessage', () => {
-  it('produces a base64url-encoded RFC 822 message with required headers', () => {
+  it('produces a base64url-encoded multipart/alternative RFC 822 message with both text and HTML parts', () => {
     const raw = buildMimeMessage({
       from: 'Gustaf <gustaf@mediagraf.se>',
       to: 'registrator@kommun.se',
@@ -18,7 +18,22 @@ describe('buildMimeMessage', () => {
     expect(decoded).toMatch(/^From: "Gustaf" <gustaf@mediagraf.se>/m);
     expect(decoded).toMatch(/^To: registrator@kommun.se/m);
     expect(decoded).toMatch(/^Subject: =\?UTF-8\?B\?/m); // base64 subject for åäö-safety
-    expect(decoded).toMatch(/^Content-Type: text\/plain; charset="UTF-8"/m);
+    expect(decoded).toMatch(/^Content-Type: multipart\/alternative; boundary="b_/m);
+    // Plain part — body's internal \n separators are preserved verbatim
+    expect(decoded).toMatch(/Content-Type: text\/plain; charset="UTF-8"/);
+    expect(decoded).toContain('Hej!\n\nText\n');
+    // HTML part — paragraphs split on blank lines
+    expect(decoded).toMatch(/Content-Type: text\/html; charset="UTF-8"/);
+    expect(decoded).toContain('<p>Hej!</p>');
+    expect(decoded).toContain('<p>Text');
+  });
+
+  it('escapes HTML special chars in the HTML part', () => {
+    const raw = buildMimeMessage({
+      from: 'a@b.se', to: 'c@d.se', subject: 'X', body: 'Less < than & ampersand',
+    });
+    const decoded = Buffer.from(raw.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
+    expect(decoded).toContain('Less &lt; than &amp; ampersand');
   });
 
   it('RFC-2047 encodes non-ASCII display names in From/To headers', () => {

@@ -31,19 +31,57 @@ function encodeAddress(addr) {
   return `${encodeRfc2047(trimmedName)} <${email}>`;
 }
 
+function escapeHtml(s) {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+// Convert a plain-text body into a minimal HTML body suitable for the
+// HTML alternative of a multipart/alternative message. Paragraphs split on
+// blank lines; single newlines within a paragraph become <br>.
+function plainTextToHtml(text) {
+  const paragraphs = text.split(/\n\s*\n/);
+  return paragraphs
+    .map((p) => `<p>${escapeHtml(p).replace(/\n/g, '<br>')}</p>`)
+    .join('\n');
+}
+
 export function buildMimeMessage({ from, to, subject, body, inReplyTo, references }) {
-  const lines = [
+  // Always send multipart/alternative (plain + HTML). Gmail's spam filter
+  // treats brand-new-domain text/plain-only API sends much more harshly
+  // than multipart messages — confirmed empirically against gmail.com.
+  const boundary = `b_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+  const html = plainTextToHtml(body);
+
+  const headers = [
     `From: ${encodeAddress(from)}`,
     `To: ${encodeAddress(to)}`,
     `Subject: ${encodeRfc2047(subject)}`,
     'MIME-Version: 1.0',
+    `Content-Type: multipart/alternative; boundary="${boundary}"`,
+  ];
+  if (inReplyTo) headers.push(`In-Reply-To: ${inReplyTo}`);
+  if (references) headers.push(`References: ${references}`);
+
+  const parts = [
+    `--${boundary}`,
     'Content-Type: text/plain; charset="UTF-8"',
     'Content-Transfer-Encoding: 8bit',
+    '',
+    body,
+    '',
+    `--${boundary}`,
+    'Content-Type: text/html; charset="UTF-8"',
+    'Content-Transfer-Encoding: 8bit',
+    '',
+    html,
+    '',
+    `--${boundary}--`,
   ];
-  if (inReplyTo) lines.push(`In-Reply-To: ${inReplyTo}`);
-  if (references) lines.push(`References: ${references}`);
-  lines.push('', body);
-  const raw = lines.join('\r\n');
+
+  const raw = [...headers, '', ...parts].join('\r\n');
   return Buffer.from(raw, 'utf8').toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
