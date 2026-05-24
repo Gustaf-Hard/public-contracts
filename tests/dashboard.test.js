@@ -132,7 +132,10 @@ describe('dashboard / escalations', () => {
     const res = await get(app, '/escalations');
     expect(res.text).toContain('Malå');
     expect(res.text).toContain('free_form');
-    expect(res.text).toContain('pilot-resolve');
+    // The card now embeds an editable form pointing at the action endpoint
+    expect(res.text).toContain(`action="/escalations/`);
+    expect(res.text).toContain('Skicka');
+    expect(res.text).toContain('Hoppa över');
   });
 
   it('shows the empty state when there are no open escalations', async () => {

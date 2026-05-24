@@ -219,6 +219,26 @@ const baseCss = `
   .filter-bar a.active { background: var(--accent); color: white; border-color: var(--accent); }
   .signature-fields dl { margin: 4px 0; display: grid; grid-template-columns: max-content 1fr; gap: 2px 12px; font-size: 12px; }
   .signature-fields dt { color: var(--fg-muted); }
+  /* Action forms (send / edit / init) */
+  .action-form { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+  .action-form input[type=text], .action-form textarea, .action-form select {
+    width: 100%; background: var(--bg-elev-2); color: var(--fg); border: 1px solid var(--border);
+    border-radius: 4px; padding: 8px 10px; font: inherit; font-size: 12px;
+    font-family: ui-monospace, SF Mono, Menlo, monospace;
+  }
+  .action-form textarea { min-height: 200px; resize: vertical; }
+  .action-form .field { display: flex; flex-direction: column; gap: 4px; }
+  .action-form .field-row { display: flex; gap: 12px; align-items: flex-end; }
+  .action-form .field-row > .field { flex: 1; }
+  .action-form label { font-size: 11px; color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .action-form .buttons { display: flex; gap: 8px; align-items: center; }
+  .btn { display: inline-block; padding: 7px 14px; border-radius: 6px; border: 1px solid; font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; }
+  .btn-primary  { background: var(--good); color: white; border-color: var(--good); }
+  .btn-primary:hover  { filter: brightness(1.1); }
+  .btn-secondary { background: transparent; color: var(--fg); border-color: var(--border); }
+  .btn-danger { background: transparent; color: var(--bad); border-color: var(--bad); }
+  .btn-disabled { background: var(--bg-elev-2); color: var(--fg-muted); border-color: var(--border); cursor: not-allowed; }
+  .send-warning { font-size: 12px; color: var(--warn); margin-left: auto; }
   footer { margin-top: 60px; padding: 20px 24px; text-align: center; color: var(--fg-muted); font-size: 11px; border-top: 1px solid var(--border); }
 </style>
 `;
@@ -371,7 +391,69 @@ export function renderOverview({ summary, rows, filter, sort, order, totalKommun
 
 // ---- Kommun detail ----
 
-export function renderKommunDetail({ kommun, conversations, messagesByConv, attachmentsByMsg, escalationsByConv, signatures, followUpByConv = {} }) {
+function renderEscalationForm(esc, gmailReady) {
+  const disabled = gmailReady ? '' : 'disabled';
+  const warn = gmailReady ? '' : '<span class="send-warning">⚠️ Gmail-token saknas — kör <code>npm run pilot-auth</code></span>';
+  // Two forms in the card: edit-and-send (uses textarea contents) + skip.
+  // Keeping subject editable lets the user fix a wrong "Re:" prefix.
+  return `
+    <form class="action-form" method="post" action="/escalations/${esc.id}">
+      <div class="field">
+        <label>Ämne</label>
+        <input type="text" name="subject" value="${escapeHtml(esc.draft_subject ?? '')}">
+      </div>
+      <div class="field">
+        <label>Brödtext</label>
+        <textarea name="body">${escapeHtml(esc.draft_body ?? '')}</textarea>
+      </div>
+      <div class="buttons">
+        <button class="btn ${gmailReady ? 'btn-primary' : 'btn-disabled'}" type="submit" name="action" value="edit" ${disabled}>📨 Skicka</button>
+        ${warn}
+      </div>
+    </form>
+    <form method="post" action="/escalations/${esc.id}" style="margin-top:8px">
+      <input type="hidden" name="action" value="skip">
+      <button class="btn btn-secondary" type="submit"
+        onclick="return confirm('Hoppa över denna eskalering utan att svara?')">Hoppa över</button>
+    </form>`;
+}
+
+function renderInitialForm(kommunKod, draft, gmailReady) {
+  const disabled = gmailReady ? '' : 'disabled';
+  const warn = gmailReady ? '' : '<span class="send-warning">⚠️ Gmail-token saknas — kör <code>npm run pilot-auth</code></span>';
+  const candidates = draft.candidate_emails;
+  // Build the "from this set of emails, pick one" select. If only one email
+  // exists for the role, render as a disabled text field so it's still
+  // visible in the form.
+  const contactPicker = candidates.length === 1
+    ? `<input type="text" name="contact_email" value="${escapeHtml(candidates[0])}" readonly>`
+    : `<select name="contact_email" required>${candidates.map((e) => `<option value="${escapeHtml(e)}">${escapeHtml(e)}</option>`).join('')}</select>`;
+  return `
+    <form class="action-form" method="post" action="/kommun/${escapeHtml(kommunKod)}/init"
+      onsubmit="return confirm('Skicka T-INITIAL till ' + this.contact_email.value + '?')">
+      <input type="hidden" name="role" value="${escapeHtml(draft.role)}">
+      <div class="field-row">
+        <div class="field">
+          <label>Mottagare (roll: ${escapeHtml(draft.role)})</label>
+          ${contactPicker}
+        </div>
+        <div class="field" style="flex:2">
+          <label>Ämne</label>
+          <input type="text" name="subject" value="${escapeHtml(draft.subject)}">
+        </div>
+      </div>
+      <div class="field">
+        <label>Brödtext</label>
+        <textarea name="body">${escapeHtml(draft.body)}</textarea>
+      </div>
+      <div class="buttons">
+        <button class="btn ${gmailReady ? 'btn-primary' : 'btn-disabled'}" type="submit" ${disabled}>📨 Skicka T-INITIAL nu</button>
+        ${warn}
+      </div>
+    </form>`;
+}
+
+export function renderKommunDetail({ kommun, conversations, messagesByConv, attachmentsByMsg, escalationsByConv, signatures, followUpByConv = {}, initialDrafts = {}, gmailReady = false }) {
   if (!kommun) {
     return layout({ title: 'Saknad kommun', body: '<p>Hittade inte kommunen.</p>', currentPath: '/' });
   }
@@ -381,8 +463,17 @@ export function renderKommunDetail({ kommun, conversations, messagesByConv, atta
       </details>`
     : '<p class="muted">Inga kontaktadresser i datasetet.</p>';
 
+  const initialDraftCards = Object.values(initialDrafts).map((d) => `
+    <div class="card">
+      <h3>Skicka T-INITIAL · roll: ${escapeHtml(d.role)}</h3>
+      <div class="muted" style="margin-bottom:6px">Ingen konversation finns för denna roll. Granska utkastet och skicka när du är nöjd.</div>
+      ${renderInitialForm(kommun.kommun_kod, d, gmailReady)}
+    </div>`).join('');
+
   const convCards = conversations.length === 0
-    ? '<p class="muted">Ingen pilot-konversation för denna kommun ännu.</p>'
+    ? (Object.keys(initialDrafts).length === 0
+        ? '<p class="muted">Ingen pilot-konversation för denna kommun ännu.</p>'
+        : '')
     : conversations.map((conv) => {
         const msgs = messagesByConv[conv.id] ?? [];
         const escs = escalationsByConv[conv.id] ?? [];
@@ -451,7 +542,7 @@ export function renderKommunDetail({ kommun, conversations, messagesByConv, atta
           ${escs.map((e) => `
             <div class="card">
               <strong>${escapeHtml(e.draft_template ?? 'free_form')}</strong> · <span class="muted">${escapeHtml(e.reason)}</span>
-              <div class="body-quote">${escapeHtml(e.draft_body ?? '(ingen draft)')}</div>
+              ${renderEscalationForm(e, gmailReady)}
             </div>`).join('')}`;
 
         const fu = followUpByConv[conv.id] ?? { date: null, source: null };
@@ -475,13 +566,14 @@ export function renderKommunDetail({ kommun, conversations, messagesByConv, atta
     ${contactBlock}
     <h2>Pilot-konversationer</h2>
     ${convCards}
+    ${initialDraftCards}
   `;
   return layout({ title: kommun.kommun_namn, body, currentPath: '/' });
 }
 
 // ---- Escalations queue ----
 
-export function renderEscalations({ items }) {
+export function renderEscalations({ items, gmailReady = false }) {
   const body = items.length === 0
     ? '<p class="muted">Inga öppna eskaleringar. ✨</p>'
     : items.map((e) => `
@@ -496,13 +588,7 @@ export function renderEscalations({ items }) {
           ${e.inbound_body ? `
             <div style="margin-top:8px">Inkommande:</div>
             <div class="body-quote body-quote-inbound">${escapeHtml(e.inbound_body)}</div>` : ''}
-          <div style="margin-top:8px">Förslag på svar:</div>
-          <div class="body-quote body-quote-outbound">${escapeHtml(e.draft_subject ? 'Subject: ' + e.draft_subject + '\n\n' : '')}${escapeHtml(e.draft_body ?? '(ingen draft)')}</div>
-          <div class="muted" style="margin-top:8px;font-family:ui-monospace,monospace;font-size:11px">
-            För att svara från terminalen: <code>npm run pilot-resolve -- --escalation=${e.id} --action=send</code>
-            eller <code>--action=edit --text="..."</code>
-            eller <code>--action=skip</code>
-          </div>
+          ${renderEscalationForm(e, gmailReady)}
         </div>`).join('');
 
   return layout({ title: 'Eskaleringar', body: `<h2>Öppna eskaleringar (${items.length})</h2>${body}`, currentPath: '/escalations' });

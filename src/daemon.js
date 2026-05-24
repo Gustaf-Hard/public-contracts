@@ -3,47 +3,14 @@ import cron from 'node-cron';
 import { runTick, runDailyFollowup } from './tick.js';
 import { openDb } from './storage.js';
 import { buildOAuthClient, loadStoredToken, makeGmail, sendMessage as gmailSend, listInboundQuery, getMessage as gmailGet, fetchAttachment } from './gmail.js';
+// gmailSend stays imported because runTick's gmailOps below uses it.
 import { makeSlackClient, verifySlackSignature, parseInteractivityPayload, postEscalation, openEditModal } from './slack.js';
 import { loadOverrides, getEffectiveNow } from './pilot-config.js';
+import { sendApprovedReply } from './send-reply.js';
 
 const TOKEN_PATH = process.env.GMAIL_TOKEN_PATH ?? `${process.env.HOME}/.config/mediagraf/pilot-gmail-token.json`;
 const DB_PATH = process.env.PILOT_DB_PATH ?? 'data/pilot.db';
 const CONTRACTS_DIR = process.env.PILOT_CONTRACTS_DIR ?? 'data/contracts';
-
-async function sendApprovedReply({ db, gmail, env, conv, esc, finalBody, decision }) {
-  const sent = await gmailSend(gmail, {
-    from: `${env.GMAIL_FROM_NAME} <${env.GMAIL_USER_EMAIL}>`,
-    to: conv.contact_email,
-    subject: esc.draft_subject ?? 'Re: Begäran om allmänna handlingar',
-    body: finalBody,
-    threadId: conv.gmail_thread_id,
-  });
-  const nowIso = new Date().toISOString();
-  db.recordMessage({
-    conversation_id: conv.id, gmail_message_id: sent.id, direction: 'outbound',
-    from_email: env.GMAIL_USER_EMAIL, to_email: conv.contact_email,
-    subject: esc.draft_subject ?? 'Re: Begäran om allmänna handlingar', body_text: finalBody,
-    classification: null, classification_confidence: null,
-    received_at: nowIso, attachment_count: 0,
-  });
-  // Side-effects per template type
-  const patch = { last_outbound_at: nowIso };
-  if (esc.draft_template === 'T_RECEIPT') patch.receipt_sent = 1;
-  if (esc.draft_template === 'T_FOLLOWUP_NUDGE' || esc.draft_template === 'T_FOLLOWUP_CLOSE') {
-    patch.followup_count = (conv.followup_count ?? 0) + 1;
-  }
-  const targetState = (conv.state === 'NEEDS_HUMAN' && esc.draft_template === 'free_form' && esc.previous_state)
-    ? esc.previous_state
-    : conv.state;
-  db.updateConversationState(conv.id, targetState, patch);
-  db.resolveEscalation(esc.id, { status: decision === 'edit' ? 'resolved_edit' : 'resolved_send', resolved_text: finalBody });
-  db.recordDecision({
-    escalation_id: esc.id, conversation_id: conv.id, conversation_state: conv.state,
-    classifier_class: esc.classifier_class ?? null, classifier_confidence: esc.classifier_confidence ?? null,
-    draft_template: esc.draft_template, draft_body: esc.draft_body,
-    decision, final_body: finalBody,
-  });
-}
 
 export async function startDaemon({ env = process.env, log = console.log } = {}) {
   const overrides = loadOverrides();

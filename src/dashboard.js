@@ -7,6 +7,8 @@ import express from 'express';
 import { readFileSync, existsSync } from 'node:fs';
 import { openDb } from './storage.js';
 import { effectiveFollowUp } from './conversation.js';
+import { buildOAuthClient, loadStoredToken, makeGmail } from './gmail.js';
+import { sendApprovedReply, sendInitial, renderInitialDraft } from './send-reply.js';
 import {
   renderOverview,
   renderKommunDetail,
@@ -17,6 +19,15 @@ import {
 const DB_PATH = process.env.PILOT_DB_PATH ?? 'data/pilot.db';
 const MUNICIPALITIES_PATH = process.env.PILOT_MUNICIPALITIES_PATH ?? 'data/municipalities.json';
 const OVERRIDES_PATH = process.env.PILOT_OVERRIDES_PATH ?? 'data/pilot-overrides.json';
+const TOKEN_PATH = process.env.GMAIL_TOKEN_PATH ?? `${process.env.HOME}/.config/mediagraf/pilot-gmail-token.json`;
+
+function loadGmail(env) {
+  const token = loadStoredToken(TOKEN_PATH);
+  if (!token) return null;
+  const oauth = buildOAuthClient(env);
+  oauth.setCredentials(token);
+  return makeGmail(oauth);
+}
 
 function loadMunicipalities() {
   const live = existsSync(MUNICIPALITIES_PATH)
@@ -226,8 +237,14 @@ function parseSignatureJson(json) {
 
 // ---- Route handlers ----
 
-export function createDashboardApp({ db = openDbOrNull(), municipalitiesLoader = loadMunicipalities } = {}) {
+export function createDashboardApp({
+  db = openDbOrNull(),
+  municipalitiesLoader = loadMunicipalities,
+  gmailClient = loadGmail(process.env),
+  env = process.env,
+} = {}) {
   const app = express();
+  app.use(express.urlencoded({ extended: false, limit: '1mb' }));
 
   app.get('/', (req, res) => {
     const municipalities = municipalitiesLoader();
@@ -285,6 +302,23 @@ export function createDashboardApp({ db = openDbOrNull(), municipalitiesLoader =
     }
 
     res.set('Content-Type', 'text/html; charset=utf-8');
+    // Render a T-INITIAL draft per role that isn't already in a conversation.
+    // The form lets the operator pick a contact email, tweak the body, and send.
+    const rolesInUse = new Set(conversations.map((c) => c.role));
+    const initialDrafts = (kommun.contacts ?? [])
+      .filter((c) => !rolesInUse.has(c.role))
+      .reduce((acc, c) => {
+        if (acc[c.role]) return acc; // first contact per role wins
+        const draft = renderInitialDraft({ kommun_namn: kommun.kommun_namn, role: c.role, env });
+        acc[c.role] = {
+          role: c.role,
+          candidate_emails: (kommun.contacts ?? []).filter((x) => x.role === c.role).map((x) => x.email),
+          subject: draft.subject,
+          body: draft.body,
+        };
+        return acc;
+      }, {});
+
     res.send(renderKommunDetail({
       kommun,
       conversations,
@@ -293,6 +327,8 @@ export function createDashboardApp({ db = openDbOrNull(), municipalitiesLoader =
       escalationsByConv,
       signatures,
       followUpByConv,
+      initialDrafts,
+      gmailReady: !!gmailClient,
     }));
   });
 
@@ -312,7 +348,7 @@ export function createDashboardApp({ db = openDbOrNull(), municipalitiesLoader =
       ORDER BY e.created_at
     `).all();
     res.set('Content-Type', 'text/html; charset=utf-8');
-    res.send(renderEscalations({ items }));
+    res.send(renderEscalations({ items, gmailReady: !!gmailClient }));
   });
 
   app.get('/activity', (req, res) => {
@@ -345,7 +381,89 @@ export function createDashboardApp({ db = openDbOrNull(), municipalitiesLoader =
     }));
   });
 
+  // --- Action endpoints (outbound email) ---
+
+  // Resolve an open escalation: send, edit-send, or skip.
+  // POST /escalations/:id  with body { action: 'send'|'edit'|'skip', body?: string, subject?: string }
+  app.post('/escalations/:id', async (req, res) => {
+    if (!db) return res.status(503).send('No DB');
+    const escId = parseInt(req.params.id, 10);
+    const esc = db.raw.prepare('SELECT * FROM escalations WHERE id = ?').get(escId);
+    if (!esc) return res.status(404).send('Escalation not found');
+    if (esc.status !== 'open') return res.redirect(`/kommun/${db.getConversation(esc.conversation_id)?.kommun_kod ?? ''}`);
+
+    const conv = db.getConversation(esc.conversation_id);
+    const action = req.body.action;
+
+    if (action === 'skip') {
+      db.resolveEscalation(escId, { status: 'resolved_skip' });
+      db.recordDecision({
+        escalation_id: escId, conversation_id: conv.id, conversation_state: conv.state,
+        classifier_class: esc.classifier_class ?? null, classifier_confidence: esc.classifier_confidence ?? null,
+        draft_template: esc.draft_template, draft_body: esc.draft_body,
+        decision: 'skip', final_body: null,
+      });
+      return res.redirect(`/kommun/${conv.kommun_kod}`);
+    }
+
+    if (action !== 'send' && action !== 'edit') {
+      return res.status(400).send(`Unknown action: ${action}`);
+    }
+
+    if (!gmailClient) return res.status(503).send('Gmail not configured — run pilot-auth first.');
+
+    const finalBody = (action === 'edit' ? req.body.body : esc.draft_body) ?? '';
+    const finalSubject = (action === 'edit' ? req.body.subject : esc.draft_subject) ?? undefined;
+    if (!finalBody.trim()) return res.status(400).send('Cannot send an empty body');
+
+    try {
+      await sendApprovedReply({
+        db, gmail: gmailClient, env, conv, esc,
+        finalBody, finalSubject,
+        decision: action === 'send' ? 'approve_unmodified' : 'edit',
+      });
+    } catch (e) {
+      return res.status(500).send(`Send failed: ${escapeForError(e.message)}`);
+    }
+    res.redirect(`/kommun/${conv.kommun_kod}`);
+  });
+
+  // Send T-INITIAL to a kommun that doesn't have a conversation yet.
+  // POST /kommun/:kod/init  with body { role, contact_email, subject, body }
+  app.post('/kommun/:kod/init', async (req, res) => {
+    if (!db) return res.status(503).send('No DB');
+    if (!gmailClient) return res.status(503).send('Gmail not configured — run pilot-auth first.');
+
+    const municipalities = municipalitiesLoader();
+    const kommun = municipalities.find((m) => m.kommun_kod === req.params.kod);
+    if (!kommun) return res.status(404).send('Kommun not found');
+
+    const { role, contact_email, subject, body } = req.body;
+    if (!role || !contact_email || !subject || !body) {
+      return res.status(400).send('Missing role, contact_email, subject, or body');
+    }
+
+    try {
+      await sendInitial({
+        db, gmail: gmailClient, env,
+        kommun_kod: kommun.kommun_kod,
+        kommun_namn: kommun.kommun_namn,
+        role,
+        contact_email,
+        subject,
+        body,
+      });
+    } catch (e) {
+      return res.status(500).send(`Send failed: ${escapeForError(e.message)}`);
+    }
+    res.redirect(`/kommun/${kommun.kommun_kod}`);
+  });
+
   return app;
+}
+
+function escapeForError(s) {
+  return String(s).replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' })[c]);
 }
 
 export function startDashboard({ port = parseInt(process.env.PILOT_DASHBOARD_PORT ?? '3100', 10) } = {}) {
