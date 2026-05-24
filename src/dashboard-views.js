@@ -41,14 +41,25 @@ function daysUntil(isoDate, now = new Date()) {
   return Math.round((target - today) / (1000 * 60 * 60 * 24));
 }
 
-// Compact countdown badge for follow_up_at. Returns null when no date set.
-function fmtFollowUpBadge(isoDate) {
+// Compact countdown pill for follow_up_at. Color encodes source:
+//   - 'kommun_promise' → green: the kommun committed to this date
+//   - 'our_followup'   → red: stale-rule default, no promise from them
+//   - overdue: amber regardless of source
+// Returns null when no date set.
+function fmtFollowUpBadge(isoDate, source = 'our_followup') {
   const d = daysUntil(isoDate);
   if (d === null) return null;
-  if (d < 0) return `<span class="warn" title="${escapeHtml(isoDate)}">försenad ${-d}d</span>`;
-  if (d === 0) return `<span class="warn" title="${escapeHtml(isoDate)}">idag</span>`;
-  if (d === 1) return `<span title="${escapeHtml(isoDate)}">imorgon</span>`;
-  return `<span title="${escapeHtml(isoDate)}">om ${d}d</span>`;
+  const tooltipSource = source === 'kommun_promise'
+    ? 'kommunen utlovade detta datum'
+    : 'standardpåminnelse (de har inte utlovat något datum)';
+  const title = `${isoDate} · ${tooltipSource}`;
+  // Overdue trumps source — always amber
+  if (d < 0) {
+    return `<span class="pill pill-overdue" title="${escapeHtml(title)}">försenad ${-d}d</span>`;
+  }
+  const klass = source === 'kommun_promise' ? 'pill pill-promise' : 'pill pill-default';
+  const label = d === 0 ? 'idag' : d === 1 ? 'imorgon' : `om ${d}d`;
+  return `<span class="${klass}" title="${escapeHtml(title)}">${label}</span>`;
 }
 
 const INTENT_LABELS = {
@@ -185,6 +196,10 @@ const baseCss = `
   table td.num { text-align: right; font-variant-numeric: tabular-nums; }
   .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 500; }
   .badge-empty { background: transparent; color: var(--fg-muted); border: 1px dashed var(--border); }
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 500; border: 1px solid; }
+  .pill-promise  { background: #22c55e1a; color: var(--good); border-color: #22c55e66; }
+  .pill-default  { background: #ef44441a; color: var(--bad);  border-color: #ef444466; }
+  .pill-overdue  { background: #f59e0b1a; color: var(--warn); border-color: #f59e0b66; }
   .pill-list { display: flex; flex-wrap: wrap; gap: 4px; }
   .muted { color: var(--fg-muted); }
   .danger { color: var(--bad); font-weight: 500; }
@@ -316,7 +331,7 @@ export function renderOverview({ summary, rows, filter, sort, order, totalKommun
           const lastActivity = r.last_activity_at
             ? `<span title="${escapeHtml(r.last_activity_at)}">${escapeHtml(fmtAgo(r.last_activity_at))}</span>`
             : '<span class="muted">—</span>';
-          const followUpCell = fmtFollowUpBadge(r.follow_up_at) ?? '<span class="muted">—</span>';
+          const followUpCell = fmtFollowUpBadge(r.follow_up_at, r.follow_up_source) ?? '<span class="muted">—</span>';
           return `<tr>
             <td><a class="kommun-link" href="/kommun/${escapeHtml(r.kommun_kod)}">${escapeHtml(r.kommun_namn)}</a> <span class="muted">${escapeHtml(r.kommun_kod)}</span></td>
             <td>${escapeHtml(r.lan ?? '')}</td>
@@ -356,7 +371,7 @@ export function renderOverview({ summary, rows, filter, sort, order, totalKommun
 
 // ---- Kommun detail ----
 
-export function renderKommunDetail({ kommun, conversations, messagesByConv, attachmentsByMsg, escalationsByConv, signatures }) {
+export function renderKommunDetail({ kommun, conversations, messagesByConv, attachmentsByMsg, escalationsByConv, signatures, followUpByConv = {} }) {
   if (!kommun) {
     return layout({ title: 'Saknad kommun', body: '<p>Hittade inte kommunen.</p>', currentPath: '/' });
   }
@@ -439,9 +454,10 @@ export function renderKommunDetail({ kommun, conversations, messagesByConv, atta
               <div class="body-quote">${escapeHtml(e.draft_body ?? '(ingen draft)')}</div>
             </div>`).join('')}`;
 
-        const followUpBadge = fmtFollowUpBadge(conv.follow_up_at);
-        const followUpLine = conv.follow_up_at
-          ? `<div class="muted">⏳ Återkommer senast: <strong>${escapeHtml(conv.follow_up_at)}</strong> · ${followUpBadge} <span class="muted">(timer från kommunens utlovade datum)</span></div>`
+        const fu = followUpByConv[conv.id] ?? { date: null, source: null };
+        const followUpBadge = fu.date ? fmtFollowUpBadge(fu.date, fu.source) : null;
+        const followUpLine = fu.date
+          ? `<div class="muted">⏳ Nästa kontakt: <strong>${escapeHtml(fu.date)}</strong> · ${followUpBadge} <span class="muted">(${fu.source === 'kommun_promise' ? 'kommunen utlovade detta datum' : 'standardpåminnelse efter ' + (fu.source === 'our_followup' ? 'tystnad' : '')})</span></div>`
           : '';
         return `
           <div class="card">

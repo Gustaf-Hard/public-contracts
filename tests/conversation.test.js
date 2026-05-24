@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { nextActionForClassification, staleAction } from '../src/conversation.js';
+import { nextActionForClassification, staleAction, effectiveFollowUp } from '../src/conversation.js';
 
 describe('nextActionForClassification', () => {
   it('SENT + auto_ack → ACK_RECEIVED, no outbound', () => {
@@ -97,5 +97,37 @@ describe('staleAction', () => {
   it('follow_up_at does not override the MAX_NUDGES escalation', () => {
     // Past the date AND past 2 nudges — still escalates to human
     expect(staleAction('SENT', 30, 2, { today: '2026-06-12', follow_up_at: '2026-06-11' })).toBe('escalate');
+  });
+});
+
+describe('effectiveFollowUp', () => {
+  it('returns LLM-set date as kommun_promise when conversation has follow_up_at', () => {
+    const r = effectiveFollowUp({
+      state: 'ACK_RECEIVED',
+      state_changed_at: '2026-05-24T10:00:00Z',
+      follow_up_at: '2026-06-11',
+    });
+    expect(r).toEqual({ date: '2026-06-11', source: 'kommun_promise' });
+  });
+
+  it('derives our_followup date from STALE_RULES when no follow_up_at is set', () => {
+    // SENT rule = 7 days; state_changed 2026-05-24 → derived = 2026-05-31
+    const r = effectiveFollowUp({ state: 'SENT', state_changed_at: '2026-05-24T10:00:00Z', follow_up_at: null });
+    expect(r).toEqual({ date: '2026-05-31', source: 'our_followup' });
+  });
+
+  it('returns nulls for terminal states', () => {
+    expect(effectiveFollowUp({ state: 'DONE', state_changed_at: '2026-05-24T10:00:00Z' })).toEqual({ date: null, source: null });
+    expect(effectiveFollowUp({ state: 'DEAD_END', state_changed_at: '2026-05-24T10:00:00Z' })).toEqual({ date: null, source: null });
+    expect(effectiveFollowUp({ state: 'NEEDS_HUMAN', state_changed_at: '2026-05-24T10:00:00Z' })).toEqual({ date: null, source: null });
+  });
+
+  it('returns nulls for INITIAL (not yet sent)', () => {
+    expect(effectiveFollowUp({ state: 'INITIAL', state_changed_at: '2026-05-24T10:00:00Z' })).toEqual({ date: null, source: null });
+  });
+
+  it('uses ACK_RECEIVED 14-day rule', () => {
+    const r = effectiveFollowUp({ state: 'ACK_RECEIVED', state_changed_at: '2026-05-24T10:00:00Z', follow_up_at: null });
+    expect(r).toEqual({ date: '2026-06-07', source: 'our_followup' });
   });
 });

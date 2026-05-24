@@ -32,7 +32,7 @@ export function nextActionForClassification(state, classification, opts = {}) {
   return { nextState: state, action: 'none' };
 }
 
-const STALE_RULES = {
+export const STALE_RULES = {
   SENT: { days: 7, action: 'send_followup_nudge' },
   ACK_RECEIVED: { days: 14, action: 'send_followup_nudge' },
   AWAITING_PRECISION: { days: 10, action: 'send_followup_nudge' },
@@ -40,7 +40,31 @@ const STALE_RULES = {
 };
 
 const MAX_NUDGES = 2;
-const TERMINAL = new Set(['DONE', 'DEAD_END', 'NEEDS_HUMAN']);
+export const TERMINAL_STATES = new Set(['DONE', 'DEAD_END', 'NEEDS_HUMAN']);
+const TERMINAL = TERMINAL_STATES;
+
+// Earliest date the bot will take action again, in YYYY-MM-DD, tagged with
+// where the date came from:
+//   - 'kommun_promise' — LLM extracted a promise from an inbound reply
+//     ("vi behöver 10 dagar"). Green in the dashboard: the kommun is on
+//     the hook.
+//   - 'our_followup'   — no promise; we'll nudge them after the stale
+//     rule fires. Red in the dashboard: we'll have to reach out again.
+// Terminal states return {date: null, source: null}.
+export function effectiveFollowUp(conv) {
+  const none = { date: null, source: null };
+  if (!conv) return none;
+  if (conv.follow_up_at) return { date: conv.follow_up_at, source: 'kommun_promise' };
+  if (TERMINAL.has(conv.state)) return none;
+  const rule = STALE_RULES[conv.state];
+  if (!rule || !conv.state_changed_at) return none;
+  const t = new Date(conv.state_changed_at).getTime();
+  if (Number.isNaN(t)) return none;
+  return {
+    date: new Date(t + rule.days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+    source: 'our_followup',
+  };
+}
 
 // staleAction optionally honors a per-conversation `follow_up_at` override
 // set by the LLM analyser. When a kommun says "we need 10 days", we record

@@ -6,6 +6,7 @@
 import express from 'express';
 import { readFileSync, existsSync } from 'node:fs';
 import { openDb } from './storage.js';
+import { effectiveFollowUp } from './conversation.js';
 import {
   renderOverview,
   renderKommunDetail,
@@ -76,14 +77,17 @@ function buildOverviewRows(municipalities, db) {
     let contracts = 0;
     let lastActivityAt = null;
     let earliestFollowUp = null;
+    let earliestFollowUpSource = null;
     for (const c of convs) {
       openEsc += openEscByConvId.get(c.id) ?? 0;
       contracts += attachByConvId.get(c.id) ?? 0;
       const candidate = c.last_outbound_at && c.state_changed_at && c.last_outbound_at > c.state_changed_at
         ? c.last_outbound_at : c.state_changed_at;
       if (!lastActivityAt || candidate > lastActivityAt) lastActivityAt = candidate;
-      if (c.follow_up_at && (!earliestFollowUp || c.follow_up_at < earliestFollowUp)) {
-        earliestFollowUp = c.follow_up_at;
+      const fu = effectiveFollowUp(c);
+      if (fu.date && (!earliestFollowUp || fu.date < earliestFollowUp)) {
+        earliestFollowUp = fu.date;
+        earliestFollowUpSource = fu.source;
       }
     }
     return {
@@ -96,6 +100,7 @@ function buildOverviewRows(municipalities, db) {
       contracts,
       last_activity_at: lastActivityAt,
       follow_up_at: earliestFollowUp,
+      follow_up_source: earliestFollowUpSource,
     };
   });
 }
@@ -259,8 +264,10 @@ export function createDashboardApp({ db = openDbOrNull(), municipalitiesLoader =
     const attachmentsByMsg = {};
     const escalationsByConv = {};
     const signatures = {};
+    const followUpByConv = {};
     if (db) {
       for (const conv of conversations) {
+        followUpByConv[conv.id] = effectiveFollowUp(conv);
         const msgs = db.raw.prepare('SELECT * FROM messages WHERE conversation_id = ? ORDER BY received_at, id').all(conv.id);
         messagesByConv[conv.id] = msgs;
         for (const m of msgs) {
@@ -285,6 +292,7 @@ export function createDashboardApp({ db = openDbOrNull(), municipalitiesLoader =
       attachmentsByMsg,
       escalationsByConv,
       signatures,
+      followUpByConv,
     }));
   });
 
