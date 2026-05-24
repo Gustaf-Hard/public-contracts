@@ -2,10 +2,6 @@ function scopeText(role) {
   return role === 'central' ? 'kommunen' : 'utbildningsförvaltningen';
 }
 
-function salutation(kommun_namn) {
-  return kommun_namn ? `Hej ${kommun_namn} kommun,` : 'Hej,';
-}
-
 function signature({ from_name, from_email }) {
   return `Med vänliga hälsningar,\n${from_name}\n${from_email}`;
 }
@@ -15,9 +11,9 @@ export function T_INITIAL(ctx) {
   return {
     subject: `Begäran om allmänna handlingar – ${ctx.kommun_namn} kommun – digitala verktyg, lärplattformar och läromedel`,
     body: [
-      salutation(ctx.kommun_namn),
+      'Hej,',
       '',
-      'Jag begär härmed att ta del av allmänna handlingar med stöd av offentlighetsprincipen (2 kap. tryckfrihetsförordningen).',
+      `Jag skriver till ${ctx.kommun_namn} kommun med en begäran om allmänna handlingar med stöd av offentlighetsprincipen (2 kap. tryckfrihetsförordningen).`,
       '',
       `Jag önskar ta del av de faktiska avtalsdokumenten för samtliga gällande avtal avseende digitala verktyg, lärplattformar och läromedel inom ${scope}.`,
       '',
@@ -46,7 +42,7 @@ export function T_PRECISION(ctx) {
   return {
     subject: `Re: ${ctx.thread_subject}`,
     body: [
-      salutation(ctx.kommun_namn),
+      'Hej,',
       '',
       'Tack för snabbt svar! Jag preciserar gärna min begäran.',
       '',
@@ -66,7 +62,7 @@ export function T_RECEIPT(ctx) {
   return {
     subject: `Re: ${ctx.thread_subject}`,
     body: [
-      salutation(ctx.kommun_namn),
+      'Hej,',
       '',
       'Tack så mycket för avtalen — jag har tagit emot dem. Är detta samtliga avtal eller är fler på väg?',
       '',
@@ -79,7 +75,7 @@ export function T_FOLLOWUP_NUDGE(ctx) {
   return {
     subject: `Påminnelse: ${ctx.thread_subject}`,
     body: [
-      salutation(ctx.kommun_namn),
+      'Hej,',
       '',
       `Jag vill bara följa upp om min begäran om allmänna handlingar (skickad ${ctx.days_since_send} dagar sedan). Behöver ni ytterligare information från min sida för att kunna behandla ärendet?`,
       '',
@@ -92,7 +88,7 @@ export function T_FOLLOWUP_CLOSE(ctx) {
   return {
     subject: `Re: ${ctx.thread_subject}`,
     body: [
-      salutation(ctx.kommun_namn),
+      'Hej,',
       '',
       'Tack igen för avtalen jag fått. Har ni ytterligare avtal som inte skickats än, eller kan vi betrakta begäran som slutförd från er sida?',
       '',

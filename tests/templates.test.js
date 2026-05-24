@@ -42,9 +42,10 @@ describe('T_INITIAL', () => {
     expect(m.subject).not.toBe(other.subject);
   });
 
-  it('opens the body with a kommun-specific salutation', () => {
+  it('opens the body with bare "Hej," (Swedish-natural) and mentions the kommun in the first sentence', () => {
     const m = T_INITIAL(ctx);
-    expect(m.body).toMatch(/^Hej Malå kommun,/);
+    expect(m.body).toMatch(/^Hej,\n/);
+    expect(m.body).toMatch(/skriver till Malå kommun/);
   });
 });
 
@@ -57,9 +58,9 @@ describe('T_PRECISION', () => {
     expect(m.body).toMatch(/leverantör/);
   });
 
-  it('opens with a kommun-specific salutation', () => {
+  it('opens with bare "Hej," (kommun context already in the thread)', () => {
     const m = T_PRECISION(ctx);
-    expect(m.body).toMatch(/^Hej Malå kommun,/);
+    expect(m.body).toMatch(/^Hej,\n/);
   });
 });
 
