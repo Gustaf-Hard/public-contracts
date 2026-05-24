@@ -15,10 +15,26 @@ import {
 
 const DB_PATH = process.env.PILOT_DB_PATH ?? 'data/pilot.db';
 const MUNICIPALITIES_PATH = process.env.PILOT_MUNICIPALITIES_PATH ?? 'data/municipalities.json';
+const OVERRIDES_PATH = process.env.PILOT_OVERRIDES_PATH ?? 'data/pilot-overrides.json';
 
 function loadMunicipalities() {
-  if (!existsSync(MUNICIPALITIES_PATH)) return [];
-  return JSON.parse(readFileSync(MUNICIPALITIES_PATH, 'utf8'));
+  const live = existsSync(MUNICIPALITIES_PATH)
+    ? JSON.parse(readFileSync(MUNICIPALITIES_PATH, 'utf8'))
+    : [];
+  // Merge any rehearsal kommuner (e.g. Testkommun kod 9999) so the dashboard
+  // shows the rehearsal target alongside the real 290 kommuner.
+  if (existsSync(OVERRIDES_PATH)) {
+    try {
+      const overrides = JSON.parse(readFileSync(OVERRIDES_PATH, 'utf8'));
+      const liveKods = new Set(live.map((m) => m.kommun_kod));
+      for (const r of overrides.rehearsal_kommuner ?? []) {
+        if (!liveKods.has(r.kommun_kod)) live.unshift(r);
+      }
+    } catch {
+      // ignore overrides loading errors — dashboard still works without
+    }
+  }
+  return live;
 }
 
 function openDbOrNull() {
