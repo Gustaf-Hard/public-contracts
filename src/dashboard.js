@@ -120,15 +120,73 @@ function applyFilter(rows, filter) {
   return rows;
 }
 
-function sortRows(rows) {
+// Map a kommun's set of role states to a single numeric priority for
+// column sorting. Lower = needs attention sooner.
+const STATE_PRIORITY = {
+  NEEDS_HUMAN: 0,
+  AWAITING_PRECISION: 1,
+  ACK_RECEIVED: 2,
+  SENT: 3,
+  DELIVERING: 4,
+  INITIAL: 5,
+  DONE: 6,
+  DEAD_END: 7,
+};
+
+function rowStatePriority(states) {
+  if (states.length === 0) return 100; // not yet contacted
+  let min = 99;
+  for (const s of states) {
+    const p = STATE_PRIORITY[s.state] ?? 50;
+    if (p < min) min = p;
+  }
+  return min;
+}
+
+const SORT_KEYS = {
+  kommun_namn: (r) => r.kommun_namn ?? '',
+  lan: (r) => r.lan ?? '',
+  folkmangd: (r) => r.folkmangd ?? 0,
+  state: (r) => rowStatePriority(r.states),
+  contracts: (r) => r.contracts,
+  open_escalations: (r) => r.open_escalations,
+  last_activity: (r) => r.last_activity_at ?? '',
+};
+
+const DEFAULT_ORDER_FOR_KEY = {
+  kommun_namn: 'asc',
+  lan: 'asc',
+  folkmangd: 'desc',
+  state: 'asc', // lowest priority first = needs attention at top
+  contracts: 'desc',
+  open_escalations: 'desc',
+  last_activity: 'desc',
+};
+
+function sortRows(rows, { sort, order } = {}) {
+  // Default sort: in-pilot first, then by recent activity
+  if (!sort || !(sort in SORT_KEYS)) {
+    return rows.slice().sort((a, b) => {
+      const aActive = a.states.length > 0 ? 0 : 1;
+      const bActive = b.states.length > 0 ? 0 : 1;
+      if (aActive !== bActive) return aActive - bActive;
+      if (a.last_activity_at && b.last_activity_at) return b.last_activity_at.localeCompare(a.last_activity_at);
+      if (a.last_activity_at) return -1;
+      if (b.last_activity_at) return 1;
+      return a.kommun_namn.localeCompare(b.kommun_namn, 'sv');
+    });
+  }
+  const keyFn = SORT_KEYS[sort];
+  const effectiveOrder = order === 'asc' || order === 'desc' ? order : DEFAULT_ORDER_FOR_KEY[sort];
+  const dir = effectiveOrder === 'desc' ? -1 : 1;
   return rows.slice().sort((a, b) => {
-    // Active (in-pilot) first, then by recent activity, then alphabetically
-    const aActive = a.states.length > 0 ? 0 : 1;
-    const bActive = b.states.length > 0 ? 0 : 1;
-    if (aActive !== bActive) return aActive - bActive;
-    if (a.last_activity_at && b.last_activity_at) return b.last_activity_at.localeCompare(a.last_activity_at);
-    if (a.last_activity_at) return -1;
-    if (b.last_activity_at) return 1;
+    const av = keyFn(a);
+    const bv = keyFn(b);
+    if (typeof av === 'string' && typeof bv === 'string') {
+      return dir * av.localeCompare(bv, 'sv');
+    }
+    if (av < bv) return -1 * dir;
+    if (av > bv) return 1 * dir;
     return a.kommun_namn.localeCompare(b.kommun_namn, 'sv');
   });
 }
@@ -148,12 +206,16 @@ export function createDashboardApp({ db = openDbOrNull(), municipalitiesLoader =
     const rows = buildOverviewRows(municipalities, db);
     const summary = buildSummary(rows);
     const filter = req.query.filter ?? 'all';
-    const filtered = sortRows(applyFilter(rows, filter));
+    const sort = typeof req.query.sort === 'string' ? req.query.sort : null;
+    const order = typeof req.query.order === 'string' ? req.query.order : null;
+    const filtered = sortRows(applyFilter(rows, filter), { sort, order });
     res.set('Content-Type', 'text/html; charset=utf-8');
     res.send(renderOverview({
       summary,
       rows: filtered,
       filter,
+      sort,
+      order,
       totalKommuner: municipalities.length,
     }));
   });

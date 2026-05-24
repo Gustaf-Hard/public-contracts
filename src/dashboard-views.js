@@ -124,6 +124,9 @@ const baseCss = `
   table { width: 100%; border-collapse: collapse; background: var(--bg-elev); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
   table th, table td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border); }
   table th { background: var(--bg-elev-2); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--fg-muted); font-weight: 600; }
+  table th a.th-sort { color: var(--fg-muted); text-decoration: none; display: block; }
+  table th a.th-sort:hover { color: var(--fg); text-decoration: none; }
+  table th a.th-sort-active { color: var(--fg); }
   table tr:last-child td { border-bottom: none; }
   table tr:hover td { background: var(--bg-elev-2); }
   table td.num { text-align: right; font-variant-numeric: tabular-nums; }
@@ -181,7 +184,35 @@ function layout({ title, body, currentPath = '/' }) {
 
 // ---- Overview ----
 
-export function renderOverview({ summary, rows, filter, totalKommuner }) {
+const COLUMN_DEFAULT_ORDER = {
+  kommun_namn: 'asc',
+  lan: 'asc',
+  folkmangd: 'desc',
+  state: 'asc',
+  contracts: 'desc',
+  open_escalations: 'desc',
+  last_activity: 'desc',
+};
+
+function sortHeader({ key, label, currentSort, currentOrder, filter, align = 'left' }) {
+  const isActive = currentSort === key;
+  // Toggle order when clicking the already-active column; otherwise use column's default order
+  let nextOrder;
+  if (isActive) {
+    nextOrder = currentOrder === 'desc' ? 'asc' : 'desc';
+  } else {
+    nextOrder = COLUMN_DEFAULT_ORDER[key] ?? 'asc';
+  }
+  const params = new URLSearchParams();
+  if (filter && filter !== 'all') params.set('filter', filter);
+  params.set('sort', key);
+  params.set('order', nextOrder);
+  const indicator = isActive ? (currentOrder === 'desc' ? ' ▼' : ' ▲') : '';
+  const style = align === 'right' ? ' style="text-align:right"' : '';
+  return `<th${style}><a href="?${params.toString()}" class="th-sort${isActive ? ' th-sort-active' : ''}">${escapeHtml(label)}${indicator}</a></th>`;
+}
+
+export function renderOverview({ summary, rows, filter, sort, order, totalKommuner }) {
   const filters = [
     { key: 'all', label: `Alla (${totalKommuner})` },
     { key: 'in-pilot', label: `I pilot (${summary.in_pilot})` },
@@ -191,10 +222,19 @@ export function renderOverview({ summary, rows, filter, totalKommuner }) {
     { key: 'dead-end', label: `Återvändsgränd (${summary.dead_end})` },
   ];
 
+  // Preserve sort+order when switching filter
+  const filterParams = (key) => {
+    const p = new URLSearchParams();
+    if (key !== 'all') p.set('filter', key);
+    if (sort) p.set('sort', sort);
+    if (order) p.set('order', order);
+    return p.toString();
+  };
+
   const filterBar = `<div class="filter-bar">${filters
     .map(
       (f) =>
-        `<a href="?filter=${f.key}"${(filter ?? 'all') === f.key ? ' class="active"' : ''}>${escapeHtml(f.label)}</a>`
+        `<a href="?${filterParams(f.key)}"${(filter ?? 'all') === f.key ? ' class="active"' : ''}>${escapeHtml(f.label)}</a>`
     )
     .join('')}</div>`;
 
@@ -234,19 +274,20 @@ export function renderOverview({ summary, rows, filter, totalKommuner }) {
         })
         .join('');
 
+  const headerArgs = { currentSort: sort, currentOrder: order, filter };
   const body = `
     ${stats}
     ${filterBar}
     <table>
       <thead>
         <tr>
-          <th>Kommun</th>
-          <th>Län</th>
-          <th>Folkmängd</th>
-          <th>Status</th>
-          <th>Avtal</th>
-          <th>Esk.</th>
-          <th>Senaste aktivitet</th>
+          ${sortHeader({ ...headerArgs, key: 'kommun_namn', label: 'Kommun' })}
+          ${sortHeader({ ...headerArgs, key: 'lan', label: 'Län' })}
+          ${sortHeader({ ...headerArgs, key: 'folkmangd', label: 'Folkmängd', align: 'right' })}
+          ${sortHeader({ ...headerArgs, key: 'state', label: 'Status' })}
+          ${sortHeader({ ...headerArgs, key: 'contracts', label: 'Avtal', align: 'right' })}
+          ${sortHeader({ ...headerArgs, key: 'open_escalations', label: 'Esk.', align: 'right' })}
+          ${sortHeader({ ...headerArgs, key: 'last_activity', label: 'Senaste aktivitet' })}
         </tr>
       </thead>
       <tbody>${tableRows}</tbody>
