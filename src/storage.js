@@ -31,7 +31,8 @@ CREATE TABLE IF NOT EXISTS messages (
   classification TEXT,
   classification_confidence REAL,
   received_at TEXT NOT NULL,
-  attachment_count INTEGER NOT NULL DEFAULT 0
+  attachment_count INTEGER NOT NULL DEFAULT 0,
+  signature_extracted TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id);
 
@@ -137,13 +138,16 @@ export function openDb(path) {
       INSERT INTO messages (
         conversation_id, gmail_message_id, direction, from_email, to_email,
         subject, body_text, classification, classification_confidence,
-        received_at, attachment_count
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        received_at, attachment_count, signature_extracted
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
+    const sigJson = m.signature_extracted
+      ? (typeof m.signature_extracted === 'string' ? m.signature_extracted : JSON.stringify(m.signature_extracted))
+      : null;
     const r = stmt.run(
       m.conversation_id, m.gmail_message_id, m.direction, m.from_email, m.to_email,
       m.subject, m.body_text, m.classification, m.classification_confidence,
-      m.received_at, m.attachment_count
+      m.received_at, m.attachment_count, sigJson
     );
     return Number(r.lastInsertRowid);
   }

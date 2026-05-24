@@ -4,6 +4,7 @@ import { nextActionForClassification, staleAction } from './conversation.js';
 import { parseInboundMessage } from './gmail.js';
 import { buildEscalationBlocks } from './slack.js';
 import { saveAttachment } from './attachments.js';
+import { extractSignature } from './extract-signature.js';
 
 const TEMPLATES = { T_INITIAL, T_PRECISION, T_RECEIPT, T_FOLLOWUP_NUDGE, T_FOLLOWUP_CLOSE };
 
@@ -122,12 +123,14 @@ export async function runTick(deps) {
         receipt_sent: !!conv.receipt_sent, is_closer: isCloser,
       });
 
+      const sig = extractSignature(parsed.body);
       const messageId = db.recordMessage({
         conversation_id: conv.id, gmail_message_id: m.id, direction: 'inbound',
         from_email: parsed.from, to_email: parsed.to,
         subject: parsed.subject, body_text: parsed.body,
         classification: classification.class, classification_confidence: classification.confidence,
         received_at: now.toISOString(), attachment_count: parsed.attachments.length,
+        signature_extracted: sig,
       });
 
       // Save attachments
