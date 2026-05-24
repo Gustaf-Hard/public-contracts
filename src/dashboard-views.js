@@ -31,6 +31,59 @@ function fmtAgo(iso) {
   return `${d} dagar sedan`;
 }
 
+// Returns days from today (UTC, date-only) to the given YYYY-MM-DD string.
+// Negative = past, 0 = today, positive = future.
+function daysUntil(isoDate, now = new Date()) {
+  if (!isoDate) return null;
+  const target = new Date(isoDate + 'T00:00:00Z').getTime();
+  if (Number.isNaN(target)) return null;
+  const today = new Date(now.toISOString().slice(0, 10) + 'T00:00:00Z').getTime();
+  return Math.round((target - today) / (1000 * 60 * 60 * 24));
+}
+
+// Compact countdown badge for follow_up_at. Returns null when no date set.
+function fmtFollowUpBadge(isoDate) {
+  const d = daysUntil(isoDate);
+  if (d === null) return null;
+  if (d < 0) return `<span class="warn" title="${escapeHtml(isoDate)}">försenad ${-d}d</span>`;
+  if (d === 0) return `<span class="warn" title="${escapeHtml(isoDate)}">idag</span>`;
+  if (d === 1) return `<span title="${escapeHtml(isoDate)}">imorgon</span>`;
+  return `<span title="${escapeHtml(isoDate)}">om ${d}d</span>`;
+}
+
+const INTENT_LABELS = {
+  auto_ack: 'Mottagningskvitto',
+  clarification: 'Begär precisering',
+  delivery: 'Leverans',
+  delay_promise: 'Utlovar svar',
+  handoff: 'Hänvisar vidare',
+  dead_end: 'Återvändsgränd',
+  fee_demand: 'Kräver avgift',
+  unknown: 'Okänt',
+};
+
+const INTENT_COLORS = {
+  auto_ack: '#6366f1',
+  clarification: '#a855f7',
+  delivery: '#10b981',
+  delay_promise: '#3b82f6',
+  handoff: '#f59e0b',
+  dead_end: '#9ca3af',
+  fee_demand: '#ef4444',
+  unknown: '#ef4444',
+};
+
+function intentBadge(intent) {
+  const color = INTENT_COLORS[intent] ?? '#6b7280';
+  const label = INTENT_LABELS[intent] ?? intent;
+  return `<span class="badge" style="background:${color}1a;color:${color};border:1px solid ${color}66">${escapeHtml(label)}</span>`;
+}
+
+function parseJsonSafe(s) {
+  if (!s) return null;
+  try { return JSON.parse(s); } catch { return null; }
+}
+
 const STATE_LABELS = {
   INITIAL: 'Schemalagt',
   SENT: 'Skickat',
@@ -192,6 +245,7 @@ const COLUMN_DEFAULT_ORDER = {
   contracts: 'desc',
   open_escalations: 'desc',
   last_activity: 'desc',
+  follow_up: 'asc',
 };
 
 function sortHeader({ key, label, currentSort, currentOrder, filter, align = 'left' }) {
@@ -250,7 +304,7 @@ export function renderOverview({ summary, rows, filter, sort, order, totalKommun
   `;
 
   const tableRows = rows.length === 0
-    ? '<tr class="empty-row"><td colspan="7">Inga kommuner matchar filtret.</td></tr>'
+    ? '<tr class="empty-row"><td colspan="8">Inga kommuner matchar filtret.</td></tr>'
     : rows
         .map((r) => {
           const stateCell = r.states.length === 0
@@ -262,6 +316,7 @@ export function renderOverview({ summary, rows, filter, sort, order, totalKommun
           const lastActivity = r.last_activity_at
             ? `<span title="${escapeHtml(r.last_activity_at)}">${escapeHtml(fmtAgo(r.last_activity_at))}</span>`
             : '<span class="muted">—</span>';
+          const followUpCell = fmtFollowUpBadge(r.follow_up_at) ?? '<span class="muted">—</span>';
           return `<tr>
             <td><a class="kommun-link" href="/kommun/${escapeHtml(r.kommun_kod)}">${escapeHtml(r.kommun_namn)}</a> <span class="muted">${escapeHtml(r.kommun_kod)}</span></td>
             <td>${escapeHtml(r.lan ?? '')}</td>
@@ -269,6 +324,7 @@ export function renderOverview({ summary, rows, filter, sort, order, totalKommun
             <td>${stateCell}</td>
             <td class="num">${r.contracts > 0 ? `<a href="/kommun/${escapeHtml(r.kommun_kod)}">${r.contracts}</a>` : '<span class="muted">0</span>'}</td>
             <td class="num">${escalCell}</td>
+            <td>${followUpCell}</td>
             <td>${lastActivity}</td>
           </tr>`;
         })
@@ -287,6 +343,7 @@ export function renderOverview({ summary, rows, filter, sort, order, totalKommun
           ${sortHeader({ ...headerArgs, key: 'state', label: 'Status' })}
           ${sortHeader({ ...headerArgs, key: 'contracts', label: 'Avtal', align: 'right' })}
           ${sortHeader({ ...headerArgs, key: 'open_escalations', label: 'Esk.', align: 'right' })}
+          ${sortHeader({ ...headerArgs, key: 'follow_up', label: 'Återkommer' })}
           ${sortHeader({ ...headerArgs, key: 'last_activity', label: 'Senaste aktivitet' })}
         </tr>
       </thead>
@@ -318,7 +375,34 @@ export function renderKommunDetail({ kommun, conversations, messagesByConv, atta
         const messagesHtml = msgs.length === 0 ? '<p class="muted">Inga meddelanden ännu.</p>' : msgs.map((m) => {
           const direction = m.direction === 'inbound' ? '⬇ Inkommande' : '⬆ Utgående';
           const cls = m.direction === 'inbound' ? 'body-quote-inbound' : 'body-quote-outbound';
-          const classBadge = m.classification ? ` · <span class="badge" style="background:#a855f71a;color:#a855f7;border:1px solid #a855f766">${escapeHtml(m.classification)} (${(m.classification_confidence ?? 0).toFixed(2)})</span>` : '';
+          const analysis = parseJsonSafe(m.analysis_json);
+          const classBadge = analysis
+            ? ` · ${intentBadge(analysis.intent)} <span class="muted">(${(analysis.confidence ?? 0).toFixed(2)})</span>`
+            : (m.classification ? ` · <span class="badge" style="background:#a855f71a;color:#a855f7;border:1px solid #a855f766">${escapeHtml(m.classification)} (${(m.classification_confidence ?? 0).toFixed(2)})</span>` : '');
+          const analysisBlock = analysis ? `
+            <div class="card" style="background:var(--bg-elev-2);margin:8px 0;padding:10px 12px">
+              <div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">LLM-analys · ${escapeHtml(analysis.suggested_action ?? '')}</div>
+              <div>${escapeHtml(analysis.summary ?? '')}</div>
+              ${analysis.follow_up_at ? `<div class="muted" style="margin-top:4px">Återkommer: <strong>${escapeHtml(analysis.follow_up_at)}</strong> · ${fmtFollowUpBadge(analysis.follow_up_at)}</div>` : ''}
+              ${analysis.extracted && Object.values(analysis.extracted).some((v) => v != null && (!Array.isArray(v) || v.length > 0)) ? `
+                <details style="margin-top:6px">
+                  <summary>Extraherade fält</summary>
+                  <dl class="signature-fields" style="margin-top:4px"><div class="signature-fields"><dl>
+                    ${analysis.extracted.arendenummer ? `<dt>Ärendenummer</dt><dd>${escapeHtml(analysis.extracted.arendenummer)}</dd>` : ''}
+                    ${analysis.extracted.promised_response_days != null ? `<dt>Utlovade dagar</dt><dd>${analysis.extracted.promised_response_days}</dd>` : ''}
+                    ${analysis.extracted.promised_response_date ? `<dt>Utlovat datum</dt><dd>${escapeHtml(analysis.extracted.promised_response_date)}</dd>` : ''}
+                    ${analysis.extracted.handoff_to_email ? `<dt>Hänvisar till e-post</dt><dd>${escapeHtml(analysis.extracted.handoff_to_email)}</dd>` : ''}
+                    ${analysis.extracted.handoff_to_forvaltning ? `<dt>Hänvisar till förvaltning</dt><dd>${escapeHtml(analysis.extracted.handoff_to_forvaltning)}</dd>` : ''}
+                    ${analysis.extracted.questions?.length ? `<dt>Frågor</dt><dd>${analysis.extracted.questions.map((q) => escapeHtml(q)).join('<br>')}</dd>` : ''}
+                    ${analysis.extracted.mentioned_vendors?.length ? `<dt>Nämnda leverantörer</dt><dd>${analysis.extracted.mentioned_vendors.map((v) => escapeHtml(v)).join(', ')}</dd>` : ''}
+                  </dl></div></dl>
+                </details>` : ''}
+              ${analysis.draft_reply ? `
+                <details style="margin-top:6px">
+                  <summary>Föreslaget svar (för manuell granskning)</summary>
+                  <div class="body-quote body-quote-outbound" style="margin-top:6px">${escapeHtml(analysis.draft_reply)}</div>
+                </details>` : ''}
+            </div>` : '';
           const atts = (attachmentsByMsg[m.id] ?? []).map((a) => `📎 ${escapeHtml(a.filename)}`).join(', ');
           const sig = signatures[m.id];
           const sigBlock = sig ? `
@@ -341,6 +425,7 @@ export function renderKommunDetail({ kommun, conversations, messagesByConv, atta
               <h3>${direction} · <span class="muted">${escapeHtml(m.received_at)}</span>${classBadge}</h3>
               <div>${escapeHtml(m.subject ?? '')}</div>
               <div class="body-quote ${cls}">${escapeHtml(m.body_text ?? '')}</div>
+              ${analysisBlock}
               ${atts ? `<div>${atts}</div>` : ''}
               ${sigBlock}
             </div>`;
@@ -354,10 +439,15 @@ export function renderKommunDetail({ kommun, conversations, messagesByConv, atta
               <div class="body-quote">${escapeHtml(e.draft_body ?? '(ingen draft)')}</div>
             </div>`).join('')}`;
 
+        const followUpBadge = fmtFollowUpBadge(conv.follow_up_at);
+        const followUpLine = conv.follow_up_at
+          ? `<div class="muted">⏳ Återkommer senast: <strong>${escapeHtml(conv.follow_up_at)}</strong> · ${followUpBadge} <span class="muted">(timer från kommunens utlovade datum)</span></div>`
+          : '';
         return `
           <div class="card">
             <h3>Roll: ${escapeHtml(conv.role)} · ${stateBadge(conv.state)} ${conv.arendenummer ? ` · <span class="muted">Ärendenummer: ${escapeHtml(conv.arendenummer)}</span>` : ''}</h3>
             <div class="muted">Kontaktadress: <code>${escapeHtml(conv.contact_email)}</code> · Senast utgående: ${fmtAgo(conv.last_outbound_at)} · Tillstånd ändrat: ${fmtAgo(conv.state_changed_at)} · Påminnelser: ${conv.followup_count}</div>
+            ${followUpLine}
             ${messagesHtml}
             ${escHtml}
           </div>`;

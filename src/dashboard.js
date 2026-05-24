@@ -75,12 +75,16 @@ function buildOverviewRows(municipalities, db) {
     let openEsc = 0;
     let contracts = 0;
     let lastActivityAt = null;
+    let earliestFollowUp = null;
     for (const c of convs) {
       openEsc += openEscByConvId.get(c.id) ?? 0;
       contracts += attachByConvId.get(c.id) ?? 0;
       const candidate = c.last_outbound_at && c.state_changed_at && c.last_outbound_at > c.state_changed_at
         ? c.last_outbound_at : c.state_changed_at;
       if (!lastActivityAt || candidate > lastActivityAt) lastActivityAt = candidate;
+      if (c.follow_up_at && (!earliestFollowUp || c.follow_up_at < earliestFollowUp)) {
+        earliestFollowUp = c.follow_up_at;
+      }
     }
     return {
       kommun_kod: m.kommun_kod,
@@ -91,6 +95,7 @@ function buildOverviewRows(municipalities, db) {
       open_escalations: openEsc,
       contracts,
       last_activity_at: lastActivityAt,
+      follow_up_at: earliestFollowUp,
     };
   });
 }
@@ -167,6 +172,7 @@ const SORT_KEYS = {
   contracts: (r) => r.contracts,
   open_escalations: (r) => r.open_escalations,
   last_activity: (r) => r.last_activity_at ?? '',
+  follow_up: (r) => r.follow_up_at ?? '9999-12-31', // null sorts last for asc
 };
 
 const DEFAULT_ORDER_FOR_KEY = {
@@ -177,6 +183,7 @@ const DEFAULT_ORDER_FOR_KEY = {
   contracts: 'desc',
   open_escalations: 'desc',
   last_activity: 'desc',
+  follow_up: 'asc', // soonest first
 };
 
 function sortRows(rows, { sort, order } = {}) {
