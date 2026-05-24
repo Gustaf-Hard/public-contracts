@@ -3,7 +3,8 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { openDb } from '../src/storage.js';
-import { runTick } from '../src/tick.js';
+import { runTick, runDailyFollowup } from '../src/tick.js';
+import * as analyseMod from '../src/analyse-message.js';
 
 let tmp, db, baseDir, contractsDir;
 beforeEach(() => {
@@ -200,6 +201,113 @@ describe('runTick — inbound processing', () => {
     expect(escs).toHaveLength(1);
     expect(escs[0].draft_template).toBe('free_form');
     expect(escs[0].previous_state).toBe('SENT');
+  });
+
+  it('LLM analysis path: delay_promise sets follow_up_at and records analysis_json (no outbound)', async () => {
+    const id = db.createConversation({
+      kommun_kod: '9999', kommun_namn: 'Testkommun', role: 'utbildning',
+      contact_email: 'gustaf.hard@gmail.com', scheduled_send_at: '2026-05-19T09:00:00Z',
+    });
+    db.updateConversationState(id, 'SENT', { gmail_thread_id: 'thr-LLM', last_outbound_at: '2026-05-19T10:00:00Z' });
+
+    const fakeAnalysis = {
+      intent: 'delay_promise', confidence: 0.95,
+      summary: 'Kommunen utlovar svar inom 10 arbetsdagar.',
+      extracted: { arendenummer: null, promised_response_days: 10, promised_response_date: '2026-06-08', handoff_to_email: null, handoff_to_forvaltning: null, questions: null, mentioned_vendors: null },
+      suggested_action: 'wait',
+      draft_reply: 'Hej,\n\nTack för uppdateringen. Jag inväntar handlingarna senast 8 juni.\n\nMed vänliga hälsningar,\nGustaf Hård af Segerstad',
+      follow_up_at: '2026-06-11',
+    };
+    const spy = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue(fakeAnalysis);
+
+    const gmail = fakeGmail({
+      listResult: [{ id: 'in-llm-1' }],
+      getResult: {
+        'in-llm-1': {
+          id: 'in-llm-1', threadId: 'thr-LLM',
+          payload: {
+            headers: [
+              { name: 'From', value: 'a@x.se' }, { name: 'To', value: 'gustaf@mediagraf.se' },
+              { name: 'Subject', value: 'Re: Begäran' }, { name: 'Date', value: 'Mon, 19 May 2026 10:30:00 +0200' },
+            ],
+            mimeType: 'text/plain',
+            body: { data: Buffer.from('Vi behöver cirka 10 arbetsdagar.').toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '') },
+          },
+        },
+      },
+    });
+    const slack = fakeSlack();
+
+    await runTick({
+      db, gmailClient: { gmail: {} }, gmailOps: gmail, slackClient: {}, slackOps: slack,
+      env, contractsDir, now: new Date('2026-05-29T11:00:00Z'),
+    });
+
+    expect(spy).toHaveBeenCalledOnce();
+    expect(gmail.sendCalls).toHaveLength(0);
+    expect(slack.posts).toHaveLength(0); // delay_promise → auto_ack legacy → no escalation
+
+    const conv = db.getConversation(id);
+    expect(conv.state).toBe('ACK_RECEIVED');
+    expect(conv.follow_up_at).toBe('2026-06-11');
+
+    // analysis_json was persisted
+    const messages = db.listMessages(id);
+    expect(messages).toHaveLength(1);
+    const recorded = JSON.parse(messages[0].analysis_json);
+    expect(recorded.intent).toBe('delay_promise');
+    expect(recorded.extracted.promised_response_days).toBe(10);
+
+    spy.mockRestore();
+  });
+
+  it('LLM analysis path: clarification uses LLM draft_reply (not template) in escalation', async () => {
+    const id = db.createConversation({
+      kommun_kod: '9999', kommun_namn: 'Testkommun', role: 'utbildning',
+      contact_email: 'gustaf.hard@gmail.com', scheduled_send_at: '2026-05-19T09:00:00Z',
+    });
+    db.updateConversationState(id, 'SENT', { gmail_thread_id: 'thr-LLM2', last_outbound_at: '2026-05-19T10:00:00Z' });
+
+    const llmBody = 'Hej,\n\nJag preciserar gärna: jag söker aktiva avtal för digitala läromedel under perioden 2024-2026...\n\nMvh\nGustaf';
+    const spy = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue({
+      intent: 'clarification', confidence: 0.9,
+      summary: 'Behöver precisering.',
+      extracted: { arendenummer: null, promised_response_days: null, promised_response_date: null, handoff_to_email: null, handoff_to_forvaltning: null, questions: ['vilken period?'], mentioned_vendors: null },
+      suggested_action: 'send_precision',
+      draft_reply: llmBody,
+      follow_up_at: null,
+    });
+
+    const gmail = fakeGmail({
+      listResult: [{ id: 'in-llm-2' }],
+      getResult: {
+        'in-llm-2': {
+          id: 'in-llm-2', threadId: 'thr-LLM2',
+          payload: {
+            headers: [
+              { name: 'From', value: 'a@x.se' }, { name: 'To', value: 'gustaf@mediagraf.se' },
+              { name: 'Subject', value: 'Re: Begäran' }, { name: 'Date', value: 'Mon, 19 May 2026 10:30:00 +0200' },
+            ],
+            mimeType: 'text/plain',
+            body: { data: Buffer.from('Vilken period?').toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '') },
+          },
+        },
+      },
+    });
+    const slack = fakeSlack();
+
+    await runTick({
+      db, gmailClient: { gmail: {} }, gmailOps: gmail, slackClient: {}, slackOps: slack,
+      env, contractsDir, now: new Date('2026-05-19T11:00:00Z'),
+    });
+
+    expect(slack.posts).toHaveLength(1);
+    const esc = db.listOpenEscalations()[0];
+    expect(esc.draft_template).toBe('T_PRECISION');
+    expect(esc.draft_body).toBe(llmBody); // not the canned template
+    expect(esc.reason).toMatch(/llm intent=clarification/);
+
+    spy.mockRestore();
   });
 
   it('does not re-process a message it already saw', async () => {

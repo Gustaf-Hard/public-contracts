@@ -42,10 +42,20 @@ const STALE_RULES = {
 const MAX_NUDGES = 2;
 const TERMINAL = new Set(['DONE', 'DEAD_END', 'NEEDS_HUMAN']);
 
-export function staleAction(state, daysInState, followupCount) {
+// staleAction optionally honors a per-conversation `follow_up_at` override
+// set by the LLM analyser. When a kommun says "we need 10 days", we record
+// `follow_up_at = today + 10 + 3 grace`, and this function returns 'none'
+// until that date is reached — overriding the default 7/10/14-day rules.
+export function staleAction(state, daysInState, followupCount, opts = {}) {
   if (TERMINAL.has(state)) return 'none';
   const rule = STALE_RULES[state];
   if (!rule) return 'none';
+
+  // ISO date string compare (YYYY-MM-DD) is lexicographic-correct
+  if (opts.follow_up_at && opts.today && opts.today < opts.follow_up_at) {
+    return 'none';
+  }
+
   if (daysInState < rule.days) return 'none';
   if (followupCount >= MAX_NUDGES && rule.action === 'send_followup_nudge') return 'escalate';
   return rule.action;

@@ -84,4 +84,18 @@ describe('staleAction', () => {
     expect(staleAction('DEAD_END', 365, 0)).toBe('none');
     expect(staleAction('NEEDS_HUMAN', 365, 0)).toBe('none');
   });
+
+  it('honors follow_up_at override — no action before the promised date', () => {
+    // Kommun said "we need 10 days"; bot recorded follow_up_at = 2026-06-11
+    expect(staleAction('SENT', 20, 0, { today: '2026-06-04', follow_up_at: '2026-06-11' })).toBe('none');
+  });
+
+  it('applies normal stale rule once follow_up_at has passed', () => {
+    expect(staleAction('SENT', 20, 0, { today: '2026-06-12', follow_up_at: '2026-06-11' })).toBe('send_followup_nudge');
+  });
+
+  it('follow_up_at does not override the MAX_NUDGES escalation', () => {
+    // Past the date AND past 2 nudges — still escalates to human
+    expect(staleAction('SENT', 30, 2, { today: '2026-06-12', follow_up_at: '2026-06-11' })).toBe('escalate');
+  });
 });

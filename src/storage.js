@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS conversations (
   arendenummer TEXT,
   followup_count INTEGER NOT NULL DEFAULT 0,
   receipt_sent INTEGER NOT NULL DEFAULT 0,
+  follow_up_at TEXT,
   notes TEXT,
   UNIQUE(kommun_kod, role)
 );
@@ -32,7 +33,8 @@ CREATE TABLE IF NOT EXISTS messages (
   classification_confidence REAL,
   received_at TEXT NOT NULL,
   attachment_count INTEGER NOT NULL DEFAULT 0,
-  signature_extracted TEXT
+  signature_extracted TEXT,
+  analysis_json TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id);
 
@@ -120,7 +122,7 @@ export function openDb(path) {
   }
 
   function updateConversationState(id, state, patch = {}) {
-    const allowed = ['gmail_thread_id', 'last_outbound_at', 'arendenummer', 'notes', 'followup_count', 'receipt_sent'];
+    const allowed = ['gmail_thread_id', 'last_outbound_at', 'arendenummer', 'notes', 'followup_count', 'receipt_sent', 'follow_up_at'];
     const sets = ["state = ?", "state_changed_at = datetime('now')"];
     const values = [state];
     for (const k of allowed) {
@@ -138,16 +140,19 @@ export function openDb(path) {
       INSERT INTO messages (
         conversation_id, gmail_message_id, direction, from_email, to_email,
         subject, body_text, classification, classification_confidence,
-        received_at, attachment_count, signature_extracted
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        received_at, attachment_count, signature_extracted, analysis_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const sigJson = m.signature_extracted
       ? (typeof m.signature_extracted === 'string' ? m.signature_extracted : JSON.stringify(m.signature_extracted))
       : null;
+    const analysisJson = m.analysis_json
+      ? (typeof m.analysis_json === 'string' ? m.analysis_json : JSON.stringify(m.analysis_json))
+      : null;
     const r = stmt.run(
       m.conversation_id, m.gmail_message_id, m.direction, m.from_email, m.to_email,
       m.subject, m.body_text, m.classification, m.classification_confidence,
-      m.received_at, m.attachment_count, sigJson
+      m.received_at, m.attachment_count, sigJson, analysisJson
     );
     return Number(r.lastInsertRowid);
   }

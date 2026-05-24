@@ -5,6 +5,7 @@ import { parseInboundMessage } from './gmail.js';
 import { buildEscalationBlocks } from './slack.js';
 import { saveAttachment } from './attachments.js';
 import { extractSignature } from './extract-signature.js';
+import { analyseMessage, analysisToLegacyClassification } from './analyse-message.js';
 
 const TEMPLATES = { T_INITIAL, T_PRECISION, T_RECEIPT, T_FOLLOWUP_NUDGE, T_FOLLOWUP_CLOSE };
 
@@ -43,11 +44,15 @@ async function dispatchInitial(conv, deps) {
   log?.(`SENT T-INITIAL → ${conv.kommun_namn}/${conv.role}`);
 }
 
-async function escalateWithDraft({ conv, parsedInbound, classification, previousState, draftTemplate, reason, deps }) {
+async function escalateWithDraft({ conv, parsedInbound, classification, previousState, draftTemplate, llmDraft, reason, deps }) {
   const { db, slackClient, slackOps, env, log } = deps;
   let subject = '(no subject)';
   let body = '';
-  if (draftTemplate === 'free_form') {
+  if (llmDraft) {
+    const baseSubject = parsedInbound?.subject?.replace(/^Re: /, '') ?? 'Begäran om allmänna handlingar';
+    subject = `Re: ${baseSubject}`;
+    body = llmDraft.body;
+  } else if (draftTemplate === 'free_form') {
     const baseSubject = parsedInbound?.subject?.replace(/^Re: /, '') ?? 'Begäran om allmänna handlingar';
     subject = `Re: ${baseSubject}`;
     body = '(ingen draft — skriv själv via Edit)';
@@ -114,10 +119,27 @@ export async function runTick(deps) {
       const full = await gmailOps.getMessage(gmailClient.gmail, m.id);
       if (!full || full.threadId !== conv.gmail_thread_id) continue;
       const parsed = parseInboundMessage(full);
-      const classification = classify({
-        from: parsed.from, subject: parsed.subject, body: parsed.body,
-        attachment_count: parsed.attachments.length,
-      });
+
+      // Try LLM analysis first; fall back to the regex classifier on null.
+      // Both produce a legacy-shaped classification object the FSM can consume.
+      const lastOutboundMs = conv.last_outbound_at ? new Date(conv.last_outbound_at).getTime() : null;
+      const daysSinceLastOutbound = lastOutboundMs != null
+        ? Math.floor((now.getTime() - lastOutboundMs) / (1000 * 60 * 60 * 24))
+        : null;
+      const analysis = await analyseMessage(parsed.body, {
+        kommun_namn: conv.kommun_namn,
+        role: conv.role,
+        conversation_state: conv.state,
+        days_since_last_outbound: daysSinceLastOutbound,
+        today_iso: now.toISOString().slice(0, 10),
+      }, { env });
+      const classification = analysis
+        ? analysisToLegacyClassification(analysis)
+        : classify({
+            from: parsed.from, subject: parsed.subject, body: parsed.body,
+            attachment_count: parsed.attachments.length,
+          });
+
       const isCloser = /samtliga avtal/i.test(parsed.body);
       const transition = nextActionForClassification(conv.state, classification.class, {
         receipt_sent: !!conv.receipt_sent, is_closer: isCloser,
@@ -131,6 +153,7 @@ export async function runTick(deps) {
         classification: classification.class, classification_confidence: classification.confidence,
         received_at: now.toISOString(), attachment_count: parsed.attachments.length,
         signature_extracted: sig,
+        analysis_json: analysis ?? null,
       });
 
       // Save attachments
@@ -153,21 +176,33 @@ export async function runTick(deps) {
       const previousState = conv.state;
       const patch = {};
       if (classification.extracted?.arendenummer) patch.arendenummer = classification.extracted.arendenummer;
+      // When the kommun says "we'll get back to you by date X", honor it.
+      if (analysis?.follow_up_at) patch.follow_up_at = analysis.follow_up_at;
       db.updateConversationState(conv.id, transition.nextState, patch);
       const updated = db.getConversation(conv.id);
 
       // Outbound: never auto-sent in v1. Draft a template and escalate to Slack.
+      // If the LLM produced a draft_reply, prefer it over the canned template.
       let draftTemplate = null;
+      let llmDraft = null;
       if (transition.action === 'send_precision') draftTemplate = 'T_PRECISION';
       else if (transition.action === 'send_receipt' && !updated.receipt_sent) draftTemplate = 'T_RECEIPT';
       else if (transition.action === 'escalate') draftTemplate = 'free_form';
 
+      if (draftTemplate && analysis?.draft_reply) {
+        llmDraft = { body: analysis.draft_reply };
+      }
+
       if (draftTemplate) {
+        const reason = analysis
+          ? `llm intent=${analysis.intent} action=${analysis.suggested_action} confidence=${(analysis.confidence ?? 0).toFixed(2)}`
+          : `classifier=${classification.class} confidence=${classification.confidence.toFixed(2)}`;
         await escalateWithDraft({
           conv: updated, parsedInbound: parsed, classification,
           previousState,
           draftTemplate,
-          reason: `classifier=${classification.class} confidence=${classification.confidence.toFixed(2)}`,
+          llmDraft,
+          reason,
           deps,
         });
       }
@@ -177,10 +212,14 @@ export async function runTick(deps) {
 
 export async function runDailyFollowup(deps) {
   const { db, now, log } = deps;
+  const todayIso = now.toISOString().slice(0, 10);
   const all = db.listAllConversations();
   for (const conv of all) {
     const days = daysBetween(new Date(conv.state_changed_at), now);
-    const action = staleAction(conv.state, days, conv.followup_count);
+    const action = staleAction(conv.state, days, conv.followup_count, {
+      today: todayIso,
+      follow_up_at: conv.follow_up_at ?? null,
+    });
     if (action === 'none') continue;
 
     let draftTemplate = null;
