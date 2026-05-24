@@ -14,7 +14,8 @@
     "pilot-auth": "node scripts/pilot-auth.js",
     "pilot-init": "node scripts/pilot-init.js",
     "pilot-daemon": "node scripts/pilot-daemon.js",
-    "pilot-resolve": "node scripts/pilot-resolve.js"
+    "pilot-resolve": "node scripts/pilot-resolve.js",
+    "pilot-dashboard": "node scripts/pilot-dashboard.js"
   },
   "dependencies": {
     "@slack/bolt": "^4.0.0",
