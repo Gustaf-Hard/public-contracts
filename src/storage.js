@@ -90,6 +90,16 @@ export function openDb(path) {
 
   function migrate() {
     db.exec(SCHEMA);
+    // Idempotent ALTERs for databases created before these columns existed.
+    // SQLite has no IF NOT EXISTS for ADD COLUMN, so we probe with PRAGMA.
+    const convCols = db.prepare("PRAGMA table_info(conversations)").all().map((r) => r.name);
+    if (!convCols.includes('follow_up_at')) {
+      db.exec('ALTER TABLE conversations ADD COLUMN follow_up_at TEXT');
+    }
+    const msgCols = db.prepare("PRAGMA table_info(messages)").all().map((r) => r.name);
+    if (!msgCols.includes('analysis_json')) {
+      db.exec('ALTER TABLE messages ADD COLUMN analysis_json TEXT');
+    }
   }
 
   function createConversation({ kommun_kod, kommun_namn, role, contact_email, scheduled_send_at }) {
