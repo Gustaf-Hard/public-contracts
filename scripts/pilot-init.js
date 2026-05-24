@@ -24,15 +24,29 @@ const ELIGIBLE_ROLES = new Set(['central', 'utbildning', 'gymnasie', 'vuxenutbil
 
 let created = 0;
 let skipped = 0;
+let dedupedByEmail = 0;
 active.forEach((kommun, dayIdx) => {
   const scheduledSendAt = new Date(today);
   scheduledSendAt.setDate(today.getDate() + dayIdx);
   const seenRoles = new Set();
+  // Track emails already used for this kommun. Two role-family entries
+  // pointing at the same inbox (e.g. central+utbildning both at
+  // registrator@x.se in a small kommun) must NOT generate two identical
+  // sends to the same address — that reads as spam.
+  const seenEmails = new Set();
   for (const c of kommun.contacts) {
     if (!ELIGIBLE_ROLES.has(c.role)) continue;
     const roleKey = c.role === 'gymnasie' || c.role === 'vuxenutbildning' ? 'utbildning' : c.role;
     if (seenRoles.has(roleKey)) continue;
+    const emailKey = (c.email ?? '').toLowerCase().trim();
+    if (!emailKey) continue;
+    if (seenEmails.has(emailKey)) {
+      dedupedByEmail++;
+      seenRoles.add(roleKey); // still mark the role as taken so a later contact for it doesn't sneak in
+      continue;
+    }
     seenRoles.add(roleKey);
+    seenEmails.add(emailKey);
     try {
       db.createConversation({
         kommun_kod: kommun.kommun_kod,
@@ -49,6 +63,6 @@ active.forEach((kommun, dayIdx) => {
   }
 });
 
-console.log(`Created ${created} conversations, skipped ${skipped} duplicates.`);
+console.log(`Created ${created} conversations, skipped ${skipped} duplicates, ${dedupedByEmail} per-kommun email duplicates.`);
 console.log(`First dispatch: ${today.toISOString()}; last: day +${active.length - 1}`);
 db.close();
