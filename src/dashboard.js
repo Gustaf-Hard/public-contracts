@@ -14,7 +14,10 @@ import {
   renderKommunDetail,
   renderEscalations,
   renderActivity,
+  renderCompose,
 } from './dashboard-views.js';
+
+const ROLE_PRIORITY = ['central', 'utbildning', 'gymnasie', 'vuxenutbildning', 'other'];
 
 const DB_PATH = process.env.PILOT_DB_PATH ?? 'data/pilot.db';
 const MUNICIPALITIES_PATH = process.env.PILOT_MUNICIPALITIES_PATH ?? 'data/municipalities.json';
@@ -329,6 +332,54 @@ export function createDashboardApp({
       followUpByConv,
       initialDrafts,
       gmailReady: !!gmailClient,
+    }));
+  });
+
+  app.get('/kommun/:kod/compose', (req, res) => {
+    const municipalities = municipalitiesLoader();
+    const kommun = municipalities.find((m) => m.kommun_kod === req.params.kod);
+    if (!kommun) {
+      res.status(404).set('Content-Type', 'text/html; charset=utf-8');
+      return res.send(renderCompose({ kommun: null, env }));
+    }
+
+    const conversations = db
+      ? db.raw.prepare('SELECT role FROM conversations WHERE kommun_kod = ?').all(req.params.kod)
+      : [];
+    const rolesInUse = new Set(conversations.map((c) => c.role));
+
+    const allRoles = [...new Set((kommun.contacts ?? []).map((c) => c.role))];
+    const availableRoles = allRoles
+      .filter((r) => !rolesInUse.has(r))
+      .sort((a, b) => {
+        const ai = ROLE_PRIORITY.indexOf(a);
+        const bi = ROLE_PRIORITY.indexOf(b);
+        return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+      });
+
+    const queryRole = typeof req.query.role === 'string' ? req.query.role : null;
+    const selectedRole = queryRole && availableRoles.includes(queryRole)
+      ? queryRole
+      : availableRoles[0] ?? null;
+
+    let draft = null;
+    let candidateEmails = [];
+    if (selectedRole) {
+      candidateEmails = (kommun.contacts ?? [])
+        .filter((c) => c.role === selectedRole)
+        .map((c) => c.email);
+      draft = renderInitialDraft({ kommun_namn: kommun.kommun_namn, role: selectedRole, env });
+    }
+
+    res.set('Content-Type', 'text/html; charset=utf-8');
+    res.send(renderCompose({
+      kommun,
+      draft,
+      availableRoles,
+      selectedRole,
+      candidateEmails,
+      gmailReady: !!gmailClient,
+      env,
     }));
   });
 

@@ -239,6 +239,29 @@ const baseCss = `
   .btn-danger { background: transparent; color: var(--bad); border-color: var(--bad); }
   .btn-disabled { background: var(--bg-elev-2); color: var(--fg-muted); border-color: var(--border); cursor: not-allowed; }
   .send-warning { font-size: 12px; color: var(--warn); margin-left: auto; }
+  /* Email-replica composer */
+  .compose-card { background: var(--bg-elev); border: 1px solid var(--border); border-radius: 8px; max-width: 820px; overflow: hidden; }
+  .compose-card .field-row { display: grid; grid-template-columns: 70px 1fr; align-items: center; gap: 12px; padding: 10px 18px; border-bottom: 1px solid var(--border); }
+  .compose-card .field-label { font-size: 11px; color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .compose-card .field-value, .compose-card .field-value input, .compose-card .field-value select {
+    font-size: 14px; color: var(--fg); width: 100%;
+    background: transparent; border: none; padding: 0; font-family: inherit;
+  }
+  .compose-card .field-value input:focus, .compose-card .field-value select:focus { outline: none; }
+  .compose-card .compose-body { padding: 16px 18px; }
+  .compose-card .compose-body textarea {
+    width: 100%; min-height: 320px; background: transparent; color: var(--fg);
+    border: none; padding: 0; resize: vertical; font-size: 14px; line-height: 1.5;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  }
+  .compose-card .compose-body textarea:focus { outline: none; }
+  .compose-card .compose-footer { padding: 14px 18px; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 12px; background: var(--bg-elev-2); }
+  .compose-card .compose-footer .spacer { flex: 1; }
+  .compose-link { color: var(--fg-muted); border-bottom: 1px dashed currentColor; }
+  .compose-link:hover { color: var(--accent); text-decoration: none; }
+  .role-tabs { display: flex; gap: 6px; margin: 0 0 14px; }
+  .role-tabs a { padding: 4px 12px; border-radius: 6px; background: var(--bg-elev); border: 1px solid var(--border); color: var(--fg-muted); font-size: 12px; }
+  .role-tabs a.active { background: var(--accent); color: white; border-color: var(--accent); }
   footer { margin-top: 60px; padding: 20px 24px; text-align: center; color: var(--fg-muted); font-size: 11px; border-top: 1px solid var(--border); }
 </style>
 `;
@@ -343,7 +366,7 @@ export function renderOverview({ summary, rows, filter, sort, order, totalKommun
     : rows
         .map((r) => {
           const stateCell = r.states.length === 0
-            ? '<span class="muted">— ej kontaktad —</span>'
+            ? `<a class="compose-link" href="/kommun/${escapeHtml(r.kommun_kod)}/compose">— ej kontaktad —</a>`
             : `<div class="pill-list">${r.states.map((s) => `<span title="${escapeHtml(s.role)}">${stateBadge(s.state)}</span>`).join('')}</div>`;
           const escalCell = r.open_escalations > 0
             ? `<a href="/escalations" class="danger">${r.open_escalations}</a>`
@@ -418,39 +441,74 @@ function renderEscalationForm(esc, gmailReady) {
     </form>`;
 }
 
-function renderInitialForm(kommunKod, draft, gmailReady) {
-  const disabled = gmailReady ? '' : 'disabled';
+export function renderCompose({ kommun, draft, availableRoles = [], selectedRole, candidateEmails = [], gmailReady = false, env = {} }) {
+  if (!kommun) {
+    return layout({ title: 'Saknad kommun', body: '<p>Hittade inte kommunen.</p>', currentPath: '/' });
+  }
+  const backLinks = `<p><a href="/">← Översikt</a> · <a href="/kommun/${escapeHtml(kommun.kommun_kod)}">${escapeHtml(kommun.kommun_namn)} kommun (detalj)</a></p>`;
+
+  if (!selectedRole) {
+    const reason = (kommun.contacts?.length ?? 0) === 0
+      ? 'Inga kontakter i datasetet för denna kommun. Lägg till en e-postadress i <code>data/municipalities.json</code> först.'
+      : 'Alla roller för denna kommun har redan en pågående konversation.';
+    const body = `
+      ${backLinks}
+      <h2>${escapeHtml(kommun.kommun_namn)} kommun</h2>
+      <p class="muted">${reason}</p>`;
+    return layout({ title: kommun.kommun_namn, body, currentPath: '/' });
+  }
+
+  const roleTabs = availableRoles.length > 1
+    ? `<div class="role-tabs">${availableRoles
+        .map((r) => `<a href="?role=${encodeURIComponent(r)}"${r === selectedRole ? ' class="active"' : ''}>${escapeHtml(r)}</a>`)
+        .join('')}</div>`
+    : '';
+
+  const fromLine = `${env.GMAIL_FROM_NAME ?? ''} &lt;${escapeHtml(env.GMAIL_USER_EMAIL ?? '')}&gt;`;
+  const toField = candidateEmails.length <= 1
+    ? `<input type="text" name="contact_email" value="${escapeHtml(candidateEmails[0] ?? '')}" readonly>`
+    : `<select name="contact_email" required>${candidateEmails.map((e) => `<option value="${escapeHtml(e)}">${escapeHtml(e)}</option>`).join('')}</select>`;
+
   const warn = gmailReady ? '' : '<span class="send-warning">⚠️ Gmail-token saknas — kör <code>npm run pilot-auth</code></span>';
-  const candidates = draft.candidate_emails;
-  // Build the "from this set of emails, pick one" select. If only one email
-  // exists for the role, render as a disabled text field so it's still
-  // visible in the form.
-  const contactPicker = candidates.length === 1
-    ? `<input type="text" name="contact_email" value="${escapeHtml(candidates[0])}" readonly>`
-    : `<select name="contact_email" required>${candidates.map((e) => `<option value="${escapeHtml(e)}">${escapeHtml(e)}</option>`).join('')}</select>`;
-  return `
-    <form class="action-form" method="post" action="/kommun/${escapeHtml(kommunKod)}/init"
-      onsubmit="return confirm('Skicka T-INITIAL till ' + this.contact_email.value + '?')">
-      <input type="hidden" name="role" value="${escapeHtml(draft.role)}">
-      <div class="field-row">
-        <div class="field">
-          <label>Mottagare (roll: ${escapeHtml(draft.role)})</label>
-          ${contactPicker}
+  const disabled = gmailReady ? '' : 'disabled';
+
+  const body = `
+    ${backLinks}
+    <h2>Ny begäran · ${escapeHtml(kommun.kommun_namn)} kommun
+      <span class="muted" style="font-weight:400;font-size:13px">${escapeHtml(kommun.lan ?? '')} · ${fmtInt(kommun.folkmangd)} inv.</span>
+    </h2>
+    ${roleTabs}
+    <form method="post" action="/kommun/${escapeHtml(kommun.kommun_kod)}/init"
+      onsubmit="return confirm('Skicka begäran till ' + this.contact_email.value + '?')">
+      <input type="hidden" name="role" value="${escapeHtml(selectedRole)}">
+      <div class="compose-card">
+        <div class="field-row">
+          <span class="field-label">Från</span>
+          <span class="field-value">${fromLine}</span>
         </div>
-        <div class="field" style="flex:2">
-          <label>Ämne</label>
-          <input type="text" name="subject" value="${escapeHtml(draft.subject)}">
+        <div class="field-row">
+          <span class="field-label">Till</span>
+          <span class="field-value">${toField}</span>
         </div>
-      </div>
-      <div class="field">
-        <label>Brödtext</label>
-        <textarea name="body">${escapeHtml(draft.body)}</textarea>
-      </div>
-      <div class="buttons">
-        <button class="btn ${gmailReady ? 'btn-primary' : 'btn-disabled'}" type="submit" ${disabled}>📨 Skicka T-INITIAL nu</button>
-        ${warn}
+        <div class="field-row">
+          <span class="field-label">Roll</span>
+          <span class="field-value muted">${escapeHtml(selectedRole)}</span>
+        </div>
+        <div class="field-row">
+          <span class="field-label">Ämne</span>
+          <span class="field-value"><input type="text" name="subject" value="${escapeHtml(draft.subject)}"></span>
+        </div>
+        <div class="compose-body">
+          <textarea name="body">${escapeHtml(draft.body)}</textarea>
+        </div>
+        <div class="compose-footer">
+          <button class="btn ${gmailReady ? 'btn-primary' : 'btn-disabled'}" type="submit" ${disabled}>📨 Skicka</button>
+          <span class="spacer"></span>
+          ${warn}
+        </div>
       </div>
     </form>`;
+  return layout({ title: `Skicka — ${kommun.kommun_namn}`, body, currentPath: '/' });
 }
 
 export function renderKommunDetail({ kommun, conversations, messagesByConv, attachmentsByMsg, escalationsByConv, signatures, followUpByConv = {}, initialDrafts = {}, gmailReady = false }) {
@@ -463,12 +521,12 @@ export function renderKommunDetail({ kommun, conversations, messagesByConv, atta
       </details>`
     : '<p class="muted">Inga kontaktadresser i datasetet.</p>';
 
-  const initialDraftCards = Object.values(initialDrafts).map((d) => `
-    <div class="card">
-      <h3>Skicka T-INITIAL · roll: ${escapeHtml(d.role)}</h3>
-      <div class="muted" style="margin-bottom:6px">Ingen konversation finns för denna roll. Granska utkastet och skicka när du är nöjd.</div>
-      ${renderInitialForm(kommun.kommun_kod, d, gmailReady)}
-    </div>`).join('');
+  const initialDraftCards = Object.keys(initialDrafts).length === 0
+    ? ''
+    : `<div class="card">
+        <h3>Ingen pågående konversation för: ${Object.values(initialDrafts).map((d) => `<code>${escapeHtml(d.role)}</code>`).join(', ')}</h3>
+        <p style="margin:6px 0"><a class="btn btn-primary" style="display:inline-block;text-decoration:none" href="/kommun/${escapeHtml(kommun.kommun_kod)}/compose">📨 Skapa och skicka begäran →</a></p>
+      </div>`;
 
   const convCards = conversations.length === 0
     ? (Object.keys(initialDrafts).length === 0
