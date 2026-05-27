@@ -479,6 +479,30 @@ export function createDashboardApp({
     res.redirect(`/kommun/${conv.kommun_kod}`);
   });
 
+  // Manually close a case (or mark it as a dead-end). POST /conversations/:id/close
+  // with body { state: 'DONE' | 'DEAD_END' }. Records the decision and updates
+  // state_changed_at so case-duration math works.
+  app.post('/conversations/:id/close', (req, res) => {
+    if (!db) return res.status(503).send('No DB');
+    const convId = parseInt(req.params.id, 10);
+    const conv = db.getConversation(convId);
+    if (!conv) return res.status(404).send('Case not found');
+    const targetState = req.body.state === 'DEAD_END' ? 'DEAD_END' : 'DONE';
+    db.updateConversationState(convId, targetState, {});
+    res.redirect(`/kommun/${conv.kommun_kod}`);
+  });
+
+  // Reopen a previously-closed case. Sets state back to ACK_RECEIVED so
+  // the staleness rules pick it up again. Mostly for typos / oh-shit moments.
+  app.post('/conversations/:id/reopen', (req, res) => {
+    if (!db) return res.status(503).send('No DB');
+    const convId = parseInt(req.params.id, 10);
+    const conv = db.getConversation(convId);
+    if (!conv) return res.status(404).send('Case not found');
+    db.updateConversationState(convId, 'ACK_RECEIVED', {});
+    res.redirect(`/kommun/${conv.kommun_kod}`);
+  });
+
   // Send T-INITIAL to a kommun that doesn't have a conversation yet.
   // POST /kommun/:kod/init  with body { role, contact_email, subject, body }
   app.post('/kommun/:kod/init', async (req, res) => {

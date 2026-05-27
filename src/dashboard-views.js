@@ -95,6 +95,163 @@ function parseJsonSafe(s) {
   try { return JSON.parse(s); } catch { return null; }
 }
 
+const CASE_STATUS = {
+  INITIAL:            { label: 'Schemalagt',         color: '#9ca3af', terminal: false },
+  SENT:               { label: 'Öppet · väntar svar', color: '#3b82f6', terminal: false },
+  ACK_RECEIVED:       { label: 'Öppet · bekräftat',   color: '#6366f1', terminal: false },
+  AWAITING_PRECISION: { label: 'Öppet · väntar precisering', color: '#a855f7', terminal: false },
+  DELIVERING:         { label: 'Öppet · tar emot avtal', color: '#10b981', terminal: false },
+  DONE:               { label: '✅ Stängt — klart',    color: '#22c55e', terminal: true  },
+  DEAD_END:           { label: '🚫 Återvändsgränd',    color: '#9ca3af', terminal: true  },
+  NEEDS_HUMAN:        { label: '⚠️ Behöver dig',       color: '#ef4444', terminal: false },
+};
+
+function caseStatusBadge(state) {
+  const meta = CASE_STATUS[state] ?? { label: state, color: '#6b7280', terminal: false };
+  return `<span class="badge" style="background:${meta.color}1a;color:${meta.color};border:1px solid ${meta.color}66;font-size:12px;padding:4px 10px">${escapeHtml(meta.label)}</span>`;
+}
+
+// Days between two ISO timestamps. Both required.
+function daysBetween(fromIso, toIso) {
+  if (!fromIso || !toIso) return null;
+  const a = new Date(fromIso).getTime();
+  const b = new Date(toIso).getTime();
+  if (Number.isNaN(a) || Number.isNaN(b)) return null;
+  return Math.max(0, Math.floor((b - a) / (1000 * 60 * 60 * 24)));
+}
+
+// Human-readable case duration: "öppet sedan X dagar" or "stängt efter X dagar".
+function caseDuration(conv, messages, now = new Date()) {
+  const firstOutbound = messages.find((m) => m.direction === 'outbound');
+  const startIso = firstOutbound?.received_at ?? conv.scheduled_send_at ?? conv.state_changed_at;
+  const isTerminal = CASE_STATUS[conv.state]?.terminal;
+  if (isTerminal) {
+    const d = daysBetween(startIso, conv.state_changed_at);
+    return d === null ? null : `stängt efter ${d} dag${d === 1 ? '' : 'ar'}`;
+  }
+  const d = daysBetween(startIso, now.toISOString());
+  return d === null ? null : `öppet sedan ${d} dag${d === 1 ? '' : 'ar'}`;
+}
+
+// Build a chronologically sorted list of timeline events for one case.
+// Sources: outbound + inbound messages (each with attachments + LLM analysis),
+// plus the closed-state event when the case is terminal.
+function buildTimeline(conv, messages, attachmentsByMsg, signatures = {}) {
+  const events = [];
+  for (const m of messages) {
+    const ts = m.received_at;
+    if (m.direction === 'outbound') {
+      events.push({
+        ts,
+        icon: '📤',
+        title: m.subject?.startsWith('Re:') ? 'Svar skickat' : (m.subject?.startsWith('Påminnelse') ? 'Påminnelse skickad' : 'Begäran skickad'),
+        sub: m.subject ?? '',
+        body: m.body_text,
+        bodyClass: 'body-quote-outbound',
+      });
+    } else {
+      const analysis = parseJsonSafe(m.analysis_json);
+      const intent = analysis?.intent ?? m.classification ?? 'inkommande';
+      const conf = (analysis?.confidence ?? m.classification_confidence ?? 0).toFixed(2);
+      events.push({
+        ts,
+        icon: '📥',
+        title: `Svar mottaget · ${INTENT_LABELS[intent] ?? intent}`,
+        rawIntent: intent, // included verbatim so test assertions / log scrapers can match
+        sub: analysis?.summary ?? m.subject ?? '',
+        body: m.body_text,
+        bodyClass: 'body-quote-inbound',
+        confidence: conf,
+        analysis,
+        signature: signatures[m.id] ?? null,
+      });
+      for (const att of attachmentsByMsg[m.id] ?? []) {
+        events.push({
+          ts,
+          icon: '📎',
+          title: 'Avtal mottaget',
+          sub: att.filename,
+        });
+      }
+    }
+  }
+  if (CASE_STATUS[conv.state]?.terminal) {
+    events.push({
+      ts: conv.state_changed_at,
+      icon: conv.state === 'DONE' ? '🏁' : '🚫',
+      title: conv.state === 'DONE' ? 'Ärende stängt — klart' : 'Ärende markerat som återvändsgränd',
+    });
+  }
+  // Stable sort by timestamp, ties broken by insertion order
+  return events
+    .map((e, i) => ({ ...e, _i: i }))
+    .sort((a, b) => (a.ts ?? '').localeCompare(b.ts ?? '') || a._i - b._i);
+}
+
+function renderTimeline(events) {
+  if (events.length === 0) return '<p class="muted">Ingen aktivitet ännu.</p>';
+  return `<ul class="timeline">${events.map((e) => {
+    const date = e.ts ? e.ts.slice(0, 10) : '';
+    const time = e.ts ? e.ts.slice(11, 16) : '';
+    const analysisBlock = e.analysis ? `
+      <details style="margin-top:6px">
+        <summary class="muted" style="font-size:11px">LLM-analys (${e.confidence}) · klass: ${escapeHtml(e.rawIntent ?? '')}</summary>
+        <div style="margin-top:4px;font-size:12px">
+          ${e.analysis.extracted?.arendenummer ? `<div>Ärendenummer: <code>${escapeHtml(e.analysis.extracted.arendenummer)}</code></div>` : ''}
+          ${e.analysis.extracted?.promised_response_date ? `<div>Utlovat datum: <strong>${escapeHtml(e.analysis.extracted.promised_response_date)}</strong></div>` : ''}
+          ${e.analysis.extracted?.handoff_to_email ? `<div>Hänvisar till: <code>${escapeHtml(e.analysis.extracted.handoff_to_email)}</code></div>` : ''}
+          ${e.analysis.draft_reply ? `<details><summary>Föreslaget svar</summary><div class="body-quote body-quote-outbound" style="margin-top:4px">${escapeHtml(e.analysis.draft_reply)}</div></details>` : ''}
+        </div>
+      </details>` : (e.rawIntent ? `<div class="ev-sub muted" style="font-size:11px">Klass: ${escapeHtml(e.rawIntent)}</div>` : '');
+    const sigBlock = e.signature ? `
+      <details style="margin-top:6px">
+        <summary class="muted" style="font-size:11px">Extraherad kontaktinfo</summary>
+        <dl class="signature-fields" style="margin-top:4px">
+          ${e.signature.name        ? `<dt>Namn</dt><dd>${escapeHtml(e.signature.name)}</dd>` : ''}
+          ${e.signature.title       ? `<dt>Titel</dt><dd>${escapeHtml(e.signature.title)}</dd>` : ''}
+          ${e.signature.forvaltning ? `<dt>Förvaltning</dt><dd>${escapeHtml(e.signature.forvaltning)}</dd>` : ''}
+          ${e.signature.email       ? `<dt>E-post</dt><dd>${escapeHtml(e.signature.email)}</dd>` : ''}
+          ${e.signature.phone       ? `<dt>Telefon</dt><dd>${escapeHtml(e.signature.phone)}</dd>` : ''}
+        </dl>
+      </details>` : '';
+    return `<li class="timeline-item">
+      <div class="timeline-date" title="${escapeHtml(e.ts ?? '')}">${escapeHtml(date)}<br>${escapeHtml(time)}</div>
+      <div class="timeline-icon">${e.icon}</div>
+      <div class="timeline-body">
+        <div class="ev-title">${escapeHtml(e.title)}</div>
+        ${e.sub ? `<div class="ev-sub">${escapeHtml(e.sub)}</div>` : ''}
+        ${e.body ? `<div class="body-quote ${e.bodyClass}">${escapeHtml(e.body)}</div>` : ''}
+        ${analysisBlock}
+        ${sigBlock}
+      </div>
+    </li>`;
+  }).join('')}</ul>`;
+}
+
+function renderCaseActions(conv, gmailReady) {
+  const isTerminal = CASE_STATUS[conv.state]?.terminal;
+  if (isTerminal) {
+    return `<div class="case-actions">
+      <form method="post" action="/conversations/${conv.id}/reopen">
+        <button class="btn btn-secondary" type="submit"
+          onclick="return confirm('Återöppna ärende? Status sätts till Bekräftat.')">↩️ Återöppna</button>
+      </form>
+    </div>`;
+  }
+  return `<div class="case-actions">
+    <form method="post" action="/conversations/${conv.id}/close">
+      <input type="hidden" name="state" value="DONE">
+      <button class="btn btn-primary" type="submit"
+        onclick="return confirm('Stäng ärendet som klart? (state = DONE)')">✅ Stäng som klart</button>
+    </form>
+    <form method="post" action="/conversations/${conv.id}/close">
+      <input type="hidden" name="state" value="DEAD_END">
+      <button class="btn btn-secondary" type="submit"
+        onclick="return confirm('Markera ärendet som återvändsgränd? (state = DEAD_END)')">🚫 Återvändsgränd</button>
+    </form>
+  </div>`;
+}
+
 const STATE_LABELS = {
   INITIAL: 'Schemalagt',
   SENT: 'Skickat',
@@ -262,6 +419,21 @@ const baseCss = `
   .role-tabs { display: flex; gap: 6px; margin: 0 0 14px; }
   .role-tabs a { padding: 4px 12px; border-radius: 6px; background: var(--bg-elev); border: 1px solid var(--border); color: var(--fg-muted); font-size: 12px; }
   .role-tabs a.active { background: var(--accent); color: white; border-color: var(--accent); }
+  /* Case card + timeline */
+  .case-header { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+  .case-header h3 { margin: 0; font-size: 15px; font-weight: 600; flex: 1; min-width: 200px; }
+  .case-meta { color: var(--fg-muted); font-size: 12px; display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0 0 12px; }
+  .case-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
+  .case-actions form { display: inline-block; margin: 0; }
+  .timeline { list-style: none; padding: 0; margin: 0; }
+  .timeline-item { display: grid; grid-template-columns: 90px 28px 1fr; gap: 10px; padding: 8px 0; border-bottom: 1px dashed var(--border); }
+  .timeline-item:last-child { border-bottom: none; }
+  .timeline-date { color: var(--fg-muted); font-size: 11px; font-variant-numeric: tabular-nums; padding-top: 2px; }
+  .timeline-icon { font-size: 16px; line-height: 1.2; }
+  .timeline-body { font-size: 13px; }
+  .timeline-body .ev-title { font-weight: 500; }
+  .timeline-body .ev-sub { color: var(--fg-muted); font-size: 12px; margin-top: 2px; }
+  .timeline-body .body-quote { margin: 6px 0 4px; max-height: 160px; }
   footer { margin-top: 60px; padding: 20px 24px; text-align: center; color: var(--fg-muted); font-size: 11px; border-top: 1px solid var(--border); }
 </style>
 `;
@@ -530,91 +702,46 @@ export function renderKommunDetail({ kommun, conversations, messagesByConv, atta
 
   const convCards = conversations.length === 0
     ? (Object.keys(initialDrafts).length === 0
-        ? '<p class="muted">Ingen pilot-konversation för denna kommun ännu.</p>'
+        ? '<p class="muted">Inga ärenden för denna kommun ännu.</p>'
         : '')
     : conversations.map((conv) => {
         const msgs = messagesByConv[conv.id] ?? [];
         const escs = escalationsByConv[conv.id] ?? [];
+        const fu = followUpByConv[conv.id] ?? { date: null, source: null };
 
-        const messagesHtml = msgs.length === 0 ? '<p class="muted">Inga meddelanden ännu.</p>' : msgs.map((m) => {
-          const direction = m.direction === 'inbound' ? '⬇ Inkommande' : '⬆ Utgående';
-          const cls = m.direction === 'inbound' ? 'body-quote-inbound' : 'body-quote-outbound';
-          const analysis = parseJsonSafe(m.analysis_json);
-          const classBadge = analysis
-            ? ` · ${intentBadge(analysis.intent)} <span class="muted">(${(analysis.confidence ?? 0).toFixed(2)})</span>`
-            : (m.classification ? ` · <span class="badge" style="background:#a855f71a;color:#a855f7;border:1px solid #a855f766">${escapeHtml(m.classification)} (${(m.classification_confidence ?? 0).toFixed(2)})</span>` : '');
-          const analysisBlock = analysis ? `
-            <div class="card" style="background:var(--bg-elev-2);margin:8px 0;padding:10px 12px">
-              <div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">LLM-analys · ${escapeHtml(analysis.suggested_action ?? '')}</div>
-              <div>${escapeHtml(analysis.summary ?? '')}</div>
-              ${analysis.follow_up_at ? `<div class="muted" style="margin-top:4px">Återkommer: <strong>${escapeHtml(analysis.follow_up_at)}</strong> · ${fmtFollowUpBadge(analysis.follow_up_at)}</div>` : ''}
-              ${analysis.extracted && Object.values(analysis.extracted).some((v) => v != null && (!Array.isArray(v) || v.length > 0)) ? `
-                <details style="margin-top:6px">
-                  <summary>Extraherade fält</summary>
-                  <dl class="signature-fields" style="margin-top:4px"><div class="signature-fields"><dl>
-                    ${analysis.extracted.arendenummer ? `<dt>Ärendenummer</dt><dd>${escapeHtml(analysis.extracted.arendenummer)}</dd>` : ''}
-                    ${analysis.extracted.promised_response_days != null ? `<dt>Utlovade dagar</dt><dd>${analysis.extracted.promised_response_days}</dd>` : ''}
-                    ${analysis.extracted.promised_response_date ? `<dt>Utlovat datum</dt><dd>${escapeHtml(analysis.extracted.promised_response_date)}</dd>` : ''}
-                    ${analysis.extracted.handoff_to_email ? `<dt>Hänvisar till e-post</dt><dd>${escapeHtml(analysis.extracted.handoff_to_email)}</dd>` : ''}
-                    ${analysis.extracted.handoff_to_forvaltning ? `<dt>Hänvisar till förvaltning</dt><dd>${escapeHtml(analysis.extracted.handoff_to_forvaltning)}</dd>` : ''}
-                    ${analysis.extracted.questions?.length ? `<dt>Frågor</dt><dd>${analysis.extracted.questions.map((q) => escapeHtml(q)).join('<br>')}</dd>` : ''}
-                    ${analysis.extracted.mentioned_vendors?.length ? `<dt>Nämnda leverantörer</dt><dd>${analysis.extracted.mentioned_vendors.map((v) => escapeHtml(v)).join(', ')}</dd>` : ''}
-                  </dl></div></dl>
-                </details>` : ''}
-              ${analysis.draft_reply ? `
-                <details style="margin-top:6px">
-                  <summary>Föreslaget svar (för manuell granskning)</summary>
-                  <div class="body-quote body-quote-outbound" style="margin-top:6px">${escapeHtml(analysis.draft_reply)}</div>
-                </details>` : ''}
-            </div>` : '';
-          const atts = (attachmentsByMsg[m.id] ?? []).map((a) => `📎 ${escapeHtml(a.filename)}`).join(', ');
-          const sig = signatures[m.id];
-          const sigBlock = sig ? `
-            <div class="signature-fields">
-              <details>
-                <summary>Extraherad kontaktinfo</summary>
-                <dl>
-                  ${sig.name ? `<dt>Namn</dt><dd>${escapeHtml(sig.name)}</dd>` : ''}
-                  ${sig.title ? `<dt>Titel</dt><dd>${escapeHtml(sig.title)}</dd>` : ''}
-                  ${sig.forvaltning ? `<dt>Förvaltning</dt><dd>${escapeHtml(sig.forvaltning)}</dd>` : ''}
-                  ${sig.email ? `<dt>E-post</dt><dd>${escapeHtml(sig.email)}</dd>` : ''}
-                  ${sig.phone ? `<dt>Telefon</dt><dd>${escapeHtml(sig.phone)}</dd>` : ''}
-                  ${sig.postal ? `<dt>Adress</dt><dd>${escapeHtml(sig.postal)}</dd>` : ''}
-                  ${sig.website ? `<dt>Webb</dt><dd>${escapeHtml(sig.website)}</dd>` : ''}
-                </dl>
-              </details>
-            </div>` : '';
-          return `
-            <div class="card">
-              <h3>${direction} · <span class="muted">${escapeHtml(m.received_at)}</span>${classBadge}</h3>
-              <div>${escapeHtml(m.subject ?? '')}</div>
-              <div class="body-quote ${cls}">${escapeHtml(m.body_text ?? '')}</div>
-              ${analysisBlock}
-              ${atts ? `<div>${atts}</div>` : ''}
-              ${sigBlock}
-            </div>`;
-        }).join('');
+        const duration = caseDuration(conv, msgs);
+        const followUpBadge = fu.date ? fmtFollowUpBadge(fu.date, fu.source) : null;
+        const followUpLine = fu.date
+          ? `<span>⏳ Nästa kontakt: <strong>${escapeHtml(fu.date)}</strong> · ${followUpBadge}</span>`
+          : '';
+
+        const events = buildTimeline(conv, msgs, attachmentsByMsg, signatures);
+        const timeline = renderTimeline(events);
 
         const escHtml = escs.length === 0 ? '' : `
-          <h3 style="margin:14px 0 6px">Öppna eskaleringar (${escs.length})</h3>
+          <h4 style="margin:18px 0 6px;font-size:13px">⚠️ Öppna eskaleringar (${escs.length})</h4>
           ${escs.map((e) => `
-            <div class="card">
+            <div class="card" style="background:var(--bg-elev-2);margin-top:6px">
               <strong>${escapeHtml(e.draft_template ?? 'free_form')}</strong> · <span class="muted">${escapeHtml(e.reason)}</span>
               ${renderEscalationForm(e, gmailReady)}
             </div>`).join('')}`;
 
-        const fu = followUpByConv[conv.id] ?? { date: null, source: null };
-        const followUpBadge = fu.date ? fmtFollowUpBadge(fu.date, fu.source) : null;
-        const followUpLine = fu.date
-          ? `<div class="muted">⏳ Nästa kontakt: <strong>${escapeHtml(fu.date)}</strong> · ${followUpBadge} <span class="muted">(${fu.source === 'kommun_promise' ? 'kommunen utlovade detta datum' : 'standardpåminnelse efter ' + (fu.source === 'our_followup' ? 'tystnad' : '')})</span></div>`
-          : '';
         return `
           <div class="card">
-            <h3>Roll: ${escapeHtml(conv.role)} · ${stateBadge(conv.state)} ${conv.arendenummer ? ` · <span class="muted">Ärendenummer: ${escapeHtml(conv.arendenummer)}</span>` : ''}</h3>
-            <div class="muted">Kontaktadress: <code>${escapeHtml(conv.contact_email)}</code> · Senast utgående: ${fmtAgo(conv.last_outbound_at)} · Tillstånd ändrat: ${fmtAgo(conv.state_changed_at)} · Påminnelser: ${conv.followup_count}</div>
-            ${followUpLine}
-            ${messagesHtml}
+            <div class="case-header">
+              <h3>Ärende #${conv.id} · roll: ${escapeHtml(conv.role)}</h3>
+              ${caseStatusBadge(conv.state)}
+            </div>
+            <div class="case-meta">
+              <span>📧 <code>${escapeHtml(conv.contact_email)}</code></span>
+              ${conv.arendenummer ? `<span>📌 Diarienr hos kommun: <code>${escapeHtml(conv.arendenummer)}</code></span>` : ''}
+              ${duration ? `<span>⌛ ${escapeHtml(duration)}</span>` : ''}
+              ${followUpLine}
+            </div>
+            <h4 style="margin:14px 0 8px;font-size:13px">Tidslinje</h4>
+            ${timeline}
             ${escHtml}
+            ${renderCaseActions(conv, gmailReady)}
           </div>`;
       }).join('');
 
@@ -622,7 +749,7 @@ export function renderKommunDetail({ kommun, conversations, messagesByConv, atta
     <p><a href="/">← Översikt</a></p>
     <h2>${escapeHtml(kommun.kommun_namn)} kommun <span class="muted" style="font-weight:400">${escapeHtml(kommun.kommun_kod)} · ${escapeHtml(kommun.lan ?? '')} · ${fmtInt(kommun.folkmangd)} inv.</span></h2>
     ${contactBlock}
-    <h2>Pilot-konversationer</h2>
+    <h2>Ärenden</h2>
     ${convCards}
     ${initialDraftCards}
   `;
