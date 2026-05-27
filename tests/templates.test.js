@@ -17,21 +17,25 @@ const ctx = {
 };
 
 describe('T_INITIAL', () => {
-  it('renders the offentlighetsprincipen request for utbildning role', () => {
+  it('renders the offentlighetsprincipen request with the school/education scope qualifier', () => {
     const m = T_INITIAL(ctx);
     expect(m.subject).toMatch(/Begäran om allmänna handlingar/);
     expect(m.body).toMatch(/offentlighetsprincipen/);
-    expect(m.body).toMatch(/utbildningsförvaltningen/);
+    expect(m.body).toMatch(/skola och utbildning – direkt eller indirekt/);
+    expect(m.body).toMatch(/inom kommunen/);
     expect(m.body).toMatch(/Skolon/);
     expect(m.body).toMatch(/Avtalsvärde eller årskostnad/);
     expect(m.body).toMatch(/Gustaf Hård af Segerstad/);
     expect(m.body).toMatch(/gustaf@mediagraf.se/);
   });
 
-  it('uses "kommunen" as scope when role is central', () => {
-    const m = T_INITIAL({ ...ctx, role: 'central' });
-    expect(m.body).toMatch(/inom kommunen/);
-    expect(m.body).not.toMatch(/utbildningsförvaltningen/);
+  it('uses "inom kommunen" as scope regardless of role (qualifier narrows the topic, not the förvaltning)', () => {
+    const central = T_INITIAL({ ...ctx, role: 'central' });
+    const utbildning = T_INITIAL({ ...ctx, role: 'utbildning' });
+    expect(central.body).toMatch(/inom kommunen/);
+    expect(utbildning.body).toMatch(/inom kommunen/);
+    expect(central.body).not.toMatch(/utbildningsförvaltningen/);
+    expect(utbildning.body).not.toMatch(/utbildningsförvaltningen/);
   });
 
   it('includes kommun_namn in the subject (uniqueness signal for spam filters)', () => {

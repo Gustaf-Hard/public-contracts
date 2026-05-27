@@ -7,7 +7,6 @@ function signature({ from_name, from_email }) {
 }
 
 export function T_INITIAL(ctx) {
-  const scope = scopeText(ctx.role);
   return {
     subject: `Begäran om allmänna handlingar – ${ctx.kommun_namn} kommun – digitala verktyg, lärplattformar och läromedel`,
     body: [
@@ -15,7 +14,7 @@ export function T_INITIAL(ctx) {
       '',
       `Jag skriver till ${ctx.kommun_namn} kommun med en begäran om allmänna handlingar med stöd av offentlighetsprincipen (2 kap. tryckfrihetsförordningen).`,
       '',
-      `Jag önskar ta del av de faktiska avtalsdokumenten för samtliga gällande avtal avseende digitala verktyg, lärplattformar och läromedel inom ${scope}.`,
+      'Jag önskar ta del av de faktiska avtalsdokumenten för samtliga gällande avtal avseende digitala verktyg, lärplattformar och läromedel som används inom skola och utbildning – direkt eller indirekt – inom kommunen.',
       '',
       'Specifikt önskar jag information om aktiva avtal (ej utgångna):',
       '- Lärplattformar och LMS (t.ex. Google Workspace, Microsoft 365, Skolon)',
