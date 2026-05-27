@@ -419,6 +419,42 @@ const baseCss = `
   .role-tabs { display: flex; gap: 6px; margin: 0 0 14px; }
   .role-tabs a { padding: 4px 12px; border-radius: 6px; background: var(--bg-elev); border: 1px solid var(--border); color: var(--fg-muted); font-size: 12px; }
   .role-tabs a.active { background: var(--accent); color: white; border-color: var(--accent); }
+  /* CRM-style kommun page layout: sticky sidebar + main column */
+  .kommun-page { display: grid; grid-template-columns: 320px 1fr; gap: 24px; align-items: start; }
+  @media (max-width: 980px) { .kommun-page { grid-template-columns: 1fr; } }
+  .kommun-sidebar { position: sticky; top: 64px; align-self: start; background: var(--bg-elev); border: 1px solid var(--border); border-radius: 8px; padding: 16px 18px; max-height: calc(100vh - 80px); overflow-y: auto; }
+  .kommun-sidebar h2 { margin: 0 0 2px; font-size: 18px; }
+  .kommun-sidebar .ident-meta { color: var(--fg-muted); font-size: 12px; margin-bottom: 14px; }
+  .kommun-sidebar h3 { margin: 14px 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--fg-muted); font-weight: 600; }
+  .kommun-sidebar .side-section { padding-top: 12px; border-top: 1px solid var(--border); }
+  .kommun-sidebar .side-section:first-of-type { border-top: none; padding-top: 0; }
+  .kommun-sidebar ul.plain { list-style: none; padding: 0; margin: 0; font-size: 13px; }
+  .kommun-sidebar ul.plain li { padding: 4px 0; border-bottom: 1px dashed var(--border); }
+  .kommun-sidebar ul.plain li:last-child { border-bottom: none; }
+  .kommun-sidebar .next-step { display: flex; flex-direction: column; gap: 2px; font-size: 12px; padding: 6px 0; border-bottom: 1px dashed var(--border); }
+  .kommun-sidebar .next-step:last-child { border-bottom: none; }
+  .kommun-sidebar .next-step .case-link { font-weight: 500; }
+  .kommun-sidebar .next-step .step-text { color: var(--fg-muted); }
+  .kpi-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .kpi-cell { background: var(--bg-elev-2); border-radius: 6px; padding: 8px 10px; }
+  .kpi-cell .kpi-label { font-size: 10px; color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .kpi-cell .kpi-value { font-size: 18px; font-weight: 600; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .completeness { padding: 10px 12px; border-radius: 6px; font-size: 12px; line-height: 1.4; margin-top: 10px; border: 1px solid; }
+  .completeness-good { background: #22c55e1a; color: var(--good); border-color: #22c55e66; }
+  .completeness-pending { background: #3b82f61a; color: var(--accent); border-color: #3b82f666; }
+  .completeness-bad { background: #ef44441a; color: var(--bad); border-color: #ef444466; }
+  .person-card { padding: 6px 0; border-bottom: 1px dashed var(--border); font-size: 12px; }
+  .person-card:last-child { border-bottom: none; }
+  .person-card .person-name { font-weight: 500; font-size: 13px; }
+  .person-card .person-meta { color: var(--fg-muted); }
+  .tag-list { display: flex; flex-wrap: wrap; gap: 4px; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; background: var(--bg-elev-2); border: 1px solid var(--border); color: var(--fg-muted); }
+  .contracts-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+  .contracts-table th, .contracts-table td { padding: 6px 10px; text-align: left; border-bottom: 1px solid var(--border); }
+  .contracts-table th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--fg-muted); }
+  .quick-actions { display: flex; flex-direction: column; gap: 6px; }
+  .quick-actions a { font-size: 12px; padding: 6px 10px; border-radius: 6px; background: var(--bg-elev-2); border: 1px solid var(--border); color: var(--fg); text-decoration: none; display: flex; align-items: center; gap: 6px; }
+  .quick-actions a:hover { border-color: var(--accent); color: var(--accent); }
   /* Case card + timeline */
   .case-header { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
   .case-header h3 { margin: 0; font-size: 15px; font-weight: 600; flex: 1; min-width: 200px; }
@@ -683,21 +719,203 @@ export function renderCompose({ kommun, draft, availableRoles = [], selectedRole
   return layout({ title: `Skicka — ${kommun.kommun_namn}`, body, currentPath: '/' });
 }
 
+// Derive a short "what happens next" string per case. Used in the sidebar.
+function nextStepFor(conv, fu, today = new Date().toISOString().slice(0, 10)) {
+  const meta = CASE_STATUS[conv.state] ?? { terminal: false };
+  if (meta.terminal) {
+    return { text: conv.state === 'DONE' ? 'Stängt — klart' : 'Återvändsgränd', urgent: false };
+  }
+  if (conv.state === 'NEEDS_HUMAN') {
+    return { text: 'Du behöver agera — eskalering öppen', urgent: true };
+  }
+  if (fu?.date) {
+    if (fu.date <= today) return { text: `Skicka påminnelse (förfallen ${fu.date})`, urgent: true };
+    const stepLabel = conv.state === 'AWAITING_PRECISION' ? 'Inväntar precisering till' : 'Bevakar svar till';
+    return { text: `${stepLabel} ${fu.date}`, urgent: false };
+  }
+  return { text: `Bevakar (${CASE_STATUS[conv.state]?.label ?? conv.state})`, urgent: false };
+}
+
+// Closed-cases (DONE) signal we've been told we have everything. Open cases
+// or only DEAD_END mean we don't. Returns {kind, text} for the sidebar banner.
+function completenessBanner(conversations) {
+  if (conversations.length === 0) return { kind: 'pending', text: 'Inga ärenden ännu.' };
+  const hasDone = conversations.some((c) => c.state === 'DONE');
+  const allTerminal = conversations.every((c) => CASE_STATUS[c.state]?.terminal);
+  const allDeadEnd = conversations.every((c) => c.state === 'DEAD_END');
+  if (allDeadEnd) return { kind: 'bad', text: 'Inga avtal mottagna — kommunen avvisade.' };
+  if (allTerminal && hasDone) return { kind: 'good', text: '✅ Alla ärenden klara — bedöms ha samtliga avtal.' };
+  if (hasDone) return { kind: 'pending', text: 'Minst ett ärende klart, andra pågår fortfarande.' };
+  return { kind: 'pending', text: 'Pågående — vi har inte bekräftat att alla avtal är mottagna.' };
+}
+
+// Aggregate unique contact people across all inbound messages for this kommun
+// (deduplicated by email or fall-back to name).
+function aggregatePeople(conversations, messagesByConv, signatures) {
+  const byKey = new Map();
+  for (const conv of conversations) {
+    for (const m of messagesByConv[conv.id] ?? []) {
+      const sig = signatures[m.id];
+      if (!sig) continue;
+      if (!sig.name && !sig.email) continue;
+      const key = (sig.email ?? sig.name ?? '').toLowerCase();
+      if (!byKey.has(key)) byKey.set(key, { ...sig, role: conv.role });
+    }
+  }
+  return [...byKey.values()];
+}
+
+// Aggregate vendor names mentioned in any inbound message's LLM analysis.
+function aggregateVendors(conversations, messagesByConv) {
+  const vendors = new Set();
+  for (const conv of conversations) {
+    for (const m of messagesByConv[conv.id] ?? []) {
+      const a = parseJsonSafe(m.analysis_json);
+      for (const v of a?.extracted?.mentioned_vendors ?? []) vendors.add(v);
+    }
+  }
+  return [...vendors];
+}
+
+// Flatten attachments across cases into a single "contracts inventory" list.
+function aggregateContracts(conversations, messagesByConv, attachmentsByMsg) {
+  const out = [];
+  for (const conv of conversations) {
+    for (const m of messagesByConv[conv.id] ?? []) {
+      for (const att of attachmentsByMsg[m.id] ?? []) {
+        out.push({
+          filename: att.filename,
+          size_bytes: att.size_bytes,
+          received_at: m.received_at,
+          role: conv.role,
+          conv_id: conv.id,
+        });
+      }
+    }
+  }
+  return out.sort((a, b) => (b.received_at ?? '').localeCompare(a.received_at ?? ''));
+}
+
+function fmtBytes(n) {
+  if (n == null) return '';
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} kB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export function renderKommunDetail({ kommun, conversations, messagesByConv, attachmentsByMsg, escalationsByConv, signatures, followUpByConv = {}, initialDrafts = {}, gmailReady = false }) {
   if (!kommun) {
     return layout({ title: 'Saknad kommun', body: '<p>Hittade inte kommunen.</p>', currentPath: '/' });
   }
-  const contactBlock = kommun.contacts && kommun.contacts.length > 0
-    ? `<details><summary>Kontaktadresser i datasetet (${kommun.contacts.length})</summary>
-        <ul>${kommun.contacts.map((c) => `<li><code>${escapeHtml(c.email)}</code> <span class="muted">${escapeHtml(c.role)}${c.forvaltning_namn ? ' · ' + escapeHtml(c.forvaltning_namn) : ''}</span></li>`).join('')}</ul>
-      </details>`
-    : '<p class="muted">Inga kontaktadresser i datasetet.</p>';
 
+  // ----- Aggregations for the sidebar + bottom sections -----
+  const today = new Date().toISOString().slice(0, 10);
+  const activeCases = conversations.filter((c) => !CASE_STATUS[c.state]?.terminal);
+  const closedCases = conversations.filter((c) => CASE_STATUS[c.state]?.terminal);
+  const completeness = completenessBanner(conversations);
+  const people = aggregatePeople(conversations, messagesByConv, signatures);
+  const vendors = aggregateVendors(conversations, messagesByConv);
+  const contracts = aggregateContracts(conversations, messagesByConv, attachmentsByMsg);
+  const needsHumanCount = conversations.filter((c) => c.state === 'NEEDS_HUMAN').length;
+
+  // ----- Sidebar -----
+  const nextSteps = activeCases.length === 0
+    ? '<p class="muted" style="font-size:12px;margin:6px 0 0">Inga aktiva ärenden.</p>'
+    : activeCases.map((c) => {
+        const step = nextStepFor(c, followUpByConv[c.id], today);
+        return `<div class="next-step">
+          <a class="case-link" href="#case-${c.id}">Ärende #${c.id} · ${escapeHtml(c.role)}</a>
+          <span class="step-text ${step.urgent ? 'danger' : ''}">${escapeHtml(step.text)}</span>
+        </div>`;
+      }).join('');
+
+  const peopleHtml = people.length === 0
+    ? '<p class="muted" style="font-size:12px;margin:6px 0 0">Inga personer fångade ännu.</p>'
+    : people.map((p) => `
+        <div class="person-card">
+          <div class="person-name">${escapeHtml(p.name ?? p.email ?? '?')}</div>
+          <div class="person-meta">
+            ${p.title ? escapeHtml(p.title) : ''}${p.forvaltning ? ' · ' + escapeHtml(p.forvaltning) : ''}
+          </div>
+          ${p.email ? `<div class="person-meta"><code>${escapeHtml(p.email)}</code></div>` : ''}
+          ${p.phone ? `<div class="person-meta">📞 ${escapeHtml(p.phone)}</div>` : ''}
+        </div>`).join('');
+
+  const datasetContacts = (kommun.contacts ?? []).length === 0
+    ? '<p class="muted" style="font-size:12px;margin:6px 0 0">Inga adresser i datasetet.</p>'
+    : `<ul class="plain">${(kommun.contacts ?? []).map((c) => `<li><code>${escapeHtml(c.email)}</code><br><span class="muted" style="font-size:11px">${escapeHtml(c.role)}${c.forvaltning_namn ? ' · ' + escapeHtml(c.forvaltning_namn) : ''}</span></li>`).join('')}</ul>`;
+
+  const quickActions = `<div class="quick-actions">
+    <a href="/kommun/${escapeHtml(kommun.kommun_kod)}/compose">📨 Ny begäran (T-INITIAL)</a>
+    ${kommun.website_url ? `<a target="_blank" rel="noopener" href="${escapeHtml(kommun.website_url)}">🌐 Kommunens webbplats</a>` : ''}
+  </div>`;
+
+  const sidebar = `
+    <aside class="kommun-sidebar">
+      <h2>${escapeHtml(kommun.kommun_namn)} kommun</h2>
+      <div class="ident-meta">${escapeHtml(kommun.kommun_kod)} · ${escapeHtml(kommun.lan ?? '')} · ${fmtInt(kommun.folkmangd)} inv.</div>
+
+      <div class="kpi-grid">
+        <div class="kpi-cell"><div class="kpi-label">Aktiva ärenden</div><div class="kpi-value">${activeCases.length}</div></div>
+        <div class="kpi-cell"><div class="kpi-label">Stängda</div><div class="kpi-value">${closedCases.length}</div></div>
+        <div class="kpi-cell"><div class="kpi-label">Avtal mottagna</div><div class="kpi-value">${contracts.length}</div></div>
+        <div class="kpi-cell"><div class="kpi-label">Behöver dig</div><div class="kpi-value ${needsHumanCount > 0 ? 'danger' : ''}">${needsHumanCount}</div></div>
+      </div>
+
+      <div class="completeness completeness-${completeness.kind}">${escapeHtml(completeness.text)}</div>
+
+      <div class="side-section">
+        <h3>Nästa steg</h3>
+        ${nextSteps}
+      </div>
+
+      <div class="side-section">
+        <h3>Personer (${people.length})</h3>
+        ${peopleHtml}
+      </div>
+
+      <div class="side-section">
+        <h3>E-postadresser i datasetet</h3>
+        ${datasetContacts}
+      </div>
+
+      <div class="side-section">
+        <h3>Snabbåtgärder</h3>
+        ${quickActions}
+      </div>
+    </aside>`;
+
+  // ----- Main column -----
   const initialDraftCards = Object.keys(initialDrafts).length === 0
     ? ''
     : `<div class="card">
         <h3>Ingen pågående konversation för: ${Object.values(initialDrafts).map((d) => `<code>${escapeHtml(d.role)}</code>`).join(', ')}</h3>
         <p style="margin:6px 0"><a class="btn btn-primary" style="display:inline-block;text-decoration:none" href="/kommun/${escapeHtml(kommun.kommun_kod)}/compose">📨 Skapa och skicka begäran →</a></p>
+      </div>`;
+
+  const contractsSection = contracts.length === 0
+    ? `<div class="card"><h3>Mottagna avtal (0)</h3><p class="muted">Inga avtal mottagna ännu.</p></div>`
+    : `<div class="card">
+        <h3>Mottagna avtal (${contracts.length})</h3>
+        <table class="contracts-table">
+          <thead><tr><th>Datum</th><th>Ärende</th><th>Roll</th><th>Filnamn</th><th>Storlek</th></tr></thead>
+          <tbody>${contracts.map((c) => `
+            <tr>
+              <td>${escapeHtml(c.received_at?.slice(0, 10) ?? '')}</td>
+              <td><a href="#case-${c.conv_id}">#${c.conv_id}</a></td>
+              <td>${escapeHtml(c.role)}</td>
+              <td>📎 ${escapeHtml(c.filename)}</td>
+              <td>${escapeHtml(fmtBytes(c.size_bytes))}</td>
+            </tr>`).join('')}</tbody>
+        </table>
+      </div>`;
+
+  const vendorsSection = vendors.length === 0
+    ? ''
+    : `<div class="card">
+        <h3>Nämnda leverantörer (${vendors.length})</h3>
+        <div class="muted" style="font-size:12px;margin-bottom:6px">Extraherade från inkommande svar via LLM-analys.</div>
+        <div class="tag-list">${vendors.map((v) => `<span class="tag">${escapeHtml(v)}</span>`).join('')}</div>
       </div>`;
 
   const convCards = conversations.length === 0
@@ -727,7 +945,7 @@ export function renderKommunDetail({ kommun, conversations, messagesByConv, atta
             </div>`).join('')}`;
 
         return `
-          <div class="card">
+          <div class="card" id="case-${conv.id}">
             <div class="case-header">
               <h3>Ärende #${conv.id} · roll: ${escapeHtml(conv.role)}</h3>
               ${caseStatusBadge(conv.state)}
@@ -745,14 +963,17 @@ export function renderKommunDetail({ kommun, conversations, messagesByConv, atta
           </div>`;
       }).join('');
 
-  const body = `
-    <p><a href="/">← Översikt</a></p>
-    <h2>${escapeHtml(kommun.kommun_namn)} kommun <span class="muted" style="font-weight:400">${escapeHtml(kommun.kommun_kod)} · ${escapeHtml(kommun.lan ?? '')} · ${fmtInt(kommun.folkmangd)} inv.</span></h2>
-    ${contactBlock}
-    <h2>Ärenden</h2>
-    ${convCards}
-    ${initialDraftCards}
-  `;
+  const mainColumn = `
+    <div>
+      <p><a href="/">← Översikt</a></p>
+      <h2 style="margin:6px 0 14px">Ärenden (${conversations.length})</h2>
+      ${convCards}
+      ${initialDraftCards}
+      ${contractsSection}
+      ${vendorsSection}
+    </div>`;
+
+  const body = `<div class="kommun-page">${sidebar}${mainColumn}</div>`;
   return layout({ title: kommun.kommun_namn, body, currentPath: '/' });
 }
 
