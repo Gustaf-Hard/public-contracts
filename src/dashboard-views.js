@@ -575,7 +575,12 @@ export function renderOverview({ summary, rows, filter, sort, order, totalKommun
         .map((r) => {
           const stateCell = r.states.length === 0
             ? `<a class="compose-link" href="/kommun/${escapeHtml(r.kommun_kod)}/compose">— ej kontaktad —</a>`
-            : `<div class="pill-list">${r.states.map((s) => `<span title="${escapeHtml(s.role)}">${stateBadge(s.state)}</span>`).join('')}</div>`;
+            : `<div class="pill-list">${r.states.map((s) => {
+                // Title attribute supports newlines on macOS/most modern browsers;
+                // we lead with "Roll: X" then the "Senast / Nästa" narrative.
+                const tip = `Roll: ${s.role}${s.tooltip ? '\n\n' + s.tooltip : ''}`;
+                return `<span title="${escapeHtml(tip)}">${stateBadge(s.state)}</span>`;
+              }).join('')}</div>`;
           const escalCell = r.open_escalations > 0
             ? `<a href="/escalations" class="danger">${r.open_escalations}</a>`
             : `<span class="muted">0</span>`;

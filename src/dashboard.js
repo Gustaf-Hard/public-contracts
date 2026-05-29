@@ -6,7 +6,7 @@
 import express from 'express';
 import { readFileSync, existsSync } from 'node:fs';
 import { openDb } from './storage.js';
-import { effectiveFollowUp } from './conversation.js';
+import { effectiveFollowUp, TERMINAL_STATES } from './conversation.js';
 import { buildOAuthClient, loadStoredToken, makeGmail } from './gmail.js';
 import { sendApprovedReply, sendInitial, renderInitialDraft } from './send-reply.js';
 import {
@@ -61,6 +61,56 @@ function openDbOrNull() {
 
 // ---- Data aggregation helpers ----
 
+// Compute calendar days from today (UTC) to a YYYY-MM-DD string.
+// Negative = past, 0 = today, positive = future.
+function daysUntilIso(iso, now = new Date()) {
+  if (!iso) return null;
+  const target = new Date(iso + 'T00:00:00Z').getTime();
+  if (Number.isNaN(target)) return null;
+  const today = new Date(now.toISOString().slice(0, 10) + 'T00:00:00Z').getTime();
+  return Math.round((target - today) / 86400000);
+}
+
+// Build a short "what happened / what's next" tooltip line per case for the
+// overview hover. ~1-2 sentences. Pure derivation, no DB I/O.
+function caseTooltip(conv, latestInbound, follow_up) {
+  // --- Senast ---
+  let happened;
+  if (latestInbound) {
+    let analysis = null;
+    try { analysis = latestInbound.analysis_json ? JSON.parse(latestInbound.analysis_json) : null; }
+    catch {}
+    if (analysis?.summary) happened = `Senast: ${analysis.summary}`;
+    else if (latestInbound.classification) happened = `Senast: ${latestInbound.classification} mottaget`;
+    else happened = `Senast: svar mottaget`;
+  } else if (conv.state === 'SENT' && conv.last_outbound_at) {
+    const d = daysUntilIso(conv.last_outbound_at.slice(0, 10));
+    const ago = d === null ? '' : ` för ${Math.max(0, -d)} dagar sedan`;
+    happened = `Senast: T-INITIAL skickad${ago}, inget svar än`;
+  } else {
+    happened = `Senast: ${conv.state}`;
+  }
+
+  // --- Nästa ---
+  let next;
+  if (TERMINAL_STATES.has(conv.state)) {
+    next = conv.state === 'DONE' ? 'Nästa: ärendet är stängt' : 'Nästa: återvändsgränd';
+  } else if (conv.state === 'NEEDS_HUMAN') {
+    next = 'Nästa: du måste agera (eskalering öppen)';
+  } else if (follow_up?.date) {
+    const d = daysUntilIso(follow_up.date);
+    const tag = follow_up.source === 'kommun_promise' ? ' (kommunen utlovade datum)' : ' (standardpåminnelse)';
+    if (d === null) next = `Nästa: bevakar till ${follow_up.date}${tag}`;
+    else if (d < 0) next = `Nästa: skicka påminnelse — försenat ${-d}d${tag}`;
+    else if (d === 0) next = `Nästa: påminnelse förfaller idag${tag}`;
+    else next = `Nästa: bevakar svar i ${d}d till ${follow_up.date}${tag}`;
+  } else {
+    next = `Nästa: bevakar (${conv.state})`;
+  }
+
+  return `${happened}\n${next}`;
+}
+
 function buildOverviewRows(municipalities, db) {
   const allConvs = db ? db.listAllConversations() : [];
   const convsByKod = new Map();
@@ -84,6 +134,19 @@ function buildOverviewRows(municipalities, db) {
       `).all()
     : [];
   const attachByConvId = new Map(attachmentCounts.map((r) => [r.conversation_id, r.n]));
+
+  // Latest inbound message per conversation — feeds the hover tooltip's "Senast: …"
+  const latestInbound = db
+    ? db.raw.prepare(`
+        SELECT m.conversation_id, m.subject, m.classification, m.analysis_json
+        FROM messages m
+        WHERE m.direction = 'inbound'
+          AND m.id = (SELECT MAX(m2.id) FROM messages m2
+                      WHERE m2.conversation_id = m.conversation_id
+                        AND m2.direction = 'inbound')
+      `).all()
+    : [];
+  const latestInboundByConvId = new Map(latestInbound.map((r) => [r.conversation_id, r]));
 
   return municipalities.map((m) => {
     const convs = convsByKod.get(m.kommun_kod) ?? [];
@@ -109,7 +172,11 @@ function buildOverviewRows(municipalities, db) {
       kommun_namn: m.kommun_namn,
       lan: m.lan,
       folkmangd: m.folkmangd,
-      states: convs.map((c) => ({ role: c.role, state: c.state })),
+      states: convs.map((c) => ({
+        role: c.role,
+        state: c.state,
+        tooltip: caseTooltip(c, latestInboundByConvId.get(c.id), effectiveFollowUp(c)),
+      })),
       open_escalations: openEsc,
       contracts,
       last_activity_at: lastActivityAt,
