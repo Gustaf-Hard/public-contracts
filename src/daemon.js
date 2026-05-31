@@ -33,6 +33,7 @@ export async function startDaemon({ env = process.env, log = console.log } = {})
 
   async function tickOnce() {
     const now = getEffectiveNow({ env, overrides });
+    let err = null;
     try {
       await runTick({
         db, gmailClient: { gmail }, gmailOps,
@@ -40,12 +41,15 @@ export async function startDaemon({ env = process.env, log = console.log } = {})
         env, contractsDir: CONTRACTS_DIR, now, log,
       });
     } catch (e) {
+      err = e.message;
       log(`tick error: ${e.message}`);
     }
+    db.recordHeartbeat({ kind: 'tick', error: err });
   }
 
   async function followupOnce() {
     const now = getEffectiveNow({ env, overrides });
+    let err = null;
     try {
       await runDailyFollowup({
         db, gmailClient: { gmail }, gmailOps,
@@ -53,8 +57,10 @@ export async function startDaemon({ env = process.env, log = console.log } = {})
         env, contractsDir: CONTRACTS_DIR, now, log,
       });
     } catch (e) {
+      err = e.message;
       log(`followup error: ${e.message}`);
     }
+    db.recordHeartbeat({ kind: 'followup', error: err });
   }
 
   cron.schedule(env.PILOT_TICK_CRON ?? '*/15 * * * *', tickOnce);

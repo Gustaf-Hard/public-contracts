@@ -38,17 +38,21 @@ db.migrate();
 const now = getEffectiveNow({ env: process.env, overrides });
 console.log(`Tick at ${now.toISOString()}`);
 
-await runTick({
-  db,
-  gmailClient: { gmail },
-  gmailOps: { sendMessage: gmailSend, listInboundQuery, getMessage: gmailGet, fetchAttachment },
-  slackClient: slack,
-  slackOps: { postEscalation },
-  env: process.env,
-  contractsDir: CONTRACTS_DIR,
-  now,
-  log: console.log,
-});
+let tickErr = null;
+try {
+  await runTick({
+    db,
+    gmailClient: { gmail },
+    gmailOps: { sendMessage: gmailSend, listInboundQuery, getMessage: gmailGet, fetchAttachment },
+    slackClient: slack,
+    slackOps: { postEscalation },
+    env: process.env,
+    contractsDir: CONTRACTS_DIR,
+    now,
+    log: console.log,
+  });
+} catch (e) { tickErr = e.message; throw e; }
+finally { db.recordHeartbeat({ kind: 'tick', error: tickErr }); }
 
 db.close();
 console.log('Tick done.');

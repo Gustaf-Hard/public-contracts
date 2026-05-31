@@ -357,6 +357,10 @@ const baseCss = `
   .pill-promise  { background: #22c55e1a; color: var(--good); border-color: #22c55e66; }
   .pill-default  { background: #ef44441a; color: var(--bad);  border-color: #ef444466; }
   .pill-overdue  { background: #f59e0b1a; color: var(--warn); border-color: #f59e0b66; }
+  .heartbeat { font-size: 11px; padding: 3px 9px; border-radius: 999px; border: 1px solid; font-weight: 500; }
+  .heartbeat-live  { background: #22c55e1a; color: var(--good); border-color: #22c55e66; }
+  .heartbeat-stale { background: #f59e0b1a; color: var(--warn); border-color: #f59e0b66; }
+  .heartbeat-off   { background: #ef44441a; color: var(--bad);  border-color: #ef444466; }
   .pill-list { display: flex; flex-wrap: wrap; gap: 4px; }
   .muted { color: var(--fg-muted); }
   .danger { color: var(--bad); font-weight: 500; }
@@ -474,7 +478,27 @@ const baseCss = `
 </style>
 `;
 
-function layout({ title, body, currentPath = '/' }) {
+// Render the daemon-heartbeat pill for the header. Thresholds: live <= 20 min,
+// stale 20-60 min, off > 60 min or no tick recorded yet.
+function renderHeartbeatPill(heartbeat) {
+  const lastTick = heartbeat?.last_tick_at;
+  if (!lastTick) {
+    return `<span class="heartbeat heartbeat-off" title="Inga ticks registrerade. Starta daemonen med 'npm run pilot-daemon'.">🔴 daemon AV</span>`;
+  }
+  const ageMs = Date.now() - new Date(lastTick).getTime();
+  const ageMin = Math.floor(ageMs / 60000);
+  const ageLabel = ageMin < 1 ? 'just nu' : ageMin === 1 ? '1 min sedan' : `${ageMin} min sedan`;
+  const titleAttr = `Senaste tick: ${lastTick} (totalt ${heartbeat.tick_count ?? 0} ticks)${heartbeat.last_error ? '\nSenaste fel: ' + heartbeat.last_error : ''}`;
+  if (ageMin <= 20) {
+    return `<span class="heartbeat heartbeat-live" title="${escapeHtml(titleAttr)}">🟢 daemon · ${ageLabel}</span>`;
+  }
+  if (ageMin <= 60) {
+    return `<span class="heartbeat heartbeat-stale" title="${escapeHtml(titleAttr)}">🟡 daemon släpar · ${ageLabel}</span>`;
+  }
+  return `<span class="heartbeat heartbeat-off" title="${escapeHtml(titleAttr)}">🔴 daemon AV · senast ${ageLabel}</span>`;
+}
+
+function layout({ title, body, currentPath = '/', heartbeat = null }) {
   return `<!doctype html>
 <html lang="sv">
 <head>
@@ -493,6 +517,7 @@ function layout({ title, body, currentPath = '/' }) {
       <a href="/activity"${currentPath === '/activity' ? ' style="color:var(--fg)"' : ''}>Aktivitet</a>
     </nav>
     <div class="spacer"></div>
+    ${renderHeartbeatPill(heartbeat)}
     <div class="refresh-info">auto-refresh 30s · ${new Date().toLocaleTimeString('sv-SE')}</div>
   </header>
   <main>${body}</main>
@@ -532,7 +557,7 @@ function sortHeader({ key, label, currentSort, currentOrder, filter, align = 'le
   return `<th${style}><a href="?${params.toString()}" class="th-sort${isActive ? ' th-sort-active' : ''}">${escapeHtml(label)}${indicator}</a></th>`;
 }
 
-export function renderOverview({ summary, rows, filter, sort, order, totalKommuner }) {
+export function renderOverview({ summary, rows, filter, sort, order, totalKommuner, heartbeat = null }) {
   const filters = [
     { key: 'all', label: `Alla (${totalKommuner})` },
     { key: 'in-pilot', label: `I pilot (${summary.in_pilot})` },
@@ -622,7 +647,7 @@ export function renderOverview({ summary, rows, filter, sort, order, totalKommun
     </table>
   `;
 
-  return layout({ title: 'Översikt', body, currentPath: '/' });
+  return layout({ title: 'Översikt', body, currentPath: '/', heartbeat });
 }
 
 // ---- Kommun detail ----
@@ -654,9 +679,9 @@ function renderEscalationForm(esc, gmailReady) {
     </form>`;
 }
 
-export function renderCompose({ kommun, draft, availableRoles = [], selectedRole, candidateEmails = [], gmailReady = false, env = {} }) {
+export function renderCompose({ kommun, draft, availableRoles = [], selectedRole, candidateEmails = [], gmailReady = false, env = {}, heartbeat = null }) {
   if (!kommun) {
-    return layout({ title: 'Saknad kommun', body: '<p>Hittade inte kommunen.</p>', currentPath: '/' });
+    return layout({ title: 'Saknad kommun', body: '<p>Hittade inte kommunen.</p>', currentPath: '/', heartbeat });
   }
   const backLinks = `<p><a href="/">← Översikt</a> · <a href="/kommun/${escapeHtml(kommun.kommun_kod)}">${escapeHtml(kommun.kommun_namn)} kommun (detalj)</a></p>`;
 
@@ -668,7 +693,7 @@ export function renderCompose({ kommun, draft, availableRoles = [], selectedRole
       ${backLinks}
       <h2>${escapeHtml(kommun.kommun_namn)} kommun</h2>
       <p class="muted">${reason}</p>`;
-    return layout({ title: kommun.kommun_namn, body, currentPath: '/' });
+    return layout({ title: kommun.kommun_namn, body, currentPath: '/', heartbeat });
   }
 
   const roleTabs = availableRoles.length > 1
@@ -721,7 +746,7 @@ export function renderCompose({ kommun, draft, availableRoles = [], selectedRole
         </div>
       </div>
     </form>`;
-  return layout({ title: `Skicka — ${kommun.kommun_namn}`, body, currentPath: '/' });
+  return layout({ title: `Skicka — ${kommun.kommun_namn}`, body, currentPath: '/', heartbeat });
 }
 
 // Derive a short "what happens next" string per case. Used in the sidebar.
@@ -808,9 +833,9 @@ function fmtBytes(n) {
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function renderKommunDetail({ kommun, conversations, messagesByConv, attachmentsByMsg, escalationsByConv, signatures, followUpByConv = {}, initialDrafts = {}, gmailReady = false }) {
+export function renderKommunDetail({ kommun, conversations, messagesByConv, attachmentsByMsg, escalationsByConv, signatures, followUpByConv = {}, initialDrafts = {}, gmailReady = false, heartbeat = null }) {
   if (!kommun) {
-    return layout({ title: 'Saknad kommun', body: '<p>Hittade inte kommunen.</p>', currentPath: '/' });
+    return layout({ title: 'Saknad kommun', body: '<p>Hittade inte kommunen.</p>', currentPath: '/', heartbeat });
   }
 
   // ----- Aggregations for the sidebar + bottom sections -----
@@ -979,12 +1004,12 @@ export function renderKommunDetail({ kommun, conversations, messagesByConv, atta
     </div>`;
 
   const body = `<div class="kommun-page">${sidebar}${mainColumn}</div>`;
-  return layout({ title: kommun.kommun_namn, body, currentPath: '/' });
+  return layout({ title: kommun.kommun_namn, body, currentPath: '/', heartbeat });
 }
 
 // ---- Escalations queue ----
 
-export function renderEscalations({ items, gmailReady = false }) {
+export function renderEscalations({ items, gmailReady = false, heartbeat = null }) {
   const body = items.length === 0
     ? '<p class="muted">Inga öppna eskaleringar. ✨</p>'
     : items.map((e) => `
@@ -1002,12 +1027,12 @@ export function renderEscalations({ items, gmailReady = false }) {
           ${renderEscalationForm(e, gmailReady)}
         </div>`).join('');
 
-  return layout({ title: 'Eskaleringar', body: `<h2>Öppna eskaleringar (${items.length})</h2>${body}`, currentPath: '/escalations' });
+  return layout({ title: 'Eskaleringar', body: `<h2>Öppna eskaleringar (${items.length})</h2>${body}`, currentPath: '/escalations', heartbeat });
 }
 
 // ---- Activity feed ----
 
-export function renderActivity({ events }) {
+export function renderActivity({ events, heartbeat = null }) {
   const body = events.length === 0
     ? '<p class="muted">Ingen aktivitet ännu.</p>'
     : `<table>
@@ -1022,5 +1047,5 @@ export function renderActivity({ events }) {
           </tr>`).join('')}
         </tbody>
       </table>`;
-  return layout({ title: 'Aktivitet', body: `<h2>Senaste aktivitet (${events.length})</h2>${body}`, currentPath: '/activity' });
+  return layout({ title: 'Aktivitet', body: `<h2>Senaste aktivitet (${events.length})</h2>${body}`, currentPath: '/activity', heartbeat });
 }

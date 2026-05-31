@@ -315,6 +315,7 @@ export function createDashboardApp({
 } = {}) {
   const app = express();
   app.use(express.urlencoded({ extended: false, limit: '1mb' }));
+  const hb = () => (db && typeof db.getHeartbeat === 'function' ? db.getHeartbeat() : null);
 
   app.get('/', (req, res) => {
     const municipalities = municipalitiesLoader();
@@ -332,6 +333,7 @@ export function createDashboardApp({
       sort,
       order,
       totalKommuner: municipalities.length,
+      heartbeat: hb(),
     }));
   });
 
@@ -399,6 +401,7 @@ export function createDashboardApp({
       followUpByConv,
       initialDrafts,
       gmailReady: !!gmailClient,
+      heartbeat: hb(),
     }));
   });
 
@@ -447,6 +450,7 @@ export function createDashboardApp({
       candidateEmails,
       gmailReady: !!gmailClient,
       env,
+      heartbeat: hb(),
     }));
   });
 
@@ -466,13 +470,13 @@ export function createDashboardApp({
       ORDER BY e.created_at
     `).all();
     res.set('Content-Type', 'text/html; charset=utf-8');
-    res.send(renderEscalations({ items, gmailReady: !!gmailClient }));
+    res.send(renderEscalations({ items, gmailReady: !!gmailClient, heartbeat: hb() }));
   });
 
   app.get('/activity', (req, res) => {
     if (!db) {
       res.set('Content-Type', 'text/html; charset=utf-8');
-      return res.send(renderActivity({ events: [] }));
+      return res.send(renderActivity({ events: [], heartbeat: hb() }));
     }
     // Recent inbound + outbound messages + state changes (rough activity feed)
     const events = db.raw.prepare(`
@@ -496,6 +500,7 @@ export function createDashboardApp({
           ? (e.subject ?? '')
           : `${e.classification ?? 'okänt'} — ${e.subject ?? ''}`,
       })),
+      heartbeat: hb(),
     }));
   });
 

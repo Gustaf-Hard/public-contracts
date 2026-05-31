@@ -81,6 +81,15 @@ CREATE TABLE IF NOT EXISTS decisions (
   decided_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_decisions_class_state ON decisions(classifier_class, conversation_state, decision);
+
+CREATE TABLE IF NOT EXISTS daemon_heartbeat (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  last_tick_at TEXT,
+  last_followup_at TEXT,
+  tick_count INTEGER NOT NULL DEFAULT 0,
+  last_error TEXT
+);
+INSERT OR IGNORE INTO daemon_heartbeat (id, tick_count) VALUES (1, 0);
 `;
 
 export function openDb(path) {
@@ -231,6 +240,21 @@ export function openDb(path) {
     `).run(status, resolved_text, id);
   }
 
+  function recordHeartbeat({ kind = 'tick', error = null } = {}) {
+    const col = kind === 'followup' ? 'last_followup_at' : 'last_tick_at';
+    db.prepare(`
+      UPDATE daemon_heartbeat
+      SET ${col} = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+          tick_count = tick_count + 1,
+          last_error = ?
+      WHERE id = 1
+    `).run(error);
+  }
+
+  function getHeartbeat() {
+    return db.prepare('SELECT * FROM daemon_heartbeat WHERE id = 1').get() ?? null;
+  }
+
   function close() {
     db.close();
   }
@@ -254,6 +278,8 @@ export function openDb(path) {
     resolveEscalation,
     recordDecision,
     listDecisions,
+    recordHeartbeat,
+    getHeartbeat,
     close,
   };
 }
