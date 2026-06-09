@@ -443,6 +443,7 @@ export function createDashboardApp({
     const vendorSlugsByName = new Map(
       (db ? db.listVendorsOverview() : []).map((v) => [v.name.toLowerCase(), v.slug])
     );
+    const handoffContacts = db ? db.listHandoffContacts(kommun.kommun_kod) : [];
     res.send(renderKommunDetail({
       kommun,
       conversations,
@@ -454,6 +455,7 @@ export function createDashboardApp({
       initialDrafts,
       gmailReady: !!gmailClient,
       vendorSlugsByName,
+      handoffContacts,
       heartbeat: hb(),
     }));
   });

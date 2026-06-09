@@ -863,7 +863,7 @@ function fmtBytes(n) {
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function renderKommunDetail({ kommun, conversations, messagesByConv, attachmentsByMsg, escalationsByConv, signatures, followUpByConv = {}, initialDrafts = {}, gmailReady = false, vendorSlugsByName = new Map(), heartbeat = null }) {
+export function renderKommunDetail({ kommun, conversations, messagesByConv, attachmentsByMsg, escalationsByConv, signatures, followUpByConv = {}, initialDrafts = {}, gmailReady = false, vendorSlugsByName = new Map(), handoffContacts = [], heartbeat = null }) {
   if (!kommun) {
     return layout({ title: 'Saknad kommun', body: '<p>Hittade inte kommunen.</p>', currentPath: '/', heartbeat });
   }
@@ -901,9 +901,13 @@ export function renderKommunDetail({ kommun, conversations, messagesByConv, atta
           ${p.phone ? `<div class="person-meta">📞 ${escapeHtml(p.phone)}</div>` : ''}
         </div>`).join('');
 
-  const datasetContacts = (kommun.contacts ?? []).length === 0
-    ? '<p class="muted" style="font-size:12px;margin:6px 0 0">Inga adresser i datasetet.</p>'
-    : `<ul class="plain">${(kommun.contacts ?? []).map((c) => `<li><code>${escapeHtml(c.email)}</code><br><span class="muted" style="font-size:11px">${escapeHtml(c.role)}${c.forvaltning_namn ? ' · ' + escapeHtml(c.forvaltning_namn) : ''}</span></li>`).join('')}</ul>`;
+  const mergedContacts = mergeContacts(kommun.contacts ?? [], handoffContacts);
+  const datasetContacts = mergedContacts.length === 0
+    ? '<p class="muted" style="font-size:12px;margin:6px 0 0">Inga adresser.</p>'
+    : `<ul class="plain">${mergedContacts.map((c) => {
+        const badgeClass = c.source === 'kommun_handoff' ? 'pill pill-promise' : 'pill pill-default';
+        return `<li><code>${escapeHtml(c.email)}</code><br><span class="muted" style="font-size:11px">${escapeHtml(c.role ?? '')}${c.forvaltning ? ' · ' + escapeHtml(c.forvaltning) : ''}</span><br><span class="${badgeClass}" style="margin-top:3px">${escapeHtml(contactSourceLabel(c.source))}</span></li>`;
+      }).join('')}</ul>`;
 
   const quickActions = `<div class="quick-actions">
     <a href="/kommun/${escapeHtml(kommun.kommun_kod)}/compose">📨 Ny begäran (T-INITIAL)</a>
@@ -935,7 +939,7 @@ export function renderKommunDetail({ kommun, conversations, messagesByConv, atta
       </div>
 
       <div class="side-section">
-        <h3>E-postadresser i datasetet</h3>
+        <h3>E-postadresser</h3>
         ${datasetContacts}
       </div>
 
