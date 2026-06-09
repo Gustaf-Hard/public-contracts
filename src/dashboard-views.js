@@ -836,7 +836,7 @@ function fmtBytes(n) {
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function renderKommunDetail({ kommun, conversations, messagesByConv, attachmentsByMsg, escalationsByConv, signatures, followUpByConv = {}, initialDrafts = {}, gmailReady = false, heartbeat = null }) {
+export function renderKommunDetail({ kommun, conversations, messagesByConv, attachmentsByMsg, escalationsByConv, signatures, followUpByConv = {}, initialDrafts = {}, gmailReady = false, vendorSlugsByName = new Map(), heartbeat = null }) {
   if (!kommun) {
     return layout({ title: 'Saknad kommun', body: '<p>Hittade inte kommunen.</p>', currentPath: '/', heartbeat });
   }
@@ -948,7 +948,12 @@ export function renderKommunDetail({ kommun, conversations, messagesByConv, atta
     : `<div class="card">
         <h3>Nämnda leverantörer (${vendors.length})</h3>
         <div class="muted" style="font-size:12px;margin-bottom:6px">Extraherade från inkommande svar via LLM-analys.</div>
-        <div class="tag-list">${vendors.map((v) => `<span class="tag">${escapeHtml(v)}</span>`).join('')}</div>
+        <div class="tag-list">${vendors.map((v) => {
+          const slug = vendorSlugsByName.get(v.toLowerCase());
+          return slug
+            ? `<a class="tag" href="/leverantor/${escapeHtml(slug)}">${escapeHtml(v)}</a>`
+            : `<span class="tag">${escapeHtml(v)}</span>`;
+        }).join('')}</div>
       </div>`;
 
   const convCards = conversations.length === 0

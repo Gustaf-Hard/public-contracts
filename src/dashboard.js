@@ -440,6 +440,9 @@ export function createDashboardApp({
         return acc;
       }, {});
 
+    const vendorSlugsByName = new Map(
+      (db ? db.listVendorsOverview() : []).map((v) => [v.name.toLowerCase(), v.slug])
+    );
     res.send(renderKommunDetail({
       kommun,
       conversations,
@@ -450,6 +453,7 @@ export function createDashboardApp({
       followUpByConv,
       initialDrafts,
       gmailReady: !!gmailClient,
+      vendorSlugsByName,
       heartbeat: hb(),
     }));
   });

@@ -262,3 +262,23 @@ describe('vendor pages', () => {
     expect(res.text).toContain('href="/leverantorer"');
   });
 });
+
+describe('kommun vendor tags link to vendor pages', () => {
+  it('vendor tags link to vendor page when name matches', async () => {
+    seedVendorWithContract();
+    const conv = db.raw.prepare("SELECT * FROM conversations WHERE kommun_kod = '2418'").get();
+    db.recordMessage({
+      conversation_id: conv.id, gmail_message_id: `gm-${Math.random()}`, direction: 'inbound',
+      from_email: 'a@b.se', to_email: 'me@x.com', subject: 'Re', body_text: 'Avtal med Skolon bifogas',
+      classification: 'delivery', classification_confidence: 0.9,
+      received_at: '2026-04-14T10:00:00Z', attachment_count: 0,
+      analysis_json: { intent: 'delivery', extracted: { mentioned_vendors: ['Skolon'] } },
+    });
+    const app = createDashboardApp({
+      db,
+      municipalitiesLoader: () => [{ kommun_kod: '2418', kommun_namn: 'Malå', lan: 'X', folkmangd: 1, contacts: [] }],
+    });
+    const res = await get(app, '/kommun/2418');
+    expect(res.text).toContain('href="/leverantor/skolon"');
+  });
+});
