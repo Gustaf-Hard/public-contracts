@@ -90,6 +90,44 @@ CREATE TABLE IF NOT EXISTS daemon_heartbeat (
   last_error TEXT
 );
 INSERT OR IGNORE INTO daemon_heartbeat (id, tick_count) VALUES (1, 0);
+
+CREATE TABLE IF NOT EXISTS vendors (
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL,
+  slug TEXT NOT NULL UNIQUE,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_vendors_name_nocase ON vendors(name COLLATE NOCASE);
+
+CREATE TABLE IF NOT EXISTS products (
+  id INTEGER PRIMARY KEY,
+  vendor_id INTEGER NOT NULL REFERENCES vendors(id),
+  name TEXT NOT NULL,
+  UNIQUE(vendor_id, name)
+);
+
+CREATE TABLE IF NOT EXISTS contracts (
+  id INTEGER PRIMARY KEY,
+  attachment_id INTEGER NOT NULL UNIQUE REFERENCES attachments(id),
+  vendor_id INTEGER REFERENCES vendors(id),
+  avtalsvarde TEXT,
+  valuta TEXT,
+  period_start TEXT,
+  period_end TEXT,
+  is_contract INTEGER NOT NULL DEFAULT 1,
+  summary TEXT,
+  confidence REAL,
+  analysis_json TEXT,
+  model TEXT,
+  analyzed_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_contracts_vendor ON contracts(vendor_id);
+
+CREATE TABLE IF NOT EXISTS contract_products (
+  contract_id INTEGER NOT NULL REFERENCES contracts(id),
+  product_id INTEGER NOT NULL REFERENCES products(id),
+  PRIMARY KEY (contract_id, product_id)
+);
 `;
 
 export function openDb(path) {
@@ -259,6 +297,127 @@ export function openDb(path) {
     db.close();
   }
 
+  function slugify(name) {
+    return name.toLowerCase()
+      .replace(/[åä]/g, 'a').replace(/ö/g, 'o')
+      .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  }
+
+  function upsertVendor(name) {
+    const existing = db.prepare('SELECT * FROM vendors WHERE name = ? COLLATE NOCASE').get(name);
+    if (existing) return existing;
+    let slug = slugify(name) || 'leverantor';
+    // Diacritics can fold two distinct names onto one slug — suffix until free.
+    let candidate = slug, n = 2;
+    while (db.prepare('SELECT 1 FROM vendors WHERE slug = ?').get(candidate)) {
+      candidate = `${slug}-${n++}`;
+    }
+    const r = db.prepare('INSERT INTO vendors (name, slug) VALUES (?, ?)').run(name, candidate);
+    return db.prepare('SELECT * FROM vendors WHERE id = ?').get(Number(r.lastInsertRowid));
+  }
+
+  function upsertProduct(vendorId, name) {
+    db.prepare('INSERT OR IGNORE INTO products (vendor_id, name) VALUES (?, ?)').run(vendorId, name);
+    return db.prepare('SELECT id FROM products WHERE vendor_id = ? AND name = ?').get(vendorId, name).id;
+  }
+
+  function recordContract(c) {
+    // Re-analysis replaces: clear old row + product links for this attachment.
+    const old = db.prepare('SELECT id FROM contracts WHERE attachment_id = ?').get(c.attachment_id);
+    if (old) {
+      db.prepare('DELETE FROM contract_products WHERE contract_id = ?').run(old.id);
+      db.prepare('DELETE FROM contracts WHERE id = ?').run(old.id);
+    }
+    const r = db.prepare(`
+      INSERT INTO contracts (attachment_id, vendor_id, avtalsvarde, valuta, period_start, period_end,
+                             is_contract, summary, confidence, analysis_json, model)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      c.attachment_id, c.vendor_id ?? null, c.avtalsvarde ?? null, c.valuta ?? null,
+      c.period_start ?? null, c.period_end ?? null, c.is_contract ?? 1,
+      c.summary ?? null, c.confidence ?? null,
+      c.analysis_json != null ? JSON.stringify(c.analysis_json) : null, c.model ?? null,
+    );
+    return Number(r.lastInsertRowid);
+  }
+
+  function linkContractProduct(contractId, productId) {
+    db.prepare('INSERT OR IGNORE INTO contract_products (contract_id, product_id) VALUES (?, ?)').run(contractId, productId);
+  }
+
+  function listPendingContractAttachments() {
+    return db.prepare(`
+      SELECT a.*, conv.kommun_kod, conv.kommun_namn, conv.role
+      FROM attachments a
+      JOIN messages m ON m.id = a.message_id
+      JOIN conversations conv ON conv.id = m.conversation_id
+      LEFT JOIN contracts c ON c.attachment_id = a.id
+      WHERE c.id IS NULL
+        AND (a.mime_type = 'application/pdf' OR lower(a.filename) LIKE '%.pdf')
+      ORDER BY a.id
+    `).all();
+  }
+
+  function productsForContractIds(ids) {
+    if (ids.length === 0) return new Map();
+    const rows = db.prepare(`
+      SELECT cp.contract_id, p.name FROM contract_products cp
+      JOIN products p ON p.id = cp.product_id
+      WHERE cp.contract_id IN (${ids.map(() => '?').join(',')})
+      ORDER BY p.name
+    `).all(...ids);
+    const map = new Map();
+    for (const r of rows) {
+      if (!map.has(r.contract_id)) map.set(r.contract_id, []);
+      map.get(r.contract_id).push(r.name);
+    }
+    return map;
+  }
+
+  function listContractsForVendor(vendorId) {
+    const rows = db.prepare(`
+      SELECT c.*, a.filename, a.size_bytes, a.id AS attachment_id,
+             m.received_at, conv.kommun_namn, conv.kommun_kod
+      FROM contracts c
+      JOIN attachments a ON a.id = c.attachment_id
+      JOIN messages m ON m.id = a.message_id
+      JOIN conversations conv ON conv.id = m.conversation_id
+      WHERE c.vendor_id = ? AND c.is_contract = 1
+      ORDER BY m.received_at DESC
+    `).all(vendorId);
+    const prodMap = productsForContractIds(rows.map((r) => r.id));
+    return rows.map((r) => ({ ...r, products: prodMap.get(r.id) ?? [] }));
+  }
+
+  function listVendorsOverview() {
+    const rows = db.prepare(`
+      SELECT v.id, v.name, v.slug,
+             COUNT(DISTINCT c.id) AS contract_count,
+             COUNT(DISTINCT conv.kommun_kod) AS kommun_count,
+             MAX(m.received_at) AS last_contract_at
+      FROM vendors v
+      LEFT JOIN contracts c ON c.vendor_id = v.id AND c.is_contract = 1
+      LEFT JOIN attachments a ON a.id = c.attachment_id
+      LEFT JOIN messages m ON m.id = a.message_id
+      LEFT JOIN conversations conv ON conv.id = m.conversation_id
+      GROUP BY v.id
+      ORDER BY contract_count DESC, v.name COLLATE NOCASE
+    `).all();
+    const prods = db.prepare(`
+      SELECT vendor_id, name FROM products ORDER BY name
+    `).all();
+    const byVendor = new Map();
+    for (const p of prods) {
+      if (!byVendor.has(p.vendor_id)) byVendor.set(p.vendor_id, []);
+      byVendor.get(p.vendor_id).push(p.name);
+    }
+    return rows.map((r) => ({ ...r, products: byVendor.get(r.id) ?? [] }));
+  }
+
+  function getVendorBySlug(slug) {
+    return db.prepare('SELECT * FROM vendors WHERE slug = ?').get(slug);
+  }
+
   return {
     raw: db,
     migrate,
@@ -281,5 +440,13 @@ export function openDb(path) {
     recordHeartbeat,
     getHeartbeat,
     close,
+    upsertVendor,
+    upsertProduct,
+    recordContract,
+    linkContractProduct,
+    listPendingContractAttachments,
+    listContractsForVendor,
+    listVendorsOverview,
+    getVendorBySlug,
   };
 }
