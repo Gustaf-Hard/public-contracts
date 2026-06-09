@@ -203,3 +203,16 @@ describe('GET /attachments/:id', () => {
     expect((await getRaw(app, `/attachments/${attId}`)).status).toBe(404);
   });
 });
+
+describe('clickable contract links on kommun page', () => {
+  it('Mottagna avtal table and timeline link to /attachments/:id', async () => {
+    const { attId, contractsDir } = seedPdfAttachment();
+    const app = createDashboardApp({
+      db, contractsDir,
+      municipalitiesLoader: () => [{ kommun_kod: '2418', kommun_namn: 'Malå', lan: 'X', folkmangd: 1, contacts: [] }],
+    });
+    const res = await get(app, '/kommun/2418');
+    const matches = res.text.match(new RegExp(`href="/attachments/${attId}"`, 'g'));
+    expect(matches?.length).toBeGreaterThanOrEqual(2); // table + timeline
+  });
+});

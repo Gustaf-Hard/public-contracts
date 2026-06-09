@@ -171,6 +171,7 @@ function buildTimeline(conv, messages, attachmentsByMsg, signatures = {}) {
           icon: '📎',
           title: 'Avtal mottaget',
           sub: att.filename,
+          link: `/attachments/${att.id}`,
         });
       }
     }
@@ -219,7 +220,7 @@ function renderTimeline(events) {
       <div class="timeline-icon">${e.icon}</div>
       <div class="timeline-body">
         <div class="ev-title">${escapeHtml(e.title)}</div>
-        ${e.sub ? `<div class="ev-sub">${escapeHtml(e.sub)}</div>` : ''}
+        ${e.sub ? `<div class="ev-sub">${e.link ? `<a href="${escapeHtml(e.link)}" target="_blank" rel="noopener">${escapeHtml(e.sub)}</a>` : escapeHtml(e.sub)}</div>` : ''}
         ${e.body ? `<div class="body-quote ${e.bodyClass}">${escapeHtml(e.body)}</div>` : ''}
         ${analysisBlock}
         ${sigBlock}
@@ -814,6 +815,7 @@ function aggregateContracts(conversations, messagesByConv, attachmentsByMsg) {
     for (const m of messagesByConv[conv.id] ?? []) {
       for (const att of attachmentsByMsg[m.id] ?? []) {
         out.push({
+          id: att.id,
           filename: att.filename,
           size_bytes: att.size_bytes,
           received_at: m.received_at,
@@ -934,7 +936,7 @@ export function renderKommunDetail({ kommun, conversations, messagesByConv, atta
               <td>${escapeHtml(c.received_at?.slice(0, 10) ?? '')}</td>
               <td><a href="#case-${c.conv_id}">#${c.conv_id}</a></td>
               <td>${escapeHtml(c.role)}</td>
-              <td>📎 ${escapeHtml(c.filename)}</td>
+              <td><a href="/attachments/${c.id}" target="_blank" rel="noopener">📎 ${escapeHtml(c.filename)}</a></td>
               <td>${escapeHtml(fmtBytes(c.size_bytes))}</td>
             </tr>`).join('')}</tbody>
         </table>
