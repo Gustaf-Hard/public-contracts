@@ -71,9 +71,24 @@ function daysUntilIso(iso, now = new Date()) {
   return Math.round((target - today) / 86400000);
 }
 
+// Translate an open escalation into a plain-Swedish action so the overview
+// tooltip can say *how* a "Behöver dig" kommun needs the operator. Keyed on the
+// queued draft template (the FSM picks the template per situation).
+export function escalationActionLabel(esc) {
+  const labels = {
+    free_form: 'fritextsvar krävs',
+    T_FOLLOWUP_NUDGE: 'skicka påminnelse',
+    T_FOLLOWUP_CLOSE: 'skicka avslutspåminnelse',
+    T_RECEIPT: 'skicka mottagningskvitto',
+  };
+  return labels[esc?.draft_template] ?? 'granska och svara';
+}
+
 // Build a short "what happened / what's next" tooltip line per case for the
-// overview hover. ~1-2 sentences. Pure derivation, no DB I/O.
-function caseTooltip(conv, latestInbound, follow_up) {
+// overview hover. ~1-2 sentences. Pure derivation, no DB I/O. `openEsc` is the
+// latest open escalation row (or undefined) — used to spell out the action when
+// the case is NEEDS_HUMAN.
+export function caseTooltip(conv, latestInbound, follow_up, openEsc) {
   // --- Senast ---
   let happened;
   if (latestInbound) {
@@ -93,10 +108,12 @@ function caseTooltip(conv, latestInbound, follow_up) {
 
   // --- Nästa ---
   let next;
-  if (TERMINAL_STATES.has(conv.state)) {
+  // NEEDS_HUMAN is in TERMINAL_STATES, so it must be checked first — otherwise
+  // the terminal branch below mislabels it as "återvändsgränd".
+  if (conv.state === 'NEEDS_HUMAN') {
+    next = `Nästa: du måste agera — ${escalationActionLabel(openEsc)}`;
+  } else if (TERMINAL_STATES.has(conv.state)) {
     next = conv.state === 'DONE' ? 'Nästa: ärendet är stängt' : 'Nästa: återvändsgränd';
-  } else if (conv.state === 'NEEDS_HUMAN') {
-    next = 'Nästa: du måste agera (eskalering öppen)';
   } else if (follow_up?.date) {
     const d = daysUntilIso(follow_up.date);
     const tag = follow_up.source === 'kommun_promise' ? ' (kommunen utlovade datum)' : ' (standardpåminnelse)';
@@ -124,6 +141,18 @@ function buildOverviewRows(municipalities, db) {
     ? db.raw.prepare("SELECT conversation_id, count(*) as n FROM escalations WHERE status='open' GROUP BY conversation_id").all()
     : [];
   const openEscByConvId = new Map(openEscalations.map((r) => [r.conversation_id, r.n]));
+
+  // Latest open escalation per conversation — feeds the tooltip's "du måste agera — …".
+  const latestOpenEsc = db
+    ? db.raw.prepare(`
+        SELECT e.conversation_id, e.draft_template
+        FROM escalations e
+        WHERE e.status = 'open'
+          AND e.id = (SELECT MAX(e2.id) FROM escalations e2
+                      WHERE e2.conversation_id = e.conversation_id AND e2.status = 'open')
+      `).all()
+    : [];
+  const latestOpenEscByConvId = new Map(latestOpenEsc.map((r) => [r.conversation_id, r]));
 
   // Attachment count per conversation
   const attachmentCounts = db
@@ -175,7 +204,7 @@ function buildOverviewRows(municipalities, db) {
       states: convs.map((c) => ({
         role: c.role,
         state: c.state,
-        tooltip: caseTooltip(c, latestInboundByConvId.get(c.id), effectiveFollowUp(c)),
+        tooltip: caseTooltip(c, latestInboundByConvId.get(c.id), effectiveFollowUp(c), latestOpenEscByConvId.get(c.id)),
       })),
       open_escalations: openEsc,
       contracts,
