@@ -1,6 +1,11 @@
 // tests/analyse-contract.test.js
 import { describe, it, expect, vi } from 'vitest';
 import { analyseContractPdf } from '../src/analyse-contract.js';
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, dirname } from 'node:path';
+import { openDb } from '../src/storage.js';
+import { storeContractAnalysis, analysePendingContracts } from '../src/analyse-contract.js';
 
 const GOOD = {
   is_contract: true, vendor_name: 'Skolon',
@@ -44,5 +49,85 @@ describe('analyseContractPdf', () => {
     const bad = { messages: { create: vi.fn(async () => ({ content: [{ type: 'text', text: 'not json' }] })) } };
     expect(await analyseContractPdf(pdf, ctx, { env: { ANTHROPIC_API_KEY: 'sk' }, client: bad })).toBeNull();
     expect(await analyseContractPdf(pdf, ctx, { env: {} })).toBeNull();
+  });
+});
+
+function seedDbWithPdf(tmp, { filename = 'Avtal Skolon.pdf' } = {}) {
+  const db = openDb(join(tmp, 'pilot.db'));
+  db.migrate();
+  const convId = db.createConversation({
+    kommun_kod: '1980', kommun_namn: 'Västerås', role: 'central',
+    contact_email: 'reg@vasteras.se', scheduled_send_at: '2026-04-01T08:00:00Z',
+  });
+  const msgId = db.recordMessage({
+    conversation_id: convId, gmail_message_id: `gm-${Math.random()}`, direction: 'inbound',
+    from_email: 'reg@vasteras.se', to_email: 'me@x.com', subject: 'Avtal', body_text: '',
+    classification: null, classification_confidence: null,
+    received_at: '2026-04-13T10:00:00Z', attachment_count: 1,
+  });
+  const savedPath = join(tmp, 'contracts', '1980', filename);
+  mkdirSync(dirname(savedPath), { recursive: true });
+  writeFileSync(savedPath, '%PDF-1.4 fake contract');
+  const attId = db.recordAttachment({
+    message_id: msgId, filename, saved_path: savedPath,
+    mime_type: 'application/pdf', size_bytes: 22,
+  });
+  return { db, attId };
+}
+
+describe('storeContractAnalysis', () => {
+  it('creates vendor, products, contract from an analysis', () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'ac-'));
+    const { db, attId } = seedDbWithPdf(tmp);
+    storeContractAnalysis(db, attId, GOOD, { model: 'claude-opus-4-8' });
+    const v = db.getVendorBySlug('skolon');
+    expect(v).toBeDefined();
+    const contracts = db.listContractsForVendor(v.id);
+    expect(contracts).toHaveLength(1);
+    expect(contracts[0].products).toEqual(['Skolon Plattform']);
+    expect(contracts[0].period_end).toBe('2027-07-31');
+    db.close(); rmSync(tmp, { recursive: true, force: true });
+  });
+
+  it('is_contract=false stores row without vendor', () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'ac-'));
+    const { db, attId } = seedDbWithPdf(tmp);
+    storeContractAnalysis(db, attId, { ...GOOD, is_contract: false, vendor_name: null, products: [] }, { model: 'm' });
+    expect(db.listVendorsOverview()).toHaveLength(0);
+    expect(db.listPendingContractAttachments()).toHaveLength(0); // analysed, not pending
+    db.close(); rmSync(tmp, { recursive: true, force: true });
+  });
+});
+
+describe('analysePendingContracts', () => {
+  it('analyses each pending PDF and stores results; second run is a no-op', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'ac-'));
+    const { db } = seedDbWithPdf(tmp);
+    const client = fakeClientReturning(GOOD);
+    const n1 = await analysePendingContracts({ db, env: { ANTHROPIC_API_KEY: 'sk' }, client });
+    expect(n1).toBe(1);
+    expect(client.messages.create).toHaveBeenCalledTimes(1);
+    const n2 = await analysePendingContracts({ db, env: { ANTHROPIC_API_KEY: 'sk' }, client });
+    expect(n2).toBe(0);
+    expect(client.messages.create).toHaveBeenCalledTimes(1);
+    db.close(); rmSync(tmp, { recursive: true, force: true });
+  });
+
+  it('leaves attachment pending when LLM returns null', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'ac-'));
+    const { db } = seedDbWithPdf(tmp);
+    const client = { messages: { create: vi.fn(async () => { throw new Error('boom'); }) } };
+    const n = await analysePendingContracts({ db, env: { ANTHROPIC_API_KEY: 'sk' }, client });
+    expect(n).toBe(0);
+    expect(db.listPendingContractAttachments()).toHaveLength(1);
+    db.close(); rmSync(tmp, { recursive: true, force: true });
+  });
+
+  it('does nothing without an API key', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'ac-'));
+    const { db } = seedDbWithPdf(tmp);
+    const n = await analysePendingContracts({ db, env: {} });
+    expect(n).toBe(0);
+    db.close(); rmSync(tmp, { recursive: true, force: true });
   });
 });

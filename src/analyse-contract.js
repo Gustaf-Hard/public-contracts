@@ -7,6 +7,8 @@
 // extraction. Claude's PDF support handles image-based pages too.
 
 import Anthropic from '@anthropic-ai/sdk';
+import { readFileSync, existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 const DEFAULT_MODEL = 'claude-opus-4-8';
 
@@ -88,4 +90,69 @@ export async function analyseContractPdf(pdfBuffer, ctx, { env = process.env, cl
     console.warn(`[analyse-contract] LLM call failed for ${ctx.filename}: ${e.message}`);
     return null;
   }
+}
+
+// Persist one analysis: vendor (case-insensitive upsert) + products + contract row.
+// Re-running for the same attachment replaces (recordContract handles that).
+export function storeContractAnalysis(db, attachmentId, analysis, { model } = {}) {
+  let vendorId = null;
+  if (analysis.is_contract && analysis.vendor_name) {
+    vendorId = db.upsertVendor(analysis.vendor_name).id;
+  }
+  const contractId = db.recordContract({
+    attachment_id: attachmentId,
+    vendor_id: vendorId,
+    avtalsvarde: analysis.avtalsvarde,
+    valuta: analysis.valuta,
+    period_start: analysis.period_start,
+    period_end: analysis.period_end,
+    is_contract: analysis.is_contract ? 1 : 0,
+    summary: analysis.summary,
+    confidence: analysis.confidence,
+    analysis_json: analysis,
+    model,
+  });
+  if (vendorId) {
+    for (const name of analysis.products ?? []) {
+      db.linkContractProduct(contractId, db.upsertProduct(vendorId, name));
+    }
+  }
+  return contractId;
+}
+
+// Analyse every PDF attachment that has no contracts row yet. Errors on one
+// PDF never block the others, and never throw to the caller (tick safety).
+// Returns the number of attachments successfully analysed+stored.
+export async function analysePendingContracts({ db, env = process.env, client = null, log = null, force = false, onlyId = null } = {}) {
+  if (!client && !(env.ANTHROPIC_API_KEY && env.ANTHROPIC_API_KEY.trim())) return 0;
+
+  let pending = force
+    ? db.raw.prepare(`
+        SELECT a.*, conv.kommun_kod, conv.kommun_namn, conv.role
+        FROM attachments a
+        JOIN messages m ON m.id = a.message_id
+        JOIN conversations conv ON conv.id = m.conversation_id
+        WHERE (a.mime_type = 'application/pdf' OR lower(a.filename) LIKE '%.pdf')
+        ORDER BY a.id
+      `).all()
+    : db.listPendingContractAttachments();
+  if (onlyId != null) pending = pending.filter((a) => a.id === onlyId);
+
+  const model = env.ANTHROPIC_CONTRACT_MODEL ?? DEFAULT_MODEL;
+  let done = 0;
+  for (const att of pending) {
+    const fullPath = resolve(att.saved_path);
+    if (!existsSync(fullPath)) {
+      log?.(`contract-analysis: file missing on disk, skipping ${att.filename}`);
+      continue;
+    }
+    const analysis = await analyseContractPdf(readFileSync(fullPath), {
+      kommun_namn: att.kommun_namn, filename: att.filename,
+    }, { env, client });
+    if (!analysis) continue; // stays pending; next run retries
+    storeContractAnalysis(db, att.id, analysis, { model });
+    log?.(`CONTRACT analysed: ${att.filename} → ${analysis.is_contract ? (analysis.vendor_name ?? 'okänd leverantör') : 'ej avtal'}`);
+    done += 1;
+  }
+  return done;
 }
