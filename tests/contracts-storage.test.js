@@ -112,3 +112,51 @@ describe('listVendorsOverview', () => {
     expect(db.getVendorBySlug('nope')).toBeUndefined();
   });
 });
+
+describe('listHandoffContacts', () => {
+  function seedConvWithHandoff({ kommun_kod = '1984', role = 'central', handoff_email = 'barn.utbildning@arboga.se', handoff_forv = 'Barn- och utbildningsförvaltningen' } = {}) {
+    const convId = db.createConversation({
+      kommun_kod, kommun_namn: 'Arboga', role,
+      contact_email: 'arboga.kommun@arboga.se', scheduled_send_at: '2026-04-01T08:00:00Z',
+    });
+    db.recordMessage({
+      conversation_id: convId, gmail_message_id: `gm-${Math.random()}`, direction: 'inbound',
+      from_email: 'arboga.kommun@arboga.se', to_email: 'me@x.com', subject: 'Re', body_text: 'Kontakta BoU',
+      classification: 'handoff', classification_confidence: 0.9,
+      received_at: '2026-04-14T10:00:00Z', attachment_count: 0,
+      analysis_json: { intent: 'handoff', extracted: { handoff_to_email: handoff_email, handoff_to_forvaltning: handoff_forv } },
+    });
+    return convId;
+  }
+
+  it('extracts handoff_to_email + forvaltning + role for a kommun', () => {
+    seedConvWithHandoff();
+    const rows = db.listHandoffContacts('1984');
+    expect(rows).toEqual([
+      { email: 'barn.utbildning@arboga.se', forvaltning: 'Barn- och utbildningsförvaltningen', role: 'central' },
+    ]);
+  });
+
+  it('dedups repeated handoff addresses (case-insensitive)', () => {
+    seedConvWithHandoff();
+    seedConvWithHandoff({ role: 'utbildning', handoff_email: 'BARN.UTBILDNING@arboga.se' });
+    const rows = db.listHandoffContacts('1984');
+    expect(rows).toHaveLength(1);
+  });
+
+  it('ignores messages without a handoff address; empty for unknown kommun', () => {
+    const convId = db.createConversation({
+      kommun_kod: '1980', kommun_namn: 'Västerås', role: 'central',
+      contact_email: 'r@v.se', scheduled_send_at: '2026-04-01T08:00:00Z',
+    });
+    db.recordMessage({
+      conversation_id: convId, gmail_message_id: `gm-${Math.random()}`, direction: 'inbound',
+      from_email: 'r@v.se', to_email: 'me@x.com', subject: 'Re', body_text: 'hej',
+      classification: 'auto_ack', classification_confidence: 0.9,
+      received_at: '2026-04-14T10:00:00Z', attachment_count: 0,
+      analysis_json: { intent: 'auto_ack', extracted: { handoff_to_email: null } },
+    });
+    expect(db.listHandoffContacts('1980')).toEqual([]);
+    expect(db.listHandoffContacts('0000')).toEqual([]);
+  });
+});

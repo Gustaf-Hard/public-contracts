@@ -418,6 +418,31 @@ export function openDb(path) {
     return db.prepare('SELECT * FROM vendors WHERE slug = ?').get(slug);
   }
 
+  function listHandoffContacts(kommunKod) {
+    // Handoff addresses the kommun explicitly gave us, derived from inbound
+    // LLM analysis. Dedup by lowercased email; first occurrence wins for role.
+    const rows = db.prepare(`
+      SELECT conv.role AS role,
+             json_extract(m.analysis_json, '$.extracted.handoff_to_email') AS email,
+             json_extract(m.analysis_json, '$.extracted.handoff_to_forvaltning') AS forvaltning
+      FROM messages m
+      JOIN conversations conv ON conv.id = m.conversation_id
+      WHERE conv.kommun_kod = ?
+        AND m.direction = 'inbound'
+        AND email IS NOT NULL AND email != ''
+      ORDER BY m.received_at, m.id
+    `).all(kommunKod);
+    const seen = new Set();
+    const out = [];
+    for (const r of rows) {
+      const key = r.email.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ email: r.email, forvaltning: r.forvaltning ?? null, role: r.role });
+    }
+    return out;
+  }
+
   return {
     raw: db,
     migrate,
@@ -448,5 +473,6 @@ export function openDb(path) {
     listContractsForVendor,
     listVendorsOverview,
     getVendorBySlug,
+    listHandoffContacts,
   };
 }
