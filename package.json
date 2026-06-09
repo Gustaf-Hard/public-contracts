@@ -15,7 +15,8 @@
     "pilot-init": "node scripts/pilot-init.js",
     "pilot-daemon": "node scripts/pilot-daemon.js",
     "pilot-resolve": "node scripts/pilot-resolve.js",
-    "pilot-dashboard": "node scripts/pilot-dashboard.js"
+    "pilot-dashboard": "node scripts/pilot-dashboard.js",
+    "analyse-contracts": "node scripts/06-analyse-contracts.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.40.1",
