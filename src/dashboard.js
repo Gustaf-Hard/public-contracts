@@ -16,6 +16,8 @@ import {
   renderEscalations,
   renderActivity,
   renderCompose,
+  renderVendors,
+  renderVendorDetail,
 } from './dashboard-views.js';
 
 const ROLE_PRIORITY = ['central', 'utbildning', 'gymnasie', 'vuxenutbildning', 'other'];
@@ -549,6 +551,20 @@ export function createDashboardApp({
       })),
       heartbeat: hb(),
     }));
+  });
+
+  app.get('/leverantorer', (req, res) => {
+    const vendors = db ? db.listVendorsOverview() : [];
+    res.set('Content-Type', 'text/html; charset=utf-8');
+    res.send(renderVendors({ vendors, heartbeat: hb() }));
+  });
+
+  app.get('/leverantor/:slug', (req, res) => {
+    const vendor = db ? db.getVendorBySlug(req.params.slug) : null;
+    res.set('Content-Type', 'text/html; charset=utf-8');
+    if (!vendor) return res.status(404).send(renderVendorDetail({ vendor: null, heartbeat: hb() }));
+    const contracts = db.listContractsForVendor(vendor.id);
+    res.send(renderVendorDetail({ vendor, contracts, heartbeat: hb() }));
   });
 
   // --- Action endpoints (outbound email) ---

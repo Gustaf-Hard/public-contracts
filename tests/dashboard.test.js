@@ -216,3 +216,49 @@ describe('clickable contract links on kommun page', () => {
     expect(matches?.length).toBeGreaterThanOrEqual(2); // table + timeline
   });
 });
+
+function seedVendorWithContract() {
+  const { attId } = seedPdfAttachment();
+  const v = db.upsertVendor('Skolon');
+  const cId = db.recordContract({
+    attachment_id: attId, vendor_id: v.id,
+    avtalsvarde: '120 000 kr/år', valuta: 'SEK',
+    period_start: '2025-08-01', period_end: '2027-07-31',
+    is_contract: 1, summary: 'Lärplattform', confidence: 0.95,
+  });
+  db.linkContractProduct(cId, db.upsertProduct(v.id, 'Skolon Plattform'));
+  return { v, attId };
+}
+
+describe('vendor pages', () => {
+  it('/leverantorer lists vendors with counts and links', async () => {
+    seedVendorWithContract();
+    const app = appWithFakes();
+    const res = await get(app, '/leverantorer');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Skolon');
+    expect(res.text).toContain('href="/leverantor/skolon"');
+    expect(res.text).toContain('Skolon Plattform');
+  });
+
+  it('/leverantor/:slug shows contracts with PDF links and kommun', async () => {
+    const { attId } = seedVendorWithContract();
+    const app = appWithFakes();
+    const res = await get(app, '/leverantor/skolon');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Malå');
+    expect(res.text).toContain(`href="/attachments/${attId}"`);
+    expect(res.text).toContain('2027-07-31');
+  });
+
+  it('unknown slug → 404', async () => {
+    const app = appWithFakes();
+    expect((await get(app, '/leverantor/nope')).status).toBe(404);
+  });
+
+  it('nav contains Leverantörer link', async () => {
+    const app = appWithFakes();
+    const res = await get(app, '/');
+    expect(res.text).toContain('href="/leverantorer"');
+  });
+});

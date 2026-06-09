@@ -516,6 +516,7 @@ function layout({ title, body, currentPath = '/', heartbeat = null }) {
       <a href="/"${currentPath === '/' ? ' style="color:var(--fg)"' : ''}>Översikt</a>
       <a href="/escalations"${currentPath === '/escalations' ? ' style="color:var(--fg)"' : ''}>Eskaleringar</a>
       <a href="/activity"${currentPath === '/activity' ? ' style="color:var(--fg)"' : ''}>Aktivitet</a>
+      <a href="/leverantorer"${currentPath === '/leverantorer' ? ' style="color:var(--fg)"' : ''}>Leverantörer</a>
     </nav>
     <div class="spacer"></div>
     ${renderHeartbeatPill(heartbeat)}
@@ -1050,4 +1051,70 @@ export function renderActivity({ events, heartbeat = null }) {
         </tbody>
       </table>`;
   return layout({ title: 'Aktivitet', body: `<h2>Senaste aktivitet (${events.length})</h2>${body}`, currentPath: '/activity', heartbeat });
+}
+
+function activeBadge(periodEnd) {
+  if (!periodEnd) return '<span class="muted">okänd avtalstid</span>';
+  const active = periodEnd >= new Date().toISOString().slice(0, 10);
+  return active
+    ? `<span class="pill pill-promise">aktivt t.o.m. ${escapeHtml(periodEnd)}</span>`
+    : `<span class="pill pill-overdue">utgånget ${escapeHtml(periodEnd)}</span>`;
+}
+
+export function renderVendors({ vendors = [], heartbeat = null } = {}) {
+  const rows = vendors.map((v) => `
+    <tr>
+      <td><a href="/leverantor/${escapeHtml(v.slug)}">${escapeHtml(v.name)}</a></td>
+      <td><div class="tag-list">${v.products.map((p) => `<span class="tag">${escapeHtml(p)}</span>`).join('')}</div></td>
+      <td>${v.contract_count}</td>
+      <td>${v.kommun_count}</td>
+      <td>${escapeHtml(v.last_contract_at?.slice(0, 10) ?? '—')}</td>
+    </tr>`).join('');
+  const body = `
+    <div class="card">
+      <h3>Leverantörer (${vendors.length})</h3>
+      ${vendors.length === 0
+        ? '<p class="muted">Inga leverantörer ännu — kör <code>npm run analyse-contracts</code>.</p>'
+        : `<table class="contracts-table">
+            <thead><tr><th>Leverantör</th><th>Produkter</th><th>Avtal</th><th>Kommuner</th><th>Senaste avtal</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>`}
+    </div>`;
+  return layout({ title: 'Leverantörer', body, currentPath: '/leverantorer', heartbeat });
+}
+
+export function renderVendorDetail({ vendor, contracts = [], heartbeat = null } = {}) {
+  if (!vendor) {
+    return layout({
+      title: 'Okänd leverantör',
+      body: '<div class="card"><h3>Okänd leverantör</h3><p><a href="/leverantorer">← Leverantörer</a></p></div>',
+      currentPath: '/leverantorer', heartbeat,
+    });
+  }
+  const allProducts = [...new Set(contracts.flatMap((c) => c.products))];
+  const kommuner = [...new Map(contracts.map((c) => [c.kommun_kod, c.kommun_namn])).entries()];
+  const rows = contracts.map((c) => `
+    <tr>
+      <td><a href="/kommun/${escapeHtml(c.kommun_kod)}">${escapeHtml(c.kommun_namn)}</a></td>
+      <td>${escapeHtml(c.received_at?.slice(0, 10) ?? '')}</td>
+      <td><a href="/attachments/${c.attachment_id}" target="_blank" rel="noopener">📎 ${escapeHtml(c.filename)}</a></td>
+      <td><div class="tag-list">${c.products.map((p) => `<span class="tag">${escapeHtml(p)}</span>`).join('')}</div></td>
+      <td>${escapeHtml(c.avtalsvarde ?? '—')}</td>
+      <td>${activeBadge(c.period_end)}</td>
+    </tr>`).join('');
+  const body = `
+    <p><a href="/leverantorer">← Leverantörer</a></p>
+    <div class="card">
+      <h3>${escapeHtml(vendor.name)}</h3>
+      ${allProducts.length ? `<div class="tag-list" style="margin:6px 0">${allProducts.map((p) => `<span class="tag">${escapeHtml(p)}</span>`).join('')}</div>` : ''}
+      <p class="muted">${contracts.length} avtal · ${kommuner.length} kommun(er): ${kommuner.map(([kod, namn]) => `<a href="/kommun/${escapeHtml(kod)}">${escapeHtml(namn)}</a>`).join(', ')}</p>
+    </div>
+    <div class="card">
+      <h3>Avtal (${contracts.length})</h3>
+      <table class="contracts-table">
+        <thead><tr><th>Kommun</th><th>Datum</th><th>Fil</th><th>Produkter</th><th>Värde</th><th>Avtalstid</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+  return layout({ title: vendor.name, body, currentPath: '/leverantorer', heartbeat });
 }
