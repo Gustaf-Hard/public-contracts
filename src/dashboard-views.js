@@ -797,6 +797,33 @@ function aggregatePeople(conversations, messagesByConv, signatures) {
   return [...byKey.values()];
 }
 
+const CONTACT_SOURCE_LABELS = {
+  kommun_handoff: 'kommunen angav i mejl',
+  website: 'hittad på webbplats',
+};
+export function contactSourceLabel(source) {
+  return CONTACT_SOURCE_LABELS[source] ?? source;
+}
+
+// Unify dataset contacts (website) and handoff contacts (kommun_handoff) into a
+// single source-tagged list. Dedup by lowercased email; highest trust wins
+// (kommun_handoff > website). Sort: trust first, then email.
+export function mergeContacts(datasetContacts = [], handoffContacts = []) {
+  const TRUST = { kommun_handoff: 0, website: 1 };
+  const byEmail = new Map();
+  const add = (email, role, forvaltning, source) => {
+    if (!email) return;
+    const key = email.toLowerCase();
+    const existing = byEmail.get(key);
+    if (existing && TRUST[existing.source] <= TRUST[source]) return; // keep higher trust
+    byEmail.set(key, { email, role, forvaltning: forvaltning ?? null, source });
+  };
+  for (const c of handoffContacts ?? []) add(c.email, c.role, c.forvaltning, 'kommun_handoff');
+  for (const c of datasetContacts ?? []) add(c.email, c.role, c.forvaltning_namn ?? c.forvaltning, 'website');
+  return [...byEmail.values()].sort((a, b) =>
+    (TRUST[a.source] - TRUST[b.source]) || a.email.localeCompare(b.email));
+}
+
 // Aggregate vendor names mentioned in any inbound message's LLM analysis.
 function aggregateVendors(conversations, messagesByConv) {
   const vendors = new Set();
