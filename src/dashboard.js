@@ -4,6 +4,7 @@
 // daemon so it works even when the daemon is off.
 
 import express from 'express';
+import path from 'node:path';
 import { readFileSync, existsSync } from 'node:fs';
 import { openDb } from './storage.js';
 import { effectiveFollowUp, TERMINAL_STATES } from './conversation.js';
@@ -341,6 +342,7 @@ export function createDashboardApp({
   municipalitiesLoader = loadMunicipalities,
   gmailClient = loadGmail(process.env),
   env = process.env,
+  contractsDir = process.env.PILOT_CONTRACTS_DIR ?? 'data/contracts',
 } = {}) {
   const app = express();
   app.use(express.urlencoded({ extended: false, limit: '1mb' }));
@@ -364,6 +366,22 @@ export function createDashboardApp({
       totalKommuner: municipalities.length,
       heartbeat: hb(),
     }));
+  });
+
+  // Serve a stored contract PDF inline. Lookup is by DB id only — the file
+  // path never appears in the URL. All failure modes are 404.
+  app.get('/attachments/:id', (req, res) => {
+    if (!db) return res.status(404).send('Not found');
+    const att = db.raw.prepare('SELECT * FROM attachments WHERE id = ?')
+      .get(parseInt(req.params.id, 10));
+    if (!att) return res.status(404).send('Not found');
+    const base = path.resolve(contractsDir);
+    const full = path.resolve(att.saved_path);
+    if (!full.startsWith(base + path.sep)) return res.status(404).send('Not found');
+    if (!existsSync(full)) return res.status(404).send('Not found');
+    res.set('Content-Type', att.mime_type || 'application/pdf');
+    res.set('Content-Disposition', `inline; filename="${att.filename.replace(/["\\\r\n]/g, '')}"`);
+    res.sendFile(full);
   });
 
   app.get('/kommun/:kod', (req, res) => {

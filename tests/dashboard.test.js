@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
 import { openDb } from '../src/storage.js';
 import { createDashboardApp } from '../src/dashboard.js';
 
@@ -142,5 +142,64 @@ describe('dashboard / escalations', () => {
     const app = appWithFakes();
     const res = await get(app, '/escalations');
     expect(res.text).toMatch(/Inga öppna eskaleringar/);
+  });
+});
+
+async function getRaw(app, path) {
+  return new Promise((resolve, reject) => {
+    const server = app.listen(0, () => {
+      const port = server.address().port;
+      fetch(`http://127.0.0.1:${port}${path}`).then(async (r) => {
+        const text = await r.text();
+        server.close(() => resolve({ status: r.status, text, headers: r.headers }));
+      }).catch((e) => server.close(() => reject(e)));
+    });
+  });
+}
+
+function seedPdfAttachment({ filename = 'Avtal X.pdf', savedPath = null } = {}) {
+  const convId = db.createConversation({
+    kommun_kod: '2418', kommun_namn: 'Malå', role: 'central',
+    contact_email: 'kommun@mala.se', scheduled_send_at: '2026-04-01T08:00:00Z',
+  });
+  const msgId = db.recordMessage({
+    conversation_id: convId, gmail_message_id: `gm-${Math.random()}`, direction: 'inbound',
+    from_email: 'kommun@mala.se', to_email: 'me@x.com', subject: 'Avtal', body_text: '',
+    classification: null, classification_confidence: null,
+    received_at: '2026-04-13T10:00:00Z', attachment_count: 1,
+  });
+  const contractsDir = join(tmp, 'contracts');
+  const realPath = savedPath ?? join(contractsDir, '2418', filename);
+  mkdirSync(dirname(realPath), { recursive: true });
+  writeFileSync(realPath, '%PDF-1.4 test');
+  const attId = db.recordAttachment({
+    message_id: msgId, filename, saved_path: realPath,
+    mime_type: 'application/pdf', size_bytes: 13,
+  });
+  return { convId, attId, contractsDir };
+}
+
+describe('GET /attachments/:id', () => {
+  it('serves the PDF inline with correct headers', async () => {
+    const { attId, contractsDir } = seedPdfAttachment();
+    const app = createDashboardApp({ db, municipalitiesLoader: () => [], contractsDir });
+    const res = await getRaw(app, `/attachments/${attId}`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toContain('application/pdf');
+    expect(res.headers.get('content-disposition')).toContain('inline');
+    expect(res.text).toContain('%PDF-1.4');
+  });
+
+  it('404 on unknown id', async () => {
+    const { contractsDir } = seedPdfAttachment();
+    const app = createDashboardApp({ db, municipalitiesLoader: () => [], contractsDir });
+    expect((await getRaw(app, '/attachments/99999')).status).toBe(404);
+  });
+
+  it('404 when saved_path escapes contractsDir', async () => {
+    const outside = join(tmp, 'secret.pdf');
+    const { attId } = seedPdfAttachment({ savedPath: outside });
+    const app = createDashboardApp({ db, municipalitiesLoader: () => [], contractsDir: join(tmp, 'contracts') });
+    expect((await getRaw(app, `/attachments/${attId}`)).status).toBe(404);
   });
 });
