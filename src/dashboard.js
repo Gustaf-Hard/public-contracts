@@ -18,6 +18,7 @@ import {
   renderCompose,
   renderVendors,
   renderVendorDetail,
+  mergeContacts,
 } from './dashboard-views.js';
 
 const ROLE_PRIORITY = ['central', 'utbildning', 'gymnasie', 'vuxenutbildning', 'other'];
@@ -490,9 +491,10 @@ export function createDashboardApp({
     let draft = null;
     let candidateEmails = [];
     if (selectedRole) {
-      candidateEmails = (kommun.contacts ?? [])
-        .filter((c) => c.role === selectedRole)
-        .map((c) => c.email);
+      const handoffContacts = db ? db.listHandoffContacts(kommun.kommun_kod) : [];
+      const datasetForRole = (kommun.contacts ?? []).filter((c) => c.role === selectedRole);
+      // Handoff addresses (kommun-given) rank first, then website addresses.
+      candidateEmails = mergeContacts(datasetForRole, handoffContacts).map((c) => c.email);
       draft = renderInitialDraft({ kommun_namn: kommun.kommun_namn, role: selectedRole, env });
     }
 

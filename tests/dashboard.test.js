@@ -308,3 +308,27 @@ describe('kommun page contact sources', () => {
     expect(res.text.indexOf('bou@mala.se')).toBeLessThan(res.text.indexOf('kommun@mala.se'));
   });
 });
+
+describe('compose candidates prefer handoff addresses', () => {
+  it('lists the handoff address first for the selected role', async () => {
+    const convId = db.createConversation({
+      kommun_kod: '2418', kommun_namn: 'Malå', role: 'gymnasie',
+      contact_email: 'kommun@mala.se', scheduled_send_at: '2026-04-01T08:00:00Z',
+    });
+    db.recordMessage({
+      conversation_id: convId, gmail_message_id: `gm-${Math.random()}`, direction: 'inbound',
+      from_email: 'kommun@mala.se', to_email: 'me@x.com', subject: 'Re', body_text: 'Kontakta central',
+      classification: 'handoff', classification_confidence: 0.9,
+      received_at: '2026-04-14T10:00:00Z', attachment_count: 0,
+      analysis_json: { intent: 'handoff', extracted: { handoff_to_email: 'registrator@mala.se', handoff_to_forvaltning: 'Kommunkansliet' } },
+    });
+    const app = createDashboardApp({
+      db,
+      municipalitiesLoader: () => [{ kommun_kod: '2418', kommun_namn: 'Malå', lan: 'X', folkmangd: 1,
+        contacts: [{ email: 'central@mala.se', role: 'central' }] }],
+    });
+    const res = await get(app, '/kommun/2418/compose?role=central');
+    expect(res.text).toContain('registrator@mala.se');
+    expect(res.text.indexOf('registrator@mala.se')).toBeLessThan(res.text.indexOf('central@mala.se'));
+  });
+});
