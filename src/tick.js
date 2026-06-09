@@ -6,6 +6,7 @@ import { buildEscalationBlocks } from './slack.js';
 import { saveAttachment } from './attachments.js';
 import { extractSignature } from './extract-signature.js';
 import { analyseMessage, analysisToLegacyClassification } from './analyse-message.js';
+import { analysePendingContracts } from './analyse-contract.js';
 
 const TEMPLATES = { T_INITIAL, T_PRECISION, T_RECEIPT, T_FOLLOWUP_NUDGE, T_FOLLOWUP_CLOSE };
 
@@ -207,6 +208,15 @@ export async function runTick(deps) {
         });
       }
     }
+  }
+
+  // 3. Contract analysis — any saved PDFs that haven't been analysed yet.
+  // Injectable for tests; failures must never break the tick.
+  const analyseContracts = deps.analyseContracts ?? analysePendingContracts;
+  try {
+    await analyseContracts({ db, env, log: deps.log });
+  } catch (e) {
+    deps.log?.(`contract analysis error: ${e.message}`);
   }
 }
 

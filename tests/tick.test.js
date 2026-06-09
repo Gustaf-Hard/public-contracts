@@ -342,3 +342,25 @@ describe('runTick — inbound processing', () => {
     expect(gmail.getMessage).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('runTick — contract analysis hook', () => {
+  it('calls the injected analyseContracts hook with the db', async () => {
+    const analyseContracts = vi.fn(async () => 0);
+    await runTick({
+      db, gmailClient: { gmail: {} }, gmailOps: fakeGmail(), slackClient: {}, slackOps: fakeSlack(),
+      env, contractsDir, now: new Date('2026-05-19T10:00:00Z'),
+      analyseContracts,
+    });
+    expect(analyseContracts).toHaveBeenCalledTimes(1);
+    expect(analyseContracts.mock.calls[0][0]).toHaveProperty('db');
+  });
+
+  it('survives an analyseContracts hook that throws', async () => {
+    const analyseContracts = vi.fn(async () => { throw new Error('llm down'); });
+    await expect(runTick({
+      db, gmailClient: { gmail: {} }, gmailOps: fakeGmail(), slackClient: {}, slackOps: fakeSlack(),
+      env, contractsDir, now: new Date('2026-05-19T10:00:00Z'),
+      analyseContracts,
+    })).resolves.not.toThrow();
+  });
+});
