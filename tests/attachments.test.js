@@ -2,7 +2,32 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { saveAttachment, safeFilename } from '../src/attachments.js';
+import { zipSync, strToU8 } from 'fflate';
+import { saveAttachment, safeFilename, extractPdfsFromZip } from '../src/attachments.js';
+
+describe('extractPdfsFromZip', () => {
+  it('returns only PDF entries, basenamed, with their bytes', () => {
+    const zip = zipSync({
+      'Avtal.pdf': strToU8('%PDF-1.4 first'),
+      'läs-mig.txt': strToU8('inte ett avtal'),
+      'bilagor/Pris.pdf': strToU8('%PDF-1.4 nested'),
+    });
+    const pdfs = extractPdfsFromZip(Buffer.from(zip));
+    expect(pdfs.map((p) => p.filename).sort()).toEqual(['Avtal.pdf', 'Pris.pdf']);
+    const avtal = pdfs.find((p) => p.filename === 'Avtal.pdf');
+    expect(avtal.data.toString()).toBe('%PDF-1.4 first');
+  });
+
+  it('skips directory entries and is case-insensitive on .pdf', () => {
+    const zip = zipSync({ 'DIR/': strToU8(''), 'X.PDF': strToU8('%PDF-1.4') });
+    const pdfs = extractPdfsFromZip(Buffer.from(zip));
+    expect(pdfs.map((p) => p.filename)).toEqual(['X.PDF']);
+  });
+
+  it('returns [] on a corrupt / non-zip buffer', () => {
+    expect(extractPdfsFromZip(Buffer.from('not a zip at all'))).toEqual([]);
+  });
+});
 
 let tmp;
 beforeEach(() => { tmp = mkdtempSync(join(tmpdir(), 'pilot-att-')); });

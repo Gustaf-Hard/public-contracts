@@ -1,5 +1,28 @@
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { unzipSync } from 'fflate';
+
+// Extract PDF entries from a zip archive buffer. Kommuner sometimes deliver
+// contracts as a zipped bundle; we pull each .pdf out so it can be saved and
+// analysed like any other attachment. Directory entries and non-PDFs are
+// skipped; inner directory components are stripped from the name. Returns []
+// on a corrupt / non-zip buffer (never throws — tick safety).
+export function extractPdfsFromZip(buffer) {
+  let files;
+  try {
+    files = unzipSync(new Uint8Array(buffer));
+  } catch {
+    return [];
+  }
+  const out = [];
+  for (const [name, data] of Object.entries(files)) {
+    if (name.endsWith('/')) continue; // directory marker
+    if (!name.toLowerCase().endsWith('.pdf')) continue;
+    const base = name.split('/').pop();
+    out.push({ filename: base, data: Buffer.from(data) });
+  }
+  return out;
+}
 
 export function safeFilename(name) {
   // First, replace path separators with underscores

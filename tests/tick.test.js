@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { zipSync, strToU8 } from 'fflate';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -422,5 +423,51 @@ describe('runTick — out-of-thread inbound matched by sender domain', () => {
     const conv = db.getConversation(id);
     expect(conv.state).toBe('SENT');                   // unchanged — not matched
     expect(db.hasGmailMessageId('spam-1')).toBe(false);
+  });
+});
+
+describe('runTick — zip attachments are expanded into inner PDFs', () => {
+  it('extracts PDF entries from a zipped inbound attachment and saves them', async () => {
+    const id = db.createConversation({
+      kommun_kod: '1440', kommun_namn: 'Ale', role: 'central',
+      contact_email: 'kansli@ale.se', scheduled_send_at: '2026-06-10T09:00:00Z',
+    });
+    db.updateConversationState(id, 'SENT', { gmail_thread_id: 'thr-zip', last_outbound_at: '2026-06-10T10:00:00Z' });
+
+    const zipBytes = Buffer.from(zipSync({
+      'Avtal LexiFlow.pdf': strToU8('%PDF-1.4 lexiflow'),
+      'notes.txt': strToU8('skip me'),
+    }));
+
+    const gmail = fakeGmail({
+      listResult: [{ id: 'zip-1' }],
+      getResult: {
+        'zip-1': {
+          id: 'zip-1', threadId: 'thr-zip',
+          payload: {
+            headers: [
+              { name: 'From', value: 'Jerker <jerker@ale.se>' },
+              { name: 'To', value: 'gustaf@mediagraf.se' },
+              { name: 'Subject', value: 'Handlingar' },
+              { name: 'Date', value: 'Fri, 12 Jun 2026 10:30:00 +0200' },
+            ],
+            mimeType: 'multipart/mixed',
+            parts: [
+              { mimeType: 'text/plain', body: { data: Buffer.from('Se bifogat').toString('base64url') } },
+              { mimeType: 'application/zip', filename: 'Handlingar.zip', body: { attachmentId: 'zatt-1', size: zipBytes.length } },
+            ],
+          },
+        },
+      },
+    });
+    gmail.fetchAttachment = vi.fn(async () => zipBytes);
+
+    await runTick({
+      db, gmailClient: { gmail: {} }, gmailOps: gmail, slackClient: {}, slackOps: fakeSlack(),
+      env, contractsDir, now: new Date('2026-06-12T11:00:00Z'),
+    });
+
+    const atts = db.raw.prepare('SELECT a.filename FROM attachments a JOIN messages m ON m.id=a.message_id WHERE m.conversation_id=?').all(id);
+    expect(atts.map((a) => a.filename)).toEqual(['Avtal LexiFlow.pdf']);
   });
 });

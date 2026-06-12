@@ -3,7 +3,7 @@ import { classify } from './classifier.js';
 import { nextActionForClassification, staleAction } from './conversation.js';
 import { parseInboundMessage, sameEmailDomain } from './gmail.js';
 import { buildEscalationBlocks } from './slack.js';
-import { saveAttachment } from './attachments.js';
+import { saveAttachment, extractPdfsFromZip } from './attachments.js';
 import { extractSignature } from './extract-signature.js';
 import { analyseMessage, analysisToLegacyClassification } from './analyse-message.js';
 import { analysePendingContracts } from './analyse-contract.js';
@@ -164,20 +164,31 @@ export async function runTick(deps) {
         analysis_json: analysis ?? null,
       });
 
-      // Save attachments
+      // Save attachments. Kommuner deliver contracts either as a PDF directly
+      // or zipped — expand zips into their inner PDFs so each is saved and
+      // analysed like any other attachment.
       for (const att of parsed.attachments) {
-        if (att.mime_type !== 'application/pdf' && !att.filename?.toLowerCase().endsWith('.pdf')) continue;
+        const fn = att.filename?.toLowerCase() ?? '';
+        const isPdf = att.mime_type === 'application/pdf' || fn.endsWith('.pdf');
+        const isZip = att.mime_type === 'application/zip'
+          || att.mime_type === 'application/x-zip-compressed' || fn.endsWith('.zip');
+        if (!isPdf && !isZip) continue;
         const buf = await gmailOps.fetchAttachment(gmailClient.gmail, m.id, att.attachment_id);
-        const saved = await saveAttachment(buf, {
-          kommun_kod: conv.kommun_kod, kommun_namn: conv.kommun_namn, role: conv.role,
-          received_at: now.toISOString(), from_email: parsed.from, from_name: null,
-          gmail_message_id: m.id, gmail_thread_id: parsed.gmail_thread_id,
-          subject: parsed.subject, original_filename: att.filename, mime_type: att.mime_type,
-        }, { baseDir: deps.contractsDir });
-        db.recordAttachment({
-          message_id: messageId, filename: att.filename,
-          saved_path: saved.saved_path, mime_type: att.mime_type, size_bytes: saved.size_bytes,
-        });
+        const entries = isZip
+          ? extractPdfsFromZip(buf).map((e) => ({ filename: e.filename, data: e.data, mime_type: 'application/pdf' }))
+          : [{ filename: att.filename, data: buf, mime_type: att.mime_type }];
+        for (const entry of entries) {
+          const saved = await saveAttachment(entry.data, {
+            kommun_kod: conv.kommun_kod, kommun_namn: conv.kommun_namn, role: conv.role,
+            received_at: now.toISOString(), from_email: parsed.from, from_name: null,
+            gmail_message_id: m.id, gmail_thread_id: parsed.gmail_thread_id,
+            subject: parsed.subject, original_filename: entry.filename, mime_type: entry.mime_type,
+          }, { baseDir: deps.contractsDir });
+          db.recordAttachment({
+            message_id: messageId, filename: entry.filename,
+            saved_path: saved.saved_path, mime_type: entry.mime_type, size_bytes: saved.size_bytes,
+          });
+        }
       }
 
       // State transition is bookkeeping — happens automatically. Outbound is gated.

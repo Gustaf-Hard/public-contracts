@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
@@ -26,6 +28,7 @@
     "csv-stringify": "^6.5.0",
     "dotenv": "^16.4.5",
     "express": "^4.21.0",
+    "fflate": "^0.8.3",
     "googleapis": "^144.0.0",
     "node-cron": "^3.0.3",
     "p-limit": "^6.1.0",
