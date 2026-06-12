@@ -364,3 +364,63 @@ describe('runTick — contract analysis hook', () => {
     })).resolves.not.toThrow();
   });
 });
+
+describe('runTick — out-of-thread inbound matched by sender domain', () => {
+  function plainMsg(id, threadId, from, bodyText) {
+    return {
+      id, threadId,
+      payload: {
+        headers: [
+          { name: 'From', value: from },
+          { name: 'To', value: 'gustaf@mediagraf.se' },
+          { name: 'Subject', value: 'Fw: Avtal' },
+          { name: 'Date', value: 'Fri, 12 Jun 2026 10:30:00 +0200' },
+        ],
+        mimeType: 'text/plain',
+        body: { data: Buffer.from(bodyText).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '') },
+      },
+    };
+  }
+
+  it('ingests a kommun reply that arrived in a DIFFERENT thread (domain match)', async () => {
+    const id = db.createConversation({
+      kommun_kod: '1440', kommun_namn: 'Ale', role: 'central',
+      contact_email: 'kansli@ale.se', scheduled_send_at: '2026-06-10T09:00:00Z',
+    });
+    db.updateConversationState(id, 'SENT', { gmail_thread_id: 'thr-orig', last_outbound_at: '2026-06-10T10:00:00Z' });
+
+    const gmail = fakeGmail({
+      listResult: [{ id: 'fwd-1' }],
+      // arrives in thr-fwd (NOT the tracked thr-orig) from jerker@ale.se
+      getResult: { 'fwd-1': plainMsg('fwd-1', 'thr-fwd', 'Jerker Rellmark <jerker.rellmark@ale.se>', 'Ärendenummer: K1440001') },
+    });
+    await runTick({
+      db, gmailClient: { gmail: {} }, gmailOps: gmail, slackClient: {}, slackOps: fakeSlack(),
+      env, contractsDir, now: new Date('2026-06-12T11:00:00Z'),
+    });
+    const conv = db.getConversation(id);
+    expect(conv.state).toBe('ACK_RECEIVED');           // message was processed
+    expect(conv.arendenummer).toBe('K1440001');
+    expect(db.hasGmailMessageId('fwd-1')).toBe(true);  // recorded
+  });
+
+  it('does NOT ingest an unrelated-domain message in a different thread', async () => {
+    const id = db.createConversation({
+      kommun_kod: '1440', kommun_namn: 'Ale', role: 'central',
+      contact_email: 'kansli@ale.se', scheduled_send_at: '2026-06-10T09:00:00Z',
+    });
+    db.updateConversationState(id, 'SENT', { gmail_thread_id: 'thr-orig', last_outbound_at: '2026-06-10T10:00:00Z' });
+
+    const gmail = fakeGmail({
+      listResult: [{ id: 'spam-1' }],
+      getResult: { 'spam-1': plainMsg('spam-1', 'thr-other', 'Willys <no-reply@handla.willys.se>', 'Ärendenummer: K9999999') },
+    });
+    await runTick({
+      db, gmailClient: { gmail: {} }, gmailOps: gmail, slackClient: {}, slackOps: fakeSlack(),
+      env, contractsDir, now: new Date('2026-06-12T11:00:00Z'),
+    });
+    const conv = db.getConversation(id);
+    expect(conv.state).toBe('SENT');                   // unchanged — not matched
+    expect(db.hasGmailMessageId('spam-1')).toBe(false);
+  });
+});

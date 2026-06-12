@@ -130,6 +130,27 @@ export function parseInboundMessage(message) {
   };
 }
 
+// Extract the lowercase domain from an email address or a "Name <a@b.se>"
+// header value. Returns null when no domain is present.
+export function extractEmailDomain(addr) {
+  if (!addr) return null;
+  const angle = String(addr).match(/<([^>]+)>/);
+  const email = (angle ? angle[1] : addr).trim();
+  const at = email.lastIndexOf('@');
+  if (at === -1) return null;
+  const domain = email.slice(at + 1).toLowerCase().replace(/[>\s]+$/, '');
+  return domain || null;
+}
+
+// True when two email addresses share the same domain (case-insensitive).
+// Used to associate a kommun's reply with its conversation even when the
+// kommun forwarded/replied in a new Gmail thread.
+export function sameEmailDomain(a, b) {
+  const da = extractEmailDomain(a);
+  const db = extractEmailDomain(b);
+  return !!da && !!db && da === db;
+}
+
 export function buildOAuthClient(env) {
   const oauth2Client = new google.auth.OAuth2(
     env.GMAIL_OAUTH_CLIENT_ID,

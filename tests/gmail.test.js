@@ -3,7 +3,24 @@ import {
   buildMimeMessage,
   parseInboundMessage,
   parseBase64Url,
+  extractEmailDomain,
+  sameEmailDomain,
 } from '../src/gmail.js';
+
+describe('extractEmailDomain / sameEmailDomain', () => {
+  it('extracts domain from bare and angle-bracket addresses', () => {
+    expect(extractEmailDomain('jerker.rellmark@ale.se')).toBe('ale.se');
+    expect(extractEmailDomain('Jerker Rellmark <jerker.rellmark@ALE.se>')).toBe('ale.se');
+    expect(extractEmailDomain('')).toBeNull();
+    expect(extractEmailDomain('no-at-sign')).toBeNull();
+  });
+
+  it('matches same-domain pairs case-insensitively, rejects different domains', () => {
+    expect(sameEmailDomain('Jerker <jerker.rellmark@ale.se>', 'kansli@ale.se')).toBe(true);
+    expect(sameEmailDomain('a@vasteras.se', 'b@ale.se')).toBe(false);
+    expect(sameEmailDomain('a@ale.se', null)).toBe(false);
+  });
+});
 
 describe('buildMimeMessage', () => {
   it('produces a base64url-encoded multipart/alternative RFC 822 message with both text and HTML parts', () => {

@@ -1,7 +1,7 @@
 import { T_INITIAL, T_PRECISION, T_RECEIPT, T_FOLLOWUP_NUDGE, T_FOLLOWUP_CLOSE } from './templates.js';
 import { classify } from './classifier.js';
 import { nextActionForClassification, staleAction } from './conversation.js';
-import { parseInboundMessage } from './gmail.js';
+import { parseInboundMessage, sameEmailDomain } from './gmail.js';
 import { buildEscalationBlocks } from './slack.js';
 import { saveAttachment } from './attachments.js';
 import { extractSignature } from './extract-signature.js';
@@ -118,8 +118,15 @@ export async function runTick(deps) {
     for (const m of list) {
       if (db.hasGmailMessageId(m.id)) continue;
       const full = await gmailOps.getMessage(gmailClient.gmail, m.id);
-      if (!full || full.threadId !== conv.gmail_thread_id) continue;
+      if (!full) continue;
       const parsed = parseInboundMessage(full);
+      // Associate the message with this conversation by Gmail thread OR by
+      // sender domain == the kommun's contact domain. Kommuner often forward or
+      // reply with a changed subject, which Gmail threads separately; matching
+      // on thread alone silently dropped those (incl. delivered contracts).
+      const threadMatch = full.threadId === conv.gmail_thread_id;
+      const domainMatch = sameEmailDomain(parsed.from, conv.contact_email);
+      if (!threadMatch && !domainMatch) continue;
 
       // Try LLM analysis first; fall back to the regex classifier on null.
       // Both produce a legacy-shaped classification object the FSM can consume.
