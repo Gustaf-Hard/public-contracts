@@ -445,3 +445,21 @@ describe('home buckets', () => {
     expect(active.some((r) => r.kommun_kod === '0560')).toBe(false);
   });
 });
+
+describe('polish', () => {
+  it('case detail uses an intent badge, not a raw intent/action debug string', async () => {
+    const cid = db.createConversation({
+      kommun_kod: '2418', kommun_namn: 'Malå', role: 'central',
+      contact_email: 'kommun@mala.se', scheduled_send_at: '2026-05-24T10:00:00Z',
+    });
+    db.recordEscalation({ conversation_id: cid, reason: 'intent=handoff action=escalate confidence=0.92', draft_template: 'free_form', classifier_class: 'handoff', draft_body: 'b' });
+    const res = await get(appWithFakes(), `/arenden/${cid}`);
+    expect(res.text).not.toMatch(/intent=\w+ action=/); // no debug string in the UI
+    expect(res.text).toContain('class="badge"');         // a real badge instead
+  });
+
+  it('activity feed shows a designed empty state when there is nothing', async () => {
+    const res = await get(appWithFakes(), '/activity');
+    expect(res.text).toMatch(/Ingen aktivitet ännu/);
+  });
+});

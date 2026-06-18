@@ -14,7 +14,6 @@ import {
   renderOverview,
   renderArenden,
   renderKommunDetail,
-  renderEscalations,
   renderActivity,
   renderCompose,
   renderVendors,

@@ -1293,47 +1293,25 @@ export function renderArenden({ cases = [], selected = null, selectedId = null, 
   return layout({ title: 'Ärenden', body, currentPath: '/arenden', heartbeat, partial, escalationCount });
 }
 
-// ---- Escalations queue ----
-
-export function renderEscalations({ items, gmailReady = false, heartbeat = null, partial = false, escalationCount = 0 }) {
-  const body = items.length === 0
-    ? '<p class="muted">Inga öppna eskaleringar. ✨</p>'
-    : items.map((e) => `
-        <div class="card">
-          <h3>
-            <a class="kommun-link" href="/kommun/${escapeHtml(e.kommun_kod)}">${escapeHtml(e.kommun_namn)}</a>
-            <span class="muted">· ${escapeHtml(e.role)}</span>
-            · <span class="badge" style="background:#a855f71a;color:#a855f7">${escapeHtml(e.draft_template ?? 'free_form')}</span>
-            · <span class="muted">${escapeHtml(fmtAgo(e.created_at))}</span>
-          </h3>
-          <div class="muted">${escapeHtml(e.reason)}</div>
-          ${e.inbound_body ? `
-            <div style="margin-top:8px">Inkommande:</div>
-            <div class="body-quote body-quote-inbound">${escapeHtml(e.inbound_body)}</div>` : ''}
-          ${renderEscalationForm(e, gmailReady)}
-        </div>`).join('');
-
-  return layout({ title: 'Eskaleringar', body: `<h2>Öppna eskaleringar (${items.length})</h2>${body}`, currentPath: '/escalations', heartbeat, partial, escalationCount });
-}
-
 // ---- Activity feed ----
+// (Escalations are handled inside Ärenden — the old /escalations page redirects there.)
 
 export function renderActivity({ events, heartbeat = null, partial = false, escalationCount = 0 }) {
   const body = events.length === 0
-    ? '<p class="muted">Ingen aktivitet ännu.</p>'
+    ? '<div class="empty-state">Ingen aktivitet ännu.</div>'
     : `<table>
         <thead><tr><th>Tid</th><th>Kommun</th><th>Roll</th><th>Händelse</th><th>Detalj</th></tr></thead>
         <tbody>
           ${events.map((e) => `<tr>
             <td><span title="${escapeHtml(e.timestamp)}">${escapeHtml(fmtAgo(e.timestamp))}</span></td>
-            <td><a href="/kommun/${escapeHtml(e.kommun_kod)}">${escapeHtml(e.kommun_namn)}</a></td>
+            <td><a href="/kommun/${escapeHtml(e.kommun_kod)}" data-pane-link>${escapeHtml(e.kommun_namn)}</a></td>
             <td>${escapeHtml(e.role)}</td>
             <td>${escapeHtml(e.event)}</td>
             <td class="muted">${escapeHtml(e.detail ?? '')}</td>
           </tr>`).join('')}
         </tbody>
       </table>`;
-  return layout({ title: 'Aktivitet', body: `<h2>Senaste aktivitet (${events.length})</h2>${body}`, currentPath: '/activity', heartbeat, partial, escalationCount });
+  return layout({ title: 'Aktivitet', body: `<div class="page-head"><h1>Aktivitet</h1><span class="muted">senaste ${events.length}</span></div>${body}`, currentPath: '/activity', heartbeat, partial, escalationCount });
 }
 
 function activeBadge(periodEnd) {
