@@ -611,7 +611,7 @@ function sortHeader({ key, label, currentSort, currentOrder, filter, align = 'le
   return `<th${style}><a href="?${params.toString()}" class="th-sort${isActive ? ' th-sort-active' : ''}">${escapeHtml(label)}${indicator}</a></th>`;
 }
 
-export function renderOverview({ summary, rows, filter, sort, order, totalKommuner, heartbeat = null }) {
+export function renderOverview({ summary, rows, filter, sort, order, totalKommuner, heartbeat = null, partial = false, escalationCount = 0 }) {
   const filters = [
     { key: 'all', label: `Alla (${totalKommuner})` },
     { key: 'in-pilot', label: `I pilot (${summary.in_pilot})` },
@@ -701,7 +701,7 @@ export function renderOverview({ summary, rows, filter, sort, order, totalKommun
     </table>
   `;
 
-  return layout({ title: 'Översikt', body, currentPath: '/', heartbeat });
+  return layout({ title: 'Översikt', body, currentPath: '/', heartbeat, partial, escalationCount });
 }
 
 // ---- Kommun detail ----
@@ -733,9 +733,9 @@ function renderEscalationForm(esc, gmailReady) {
     </form>`;
 }
 
-export function renderCompose({ kommun, draft, availableRoles = [], selectedRole, candidateEmails = [], gmailReady = false, env = {}, heartbeat = null }) {
+export function renderCompose({ kommun, draft, availableRoles = [], selectedRole, candidateEmails = [], gmailReady = false, env = {}, heartbeat = null, partial = false, escalationCount = 0 }) {
   if (!kommun) {
-    return layout({ title: 'Saknad kommun', body: '<p>Hittade inte kommunen.</p>', currentPath: '/', heartbeat });
+    return layout({ title: 'Saknad kommun', body: '<p>Hittade inte kommunen.</p>', currentPath: '/', heartbeat, partial, escalationCount });
   }
   const backLinks = `<p><a href="/">← Översikt</a> · <a href="/kommun/${escapeHtml(kommun.kommun_kod)}">${escapeHtml(kommun.kommun_namn)} kommun (detalj)</a></p>`;
 
@@ -747,7 +747,7 @@ export function renderCompose({ kommun, draft, availableRoles = [], selectedRole
       ${backLinks}
       <h2>${escapeHtml(kommun.kommun_namn)} kommun</h2>
       <p class="muted">${reason}</p>`;
-    return layout({ title: kommun.kommun_namn, body, currentPath: '/', heartbeat });
+    return layout({ title: kommun.kommun_namn, body, currentPath: '/', heartbeat, partial, escalationCount });
   }
 
   const roleTabs = availableRoles.length > 1
@@ -800,7 +800,7 @@ export function renderCompose({ kommun, draft, availableRoles = [], selectedRole
         </div>
       </div>
     </form>`;
-  return layout({ title: `Skicka — ${kommun.kommun_namn}`, body, currentPath: '/', heartbeat });
+  return layout({ title: `Skicka — ${kommun.kommun_namn}`, body, currentPath: '/', heartbeat, partial, escalationCount });
 }
 
 // Derive a short "what happens next" string per case. Used in the sidebar.
@@ -915,9 +915,9 @@ function fmtBytes(n) {
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function renderKommunDetail({ kommun, conversations, messagesByConv, attachmentsByMsg, escalationsByConv, signatures, followUpByConv = {}, initialDrafts = {}, gmailReady = false, vendorSlugsByName = new Map(), handoffContacts = [], heartbeat = null }) {
+export function renderKommunDetail({ kommun, conversations, messagesByConv, attachmentsByMsg, escalationsByConv, signatures, followUpByConv = {}, initialDrafts = {}, gmailReady = false, vendorSlugsByName = new Map(), handoffContacts = [], heartbeat = null, partial = false, escalationCount = 0 }) {
   if (!kommun) {
-    return layout({ title: 'Saknad kommun', body: '<p>Hittade inte kommunen.</p>', currentPath: '/', heartbeat });
+    return layout({ title: 'Saknad kommun', body: '<p>Hittade inte kommunen.</p>', currentPath: '/', heartbeat, partial, escalationCount });
   }
 
   // ----- Aggregations for the sidebar + bottom sections -----
@@ -1095,12 +1095,12 @@ export function renderKommunDetail({ kommun, conversations, messagesByConv, atta
     </div>`;
 
   const body = `<div class="kommun-page">${sidebar}${mainColumn}</div>`;
-  return layout({ title: kommun.kommun_namn, body, currentPath: '/', heartbeat });
+  return layout({ title: kommun.kommun_namn, body, currentPath: '/', heartbeat, partial, escalationCount });
 }
 
 // ---- Escalations queue ----
 
-export function renderEscalations({ items, gmailReady = false, heartbeat = null }) {
+export function renderEscalations({ items, gmailReady = false, heartbeat = null, partial = false, escalationCount = 0 }) {
   const body = items.length === 0
     ? '<p class="muted">Inga öppna eskaleringar. ✨</p>'
     : items.map((e) => `
@@ -1118,12 +1118,12 @@ export function renderEscalations({ items, gmailReady = false, heartbeat = null 
           ${renderEscalationForm(e, gmailReady)}
         </div>`).join('');
 
-  return layout({ title: 'Eskaleringar', body: `<h2>Öppna eskaleringar (${items.length})</h2>${body}`, currentPath: '/escalations', heartbeat });
+  return layout({ title: 'Eskaleringar', body: `<h2>Öppna eskaleringar (${items.length})</h2>${body}`, currentPath: '/escalations', heartbeat, partial, escalationCount });
 }
 
 // ---- Activity feed ----
 
-export function renderActivity({ events, heartbeat = null }) {
+export function renderActivity({ events, heartbeat = null, partial = false, escalationCount = 0 }) {
   const body = events.length === 0
     ? '<p class="muted">Ingen aktivitet ännu.</p>'
     : `<table>
@@ -1138,7 +1138,7 @@ export function renderActivity({ events, heartbeat = null }) {
           </tr>`).join('')}
         </tbody>
       </table>`;
-  return layout({ title: 'Aktivitet', body: `<h2>Senaste aktivitet (${events.length})</h2>${body}`, currentPath: '/activity', heartbeat });
+  return layout({ title: 'Aktivitet', body: `<h2>Senaste aktivitet (${events.length})</h2>${body}`, currentPath: '/activity', heartbeat, partial, escalationCount });
 }
 
 function activeBadge(periodEnd) {
@@ -1149,7 +1149,7 @@ function activeBadge(periodEnd) {
     : `<span class="pill pill-overdue">utgånget ${escapeHtml(periodEnd)}</span>`;
 }
 
-export function renderVendors({ vendors = [], heartbeat = null } = {}) {
+export function renderVendors({ vendors = [], heartbeat = null, partial = false, escalationCount = 0 } = {}) {
   const rows = vendors.map((v) => `
     <tr>
       <td><a href="/leverantor/${escapeHtml(v.slug)}">${escapeHtml(v.name)}</a></td>
@@ -1168,15 +1168,15 @@ export function renderVendors({ vendors = [], heartbeat = null } = {}) {
             <tbody>${rows}</tbody>
           </table>`}
     </div>`;
-  return layout({ title: 'Leverantörer', body, currentPath: '/leverantorer', heartbeat });
+  return layout({ title: 'Leverantörer', body, currentPath: '/leverantorer', heartbeat, partial, escalationCount });
 }
 
-export function renderVendorDetail({ vendor, contracts = [], heartbeat = null } = {}) {
+export function renderVendorDetail({ vendor, contracts = [], heartbeat = null, partial = false, escalationCount = 0 } = {}) {
   if (!vendor) {
     return layout({
       title: 'Okänd leverantör',
       body: '<div class="card"><h3>Okänd leverantör</h3><p><a href="/leverantorer">← Leverantörer</a></p></div>',
-      currentPath: '/leverantorer', heartbeat,
+      currentPath: '/leverantorer', heartbeat, partial, escalationCount,
     });
   }
   const allProducts = [...new Set(contracts.flatMap((c) => c.products))];
@@ -1204,5 +1204,5 @@ export function renderVendorDetail({ vendor, contracts = [], heartbeat = null } 
         <tbody>${rows}</tbody>
       </table>
     </div>`;
-  return layout({ title: vendor.name, body, currentPath: '/leverantorer', heartbeat });
+  return layout({ title: vendor.name, body, currentPath: '/leverantorer', heartbeat, partial, escalationCount });
 }

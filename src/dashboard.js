@@ -349,7 +349,16 @@ export function createDashboardApp({
 } = {}) {
   const app = express();
   app.use(express.urlencoded({ extended: false, limit: '1mb' }));
+  app.use(express.static('public'));
   const hb = () => (db && typeof db.getHeartbeat === 'function' ? db.getHeartbeat() : null);
+  // A client pane-swap request asks for just the content fragment.
+  const isPartial = (req) => req.query.partial === '1' || req.get('X-Partial') === '1';
+  // Open-escalation count drives the sidebar badge + quiet-poll updates.
+  const escCount = () => {
+    if (!db) return 0;
+    try { return db.raw.prepare("SELECT COUNT(*) n FROM escalations WHERE status = 'open'").get().n; }
+    catch { return 0; }
+  };
 
   app.get('/', (req, res) => {
     const municipalities = municipalitiesLoader();
@@ -367,7 +376,7 @@ export function createDashboardApp({
       sort,
       order,
       totalKommuner: municipalities.length,
-      heartbeat: hb(),
+      heartbeat: hb(), partial: isPartial(req), escalationCount: escCount(),
     }));
   });
 
@@ -392,7 +401,7 @@ export function createDashboardApp({
     const kommun = municipalities.find((m) => m.kommun_kod === req.params.kod);
     if (!kommun) {
       res.status(404).set('Content-Type', 'text/html; charset=utf-8');
-      return res.send(renderKommunDetail({ kommun: null }));
+      return res.send(renderKommunDetail({ kommun: null, partial: isPartial(req), escalationCount: escCount() }));
     }
 
     const conversations = db
@@ -457,7 +466,7 @@ export function createDashboardApp({
       gmailReady: !!gmailClient,
       vendorSlugsByName,
       handoffContacts,
-      heartbeat: hb(),
+      heartbeat: hb(), partial: isPartial(req), escalationCount: escCount(),
     }));
   });
 
@@ -466,7 +475,7 @@ export function createDashboardApp({
     const kommun = municipalities.find((m) => m.kommun_kod === req.params.kod);
     if (!kommun) {
       res.status(404).set('Content-Type', 'text/html; charset=utf-8');
-      return res.send(renderCompose({ kommun: null, env }));
+      return res.send(renderCompose({ kommun: null, env, partial: isPartial(req), escalationCount: escCount() }));
     }
 
     const conversations = db
@@ -507,14 +516,14 @@ export function createDashboardApp({
       candidateEmails,
       gmailReady: !!gmailClient,
       env,
-      heartbeat: hb(),
+      heartbeat: hb(), partial: isPartial(req), escalationCount: escCount(),
     }));
   });
 
   app.get('/escalations', (req, res) => {
     if (!db) {
       res.set('Content-Type', 'text/html; charset=utf-8');
-      return res.send(renderEscalations({ items: [] }));
+      return res.send(renderEscalations({ items: [], partial: isPartial(req), escalationCount: escCount() }));
     }
     const items = db.raw.prepare(`
       SELECT e.id, e.reason, e.draft_template, e.draft_subject, e.draft_body, e.created_at,
@@ -527,13 +536,13 @@ export function createDashboardApp({
       ORDER BY e.created_at
     `).all();
     res.set('Content-Type', 'text/html; charset=utf-8');
-    res.send(renderEscalations({ items, gmailReady: !!gmailClient, heartbeat: hb() }));
+    res.send(renderEscalations({ items, gmailReady: !!gmailClient, heartbeat: hb(), partial: isPartial(req), escalationCount: escCount() }));
   });
 
   app.get('/activity', (req, res) => {
     if (!db) {
       res.set('Content-Type', 'text/html; charset=utf-8');
-      return res.send(renderActivity({ events: [], heartbeat: hb() }));
+      return res.send(renderActivity({ events: [], heartbeat: hb(), partial: isPartial(req), escalationCount: escCount() }));
     }
     // Recent inbound + outbound messages + state changes (rough activity feed)
     const events = db.raw.prepare(`
@@ -557,22 +566,22 @@ export function createDashboardApp({
           ? (e.subject ?? '')
           : `${e.classification ?? 'okänt'} — ${e.subject ?? ''}`,
       })),
-      heartbeat: hb(),
+      heartbeat: hb(), partial: isPartial(req), escalationCount: escCount(),
     }));
   });
 
   app.get('/leverantorer', (req, res) => {
     const vendors = db ? db.listVendorsOverview() : [];
     res.set('Content-Type', 'text/html; charset=utf-8');
-    res.send(renderVendors({ vendors, heartbeat: hb() }));
+    res.send(renderVendors({ vendors, heartbeat: hb(), partial: isPartial(req), escalationCount: escCount() }));
   });
 
   app.get('/leverantor/:slug', (req, res) => {
     const vendor = db ? db.getVendorBySlug(req.params.slug) : null;
     res.set('Content-Type', 'text/html; charset=utf-8');
-    if (!vendor) return res.status(404).send(renderVendorDetail({ vendor: null, heartbeat: hb() }));
+    if (!vendor) return res.status(404).send(renderVendorDetail({ vendor: null, heartbeat: hb(), partial: isPartial(req), escalationCount: escCount() }));
     const contracts = db.listContractsForVendor(vendor.id);
-    res.send(renderVendorDetail({ vendor, contracts, heartbeat: hb() }));
+    res.send(renderVendorDetail({ vendor, contracts, heartbeat: hb(), partial: isPartial(req), escalationCount: escCount() }));
   });
 
   // --- Action endpoints (outbound email) ---

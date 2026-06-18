@@ -353,3 +353,20 @@ describe('app shell', () => {
     expect(html).not.toContain('class="sidebar"');
   });
 });
+
+describe('partial responses', () => {
+  it('GET /?partial=1 returns a fragment, not a full document', async () => {
+    const res = await get(appWithFakes(), '/?partial=1');
+    expect(res.status).toBe(200);
+    expect(res.text).not.toMatch(/<!doctype/i);
+    expect(res.text).not.toContain('class="sidebar"');
+  });
+  it('GET / (no partial) returns the full shell', async () => {
+    const res = await get(appWithFakes(), '/');
+    expect(res.text).toContain('class="sidebar"');
+  });
+  it('serves /app.js', async () => {
+    const res = await get(appWithFakes(), '/app.js');
+    expect(res.status).toBe(200);
+  });
+});
