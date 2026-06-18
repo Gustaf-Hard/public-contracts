@@ -285,26 +285,35 @@ function stateBadge(state) {
 const baseCss = `
 <style>
   :root {
+    /* Light is the default theme. */
+    --bg: #f7f8fa;
+    --bg-elev: #ffffff;
+    --bg-elev-2: #f1f3f6;
+    --fg: #1a1f29;
+    --fg-muted: #5b6573;
+    --border: #e4e7ec;
+    --accent: #4f46e5;
+    --accent-fg: #ffffff;
+    --good: #16a34a;
+    --warn: #d97706;
+    --bad: #dc2626;
+    --r-1: 4px; --r-2: 8px; --r-3: 12px;
+    --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 24px; --sp-6: 32px;
+    --shadow: 0 1px 2px rgba(16,24,40,.04), 0 1px 3px rgba(16,24,40,.06);
+  }
+  :root[data-theme="dark"] {
     --bg: #0b0d10;
     --bg-elev: #14181d;
     --bg-elev-2: #1c2128;
     --fg: #e6edf3;
     --fg-muted: #9aa4b2;
     --border: #2a313c;
-    --accent: #58a6ff;
+    --accent: #818cf8;
+    --accent-fg: #0b0d10;
     --good: #22c55e;
     --warn: #f59e0b;
     --bad: #ef4444;
-  }
-  @media (prefers-color-scheme: light) {
-    :root {
-      --bg: #ffffff;
-      --bg-elev: #f6f8fa;
-      --bg-elev-2: #eef1f4;
-      --fg: #1f2937;
-      --fg-muted: #4b5563;
-      --border: #d0d7de;
-    }
+    --shadow: 0 1px 2px rgba(0,0,0,.35);
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
@@ -314,7 +323,36 @@ const baseCss = `
     color: var(--fg);
     font-size: 14px;
     line-height: 1.45;
+    display: flex;
+    min-height: 100vh;
   }
+  /* App shell: persistent left sidebar + scrollable content region */
+  .sidebar {
+    width: 208px; flex: none; box-sizing: border-box;
+    border-right: 1px solid var(--border); background: var(--bg-elev);
+    display: flex; flex-direction: column; gap: var(--sp-4);
+    padding: var(--sp-4) var(--sp-3);
+    position: sticky; top: 0; height: 100vh;
+  }
+  .sidebar .brand { font-size: 14px; font-weight: 700; letter-spacing: .2px; padding: 4px 10px 0; }
+  .sidebar nav { display: flex; flex-direction: column; gap: 2px; }
+  .sidebar .nav-item {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 8px 10px; border-radius: var(--r-2); color: var(--fg-muted); font-weight: 500;
+  }
+  .sidebar .nav-item:hover { background: var(--bg-elev-2); color: var(--fg); text-decoration: none; }
+  .sidebar .nav-item.active { background: var(--bg-elev-2); color: var(--fg); }
+  .sidebar .nav-item .nav-badge {
+    background: var(--bad); color: #fff; font-size: 11px; font-weight: 600;
+    min-width: 18px; text-align: center; padding: 1px 6px; border-radius: 999px;
+  }
+  .sidebar-foot { margin-top: auto; display: flex; flex-direction: column; gap: var(--sp-2); align-items: flex-start; }
+  .theme-toggle {
+    background: var(--bg-elev-2); color: var(--fg-muted); border: 1px solid var(--border);
+    border-radius: var(--r-2); padding: 6px 10px; font: inherit; font-size: 12px; cursor: pointer; width: 100%;
+    text-align: left;
+  }
+  .theme-toggle:hover { color: var(--fg); border-color: var(--accent); }
   a { color: var(--accent); text-decoration: none; }
   a:hover { text-decoration: underline; }
   header {
@@ -334,7 +372,7 @@ const baseCss = `
   header nav a:hover { background: var(--bg-elev-2); text-decoration: none; color: var(--fg); }
   header .spacer { flex: 1; }
   header .refresh-info { font-size: 12px; color: var(--fg-muted); }
-  main { padding: 20px 24px 60px; max-width: 1400px; margin: 0 auto; }
+  main#content { flex: 1; min-width: 0; padding: var(--sp-5) var(--sp-6) 60px; max-width: 1500px; overflow-x: hidden; }
   h2 { margin: 28px 0 12px; font-size: 16px; font-weight: 600; }
   .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 24px; }
   .stat-card { background: var(--bg-elev); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; }
@@ -499,31 +537,45 @@ function renderHeartbeatPill(heartbeat) {
   return `<span class="heartbeat heartbeat-off" title="${escapeHtml(titleAttr)}">🔴 daemon AV · senast ${ageLabel}</span>`;
 }
 
-function layout({ title, body, currentPath = '/', heartbeat = null }) {
+export function layout({ title, body, currentPath = '/', heartbeat = null, partial = false, escalationCount = 0 }) {
+  // Partial requests (client pane-swap) get only the inner content fragment.
+  if (partial) return body;
+
+  const isActive = (href) => href === '/'
+    ? currentPath === '/'
+    : currentPath.startsWith(href);
+  const navItem = (href, label, badge = '') =>
+    `<a href="${href}" data-pane-link class="nav-item${isActive(href) ? ' active' : ''}">${escapeHtml(label)}${badge}</a>`;
+  const escBadge = escalationCount > 0
+    ? `<span class="nav-badge" data-poll="esc-count">${escalationCount}</span>`
+    : '';
+
   return `<!doctype html>
 <html lang="sv">
 <head>
   <meta charset="utf-8">
-  <meta http-equiv="refresh" content="30">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${escapeHtml(title)} — Pilot dashboard</title>
+  <script>(function(){try{var t=localStorage.getItem('pilot-theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
   ${baseCss}
 </head>
 <body>
-  <header>
-    <h1>Mediagraf · Pilot</h1>
+  <aside class="sidebar">
+    <div class="brand">Mediagraf · Pilot</div>
     <nav>
-      <a href="/"${currentPath === '/' ? ' style="color:var(--fg)"' : ''}>Översikt</a>
-      <a href="/escalations"${currentPath === '/escalations' ? ' style="color:var(--fg)"' : ''}>Eskaleringar</a>
-      <a href="/activity"${currentPath === '/activity' ? ' style="color:var(--fg)"' : ''}>Aktivitet</a>
-      <a href="/leverantorer"${currentPath === '/leverantorer' ? ' style="color:var(--fg)"' : ''}>Leverantörer</a>
+      ${navItem('/', 'Översikt')}
+      ${navItem('/arenden', 'Ärenden')}
+      ${navItem('/escalations', 'Eskaleringar', escBadge)}
+      ${navItem('/leverantorer', 'Leverantörer')}
+      ${navItem('/activity', 'Aktivitet')}
     </nav>
-    <div class="spacer"></div>
-    ${renderHeartbeatPill(heartbeat)}
-    <div class="refresh-info">auto-refresh 30s · ${new Date().toLocaleTimeString('sv-SE')}</div>
-  </header>
-  <main>${body}</main>
-  <footer>data/pilot.db · data/municipalities.json · data/contracts/</footer>
+    <div class="sidebar-foot">
+      ${renderHeartbeatPill(heartbeat)}
+      <button type="button" class="theme-toggle" data-theme-toggle title="Växla ljust/mörkt tema">◐ Tema</button>
+    </div>
+  </aside>
+  <main id="content" data-path="${escapeHtml(currentPath)}">${body}</main>
+  <script src="/app.js" defer></script>
 </body>
 </html>`;
 }

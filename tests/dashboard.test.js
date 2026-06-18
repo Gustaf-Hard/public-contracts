@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { openDb } from '../src/storage.js';
 import { createDashboardApp } from '../src/dashboard.js';
+import { layout } from '../src/dashboard-views.js';
 
 let tmp, db, dbPath, muniPath;
 
@@ -330,5 +331,25 @@ describe('compose candidates prefer handoff addresses', () => {
     const res = await get(app, '/kommun/2418/compose?role=central');
     expect(res.text).toContain('registrator@mala.se');
     expect(res.text.indexOf('registrator@mala.se')).toBeLessThan(res.text.indexOf('central@mala.se'));
+  });
+});
+
+describe('app shell', () => {
+  it('full layout has a sidebar nav, theme bootstrap, app.js, no meta-refresh', () => {
+    const html = layout({ title: 'X', body: '<p>hi</p>', currentPath: '/' });
+    expect(html).toMatch(/<!doctype html>/i);
+    expect(html).toContain('class="sidebar"');
+    expect(html).toContain('href="/arenden"');
+    expect(html).toContain('id="content"');
+    expect(html).toContain('/app.js');
+    expect(html).toContain("localStorage.getItem('pilot-theme')");
+    expect(html).not.toMatch(/http-equiv="refresh"/);
+  });
+
+  it('partial layout returns only the inner body fragment', () => {
+    const html = layout({ title: 'X', body: '<p>hi</p>', currentPath: '/', partial: true });
+    expect(html).toBe('<p>hi</p>');
+    expect(html).not.toMatch(/<!doctype/i);
+    expect(html).not.toContain('class="sidebar"');
   });
 });
