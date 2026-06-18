@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { openDb } from '../src/storage.js';
-import { createDashboardApp } from '../src/dashboard.js';
+import { createDashboardApp, buildActionQueue, buildWaiting, applyFilter, buildOverviewRows } from '../src/dashboard.js';
 import { layout } from '../src/dashboard-views.js';
 
 let tmp, db, dbPath, muniPath;
@@ -55,14 +55,23 @@ async function get(app, path) {
 }
 
 describe('dashboard / overview', () => {
-  it('shows all kommuner with "ej kontaktad" when no pilot data exists', async () => {
+  it('shows all kommuner with "ej kontaktad" under ?filter=all', async () => {
     const app = appWithFakes();
-    const res = await get(app, '/');
+    // Home now defaults to active kommuner; the full 290-list is behind ?filter=all
+    const res = await get(app, '/?filter=all');
     expect(res.status).toBe(200);
     expect(res.text).toContain('Malå');
     expect(res.text).toContain('Boxholm');
     expect(res.text).toContain('Testkommun');
     expect(res.text).toContain('ej kontaktad');
+  });
+
+  it('default home hides never-contacted kommuner and shows the queue heading', async () => {
+    const app = appWithFakes();
+    const res = await get(app, '/');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Behöver dig');
+    expect(res.text).not.toContain('Boxholm'); // never contacted → not in the active default
   });
 
   it('shows pilot state when a conversation exists', async () => {
@@ -368,5 +377,38 @@ describe('partial responses', () => {
   it('serves /app.js', async () => {
     const res = await get(appWithFakes(), '/app.js');
     expect(res.status).toBe(200);
+  });
+});
+
+describe('home buckets', () => {
+  it('buildActionQueue surfaces a conversation with an open escalation', () => {
+    const cid = db.createConversation({
+      kommun_kod: '2418', kommun_namn: 'Malå', role: 'central', contact_email: 'k@mala.se',
+      scheduled_send_at: '2026-05-24T10:00:00Z',
+    });
+    db.recordEscalation({ conversation_id: cid, reason: 'handoff', draft_template: 'free_form', draft_subject: 'Re', draft_body: 'b' });
+    const q = buildActionQueue(db);
+    expect(q.some((x) => x.conv_id === cid && x.kommun_kod === '2418')).toBe(true);
+  });
+
+  it('buildWaiting surfaces an open SENT case but not one with an open escalation', () => {
+    const waitingId = db.createConversation({ kommun_kod: '2418', kommun_namn: 'Malå', role: 'central', contact_email: 'k@mala.se', scheduled_send_at: '2026-05-24T10:00:00Z' });
+    db.updateConversationState(waitingId, 'SENT', { last_outbound_at: '2026-05-24T10:00:00Z' });
+    const escId = db.createConversation({ kommun_kod: '0560', kommun_namn: 'Boxholm', role: 'central', contact_email: 'k@box.se', scheduled_send_at: '2026-05-24T10:00:00Z' });
+    db.updateConversationState(escId, 'SENT', {});
+    db.recordEscalation({ conversation_id: escId, reason: 'x', draft_template: 'free_form', draft_body: 'b' });
+    const w = buildWaiting(db);
+    expect(w.some((x) => x.conv_id === waitingId)).toBe(true);
+    expect(w.some((x) => x.conv_id === escId)).toBe(false); // in the action queue instead
+  });
+
+  it("applyFilter('active') drops never-contacted kommuner", () => {
+    db.createConversation({ kommun_kod: '2418', kommun_namn: 'Malå', role: 'central', contact_email: 'k@mala.se', scheduled_send_at: '2026-05-24T10:00:00Z' });
+    const munis = JSON.parse(require('node:fs').readFileSync(muniPath, 'utf8'));
+    const rows = buildOverviewRows(munis, db);
+    const active = applyFilter(rows, 'active');
+    expect(active.every((r) => r.states.length > 0)).toBe(true);
+    expect(active.some((r) => r.kommun_kod === '2418')).toBe(true);
+    expect(active.some((r) => r.kommun_kod === '0560')).toBe(false);
   });
 });

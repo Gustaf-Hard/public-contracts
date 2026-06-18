@@ -252,7 +252,7 @@ function buildSummary(rows) {
 
 function applyFilter(rows, filter) {
   if (!filter || filter === 'all') return rows;
-  if (filter === 'in-pilot') return rows.filter((r) => r.states.length > 0);
+  if (filter === 'in-pilot' || filter === 'active') return rows.filter((r) => r.states.length > 0);
   if (filter === 'needs-attention') return rows.filter((r) => r.states.some((s) => s.state === 'NEEDS_HUMAN') || r.open_escalations > 0);
   if (filter === 'delivering') return rows.filter((r) => r.states.some((s) => s.state === 'DELIVERING'));
   if (filter === 'done') return rows.filter((r) => r.states.some((s) => s.state === 'DONE'));
@@ -338,6 +338,66 @@ function parseSignatureJson(json) {
   try { return JSON.parse(json); } catch { return null; }
 }
 
+// The "what just happened, when" timestamp for a case row.
+function caseSince(c) {
+  return c.last_outbound_at && c.state_changed_at && c.last_outbound_at > c.state_changed_at
+    ? c.last_outbound_at : c.state_changed_at;
+}
+
+// Cases needing a human right now: any open escalation, or state NEEDS_HUMAN.
+// One entry per conversation, oldest-waiting first. Each carries conv_id so the
+// home queue links straight into the Ärenden detail pane.
+export function buildActionQueue(db) {
+  if (!db) return [];
+  const out = [];
+  for (const c of db.listAllConversations()) {
+    const openEsc = db.raw
+      .prepare("SELECT * FROM escalations WHERE conversation_id = ? AND status = 'open' ORDER BY id DESC")
+      .all(c.id);
+    if (c.state !== 'NEEDS_HUMAN' && openEsc.length === 0) continue;
+    out.push({
+      conv_id: c.id,
+      kommun_kod: c.kommun_kod,
+      kommun_namn: c.kommun_namn,
+      role: c.role,
+      state: c.state,
+      action: openEsc.length > 0 ? escalationActionLabel(openEsc[0]) : 'granska och svara',
+      since: caseSince(c),
+    });
+  }
+  return out.sort((a, b) => (a.since ?? '').localeCompare(b.since ?? ''));
+}
+
+// Open cases that are progressing on their own (waiting on the kommun), i.e. NOT
+// in the action queue. Soonest follow-up first.
+const WAITING_STATES = new Set(['INITIAL', 'SENT', 'ACK_RECEIVED', 'AWAITING_PRECISION', 'DELIVERING']);
+export function buildWaiting(db) {
+  if (!db) return [];
+  const out = [];
+  for (const c of db.listAllConversations()) {
+    if (c.state === 'NEEDS_HUMAN' || !WAITING_STATES.has(c.state)) continue;
+    const openEsc = db.raw
+      .prepare("SELECT COUNT(*) n FROM escalations WHERE conversation_id = ? AND status = 'open'")
+      .get(c.id).n;
+    if (openEsc > 0) continue; // belongs in the action queue
+    const fu = effectiveFollowUp(c);
+    out.push({
+      conv_id: c.id,
+      kommun_kod: c.kommun_kod,
+      kommun_namn: c.kommun_namn,
+      role: c.role,
+      state: c.state,
+      follow_up_at: fu.date,
+      follow_up_source: fu.source,
+      since: caseSince(c),
+    });
+  }
+  return out.sort((a, b) => (a.follow_up_at ?? '9999-12-31').localeCompare(b.follow_up_at ?? '9999-12-31'));
+}
+
+// Exported for tests + the Ärenden routes.
+export { buildOverviewRows, applyFilter };
+
 // ---- Route handlers ----
 
 export function createDashboardApp({
@@ -364,10 +424,17 @@ export function createDashboardApp({
     const municipalities = municipalitiesLoader();
     const rows = buildOverviewRows(municipalities, db);
     const summary = buildSummary(rows);
-    const filter = req.query.filter ?? 'all';
+    // Home defaults to active kommuner; full 290-list is behind ?filter=all.
+    const filter = req.query.filter ?? 'active';
     const sort = typeof req.query.sort === 'string' ? req.query.sort : null;
     const order = typeof req.query.order === 'string' ? req.query.order : null;
-    const filtered = sortRows(applyFilter(rows, filter), { sort, order });
+    const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+    let filtered = sortRows(applyFilter(rows, filter), { sort, order });
+    if (q) {
+      const ql = q.toLowerCase();
+      filtered = filtered.filter((r) =>
+        r.kommun_namn.toLowerCase().includes(ql) || r.kommun_kod.includes(ql));
+    }
     res.set('Content-Type', 'text/html; charset=utf-8');
     res.send(renderOverview({
       summary,
@@ -375,7 +442,10 @@ export function createDashboardApp({
       filter,
       sort,
       order,
+      q,
       totalKommuner: municipalities.length,
+      actionQueue: buildActionQueue(db),
+      waiting: buildWaiting(db),
       heartbeat: hb(), partial: isPartial(req), escalationCount: escCount(),
     }));
   });

@@ -514,6 +514,31 @@ const baseCss = `
   .timeline-body .ev-sub { color: var(--fg-muted); font-size: 12px; margin-top: 2px; }
   .timeline-body .body-quote { margin: 6px 0 4px; max-height: 160px; }
   footer { margin-top: 60px; padding: 20px 24px; text-align: center; color: var(--fg-muted); font-size: 11px; border-top: 1px solid var(--border); }
+  /* Page heading + KPI band */
+  .page-head { display: flex; align-items: baseline; gap: 12px; margin: 0 0 var(--sp-4); }
+  .page-head h1 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -.2px; }
+  .stats-band { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: var(--sp-3); }
+  .stats-band .stat-card { padding: 10px 14px; box-shadow: var(--shadow); }
+  .stats-band .stat-card .value { font-size: 22px; }
+  .stat-card.stat-alert { border-color: var(--bad); }
+  /* Action board */
+  .board { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-4); margin-bottom: var(--sp-5); align-items: start; }
+  @media (max-width: 1100px) { .board { grid-template-columns: 1fr; } }
+  .board-section { margin-bottom: var(--sp-5); }
+  .board-section > h2 { display: flex; align-items: center; gap: 8px; margin: 0 0 var(--sp-3); font-size: 14px; }
+  .board-section > h2 .count { background: var(--bg-elev-2); color: var(--fg-muted); border-radius: 999px; font-size: 12px; padding: 1px 9px; font-weight: 600; }
+  .queue { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; background: var(--bg-elev); box-shadow: var(--shadow); }
+  .queue-row { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: var(--sp-3); padding: 10px 14px; border-bottom: 1px solid var(--border); color: var(--fg); }
+  .queue-row:last-child { border-bottom: none; }
+  .queue-row:hover { background: var(--bg-elev-2); text-decoration: none; }
+  .queue-alert .queue-row { border-left: 3px solid var(--bad); }
+  .queue-row .q-kommun { font-weight: 600; }
+  .queue-row .q-action { color: var(--bad); font-size: 13px; font-weight: 500; }
+  .queue-row .q-age { font-size: 12px; white-space: nowrap; }
+  .empty-state { padding: 20px; text-align: center; color: var(--fg-muted); background: var(--bg-elev); border: 1px dashed var(--border); border-radius: var(--r-2); font-size: 13px; }
+  .table-search { margin: 0 0 var(--sp-3); }
+  .table-search input[type=search] { width: 320px; max-width: 100%; padding: 8px 12px; font: inherit; background: var(--bg-elev); color: var(--fg); border: 1px solid var(--border); border-radius: var(--r-2); }
+  .table-search input[type=search]:focus { outline: none; border-color: var(--accent); }
 </style>
 `;
 
@@ -611,42 +636,76 @@ function sortHeader({ key, label, currentSort, currentOrder, filter, align = 'le
   return `<th${style}><a href="?${params.toString()}" class="th-sort${isActive ? ' th-sort-active' : ''}">${escapeHtml(label)}${indicator}</a></th>`;
 }
 
-export function renderOverview({ summary, rows, filter, sort, order, totalKommuner, heartbeat = null, partial = false, escalationCount = 0 }) {
+export function renderOverview({ summary, rows, filter, sort, order, totalKommuner, q = '', actionQueue = [], waiting = [], heartbeat = null, partial = false, escalationCount = 0 }) {
+  const activeFilter = filter ?? 'active';
   const filters = [
-    { key: 'all', label: `Alla (${totalKommuner})` },
-    { key: 'in-pilot', label: `I pilot (${summary.in_pilot})` },
+    { key: 'active', label: `Aktiva (${summary.in_pilot})` },
     { key: 'needs-attention', label: `Behöver dig (${summary.needs_human + summary.open_escalations})` },
     { key: 'delivering', label: `Levererar (${summary.delivering})` },
     { key: 'done', label: `Klart (${summary.done})` },
     { key: 'dead-end', label: `Återvändsgränd (${summary.dead_end})` },
+    { key: 'all', label: `Visa alla (${totalKommuner})` },
   ];
 
-  // Preserve sort+order when switching filter
+  // Preserve sort+order+search when switching filter
   const filterParams = (key) => {
     const p = new URLSearchParams();
     if (key !== 'all') p.set('filter', key);
     if (sort) p.set('sort', sort);
     if (order) p.set('order', order);
+    if (q) p.set('q', q);
     return p.toString();
   };
 
   const filterBar = `<div class="filter-bar">${filters
     .map(
       (f) =>
-        `<a href="?${filterParams(f.key)}"${(filter ?? 'all') === f.key ? ' class="active"' : ''}>${escapeHtml(f.label)}</a>`
+        `<a href="?${filterParams(f.key)}" data-pane-link${activeFilter === f.key ? ' class="active"' : ''}>${escapeHtml(f.label)}</a>`
     )
     .join('')}</div>`;
 
+  const needsCount = summary.needs_human + summary.open_escalations;
   const stats = `
-    <div class="stats">
-      <div class="stat-card"><div class="label">I pilot</div><div class="value">${summary.in_pilot}</div></div>
+    <div class="stats stats-band">
+      <div class="stat-card${needsCount > 0 ? ' stat-alert' : ''}"><div class="label">Behöver dig</div><div class="value ${needsCount > 0 ? 'bad' : 'good'}">${needsCount}</div></div>
+      <div class="stat-card"><div class="label">Aktiva</div><div class="value">${summary.in_pilot}</div></div>
       <div class="stat-card"><div class="label">Levererar</div><div class="value good">${summary.delivering}</div></div>
       <div class="stat-card"><div class="label">Klart</div><div class="value good">${summary.done}</div></div>
-      <div class="stat-card"><div class="label">Behöver dig</div><div class="value ${summary.needs_human + summary.open_escalations > 0 ? 'bad' : ''}">${summary.needs_human + summary.open_escalations}</div></div>
       <div class="stat-card"><div class="label">Avtal mottagna</div><div class="value">${summary.contracts}</div></div>
       <div class="stat-card"><div class="label">Snittsvarstid</div><div class="value">${summary.avg_reply_days === null ? '—' : summary.avg_reply_days + ' d'}</div></div>
     </div>
   `;
+
+  // --- Action-first queues ---
+  const queueRow = (item, badgeHtml) => `<a class="queue-row" data-pane-link href="/arenden/${item.conv_id}">
+      <span class="q-kommun">${escapeHtml(item.kommun_namn)} <span class="muted">· ${escapeHtml(item.role)}</span></span>
+      <span class="q-mid">${badgeHtml}</span>
+      <span class="q-age muted" title="${escapeHtml(item.since ?? '')}">${escapeHtml(fmtAgo(item.since))}</span>
+    </a>`;
+
+  const actionSection = `
+    <section class="board-section">
+      <h2>Behöver dig <span class="count">${actionQueue.length}</span></h2>
+      ${actionQueue.length === 0
+        ? '<div class="empty-state">Inget kräver din uppmärksamhet just nu. 🎉</div>'
+        : `<div class="queue queue-alert">${actionQueue.map((a) =>
+            queueRow(a, `<span class="q-action">${escapeHtml(a.action)}</span>`)).join('')}</div>`}
+    </section>`;
+
+  const waitingSection = `
+    <section class="board-section">
+      <h2>Pågår · väntar <span class="count">${waiting.length}</span></h2>
+      ${waiting.length === 0
+        ? '<div class="empty-state">Inga öppna ärenden väntar på svar.</div>'
+        : `<div class="queue">${waiting.map((w) =>
+            queueRow(w, `${stateBadge(w.state)} ${fmtFollowUpBadge(w.follow_up_at, w.follow_up_source) ?? ''}`)).join('')}</div>`}
+    </section>`;
+
+  const searchForm = `
+    <form class="table-search" method="get" action="/">
+      <input type="search" name="q" value="${escapeHtml(q)}" placeholder="Sök kommun eller kod…" autocomplete="off">
+      ${activeFilter !== 'active' ? `<input type="hidden" name="filter" value="${escapeHtml(activeFilter)}">` : ''}
+    </form>`;
 
   const tableRows = rows.length === 0
     ? '<tr class="empty-row"><td colspan="8">Inga kommuner matchar filtret.</td></tr>'
@@ -680,25 +739,34 @@ export function renderOverview({ summary, rows, filter, sort, order, totalKommun
         })
         .join('');
 
-  const headerArgs = { currentSort: sort, currentOrder: order, filter };
+  const headerArgs = { currentSort: sort, currentOrder: order, filter: activeFilter };
   const body = `
+    <div class="page-head"><h1>Översikt</h1></div>
     ${stats}
-    ${filterBar}
-    <table>
-      <thead>
-        <tr>
-          ${sortHeader({ ...headerArgs, key: 'kommun_namn', label: 'Kommun' })}
-          ${sortHeader({ ...headerArgs, key: 'lan', label: 'Län' })}
-          ${sortHeader({ ...headerArgs, key: 'folkmangd', label: 'Folkmängd', align: 'right' })}
-          ${sortHeader({ ...headerArgs, key: 'state', label: 'Status' })}
-          ${sortHeader({ ...headerArgs, key: 'contracts', label: 'Avtal', align: 'right' })}
-          ${sortHeader({ ...headerArgs, key: 'open_escalations', label: 'Esk.', align: 'right' })}
-          ${sortHeader({ ...headerArgs, key: 'follow_up', label: 'Återkommer' })}
-          ${sortHeader({ ...headerArgs, key: 'last_activity', label: 'Senaste aktivitet' })}
-        </tr>
-      </thead>
-      <tbody>${tableRows}</tbody>
-    </table>
+    <div class="board">
+      ${actionSection}
+      ${waitingSection}
+    </div>
+    <section class="board-section">
+      <h2>Alla kommuner</h2>
+      ${searchForm}
+      ${filterBar}
+      <table>
+        <thead>
+          <tr>
+            ${sortHeader({ ...headerArgs, key: 'kommun_namn', label: 'Kommun' })}
+            ${sortHeader({ ...headerArgs, key: 'lan', label: 'Län' })}
+            ${sortHeader({ ...headerArgs, key: 'folkmangd', label: 'Folkmängd', align: 'right' })}
+            ${sortHeader({ ...headerArgs, key: 'state', label: 'Status' })}
+            ${sortHeader({ ...headerArgs, key: 'contracts', label: 'Avtal', align: 'right' })}
+            ${sortHeader({ ...headerArgs, key: 'open_escalations', label: 'Esk.', align: 'right' })}
+            ${sortHeader({ ...headerArgs, key: 'follow_up', label: 'Återkommer' })}
+            ${sortHeader({ ...headerArgs, key: 'last_activity', label: 'Senaste aktivitet' })}
+          </tr>
+        </thead>
+        <tbody>${tableRows}</tbody>
+      </table>
+    </section>
   `;
 
   return layout({ title: 'Översikt', body, currentPath: '/', heartbeat, partial, escalationCount });
