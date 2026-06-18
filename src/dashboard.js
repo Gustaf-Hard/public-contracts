@@ -18,7 +18,6 @@ import {
   renderActivity,
   renderCompose,
   renderVendors,
-  renderVendorDetail,
   mergeContacts,
 } from './dashboard-views.js';
 
@@ -703,15 +702,21 @@ export function createDashboardApp({
   app.get('/leverantorer', (req, res) => {
     const vendors = db ? db.listVendorsOverview() : [];
     res.set('Content-Type', 'text/html; charset=utf-8');
-    res.send(renderVendors({ vendors, heartbeat: hb(), partial: isPartial(req), escalationCount: escCount() }));
+    res.send(renderVendors({ vendors, selected: null, heartbeat: hb(), partial: isPartial(req), escalationCount: escCount() }));
   });
 
   app.get('/leverantor/:slug', (req, res) => {
+    const vendors = db ? db.listVendorsOverview() : [];
     const vendor = db ? db.getVendorBySlug(req.params.slug) : null;
     res.set('Content-Type', 'text/html; charset=utf-8');
-    if (!vendor) return res.status(404).send(renderVendorDetail({ vendor: null, heartbeat: hb(), partial: isPartial(req), escalationCount: escCount() }));
+    if (!vendor) {
+      return res.status(404).send(renderVendors({ vendors, selected: null, heartbeat: hb(), partial: isPartial(req), escalationCount: escCount() }));
+    }
     const contracts = db.listContractsForVendor(vendor.id);
-    res.send(renderVendorDetail({ vendor, contracts, heartbeat: hb(), partial: isPartial(req), escalationCount: escCount() }));
+    res.send(renderVendors({
+      vendors, selected: { vendor, contracts }, selectedSlug: req.params.slug,
+      heartbeat: hb(), partial: isPartial(req), escalationCount: escCount(),
+    }));
   });
 
   // --- Action endpoints (outbound email) ---

@@ -573,6 +573,15 @@ const baseCss = `
   .collapse-toggle { background: none; border: none; color: var(--accent); font: inherit; font-size: 12px;
     cursor: pointer; padding: 4px 0; }
   .collapse-toggle:hover { text-decoration: underline; }
+  /* Vendor list pane */
+  .vendor-item { display: block; padding: 12px 14px; border-bottom: 1px solid var(--border); color: var(--fg); }
+  .vendor-item:last-child { border-bottom: none; }
+  .vendor-item:hover { background: var(--bg-elev-2); text-decoration: none; }
+  .vendor-item.active { background: color-mix(in srgb, var(--accent) 12%, transparent); box-shadow: inset 3px 0 0 var(--accent); }
+  .vendor-item .vi-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 6px; font-size: 12px; }
+  .vendor-item .vi-name { font-weight: 600; font-size: 14px; }
+  .chip-row { display: flex; flex-wrap: wrap; gap: 4px; }
+  .tag-more { background: transparent; border-style: dashed; }
 </style>
 `;
 
@@ -1335,54 +1344,50 @@ function activeBadge(periodEnd) {
     : `<span class="pill pill-overdue">utgånget ${escapeHtml(periodEnd)}</span>`;
 }
 
-export function renderVendors({ vendors = [], heartbeat = null, partial = false, escalationCount = 0 } = {}) {
-  const rows = vendors.map((v) => `
-    <tr>
-      <td><a href="/leverantor/${escapeHtml(v.slug)}">${escapeHtml(v.name)}</a></td>
-      <td><div class="tag-list">${v.products.map((p) => `<span class="tag">${escapeHtml(p)}</span>`).join('')}</div></td>
-      <td>${v.contract_count}</td>
-      <td>${v.kommun_count}</td>
-      <td>${escapeHtml(v.last_contract_at?.slice(0, 10) ?? '—')}</td>
-    </tr>`).join('');
-  const body = `
-    <div class="card">
-      <h3>Leverantörer (${vendors.length})</h3>
-      ${vendors.length === 0
-        ? '<p class="muted">Inga leverantörer ännu — kör <code>npm run analyse-contracts</code>.</p>'
-        : `<table class="contracts-table">
-            <thead><tr><th>Leverantör</th><th>Produkter</th><th>Avtal</th><th>Kommuner</th><th>Senaste avtal</th></tr></thead>
-            <tbody>${rows}</tbody>
-          </table>`}
-    </div>`;
-  return layout({ title: 'Leverantörer', body, currentPath: '/leverantorer', heartbeat, partial, escalationCount });
+// Product chips, capped so a prolific vendor doesn't flood the list pane.
+function chipRow(products, cap = 10) {
+  const list = products ?? [];
+  const shown = list.slice(0, cap);
+  const extra = list.length - shown.length;
+  return `<div class="chip-row">${shown.map((p) => `<span class="tag">${escapeHtml(p)}</span>`).join('')}${
+    extra > 0 ? `<span class="tag tag-more">+${extra} till</span>` : ''}</div>`;
 }
 
-export function renderVendorDetail({ vendor, contracts = [], heartbeat = null, partial = false, escalationCount = 0 } = {}) {
-  if (!vendor) {
-    return layout({
-      title: 'Okänd leverantör',
-      body: '<div class="card"><h3>Okänd leverantör</h3><p><a href="/leverantorer">← Leverantörer</a></p></div>',
-      currentPath: '/leverantorer', heartbeat, partial, escalationCount,
-    });
+function renderVendorListPane(vendors, selectedSlug) {
+  if (vendors.length === 0) {
+    return '<div class="empty-state">Inga leverantörer ännu — kör <code>npm run analyse-contracts</code>.</div>';
   }
+  return vendors.map((v) => `
+    <a class="vendor-item${v.slug === selectedSlug ? ' active' : ''}" data-pane-link href="/leverantor/${escapeHtml(v.slug)}">
+      <div class="vi-head"><span class="vi-name">${escapeHtml(v.name)}</span>
+        <span class="muted">${v.contract_count} avtal · ${v.kommun_count} kommuner</span></div>
+      ${chipRow(v.products, 6)}
+    </a>`).join('');
+}
+
+function renderVendorDetailPane(selected) {
+  if (!selected || !selected.vendor) {
+    return '<div class="detail-empty"><p class="muted">Välj en leverantör i listan till vänster.</p></div>';
+  }
+  const { vendor, contracts = [] } = selected;
   const allProducts = [...new Set(contracts.flatMap((c) => c.products))];
   const kommuner = [...new Map(contracts.map((c) => [c.kommun_kod, c.kommun_namn])).entries()];
   const rows = contracts.map((c) => `
     <tr>
-      <td><a href="/kommun/${escapeHtml(c.kommun_kod)}">${escapeHtml(c.kommun_namn)}</a></td>
+      <td><a href="/kommun/${escapeHtml(c.kommun_kod)}" data-pane-link>${escapeHtml(c.kommun_namn)}</a></td>
       <td>${escapeHtml(c.received_at?.slice(0, 10) ?? '')}</td>
       <td><a href="/attachments/${c.attachment_id}" target="_blank" rel="noopener">📎 ${escapeHtml(c.filename)}</a></td>
-      <td><div class="tag-list">${c.products.map((p) => `<span class="tag">${escapeHtml(p)}</span>`).join('')}</div></td>
+      <td>${chipRow(c.products, 6)}</td>
       <td>${escapeHtml(c.avtalsvarde ?? '—')}</td>
       <td>${activeBadge(c.period_end)}</td>
     </tr>`).join('');
-  const body = `
-    <p><a href="/leverantorer">← Leverantörer</a></p>
-    <div class="card">
-      <h3>${escapeHtml(vendor.name)}</h3>
-      ${allProducts.length ? `<div class="tag-list" style="margin:6px 0">${allProducts.map((p) => `<span class="tag">${escapeHtml(p)}</span>`).join('')}</div>` : ''}
-      <p class="muted">${contracts.length} avtal · ${kommuner.length} kommun(er): ${kommuner.map(([kod, namn]) => `<a href="/kommun/${escapeHtml(kod)}">${escapeHtml(namn)}</a>`).join(', ')}</p>
+  return `<div class="case-detail">
+    <div class="case-header"><h3>${escapeHtml(vendor.name)}</h3></div>
+    <div class="case-meta">
+      <span>${contracts.length} avtal · ${kommuner.length} kommun(er)</span>
+      <span>${kommuner.map(([kod, namn]) => `<a href="/kommun/${escapeHtml(kod)}" data-pane-link>${escapeHtml(namn)}</a>`).join(', ')}</span>
     </div>
+    ${allProducts.length ? `<div class="card"><h3>Produkter</h3>${chipRow(allProducts, 50)}</div>` : ''}
     <div class="card">
       <h3>Avtal (${contracts.length})</h3>
       <table class="contracts-table">
@@ -1390,5 +1395,14 @@ export function renderVendorDetail({ vendor, contracts = [], heartbeat = null, p
         <tbody>${rows}</tbody>
       </table>
     </div>`;
-  return layout({ title: vendor.name, body, currentPath: '/leverantorer', heartbeat, partial, escalationCount });
+}
+
+export function renderVendors({ vendors = [], selected = null, selectedSlug = null, heartbeat = null, partial = false, escalationCount = 0 } = {}) {
+  const body = `
+    <div class="page-head"><h1>Leverantörer</h1><span class="muted">${vendors.length} st</span></div>
+    <div class="master-detail">
+      <aside class="md-list">${renderVendorListPane(vendors, selectedSlug)}</aside>
+      <div class="md-detail">${renderVendorDetailPane(selected)}</div>
+    </div>`;
+  return layout({ title: 'Leverantörer', body, currentPath: '/leverantorer', heartbeat, partial, escalationCount });
 }

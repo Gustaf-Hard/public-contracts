@@ -273,11 +273,12 @@ function seedVendorWithContract() {
 }
 
 describe('vendor pages', () => {
-  it('/leverantorer lists vendors with counts and links', async () => {
+  it('/leverantorer lists vendors with counts and links in a master-detail view', async () => {
     seedVendorWithContract();
     const app = appWithFakes();
     const res = await get(app, '/leverantorer');
     expect(res.status).toBe(200);
+    expect(res.text).toContain('class="master-detail"');
     expect(res.text).toContain('Skolon');
     expect(res.text).toContain('href="/leverantor/skolon"');
     expect(res.text).toContain('Skolon Plattform');
