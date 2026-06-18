@@ -54,6 +54,18 @@ async function get(app, path) {
   });
 }
 
+// Like get(), but does not follow redirects — returns status + Location.
+async function getNoRedirect(app, path) {
+  return new Promise((resolve, reject) => {
+    const server = app.listen(0, () => {
+      const port = server.address().port;
+      fetch(`http://127.0.0.1:${port}${path}`, { redirect: 'manual' }).then(async (r) => {
+        server.close(() => resolve({ status: r.status, location: r.headers.get('location') }));
+      }).catch((e) => server.close(() => reject(e)));
+    });
+  });
+}
+
 describe('dashboard / overview', () => {
   it('shows all kommuner with "ej kontaktad" under ?filter=all', async () => {
     const app = appWithFakes();
@@ -128,30 +140,50 @@ describe('dashboard / kommun detail', () => {
   });
 });
 
-describe('dashboard / escalations', () => {
-  it('lists open escalations across kommuner', async () => {
+describe('dashboard / arenden (master-detail)', () => {
+  it('GET /escalations redirects into the Ärenden behöver-dig bucket', async () => {
+    const res = await getNoRedirect(appWithFakes(), '/escalations');
+    expect(res.status).toBe(302);
+    expect(res.location).toContain('/arenden');
+  });
+
+  it('GET /arenden lists cases grouped by bucket', async () => {
     const cid = db.createConversation({
       kommun_kod: '2418', kommun_namn: 'Malå', role: 'central',
       contact_email: 'kommun@mala.se', scheduled_send_at: '2026-05-24T10:00:00Z',
     });
-    db.recordEscalation({
-      conversation_id: cid, reason: 'classifier=unknown',
-      draft_template: 'free_form', draft_body: '(ingen draft)',
-    });
-    const app = appWithFakes();
-    const res = await get(app, '/escalations');
+    db.recordEscalation({ conversation_id: cid, reason: 'classifier=unknown', draft_template: 'free_form', draft_body: '(ingen draft)' });
+    const res = await get(appWithFakes(), '/arenden');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('class="master-detail"');
     expect(res.text).toContain('Malå');
-    expect(res.text).toContain('free_form');
-    // The card now embeds an editable form pointing at the action endpoint
-    expect(res.text).toContain(`action="/escalations/`);
+    expect(res.text).toContain('Behöver dig');
+  });
+
+  it('GET /arenden/:id renders the case detail with the escalation form and a collapsed timeline', async () => {
+    const cid = db.createConversation({
+      kommun_kod: '2418', kommun_namn: 'Malå', role: 'central',
+      contact_email: 'kommun@mala.se', scheduled_send_at: '2026-05-24T10:00:00Z',
+    });
+    db.updateConversationState(cid, 'SENT', { last_outbound_at: '2026-05-24T10:00:00Z' });
+    db.recordMessage({
+      conversation_id: cid, gmail_message_id: 'm1', direction: 'inbound',
+      from_email: 'k@mala.se', to_email: 'me@x.com', subject: 'Re: Begäran',
+      body_text: 'Hej, vi återkommer.', classification: 'delay_promise', classification_confidence: 0.8,
+      received_at: '2026-05-24T11:00:00Z', attachment_count: 0,
+    });
+    db.recordEscalation({ conversation_id: cid, reason: 'classifier=unknown', draft_template: 'free_form', draft_subject: 'Re: Begäran', draft_body: '(ingen draft)' });
+    const res = await get(appWithFakes(), `/arenden/${cid}`);
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('data-collapse-target');     // timeline body collapsed
+    expect(res.text).toContain('action="/escalations/');    // send form present
     expect(res.text).toContain('Skicka');
     expect(res.text).toContain('Hoppa över');
   });
 
-  it('shows the empty state when there are no open escalations', async () => {
-    const app = appWithFakes();
-    const res = await get(app, '/escalations');
-    expect(res.text).toMatch(/Inga öppna eskaleringar/);
+  it('GET /arenden shows an empty state when there are no cases', async () => {
+    const res = await get(appWithFakes(), '/arenden');
+    expect(res.text).toMatch(/Inga ärenden ännu/);
   });
 });
 

@@ -221,7 +221,7 @@ function renderTimeline(events) {
       <div class="timeline-body">
         <div class="ev-title">${escapeHtml(e.title)}</div>
         ${e.sub ? `<div class="ev-sub">${e.link ? `<a href="${escapeHtml(e.link)}" target="_blank" rel="noopener">${escapeHtml(e.sub)}</a>` : escapeHtml(e.sub)}</div>` : ''}
-        ${e.body ? `<div class="body-quote ${e.bodyClass}">${escapeHtml(e.body)}</div>` : ''}
+        ${e.body ? `<button type="button" class="collapse-toggle" data-collapse aria-expanded="false">Visa meddelande</button><div class="body-quote ${e.bodyClass}" data-collapse-target hidden>${escapeHtml(e.body)}</div>` : ''}
         ${analysisBlock}
         ${sigBlock}
       </div>
@@ -229,23 +229,28 @@ function renderTimeline(events) {
   }).join('')}</ul>`;
 }
 
-function renderCaseActions(conv, gmailReady) {
+function renderCaseActions(conv, gmailReady, returnTo = null) {
+  const paneAttrs = returnTo ? ` data-pane-form data-return="${escapeHtml(returnTo)}"` : '';
+  const returnField = returnTo ? `<input type="hidden" name="return" value="${escapeHtml(returnTo)}">` : '';
   const isTerminal = CASE_STATUS[conv.state]?.terminal;
   if (isTerminal) {
     return `<div class="case-actions">
-      <form method="post" action="/conversations/${conv.id}/reopen">
+      <form method="post" action="/conversations/${conv.id}/reopen"${paneAttrs}>
+        ${returnField}
         <button class="btn btn-secondary" type="submit"
           onclick="return confirm('Återöppna ärende? Status sätts till Bekräftat.')">↩️ Återöppna</button>
       </form>
     </div>`;
   }
   return `<div class="case-actions">
-    <form method="post" action="/conversations/${conv.id}/close">
+    <form method="post" action="/conversations/${conv.id}/close"${paneAttrs}>
+      ${returnField}
       <input type="hidden" name="state" value="DONE">
       <button class="btn btn-primary" type="submit"
         onclick="return confirm('Stäng ärendet som klart? (state = DONE)')">✅ Stäng som klart</button>
     </form>
-    <form method="post" action="/conversations/${conv.id}/close">
+    <form method="post" action="/conversations/${conv.id}/close"${paneAttrs}>
+      ${returnField}
       <input type="hidden" name="state" value="DEAD_END">
       <button class="btn btn-secondary" type="submit"
         onclick="return confirm('Markera ärendet som återvändsgränd? (state = DEAD_END)')">🚫 Återvändsgränd</button>
@@ -539,6 +544,35 @@ const baseCss = `
   .table-search { margin: 0 0 var(--sp-3); }
   .table-search input[type=search] { width: 320px; max-width: 100%; padding: 8px 12px; font: inherit; background: var(--bg-elev); color: var(--fg); border: 1px solid var(--border); border-radius: var(--r-2); }
   .table-search input[type=search]:focus { outline: none; border-color: var(--accent); }
+  /* Master–detail (Ärenden, Leverantörer) */
+  .master-detail { display: grid; grid-template-columns: 340px 1fr; gap: var(--sp-4); align-items: start; }
+  @media (max-width: 980px) { .master-detail { grid-template-columns: 1fr; } }
+  .md-list { position: sticky; top: var(--sp-5); align-self: start; max-height: calc(100vh - 80px); overflow-y: auto;
+    border: 1px solid var(--border); border-radius: var(--r-2); background: var(--bg-elev); box-shadow: var(--shadow); }
+  .case-group + .case-group { border-top: 1px solid var(--border); }
+  .case-group-head { display: flex; align-items: center; gap: 8px; padding: 8px 14px; font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .5px; color: var(--fg-muted); background: var(--bg-elev-2); position: sticky; top: 0; }
+  .case-group-head .count { background: var(--bg-elev); border-radius: 999px; padding: 0 7px; }
+  .case-item { display: grid; grid-template-columns: 10px 1fr auto; align-items: center; gap: 10px;
+    padding: 10px 14px; border-bottom: 1px solid var(--border); color: var(--fg); }
+  .case-item:last-child { border-bottom: none; }
+  .case-item:hover { background: var(--bg-elev-2); text-decoration: none; }
+  .case-item.active { background: color-mix(in srgb, var(--accent) 12%, transparent); box-shadow: inset 3px 0 0 var(--accent); }
+  .ci-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--fg-muted); }
+  .ci-dot.bad { background: var(--bad); } .ci-dot.ok { background: var(--accent); } .ci-dot.muted { background: var(--border); }
+  .ci-kommun { font-weight: 600; }
+  .ci-meta { font-size: 12px; white-space: nowrap; }
+  .md-detail { min-width: 0; }
+  .detail-empty { display: flex; align-items: center; justify-content: center; min-height: 50vh;
+    border: 1px dashed var(--border); border-radius: var(--r-2); }
+  .case-detail .case-header { display: flex; align-items: center; gap: 12px; }
+  .case-detail .case-header h3 { font-size: 18px; }
+  .card.card-alert { border-color: var(--bad); }
+  .esc-reason { margin-bottom: 8px; }
+  hr.soft { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
+  .collapse-toggle { background: none; border: none; color: var(--accent); font: inherit; font-size: 12px;
+    cursor: pointer; padding: 4px 0; }
+  .collapse-toggle:hover { text-decoration: underline; }
 </style>
 `;
 
@@ -774,13 +808,18 @@ export function renderOverview({ summary, rows, filter, sort, order, totalKommun
 
 // ---- Kommun detail ----
 
-function renderEscalationForm(esc, gmailReady) {
+function renderEscalationForm(esc, gmailReady, returnTo = null) {
   const disabled = gmailReady ? '' : 'disabled';
   const warn = gmailReady ? '' : '<span class="send-warning">⚠️ Gmail-token saknas — kör <code>npm run pilot-auth</code></span>';
+  // When rendered inside a swappable pane, forms post via fetch and return to
+  // `returnTo` (so the operator stays on the case). Otherwise they full-reload.
+  const paneAttrs = returnTo ? ` data-pane-form data-return="${escapeHtml(returnTo)}"` : '';
+  const returnField = returnTo ? `<input type="hidden" name="return" value="${escapeHtml(returnTo)}">` : '';
   // Two forms in the card: edit-and-send (uses textarea contents) + skip.
   // Keeping subject editable lets the user fix a wrong "Re:" prefix.
   return `
-    <form class="action-form" method="post" action="/escalations/${esc.id}">
+    <form class="action-form" method="post" action="/escalations/${esc.id}"${paneAttrs}>
+      ${returnField}
       <div class="field">
         <label>Ämne</label>
         <input type="text" name="subject" value="${escapeHtml(esc.draft_subject ?? '')}">
@@ -794,7 +833,8 @@ function renderEscalationForm(esc, gmailReady) {
         ${warn}
       </div>
     </form>
-    <form method="post" action="/escalations/${esc.id}" style="margin-top:8px">
+    <form method="post" action="/escalations/${esc.id}" style="margin-top:8px"${paneAttrs}>
+      ${returnField}
       <input type="hidden" name="action" value="skip">
       <button class="btn btn-secondary" type="submit"
         onclick="return confirm('Hoppa över denna eskalering utan att svara?')">Hoppa över</button>
@@ -1164,6 +1204,84 @@ export function renderKommunDetail({ kommun, conversations, messagesByConv, atta
 
   const body = `<div class="kommun-page">${sidebar}${mainColumn}</div>`;
   return layout({ title: kommun.kommun_namn, body, currentPath: '/', heartbeat, partial, escalationCount });
+}
+
+// ---- Ärenden (master–detail) ----
+
+const ARENDEN_BUCKETS = [
+  { key: 'behover_dig', label: 'Behöver dig' },
+  { key: 'oppna', label: 'Öppna' },
+  { key: 'stangda', label: 'Stängda' },
+];
+
+function caseBucket(c) {
+  if (c.state === 'NEEDS_HUMAN' || (c.open_esc ?? 0) > 0) return 'behover_dig';
+  if (CASE_STATUS[c.state]?.terminal) return 'stangda';
+  return 'oppna';
+}
+
+function renderCaseList(cases, selectedId) {
+  if (cases.length === 0) return '<div class="empty-state">Inga ärenden ännu.</div>';
+  const groups = { behover_dig: [], oppna: [], stangda: [] };
+  for (const c of cases) groups[caseBucket(c)].push(c);
+  return ARENDEN_BUCKETS.map((b) => {
+    const items = groups[b.key];
+    if (items.length === 0) return '';
+    return `<div class="case-group">
+      <div class="case-group-head">${escapeHtml(b.label)} <span class="count">${items.length}</span></div>
+      ${items.map((c) => {
+        const dot = b.key === 'behover_dig' ? 'bad' : (b.key === 'stangda' ? 'muted' : 'ok');
+        const meta = b.key === 'oppna'
+          ? (fmtFollowUpBadge(c.follow_up_at, c.follow_up_source) ?? `<span class="muted">${escapeHtml(fmtAgo(c.since))}</span>`)
+          : `<span class="muted">${escapeHtml(fmtAgo(c.since))}</span>`;
+        return `<a class="case-item${c.conv_id === selectedId ? ' active' : ''}" data-pane-link href="/arenden/${c.conv_id}">
+          <span class="ci-dot ${dot}"></span>
+          <span class="ci-main"><span class="ci-kommun">${escapeHtml(c.kommun_namn)}</span> <span class="muted">· ${escapeHtml(c.role)}</span></span>
+          <span class="ci-meta">${meta}</span>
+        </a>`;
+      }).join('')}
+    </div>`;
+  }).join('');
+}
+
+function renderCaseDetailPane(selected, gmailReady) {
+  if (!selected) return '<div class="detail-empty"><p class="muted">Välj ett ärende i listan till vänster.</p></div>';
+  const { conv, messages, attachmentsByMsg, signatures, escalations, follow_up } = selected;
+  const returnTo = `/arenden/${conv.id}`;
+  const events = buildTimeline(conv, messages, attachmentsByMsg, signatures);
+  const duration = caseDuration(conv, messages);
+  const fuBadge = fmtFollowUpBadge(follow_up?.date, follow_up?.source);
+  const escBlock = escalations.length
+    ? `<div class="card card-alert"><h3>⚠️ Behöver ditt svar</h3>${escalations.map((e) => `
+        <div class="esc-reason">${intentBadge(e.classifier_class ?? 'unknown')} <span class="muted">Föreslaget svar — granska och skicka:</span></div>
+        ${renderEscalationForm(e, gmailReady, returnTo)}`).join('<hr class="soft">')}</div>`
+    : '';
+  return `<div class="case-detail">
+    <div class="case-header">
+      <h3>${escapeHtml(conv.kommun_namn)} <span class="muted">· ${escapeHtml(conv.role)}</span></h3>
+      ${caseStatusBadge(conv.state)}
+    </div>
+    <div class="case-meta">
+      <span>📧 ${escapeHtml(conv.contact_email ?? '')}</span>
+      ${conv.arendenummer ? `<span>Ärendenr: <code>${escapeHtml(conv.arendenummer)}</code></span>` : ''}
+      ${duration ? `<span>${escapeHtml(duration)}</span>` : ''}
+      ${fuBadge ? `<span>Återkommer: ${fuBadge}</span>` : ''}
+      <span><a href="/kommun/${escapeHtml(conv.kommun_kod)}" data-pane-link>Kommunprofil →</a></span>
+    </div>
+    ${escBlock}
+    <div class="card"><h3>Tidslinje</h3>${renderTimeline(events)}</div>
+    ${renderCaseActions(conv, gmailReady, returnTo)}
+  </div>`;
+}
+
+export function renderArenden({ cases = [], selected = null, selectedId = null, gmailReady = false, heartbeat = null, partial = false, escalationCount = 0 }) {
+  const body = `
+    <div class="page-head"><h1>Ärenden</h1></div>
+    <div class="master-detail">
+      <aside class="md-list">${renderCaseList(cases, selectedId)}</aside>
+      <div class="md-detail">${renderCaseDetailPane(selected, gmailReady)}</div>
+    </div>`;
+  return layout({ title: 'Ärenden', body, currentPath: '/arenden', heartbeat, partial, escalationCount });
 }
 
 // ---- Escalations queue ----
