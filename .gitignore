@@ -14,3 +14,7 @@ data/pilot.db-shm
 data/contracts/
 ~/.config/mediagraf/
 *.gmail-token.json
+
+# Local UI review artifacts (Playwright screenshots/snapshots)
+.playwright-mcp/
+/*.png
