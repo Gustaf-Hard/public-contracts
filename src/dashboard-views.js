@@ -683,7 +683,7 @@ export function renderOverview({ summary, rows, filter, sort, order, totalKommun
   const activeFilter = filter ?? 'active';
   const filters = [
     { key: 'active', label: `Aktiva (${summary.in_pilot})` },
-    { key: 'needs-attention', label: `Behöver dig (${summary.needs_human + summary.open_escalations})` },
+    { key: 'needs-attention', label: `Behöver dig (${actionQueue.length})` },
     { key: 'delivering', label: `Levererar (${summary.delivering})` },
     { key: 'done', label: `Klart (${summary.done})` },
     { key: 'dead-end', label: `Återvändsgränd (${summary.dead_end})` },
@@ -707,7 +707,7 @@ export function renderOverview({ summary, rows, filter, sort, order, totalKommun
     )
     .join('')}</div>`;
 
-  const needsCount = summary.needs_human + summary.open_escalations;
+  const needsCount = actionQueue.length;
   const stats = `
     <div class="stats stats-band">
       <div class="stat-card${needsCount > 0 ? ' stat-alert' : ''}"><div class="label">Behöver dig</div><div class="value ${needsCount > 0 ? 'bad' : 'good'}">${needsCount}</div></div>

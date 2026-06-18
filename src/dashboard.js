@@ -450,10 +450,10 @@ export function createDashboardApp({
   const hb = () => (db && typeof db.getHeartbeat === 'function' ? db.getHeartbeat() : null);
   // A client pane-swap request asks for just the content fragment.
   const isPartial = (req) => req.query.partial === '1' || req.get('X-Partial') === '1';
-  // Open-escalation count drives the sidebar badge + quiet-poll updates.
+  // Cases needing a human — drives the sidebar badge + quiet-poll updates.
+  // Counts conversations (not raw escalations) so it matches the home queue.
   const escCount = () => {
-    if (!db) return 0;
-    try { return db.raw.prepare("SELECT COUNT(*) n FROM escalations WHERE status = 'open'").get().n; }
+    try { return buildActionQueue(db).length; }
     catch { return 0; }
   };
   // After an action, return to where the form was submitted from (e.g. the
