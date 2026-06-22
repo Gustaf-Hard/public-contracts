@@ -463,3 +463,32 @@ describe('polish', () => {
     expect(res.text).toMatch(/Ingen aktivitet ännu/);
   });
 });
+
+describe('arenden gmail look', () => {
+  it('list uses Gmail-style mail rows; detail is a thread with a reply box', async () => {
+    const cid = db.createConversation({
+      kommun_kod: '2418', kommun_namn: 'Malå', role: 'central',
+      contact_email: 'kommun@mala.se', scheduled_send_at: '2026-05-24T10:00:00Z',
+    });
+    db.recordMessage({
+      conversation_id: cid, gmail_message_id: 'o1', direction: 'outbound',
+      from_email: 'me@x.com', to_email: 'kommun@mala.se', subject: 'Begäran om allmänna handlingar',
+      body_text: 'Hej, vi begär...', classification: null, classification_confidence: null,
+      received_at: '2026-05-24T10:00:00Z', attachment_count: 0,
+    });
+    db.recordMessage({
+      conversation_id: cid, gmail_message_id: 'i1', direction: 'inbound',
+      from_email: 'kommun@mala.se', to_email: 'me@x.com', subject: 'Re: Begäran',
+      body_text: 'Hej, vi återkommer.', classification: 'delay_promise', classification_confidence: 0.8,
+      received_at: '2026-05-26T09:00:00Z', attachment_count: 0,
+    });
+    db.recordEscalation({ conversation_id: cid, reason: 'x', draft_template: 'free_form', draft_subject: 'Re: Begäran', draft_body: 'utkast' });
+    const list = await get(appWithFakes(), '/arenden');
+    expect(list.text).toContain('class="mail-row');     // Gmail inbox rows
+    const detail = await get(appWithFakes(), `/arenden/${cid}`);
+    expect(detail.text).toContain('class="thread"');     // Gmail thread
+    expect(detail.text).toContain('class="msg ');        // stacked message blocks
+    expect(detail.text).toContain('class="reply-box"');  // suggested reply box
+    expect(detail.text).toContain('kommun@mala.se');     // sender address shown
+  });
+});

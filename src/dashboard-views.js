@@ -545,7 +545,7 @@ const baseCss = `
   .table-search input[type=search] { width: 320px; max-width: 100%; padding: 8px 12px; font: inherit; background: var(--bg-elev); color: var(--fg); border: 1px solid var(--border); border-radius: var(--r-2); }
   .table-search input[type=search]:focus { outline: none; border-color: var(--accent); }
   /* Master–detail (Ärenden, Leverantörer) */
-  .master-detail { display: grid; grid-template-columns: 340px 1fr; gap: var(--sp-4); align-items: start; }
+  .master-detail { display: grid; grid-template-columns: 380px 1fr; gap: var(--sp-4); align-items: start; }
   @media (max-width: 980px) { .master-detail { grid-template-columns: 1fr; } }
   .md-list { position: sticky; top: var(--sp-5); align-self: start; max-height: calc(100vh - 80px); overflow-y: auto;
     border: 1px solid var(--border); border-radius: var(--r-2); background: var(--bg-elev); box-shadow: var(--shadow); }
@@ -582,6 +582,47 @@ const baseCss = `
   .vendor-item .vi-name { font-weight: 600; font-size: 14px; }
   .chip-row { display: flex; flex-wrap: wrap; gap: 4px; }
   .tag-more { background: transparent; border-style: dashed; }
+  /* Gmail-style inbox rows (Ärenden list) */
+  .mail-row { display: grid; grid-template-columns: 10px minmax(110px, 150px) 1fr auto; align-items: center; gap: 10px;
+    padding: 9px 14px; border-bottom: 1px solid var(--border); color: var(--fg); }
+  .mail-row:last-child { border-bottom: none; }
+  .mail-row:hover { background: var(--bg-elev-2); text-decoration: none; }
+  .mail-row.active { background: color-mix(in srgb, var(--accent) 12%, transparent); box-shadow: inset 3px 0 0 var(--accent); }
+  .mail-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--fg-muted); }
+  .mail-dot.bad { background: var(--bad); } .mail-dot.ok { background: var(--accent); } .mail-dot.muted { background: var(--border); }
+  .mail-sender { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; }
+  .mail-row.unread .mail-sender, .mail-row.unread .mail-subject { font-weight: 700; }
+  .mail-line { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 13px; }
+  .mail-date { font-size: 12px; white-space: nowrap; }
+  /* Gmail-style thread (Ärenden detail) */
+  .thread-head { padding-bottom: var(--sp-3); border-bottom: 1px solid var(--border); margin-bottom: var(--sp-4); }
+  .thread-title-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .thread-subject { margin: 0; font-size: 20px; font-weight: 600; }
+  .thread-meta { margin-top: 6px; font-size: 12px; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; }
+  .thread-msgs { display: flex; flex-direction: column; }
+  .msg { border: 1px solid var(--border); border-radius: var(--r-2); margin-bottom: 10px; background: var(--bg-elev); overflow: hidden; box-shadow: var(--shadow); }
+  .msg-outbound { background: color-mix(in srgb, var(--good) 6%, var(--bg-elev)); }
+  .msg-head { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; padding: 12px 14px; cursor: pointer; }
+  .msg-head:hover { background: var(--bg-elev-2); }
+  .avatar { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-weight: 600; font-size: 14px; background: var(--bg-elev-2); color: var(--fg-muted); flex: none; }
+  .avatar-inbound { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
+  .avatar-outbound { background: color-mix(in srgb, var(--good) 18%, transparent); color: var(--good); }
+  .msg-who { min-width: 0; }
+  .msg-from { font-weight: 600; font-size: 13px; }
+  .msg-addr { font-weight: 400; }
+  .msg-snippet { display: block; font-size: 12px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .msg-date { font-size: 12px; white-space: nowrap; }
+  .msg-body { padding: 0 16px 16px 60px; }
+  .msg-text { white-space: pre-wrap; font-size: 13px; line-height: 1.55; }
+  .msg-atts { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .msg-att { font-size: 12px; padding: 4px 8px; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--bg-elev-2); }
+  /* Gmail-style reply box */
+  .reply-box { border: 1px solid var(--accent); border-radius: var(--r-2); margin: 14px 0; background: var(--bg-elev); box-shadow: var(--shadow); overflow: hidden; }
+  .reply-head { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .reply-box > form { padding: 0 14px; }
+  .reply-box > form:first-of-type { padding-top: 12px; }
+  .reply-box > form:last-of-type { padding-bottom: 14px; }
 </style>
 `;
 
@@ -1229,6 +1270,8 @@ function caseBucket(c) {
   return 'oppna';
 }
 
+// Gmail-style inbox rows: leading status dot, bold sender, subject + grey
+// snippet, date on the right. Grouped under the status buckets.
 function renderCaseList(cases, selectedId) {
   if (cases.length === 0) return '<div class="empty-state">Inga ärenden ännu.</div>';
   const groups = { behover_dig: [], oppna: [], stangda: [] };
@@ -1240,45 +1283,101 @@ function renderCaseList(cases, selectedId) {
       <div class="case-group-head">${escapeHtml(b.label)} <span class="count">${items.length}</span></div>
       ${items.map((c) => {
         const dot = b.key === 'behover_dig' ? 'bad' : (b.key === 'stangda' ? 'muted' : 'ok');
-        const meta = b.key === 'oppna'
+        const date = b.key === 'oppna'
           ? (fmtFollowUpBadge(c.follow_up_at, c.follow_up_source) ?? `<span class="muted">${escapeHtml(fmtAgo(c.since))}</span>`)
           : `<span class="muted">${escapeHtml(fmtAgo(c.since))}</span>`;
-        return `<a class="case-item${c.conv_id === selectedId ? ' active' : ''}" data-pane-link href="/arenden/${c.conv_id}">
-          <span class="ci-dot ${dot}"></span>
-          <span class="ci-main"><span class="ci-kommun">${escapeHtml(c.kommun_namn)}</span> <span class="muted">· ${escapeHtml(c.role)}</span></span>
-          <span class="ci-meta">${meta}</span>
+        const unread = b.key === 'behover_dig' ? ' unread' : '';
+        return `<a class="mail-row${unread}${c.conv_id === selectedId ? ' active' : ''}" data-pane-link href="/arenden/${c.conv_id}">
+          <span class="mail-dot ${dot}"></span>
+          <span class="mail-sender">${escapeHtml(c.kommun_namn)} <span class="muted">· ${escapeHtml(c.role)}</span></span>
+          <span class="mail-line"><span class="mail-subject">${escapeHtml(c.subject ?? '')}</span>${c.snippet ? ` <span class="mail-snippet">— ${escapeHtml(c.snippet)}</span>` : ''}</span>
+          <span class="mail-date">${date}</span>
         </a>`;
       }).join('')}
     </div>`;
   }).join('');
 }
 
+// Split a raw From/To header ("Display Name <a@b.se>" or "a@b.se") into parts.
+function parseAddr(raw) {
+  if (!raw) return { name: '', email: '' };
+  const m = String(raw).match(/^\s*"?([^"<]*?)"?\s*<([^>]+)>\s*$/);
+  if (m) return { name: m[1].trim(), email: m[2].trim() };
+  return { name: '', email: String(raw).trim() };
+}
+
+// One Gmail-style message block. Latest message is expanded; older ones are
+// collapsed to a header (sender · snippet · date) you click to open.
+function threadMessage(m, attachments, sig, expanded) {
+  const isOut = m.direction === 'outbound';
+  const from = parseAddr(m.from_email);
+  const to = parseAddr(m.to_email);
+  const name = isOut ? 'Du' : (from.name || from.email || 'Avsändare');
+  const initial = (name || '?').trim().charAt(0).toUpperCase() || '?';
+  const date = m.received_at ? `${m.received_at.slice(0, 10)} ${m.received_at.slice(11, 16)}` : '';
+  const addr = isOut
+    ? `till ${to.email || m.to_email || ''}`
+    : (from.email ? `<${from.email}>` : '');
+  const snippet = (m.body_text ?? '').replace(/\s+/g, ' ').trim().slice(0, 100);
+  const atts = (attachments ?? [])
+    .map((a) => `<a class="msg-att" href="/attachments/${a.id}" target="_blank" rel="noopener">📎 ${escapeHtml(a.filename)}</a>`)
+    .join('');
+  return `<div class="msg msg-${m.direction}">
+    <div class="msg-head" data-collapse aria-expanded="${expanded ? 'true' : 'false'}">
+      <span class="avatar avatar-${m.direction}">${escapeHtml(initial)}</span>
+      <div class="msg-who">
+        <span class="msg-from">${escapeHtml(name)} <span class="msg-addr muted">${escapeHtml(addr)}</span></span>
+        ${expanded ? '' : `<span class="msg-snippet muted">${escapeHtml(snippet)}</span>`}
+      </div>
+      <span class="msg-date muted">${escapeHtml(date)}</span>
+    </div>
+    <div class="msg-body" data-collapse-target${expanded ? '' : ' hidden'}>
+      <div class="msg-text">${escapeHtml(m.body_text ?? '')}</div>
+      ${atts ? `<div class="msg-atts">${atts}</div>` : ''}
+    </div>
+  </div>`;
+}
+
 function renderCaseDetailPane(selected, gmailReady) {
   if (!selected) return '<div class="detail-empty"><p class="muted">Välj ett ärende i listan till vänster.</p></div>';
   const { conv, messages, attachmentsByMsg, signatures, escalations, follow_up } = selected;
   const returnTo = `/arenden/${conv.id}`;
-  const events = buildTimeline(conv, messages, attachmentsByMsg, signatures);
   const duration = caseDuration(conv, messages);
   const fuBadge = fmtFollowUpBadge(follow_up?.date, follow_up?.source);
-  const escBlock = escalations.length
-    ? `<div class="card card-alert"><h3>⚠️ Behöver ditt svar</h3>${escalations.map((e) => `
-        <div class="esc-reason">${intentBadge(e.classifier_class ?? 'unknown')} <span class="muted">Föreslaget svar — granska och skicka:</span></div>
-        ${renderEscalationForm(e, gmailReady, returnTo)}`).join('<hr class="soft">')}</div>`
-    : '';
-  return `<div class="case-detail">
-    <div class="case-header">
-      <h3>${escapeHtml(conv.kommun_namn)} <span class="muted">· ${escapeHtml(conv.role)}</span></h3>
-      ${caseStatusBadge(conv.state)}
+  const subject = messages.find((m) => m.subject)?.subject ?? `Begäran — ${conv.kommun_namn}`;
+
+  const thread = messages.length
+    ? messages.map((m, i) => threadMessage(m, attachmentsByMsg[m.id], signatures[m.id], i === messages.length - 1)).join('')
+    : '<p class="muted">Inga meddelanden ännu.</p>';
+
+  // Suggested reply (Gmail-style reply box) for each open escalation.
+  const replyBoxes = escalations.map((e) => `
+    <div class="reply-box">
+      <div class="reply-head">
+        <span class="avatar avatar-outbound">↩</span>
+        <span class="muted">Föreslaget svar till <strong>${escapeHtml(conv.contact_email ?? '')}</strong></span>
+        ${intentBadge(e.classifier_class ?? 'unknown')}
+      </div>
+      ${renderEscalationForm(e, gmailReady, returnTo)}
+    </div>`).join('');
+
+  return `<div class="thread">
+    <div class="thread-head">
+      <div class="thread-title-row">
+        <h2 class="thread-subject">${escapeHtml(subject)}</h2>
+        ${caseStatusBadge(conv.state)}
+      </div>
+      <div class="thread-meta muted">
+        <strong>${escapeHtml(conv.kommun_namn)} · ${escapeHtml(conv.role)}</strong>
+        · ${escapeHtml(conv.contact_email ?? '')}
+        ${conv.arendenummer ? `· Ärendenr ${escapeHtml(conv.arendenummer)}` : ''}
+        ${duration ? `· ${escapeHtml(duration)}` : ''}
+        ${fuBadge ? `· Återkommer ${fuBadge}` : ''}
+        · <a href="/kommun/${escapeHtml(conv.kommun_kod)}" data-pane-link>Kommunprofil →</a>
+      </div>
     </div>
-    <div class="case-meta">
-      <span>📧 ${escapeHtml(conv.contact_email ?? '')}</span>
-      ${conv.arendenummer ? `<span>Ärendenr: <code>${escapeHtml(conv.arendenummer)}</code></span>` : ''}
-      ${duration ? `<span>${escapeHtml(duration)}</span>` : ''}
-      ${fuBadge ? `<span>Återkommer: ${fuBadge}</span>` : ''}
-      <span><a href="/kommun/${escapeHtml(conv.kommun_kod)}" data-pane-link>Kommunprofil →</a></span>
-    </div>
-    ${escBlock}
-    <div class="card"><h3>Tidslinje</h3>${renderTimeline(events)}</div>
+    <div class="thread-msgs">${thread}</div>
+    ${replyBoxes}
     ${renderCaseActions(conv, gmailReady, returnTo)}
   </div>`;
 }

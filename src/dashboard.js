@@ -394,17 +394,24 @@ export function buildWaiting(db) {
   return out.sort((a, b) => (a.follow_up_at ?? '9999-12-31').localeCompare(b.follow_up_at ?? '9999-12-31'));
 }
 
-// One row per conversation for the Ärenden list pane.
+// One row per conversation for the Ärenden list pane (Gmail-inbox style:
+// sender · subject · snippet · date), with the latest message previewed.
 function loadCaseSummaries(db) {
   if (!db) return [];
   return db.listAllConversations().map((c) => {
     const open_esc = db.raw
       .prepare("SELECT COUNT(*) n FROM escalations WHERE conversation_id = ? AND status = 'open'")
       .get(c.id).n;
+    const last = db.raw
+      .prepare('SELECT subject, body_text, direction FROM messages WHERE conversation_id = ? ORDER BY received_at DESC, id DESC LIMIT 1')
+      .get(c.id);
     const fu = effectiveFollowUp(c);
     return {
       conv_id: c.id, kommun_kod: c.kommun_kod, kommun_namn: c.kommun_namn, role: c.role,
       state: c.state, open_esc, follow_up_at: fu.date, follow_up_source: fu.source, since: caseSince(c),
+      subject: last?.subject ?? 'Begäran om allmänna handlingar',
+      snippet: (last?.body_text ?? '').replace(/\s+/g, ' ').trim().slice(0, 100),
+      last_direction: last?.direction ?? null,
     };
   });
 }
