@@ -216,7 +216,7 @@ function renderTimeline(events) {
         </dl>
       </details>` : '';
     return `<li class="timeline-item">
-      <div class="timeline-date" title="${escapeHtml(e.ts ?? '')}">${escapeHtml(date)}<br>${escapeHtml(time)}</div>
+      <div class="timeline-date" title="${escapeHtml(e.ts ?? '')}">${escapeHtml(date)}<br>${escapeHtml(time)}<br><span class="muted">${escapeHtml(fmtAgo(e.ts))}</span></div>
       <div class="timeline-icon">${e.icon}</div>
       <div class="timeline-body">
         <div class="ev-title">${escapeHtml(e.title)}</div>
@@ -1314,7 +1314,9 @@ function threadMessage(m, attachments, sig, expanded) {
   const to = parseAddr(m.to_email);
   const name = isOut ? 'Du' : (from.name || from.email || 'Avsändare');
   const initial = (name || '?').trim().charAt(0).toUpperCase() || '?';
-  const date = m.received_at ? `${m.received_at.slice(0, 10)} ${m.received_at.slice(11, 16)}` : '';
+  const date = m.received_at
+    ? `${m.received_at.slice(0, 10)} ${m.received_at.slice(11, 16)} · ${fmtAgo(m.received_at)}`
+    : '';
   const addr = isOut
     ? `till ${to.email || m.to_email || ''}`
     : (from.email ? `<${from.email}>` : '');
