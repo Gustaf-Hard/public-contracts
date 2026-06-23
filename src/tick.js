@@ -113,7 +113,11 @@ export async function runTick(deps) {
   for (const conv of active) {
     const list = await gmailOps.listInboundQuery(
       gmailClient.gmail,
-      `to:${env.GMAIL_USER_EMAIL} -from:${env.GMAIL_USER_EMAIL} newer_than:7d`
+      // Stopgap window widened from 7d → 30d so recovery after a multi-day
+      // outage still catches replies that arrived during the blackout (e.g.
+      // Arboga's contracts, delivered 16 Jun while the daemon was blind).
+      // Proper fix: derive the window from the last successful tick (see spec).
+      `to:${env.GMAIL_USER_EMAIL} -from:${env.GMAIL_USER_EMAIL} newer_than:30d`
     );
     for (const m of list) {
       if (db.hasGmailMessageId(m.id)) continue;
