@@ -731,10 +731,12 @@ export function renderOverview({ summary, rows, filter, sort, order, totalKommun
     { key: 'all', label: `Visa alla (${totalKommuner})` },
   ];
 
-  // Preserve sort+order+search when switching filter
+  // Preserve sort+order+search when switching filter. The filter is always set
+  // explicitly (incl. 'all') — the route defaults to 'active', so an omitted
+  // param would silently fall back to active instead of showing all kommuner.
   const filterParams = (key) => {
     const p = new URLSearchParams();
-    if (key !== 'all') p.set('filter', key);
+    p.set('filter', key);
     if (sort) p.set('sort', sort);
     if (order) p.set('order', order);
     if (q) p.set('q', q);
