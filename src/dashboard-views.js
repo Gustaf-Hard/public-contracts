@@ -623,27 +623,66 @@ const baseCss = `
   .reply-box > form { padding: 0 14px; }
   .reply-box > form:first-of-type { padding-top: 12px; }
   .reply-box > form:last-of-type { padding-bottom: 14px; }
+  /* Health modal */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(8,11,16,.55); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 20px; }
+  .modal { background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-3); box-shadow: 0 12px 40px rgba(0,0,0,.35); max-width: 520px; width: 100%; padding: 24px 26px; }
+  .modal h2 { margin: 0 0 12px; font-size: 18px; }
+  .modal p { margin: 0 0 10px; font-size: 14px; line-height: 1.5; }
+  .modal code { background: var(--bg-elev-2); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+  .modal-actions { display: flex; gap: 10px; margin-top: 18px; }
+  .modal-status { font-size: 13px; padding: 10px 12px; border-radius: var(--r-2); background: var(--bg-elev-2); margin: 4px 0 0; }
+  .modal-status.ok { color: var(--good); } .modal-status.err { color: var(--bad); }
 </style>
 `;
 
 // Render the daemon-heartbeat pill for the header. Thresholds: live <= 20 min,
 // stale 20-60 min, off > 60 min or no tick recorded yet.
-function renderHeartbeatPill(heartbeat) {
-  const lastTick = heartbeat?.last_tick_at;
-  if (!lastTick) {
-    return `<span class="heartbeat heartbeat-off" title="Inga ticks registrerade. Starta daemonen med 'npm run pilot-daemon'.">🔴 daemon AV</span>`;
+// Human "X min/h/dagar sedan" for an ISO timestamp.
+function agoLabel(iso) {
+  if (!iso) return '—';
+  const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  if (m < 1) return 'just nu';
+  if (m === 1) return '1 min sedan';
+  if (m < 120) return `${m} min sedan`;
+  const h = Math.floor(m / 60);
+  if (h < 48) return `${h} h sedan`;
+  return `${Math.floor(h / 24)} dagar sedan`;
+}
+
+// The pill keys off the last *successful* tick — so a daemon that's up but
+// failing (e.g. invalid_grant) reads red, not green.
+function renderHeartbeatPill(h) {
+  if (!h || !h.ever) {
+    return `<span class="heartbeat heartbeat-off" title="Ingen lyckad bearbetning ännu.">🔴 daemon AV</span>`;
   }
-  const ageMs = Date.now() - new Date(lastTick).getTime();
-  const ageMin = Math.floor(ageMs / 60000);
-  const ageLabel = ageMin < 1 ? 'just nu' : ageMin === 1 ? '1 min sedan' : `${ageMin} min sedan`;
-  const titleAttr = `Senaste tick: ${lastTick} (totalt ${heartbeat.tick_count ?? 0} ticks)${heartbeat.last_error ? '\nSenaste fel: ' + heartbeat.last_error : ''}`;
-  if (ageMin <= 20) {
-    return `<span class="heartbeat heartbeat-live" title="${escapeHtml(titleAttr)}">🟢 daemon · ${ageLabel}</span>`;
+  const title = `Senaste lyckade bearbetning: ${h.last_success_at}${h.last_error ? '\nSenaste fel: ' + h.last_error : ''}`;
+  if (!h.stale) {
+    return `<span class="heartbeat heartbeat-live" title="${escapeHtml(title)}">🟢 daemon · ${agoLabel(h.last_success_at)}</span>`;
   }
-  if (ageMin <= 60) {
-    return `<span class="heartbeat heartbeat-stale" title="${escapeHtml(titleAttr)}">🟡 daemon släpar · ${ageLabel}</span>`;
-  }
-  return `<span class="heartbeat heartbeat-off" title="${escapeHtml(titleAttr)}">🔴 daemon AV · senast ${ageLabel}</span>`;
+  return `<span class="heartbeat heartbeat-off" title="${escapeHtml(title)}">🔴 daemon blind · ${agoLabel(h.last_success_at)}</span>`;
+}
+
+// Blocking modal shown on full page loads when the pipeline is unhealthy, with
+// a one-click in-app Gmail re-auth. `app.js` handles dismiss + the reauth flow.
+function renderHealthModal(h) {
+  const invalidGrant = (h.last_error ?? '').toLowerCase().includes('invalid_grant');
+  let cause;
+  if (invalidGrant) cause = 'Gmail-behörigheten har gått ut (<code>invalid_grant</code>).';
+  else if (!h.ever) cause = 'Daemonen har inte kört någon lyckad bearbetning ännu.';
+  else cause = `Daemonen har inte bearbetat mejl sedan <strong>${escapeHtml((h.last_success_at ?? '').slice(0, 16).replace('T', ' '))}</strong>.`;
+  return `
+  <div class="modal-overlay" data-health-modal>
+    <div class="modal" role="dialog" aria-modal="true">
+      <h2>⚠️ Inkommande mejl bearbetas inte</h2>
+      <p>${cause}</p>
+      <p class="muted">Nya svar och avtal fångas inte, och statusarna nedan kan vara inaktuella (de visar senast kända läge).</p>
+      <div class="modal-status" data-reauth-status hidden></div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-primary" data-reauth>🔌 Återanslut Gmail</button>
+        <button type="button" class="btn btn-secondary" data-dismiss-modal>Stäng</button>
+      </div>
+    </div>
+  </div>`;
 }
 
 export function layout({ title, body, currentPath = '/', heartbeat = null, partial = false, escalationCount = 0 }) {
@@ -684,6 +723,7 @@ export function layout({ title, body, currentPath = '/', heartbeat = null, parti
     </div>
   </aside>
   <main id="content" data-path="${escapeHtml(currentPath)}">${body}</main>
+  ${heartbeat?.stale ? renderHealthModal(heartbeat) : ''}
   <script src="/app.js" defer></script>
 </body>
 </html>`;

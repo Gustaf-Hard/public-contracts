@@ -492,3 +492,30 @@ describe('arenden gmail look', () => {
     expect(detail.text).toContain('kommun@mala.se');     // sender address shown
   });
 });
+
+describe('health modal', () => {
+  it('shows the health modal + reauth button when there is no successful tick', async () => {
+    const res = await get(appWithFakes(), '/');
+    expect(res.text).toContain('data-health-modal');
+    expect(res.text).toContain('Återanslut Gmail');
+  });
+
+  it('hides the modal once a successful tick is recorded', async () => {
+    db.recordHeartbeat({ kind: 'tick', error: null });
+    const res = await get(appWithFakes(), '/');
+    expect(res.text).not.toContain('data-health-modal');
+  });
+
+  it('flags invalid_grant cause in the modal', async () => {
+    db.recordHeartbeat({ kind: 'tick', error: 'invalid_grant' });
+    const res = await get(appWithFakes(), '/');
+    expect(res.text).toContain('data-health-modal');
+    expect(res.text).toContain('invalid_grant');
+  });
+
+  it('GET /api/health reports stale state', async () => {
+    const res = await get(appWithFakes(), '/api/health');
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.text).stale).toBe(true);
+  });
+});

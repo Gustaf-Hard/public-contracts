@@ -9,6 +9,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { openDb } from './storage.js';
 import { effectiveFollowUp, TERMINAL_STATES } from './conversation.js';
 import { buildOAuthClient, loadStoredToken, makeGmail } from './gmail.js';
+import { beginReauth } from './gmail-auth.js';
 import { sendApprovedReply, sendInitial, renderInitialDraft } from './send-reply.js';
 import {
   renderOverview,
@@ -454,7 +455,9 @@ export function createDashboardApp({
   const app = express();
   app.use(express.urlencoded({ extended: false, limit: '1mb' }));
   app.use(express.static('public'));
-  const hb = () => (db && typeof db.getHeartbeat === 'function' ? db.getHeartbeat() : null);
+  // Pipeline health drives the heartbeat pill + the health modal (one object,
+  // already threaded everywhere as `heartbeat`).
+  const hb = () => (db && typeof db.getTickHealth === 'function' ? db.getTickHealth() : null);
   // A client pane-swap request asks for just the content fragment.
   const isPartial = (req) => req.query.partial === '1' || req.get('X-Partial') === '1';
   // Cases needing a human — drives the sidebar badge + quiet-poll updates.
@@ -469,6 +472,10 @@ export function createDashboardApp({
     const r = typeof req.body.return === 'string' ? req.body.return : '';
     return r && r.startsWith('/') ? r : fallback;
   };
+  // In-app Gmail re-auth state (one flow at a time). The modal's button starts
+  // it; the OAuth callback lands on the dedicated redirect port and saves the
+  // token, then status flips to 'success'.
+  let reauth = null;
 
   app.get('/', (req, res) => {
     const municipalities = municipalitiesLoader();
@@ -670,6 +677,29 @@ export function createDashboardApp({
 
   // Lightweight count endpoint for the sidebar badge's quiet poll.
   app.get('/api/escalation-count', (req, res) => res.json({ count: escCount() }));
+
+  // Pipeline health (used by tooling / future polling).
+  app.get('/api/health', (req, res) => res.json(db ? db.getTickHealth() : { stale: true, ever: false }));
+
+  // Start in-app Gmail re-auth: returns the Google consent URL for the client
+  // to open. The OAuth callback is handled by the listener beginReauth() spins
+  // up on the dedicated redirect port; success/failure surfaces via /status.
+  app.post('/auth/gmail/start', (req, res) => {
+    try {
+      if (!reauth || reauth.status !== 'pending') {
+        const { consentUrl, done } = beginReauth({ env, tokenPath: TOKEN_PATH });
+        reauth = { status: 'pending', consentUrl, error: null };
+        done.then(() => { reauth.status = 'success'; })
+          .catch((e) => { reauth = { status: 'error', consentUrl, error: e.message }; });
+      }
+      res.json({ consentUrl: reauth.consentUrl });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.get('/auth/gmail/status', (req, res) =>
+    res.json({ status: reauth?.status ?? 'idle', error: reauth?.error ?? null }));
 
   // Escalations are now handled inside Ärenden — redirect old links there.
   app.get('/escalations', (req, res) => res.redirect('/arenden?bucket=behover-dig'));

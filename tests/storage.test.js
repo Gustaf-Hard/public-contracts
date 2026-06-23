@@ -186,3 +186,31 @@ describe('decisions', () => {
     expect(list[0].classifier_class).toBe('clarification');
   });
 });
+
+describe('getTickHealth', () => {
+  it('is stale with no successful tick yet', () => {
+    const h = db.getTickHealth();
+    expect(h.ever).toBe(false);
+    expect(h.stale).toBe(true);
+  });
+
+  it('becomes healthy after a clean tick; a later failure keeps last_success_at', () => {
+    db.recordHeartbeat({ kind: 'tick', error: null });
+    let h = db.getTickHealth();
+    expect(h.ever).toBe(true);
+    expect(h.stale).toBe(false);
+    expect(h.last_success_at).toBeTruthy();
+
+    db.recordHeartbeat({ kind: 'tick', error: 'invalid_grant' });
+    h = db.getTickHealth();
+    expect(h.last_error).toBe('invalid_grant');
+    expect(h.last_success_at).toBeTruthy(); // preserved from the clean tick
+    expect(h.stale).toBe(false);            // success still recent
+  });
+
+  it('is stale when the last success is older than the threshold', () => {
+    db.recordHeartbeat({ error: null });
+    const future = new Date(Date.now() + 2 * 60 * 60 * 1000); // +2h
+    expect(db.getTickHealth({ now: future, thresholdMin: 60 }).stale).toBe(true);
+  });
+});
