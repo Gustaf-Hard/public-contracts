@@ -147,6 +147,10 @@ export function openDb(path) {
     if (!msgCols.includes('analysis_json')) {
       db.exec('ALTER TABLE messages ADD COLUMN analysis_json TEXT');
     }
+    const hbCols = db.prepare("PRAGMA table_info(daemon_heartbeat)").all().map((r) => r.name);
+    if (!hbCols.includes('last_success_at')) {
+      db.exec('ALTER TABLE daemon_heartbeat ADD COLUMN last_success_at TEXT');
+    }
   }
 
   function createConversation({ kommun_kod, kommun_namn, role, contact_email, scheduled_send_at }) {
@@ -280,17 +284,42 @@ export function openDb(path) {
 
   function recordHeartbeat({ kind = 'tick', error = null } = {}) {
     const col = kind === 'followup' ? 'last_followup_at' : 'last_tick_at';
+    // A clean tick (no error) also stamps last_success_at — that's what the
+    // health check keys off, so "up but failing on Gmail" reads as unhealthy.
+    const successSet = error == null
+      ? ", last_success_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')"
+      : '';
     db.prepare(`
       UPDATE daemon_heartbeat
       SET ${col} = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
           tick_count = tick_count + 1,
-          last_error = ?
+          last_error = ?${successSet}
       WHERE id = 1
     `).run(error);
   }
 
   function getHeartbeat() {
     return db.prepare('SELECT * FROM daemon_heartbeat WHERE id = 1').get() ?? null;
+  }
+
+  // Pipeline health from the heartbeat row. `stale` is true when no successful
+  // tick has ever happened, or the last one is older than thresholdMin.
+  function getTickHealth({ now = new Date(), thresholdMin = 60 } = {}) {
+    const hb = db.prepare('SELECT * FROM daemon_heartbeat WHERE id = 1').get() ?? null;
+    const lastSuccess = hb?.last_success_at ?? null;
+    let stale = true;
+    if (lastSuccess) {
+      const ageMin = (now.getTime() - new Date(lastSuccess).getTime()) / 60000;
+      stale = ageMin > thresholdMin;
+    }
+    return {
+      last_tick_at: hb?.last_tick_at ?? null,
+      last_success_at: lastSuccess,
+      last_error: hb?.last_error ?? null,
+      tick_count: hb?.tick_count ?? 0,
+      stale,
+      ever: !!lastSuccess,
+    };
   }
 
   function close() {
@@ -464,6 +493,7 @@ export function openDb(path) {
     listDecisions,
     recordHeartbeat,
     getHeartbeat,
+    getTickHealth,
     close,
     upsertVendor,
     upsertProduct,
