@@ -5,7 +5,36 @@ import {
   parseBase64Url,
   extractEmailDomain,
   sameEmailDomain,
+  listInboundQuery,
 } from '../src/gmail.js';
+
+describe('listInboundQuery', () => {
+  it('paginates through every page so replies past the first 100 are not dropped', async () => {
+    // Gmail caps a page at 100 and returns newest-first. A 30-day window can
+    // exceed one page (it did: 201 messages), so an unpaginated fetch silently
+    // dropped older-but-in-window replies — including delivered contracts.
+    const page1 = { data: { messages: Array.from({ length: 100 }, (_, i) => ({ id: `a${i}` })), nextPageToken: 'PAGE2' } };
+    const page2 = { data: { messages: [{ id: 'older-contract' }], nextPageToken: undefined } };
+    const list = vi.fn()
+      .mockResolvedValueOnce(page1)
+      .mockResolvedValueOnce(page2);
+    const gmail = { users: { messages: { list } } };
+
+    const result = await listInboundQuery(gmail, 'to:me -from:me newer_than:30d');
+
+    expect(result).toHaveLength(101);
+    expect(result.map((m) => m.id)).toContain('older-contract');
+    // Second call must forward the pageToken from the first response.
+    expect(list).toHaveBeenCalledTimes(2);
+    expect(list.mock.calls[1][0]).toMatchObject({ pageToken: 'PAGE2' });
+  });
+
+  it('returns an empty array when the mailbox has no matches', async () => {
+    const list = vi.fn().mockResolvedValue({ data: {} });
+    const gmail = { users: { messages: { list } } };
+    expect(await listInboundQuery(gmail, 'q')).toEqual([]);
+  });
+});
 
 describe('extractEmailDomain / sameEmailDomain', () => {
   it('extracts domain from bare and angle-bracket addresses', () => {

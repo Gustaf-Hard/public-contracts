@@ -183,8 +183,21 @@ export async function sendMessage(gmail, opts) {
 }
 
 export async function listInboundQuery(gmail, query) {
-  const res = await gmail.users.messages.list({ userId: 'me', q: query, maxResults: 100 });
-  return res.data.messages ?? [];
+  // Gmail caps a page at 100 messages and orders them newest-first. Our inbound
+  // window can exceed one page (a 30-day window hit 201), so a single-page fetch
+  // silently dropped older-but-in-window replies — including delivered contracts
+  // (Alingsås, 11 Jun). Page through nextPageToken until exhausted. The 5000-cap
+  // is a runaway guard; a real inbound window never approaches it.
+  const all = [];
+  let pageToken;
+  do {
+    const res = await gmail.users.messages.list({
+      userId: 'me', q: query, maxResults: 100, pageToken,
+    });
+    for (const m of res.data.messages ?? []) all.push(m);
+    pageToken = res.data.nextPageToken;
+  } while (pageToken && all.length < 5000);
+  return all;
 }
 
 export async function getMessage(gmail, id) {
