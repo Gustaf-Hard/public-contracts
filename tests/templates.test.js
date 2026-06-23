@@ -23,6 +23,10 @@ describe('T_INITIAL', () => {
     expect(m.body).toMatch(/offentlighetsprincipen/);
     expect(m.body).toMatch(/skola och utbildning – direkt eller indirekt/);
     expect(m.body).toMatch(/inom kommunen/);
+    // Explicit indirect-procurement coverage so tools bought via resellers /
+    // framework agreements (Atea, Läromedia, Adda) are not silently excluded.
+    expect(m.body).toMatch(/ramavtal eller inköpscentral/);
+    expect(m.body).toMatch(/Atea eller Läromedia/);
     expect(m.body).toMatch(/Skolon/);
     expect(m.body).toMatch(/Avtalsvärde eller årskostnad/);
     expect(m.body).toMatch(/Gustaf Hård af Segerstad/);
