@@ -216,12 +216,12 @@ function renderTimeline(events) {
         </dl>
       </details>` : '';
     return `<li class="timeline-item">
-      <div class="timeline-date" title="${escapeHtml(e.ts ?? '')}">${escapeHtml(date)}<br>${escapeHtml(time)}</div>
+      <div class="timeline-date" title="${escapeHtml(e.ts ?? '')}">${escapeHtml(date)}<br>${escapeHtml(time)}<br><span class="muted">${escapeHtml(fmtAgo(e.ts))}</span></div>
       <div class="timeline-icon">${e.icon}</div>
       <div class="timeline-body">
         <div class="ev-title">${escapeHtml(e.title)}</div>
         ${e.sub ? `<div class="ev-sub">${e.link ? `<a href="${escapeHtml(e.link)}" target="_blank" rel="noopener">${escapeHtml(e.sub)}</a>` : escapeHtml(e.sub)}</div>` : ''}
-        ${e.body ? `<div class="body-quote ${e.bodyClass}">${escapeHtml(e.body)}</div>` : ''}
+        ${e.body ? `<button type="button" class="collapse-toggle" data-collapse aria-expanded="false">Visa meddelande</button><div class="body-quote ${e.bodyClass}" data-collapse-target hidden>${escapeHtml(e.body)}</div>` : ''}
         ${analysisBlock}
         ${sigBlock}
       </div>
@@ -229,23 +229,28 @@ function renderTimeline(events) {
   }).join('')}</ul>`;
 }
 
-function renderCaseActions(conv, gmailReady) {
+function renderCaseActions(conv, gmailReady, returnTo = null) {
+  const paneAttrs = returnTo ? ` data-pane-form data-return="${escapeHtml(returnTo)}"` : '';
+  const returnField = returnTo ? `<input type="hidden" name="return" value="${escapeHtml(returnTo)}">` : '';
   const isTerminal = CASE_STATUS[conv.state]?.terminal;
   if (isTerminal) {
     return `<div class="case-actions">
-      <form method="post" action="/conversations/${conv.id}/reopen">
+      <form method="post" action="/conversations/${conv.id}/reopen"${paneAttrs}>
+        ${returnField}
         <button class="btn btn-secondary" type="submit"
           onclick="return confirm('Återöppna ärende? Status sätts till Bekräftat.')">↩️ Återöppna</button>
       </form>
     </div>`;
   }
   return `<div class="case-actions">
-    <form method="post" action="/conversations/${conv.id}/close">
+    <form method="post" action="/conversations/${conv.id}/close"${paneAttrs}>
+      ${returnField}
       <input type="hidden" name="state" value="DONE">
       <button class="btn btn-primary" type="submit"
         onclick="return confirm('Stäng ärendet som klart? (state = DONE)')">✅ Stäng som klart</button>
     </form>
-    <form method="post" action="/conversations/${conv.id}/close">
+    <form method="post" action="/conversations/${conv.id}/close"${paneAttrs}>
+      ${returnField}
       <input type="hidden" name="state" value="DEAD_END">
       <button class="btn btn-secondary" type="submit"
         onclick="return confirm('Markera ärendet som återvändsgränd? (state = DEAD_END)')">🚫 Återvändsgränd</button>
@@ -285,26 +290,35 @@ function stateBadge(state) {
 const baseCss = `
 <style>
   :root {
+    /* Light is the default theme. */
+    --bg: #f7f8fa;
+    --bg-elev: #ffffff;
+    --bg-elev-2: #f1f3f6;
+    --fg: #1a1f29;
+    --fg-muted: #5b6573;
+    --border: #e4e7ec;
+    --accent: #4f46e5;
+    --accent-fg: #ffffff;
+    --good: #16a34a;
+    --warn: #d97706;
+    --bad: #dc2626;
+    --r-1: 4px; --r-2: 8px; --r-3: 12px;
+    --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 24px; --sp-6: 32px;
+    --shadow: 0 1px 2px rgba(16,24,40,.04), 0 1px 3px rgba(16,24,40,.06);
+  }
+  :root[data-theme="dark"] {
     --bg: #0b0d10;
     --bg-elev: #14181d;
     --bg-elev-2: #1c2128;
     --fg: #e6edf3;
     --fg-muted: #9aa4b2;
     --border: #2a313c;
-    --accent: #58a6ff;
+    --accent: #818cf8;
+    --accent-fg: #0b0d10;
     --good: #22c55e;
     --warn: #f59e0b;
     --bad: #ef4444;
-  }
-  @media (prefers-color-scheme: light) {
-    :root {
-      --bg: #ffffff;
-      --bg-elev: #f6f8fa;
-      --bg-elev-2: #eef1f4;
-      --fg: #1f2937;
-      --fg-muted: #4b5563;
-      --border: #d0d7de;
-    }
+    --shadow: 0 1px 2px rgba(0,0,0,.35);
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
@@ -314,7 +328,36 @@ const baseCss = `
     color: var(--fg);
     font-size: 14px;
     line-height: 1.45;
+    display: flex;
+    min-height: 100vh;
   }
+  /* App shell: persistent left sidebar + scrollable content region */
+  .sidebar {
+    width: 208px; flex: none; box-sizing: border-box;
+    border-right: 1px solid var(--border); background: var(--bg-elev);
+    display: flex; flex-direction: column; gap: var(--sp-4);
+    padding: var(--sp-4) var(--sp-3);
+    position: sticky; top: 0; height: 100vh;
+  }
+  .sidebar .brand { font-size: 14px; font-weight: 700; letter-spacing: .2px; padding: 4px 10px 0; }
+  .sidebar nav { display: flex; flex-direction: column; gap: 2px; }
+  .sidebar .nav-item {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 8px 10px; border-radius: var(--r-2); color: var(--fg-muted); font-weight: 500;
+  }
+  .sidebar .nav-item:hover { background: var(--bg-elev-2); color: var(--fg); text-decoration: none; }
+  .sidebar .nav-item.active { background: var(--bg-elev-2); color: var(--fg); }
+  .sidebar .nav-item .nav-badge {
+    background: var(--bad); color: #fff; font-size: 11px; font-weight: 600;
+    min-width: 18px; text-align: center; padding: 1px 6px; border-radius: 999px;
+  }
+  .sidebar-foot { margin-top: auto; display: flex; flex-direction: column; gap: var(--sp-2); align-items: flex-start; }
+  .theme-toggle {
+    background: var(--bg-elev-2); color: var(--fg-muted); border: 1px solid var(--border);
+    border-radius: var(--r-2); padding: 6px 10px; font: inherit; font-size: 12px; cursor: pointer; width: 100%;
+    text-align: left;
+  }
+  .theme-toggle:hover { color: var(--fg); border-color: var(--accent); }
   a { color: var(--accent); text-decoration: none; }
   a:hover { text-decoration: underline; }
   header {
@@ -334,7 +377,7 @@ const baseCss = `
   header nav a:hover { background: var(--bg-elev-2); text-decoration: none; color: var(--fg); }
   header .spacer { flex: 1; }
   header .refresh-info { font-size: 12px; color: var(--fg-muted); }
-  main { padding: 20px 24px 60px; max-width: 1400px; margin: 0 auto; }
+  main#content { flex: 1; min-width: 0; padding: var(--sp-5) var(--sp-6) 60px; max-width: 1500px; overflow-x: hidden; }
   h2 { margin: 28px 0 12px; font-size: 16px; font-weight: 600; }
   .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 24px; }
   .stat-card { background: var(--bg-elev); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; }
@@ -476,6 +519,110 @@ const baseCss = `
   .timeline-body .ev-sub { color: var(--fg-muted); font-size: 12px; margin-top: 2px; }
   .timeline-body .body-quote { margin: 6px 0 4px; max-height: 160px; }
   footer { margin-top: 60px; padding: 20px 24px; text-align: center; color: var(--fg-muted); font-size: 11px; border-top: 1px solid var(--border); }
+  /* Page heading + KPI band */
+  .page-head { display: flex; align-items: baseline; gap: 12px; margin: 0 0 var(--sp-4); }
+  .page-head h1 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -.2px; }
+  .stats-band { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: var(--sp-3); }
+  .stats-band .stat-card { padding: 10px 14px; box-shadow: var(--shadow); }
+  .stats-band .stat-card .value { font-size: 22px; }
+  .stat-card.stat-alert { border-color: var(--bad); }
+  /* Action board */
+  .board { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-4); margin-bottom: var(--sp-5); align-items: start; }
+  @media (max-width: 1100px) { .board { grid-template-columns: 1fr; } }
+  .board-section { margin-bottom: var(--sp-5); }
+  .board-section > h2 { display: flex; align-items: center; gap: 8px; margin: 0 0 var(--sp-3); font-size: 14px; }
+  .board-section > h2 .count { background: var(--bg-elev-2); color: var(--fg-muted); border-radius: 999px; font-size: 12px; padding: 1px 9px; font-weight: 600; }
+  .queue { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; background: var(--bg-elev); box-shadow: var(--shadow); }
+  .queue-row { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: var(--sp-3); padding: 10px 14px; border-bottom: 1px solid var(--border); color: var(--fg); }
+  .queue-row:last-child { border-bottom: none; }
+  .queue-row:hover { background: var(--bg-elev-2); text-decoration: none; }
+  .queue-alert .queue-row { border-left: 3px solid var(--bad); }
+  .queue-row .q-kommun { font-weight: 600; }
+  .queue-row .q-action { color: var(--bad); font-size: 13px; font-weight: 500; }
+  .queue-row .q-age { font-size: 12px; white-space: nowrap; }
+  .empty-state { padding: 20px; text-align: center; color: var(--fg-muted); background: var(--bg-elev); border: 1px dashed var(--border); border-radius: var(--r-2); font-size: 13px; }
+  .table-search { margin: 0 0 var(--sp-3); }
+  .table-search input[type=search] { width: 320px; max-width: 100%; padding: 8px 12px; font: inherit; background: var(--bg-elev); color: var(--fg); border: 1px solid var(--border); border-radius: var(--r-2); }
+  .table-search input[type=search]:focus { outline: none; border-color: var(--accent); }
+  /* Master–detail (Ärenden, Leverantörer) */
+  .master-detail { display: grid; grid-template-columns: 380px 1fr; gap: var(--sp-4); align-items: start; }
+  @media (max-width: 980px) { .master-detail { grid-template-columns: 1fr; } }
+  .md-list { position: sticky; top: var(--sp-5); align-self: start; max-height: calc(100vh - 80px); overflow-y: auto;
+    border: 1px solid var(--border); border-radius: var(--r-2); background: var(--bg-elev); box-shadow: var(--shadow); }
+  .case-group + .case-group { border-top: 1px solid var(--border); }
+  .case-group-head { display: flex; align-items: center; gap: 8px; padding: 8px 14px; font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .5px; color: var(--fg-muted); background: var(--bg-elev-2); position: sticky; top: 0; }
+  .case-group-head .count { background: var(--bg-elev); border-radius: 999px; padding: 0 7px; }
+  .case-item { display: grid; grid-template-columns: 10px 1fr auto; align-items: center; gap: 10px;
+    padding: 10px 14px; border-bottom: 1px solid var(--border); color: var(--fg); }
+  .case-item:last-child { border-bottom: none; }
+  .case-item:hover { background: var(--bg-elev-2); text-decoration: none; }
+  .case-item.active { background: color-mix(in srgb, var(--accent) 12%, transparent); box-shadow: inset 3px 0 0 var(--accent); }
+  .ci-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--fg-muted); }
+  .ci-dot.bad { background: var(--bad); } .ci-dot.ok { background: var(--accent); } .ci-dot.muted { background: var(--border); }
+  .ci-kommun { font-weight: 600; }
+  .ci-meta { font-size: 12px; white-space: nowrap; }
+  .md-detail { min-width: 0; }
+  .detail-empty { display: flex; align-items: center; justify-content: center; min-height: 50vh;
+    border: 1px dashed var(--border); border-radius: var(--r-2); }
+  .case-detail .case-header { display: flex; align-items: center; gap: 12px; }
+  .case-detail .case-header h3 { font-size: 18px; }
+  .card.card-alert { border-color: var(--bad); }
+  .esc-reason { margin-bottom: 8px; }
+  hr.soft { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
+  .collapse-toggle { background: none; border: none; color: var(--accent); font: inherit; font-size: 12px;
+    cursor: pointer; padding: 4px 0; }
+  .collapse-toggle:hover { text-decoration: underline; }
+  /* Vendor list pane */
+  .vendor-item { display: block; padding: 12px 14px; border-bottom: 1px solid var(--border); color: var(--fg); }
+  .vendor-item:last-child { border-bottom: none; }
+  .vendor-item:hover { background: var(--bg-elev-2); text-decoration: none; }
+  .vendor-item.active { background: color-mix(in srgb, var(--accent) 12%, transparent); box-shadow: inset 3px 0 0 var(--accent); }
+  .vendor-item .vi-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 6px; font-size: 12px; }
+  .vendor-item .vi-name { font-weight: 600; font-size: 14px; }
+  .chip-row { display: flex; flex-wrap: wrap; gap: 4px; }
+  .tag-more { background: transparent; border-style: dashed; }
+  /* Gmail-style inbox rows (Ärenden list) */
+  .mail-row { display: grid; grid-template-columns: 10px minmax(110px, 150px) 1fr auto; align-items: center; gap: 10px;
+    padding: 9px 14px; border-bottom: 1px solid var(--border); color: var(--fg); }
+  .mail-row:last-child { border-bottom: none; }
+  .mail-row:hover { background: var(--bg-elev-2); text-decoration: none; }
+  .mail-row.active { background: color-mix(in srgb, var(--accent) 12%, transparent); box-shadow: inset 3px 0 0 var(--accent); }
+  .mail-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--fg-muted); }
+  .mail-dot.bad { background: var(--bad); } .mail-dot.ok { background: var(--accent); } .mail-dot.muted { background: var(--border); }
+  .mail-sender { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; }
+  .mail-row.unread .mail-sender, .mail-row.unread .mail-subject { font-weight: 700; }
+  .mail-line { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 13px; }
+  .mail-date { font-size: 12px; white-space: nowrap; }
+  /* Gmail-style thread (Ärenden detail) */
+  .thread-head { padding-bottom: var(--sp-3); border-bottom: 1px solid var(--border); margin-bottom: var(--sp-4); }
+  .thread-title-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .thread-subject { margin: 0; font-size: 20px; font-weight: 600; }
+  .thread-meta { margin-top: 6px; font-size: 12px; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; }
+  .thread-msgs { display: flex; flex-direction: column; }
+  .msg { border: 1px solid var(--border); border-radius: var(--r-2); margin-bottom: 10px; background: var(--bg-elev); overflow: hidden; box-shadow: var(--shadow); }
+  .msg-outbound { background: color-mix(in srgb, var(--good) 6%, var(--bg-elev)); }
+  .msg-head { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; padding: 12px 14px; cursor: pointer; }
+  .msg-head:hover { background: var(--bg-elev-2); }
+  .avatar { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-weight: 600; font-size: 14px; background: var(--bg-elev-2); color: var(--fg-muted); flex: none; }
+  .avatar-inbound { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
+  .avatar-outbound { background: color-mix(in srgb, var(--good) 18%, transparent); color: var(--good); }
+  .msg-who { min-width: 0; }
+  .msg-from { font-weight: 600; font-size: 13px; }
+  .msg-addr { font-weight: 400; }
+  .msg-snippet { display: block; font-size: 12px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .msg-date { font-size: 12px; white-space: nowrap; }
+  .msg-body { padding: 0 16px 16px 60px; }
+  .msg-text { white-space: pre-wrap; font-size: 13px; line-height: 1.55; }
+  .msg-atts { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .msg-att { font-size: 12px; padding: 4px 8px; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--bg-elev-2); }
+  /* Gmail-style reply box */
+  .reply-box { border: 1px solid var(--accent); border-radius: var(--r-2); margin: 14px 0; background: var(--bg-elev); box-shadow: var(--shadow); overflow: hidden; }
+  .reply-head { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .reply-box > form { padding: 0 14px; }
+  .reply-box > form:first-of-type { padding-top: 12px; }
+  .reply-box > form:last-of-type { padding-bottom: 14px; }
 </style>
 `;
 
@@ -499,31 +646,45 @@ function renderHeartbeatPill(heartbeat) {
   return `<span class="heartbeat heartbeat-off" title="${escapeHtml(titleAttr)}">🔴 daemon AV · senast ${ageLabel}</span>`;
 }
 
-function layout({ title, body, currentPath = '/', heartbeat = null }) {
+export function layout({ title, body, currentPath = '/', heartbeat = null, partial = false, escalationCount = 0 }) {
+  // Partial requests (client pane-swap) get only the inner content fragment.
+  if (partial) return body;
+
+  const isActive = (href) => href === '/'
+    ? currentPath === '/'
+    : currentPath.startsWith(href);
+  const navItem = (href, label, badge = '') =>
+    `<a href="${href}" data-pane-link class="nav-item${isActive(href) ? ' active' : ''}">${escapeHtml(label)}${badge}</a>`;
+  const escBadge = escalationCount > 0
+    ? `<span class="nav-badge" data-poll="esc-count">${escalationCount}</span>`
+    : '';
+
   return `<!doctype html>
 <html lang="sv">
 <head>
   <meta charset="utf-8">
-  <meta http-equiv="refresh" content="30">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${escapeHtml(title)} — Pilot dashboard</title>
+  <script>(function(){try{var t=localStorage.getItem('pilot-theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
   ${baseCss}
 </head>
 <body>
-  <header>
-    <h1>Mediagraf · Pilot</h1>
+  <aside class="sidebar">
+    <div class="brand">Mediagraf · Pilot</div>
     <nav>
-      <a href="/"${currentPath === '/' ? ' style="color:var(--fg)"' : ''}>Översikt</a>
-      <a href="/escalations"${currentPath === '/escalations' ? ' style="color:var(--fg)"' : ''}>Eskaleringar</a>
-      <a href="/activity"${currentPath === '/activity' ? ' style="color:var(--fg)"' : ''}>Aktivitet</a>
-      <a href="/leverantorer"${currentPath === '/leverantorer' ? ' style="color:var(--fg)"' : ''}>Leverantörer</a>
+      ${navItem('/', 'Översikt')}
+      ${navItem('/arenden', 'Ärenden')}
+      ${navItem('/escalations', 'Eskaleringar', escBadge)}
+      ${navItem('/leverantorer', 'Leverantörer')}
+      ${navItem('/activity', 'Aktivitet')}
     </nav>
-    <div class="spacer"></div>
-    ${renderHeartbeatPill(heartbeat)}
-    <div class="refresh-info">auto-refresh 30s · ${new Date().toLocaleTimeString('sv-SE')}</div>
-  </header>
-  <main>${body}</main>
-  <footer>data/pilot.db · data/municipalities.json · data/contracts/</footer>
+    <div class="sidebar-foot">
+      ${renderHeartbeatPill(heartbeat)}
+      <button type="button" class="theme-toggle" data-theme-toggle title="Växla ljust/mörkt tema">◐ Tema</button>
+    </div>
+  </aside>
+  <main id="content" data-path="${escapeHtml(currentPath)}">${body}</main>
+  <script src="/app.js" defer></script>
 </body>
 </html>`;
 }
@@ -559,42 +720,78 @@ function sortHeader({ key, label, currentSort, currentOrder, filter, align = 'le
   return `<th${style}><a href="?${params.toString()}" class="th-sort${isActive ? ' th-sort-active' : ''}">${escapeHtml(label)}${indicator}</a></th>`;
 }
 
-export function renderOverview({ summary, rows, filter, sort, order, totalKommuner, heartbeat = null }) {
+export function renderOverview({ summary, rows, filter, sort, order, totalKommuner, q = '', actionQueue = [], waiting = [], heartbeat = null, partial = false, escalationCount = 0 }) {
+  const activeFilter = filter ?? 'active';
   const filters = [
-    { key: 'all', label: `Alla (${totalKommuner})` },
-    { key: 'in-pilot', label: `I pilot (${summary.in_pilot})` },
-    { key: 'needs-attention', label: `Behöver dig (${summary.needs_human + summary.open_escalations})` },
+    { key: 'active', label: `Aktiva (${summary.in_pilot})` },
+    { key: 'needs-attention', label: `Behöver dig (${actionQueue.length})` },
     { key: 'delivering', label: `Levererar (${summary.delivering})` },
     { key: 'done', label: `Klart (${summary.done})` },
     { key: 'dead-end', label: `Återvändsgränd (${summary.dead_end})` },
+    { key: 'all', label: `Visa alla (${totalKommuner})` },
   ];
 
-  // Preserve sort+order when switching filter
+  // Preserve sort+order+search when switching filter. The filter is always set
+  // explicitly (incl. 'all') — the route defaults to 'active', so an omitted
+  // param would silently fall back to active instead of showing all kommuner.
   const filterParams = (key) => {
     const p = new URLSearchParams();
-    if (key !== 'all') p.set('filter', key);
+    p.set('filter', key);
     if (sort) p.set('sort', sort);
     if (order) p.set('order', order);
+    if (q) p.set('q', q);
     return p.toString();
   };
 
   const filterBar = `<div class="filter-bar">${filters
     .map(
       (f) =>
-        `<a href="?${filterParams(f.key)}"${(filter ?? 'all') === f.key ? ' class="active"' : ''}>${escapeHtml(f.label)}</a>`
+        `<a href="?${filterParams(f.key)}" data-pane-link${activeFilter === f.key ? ' class="active"' : ''}>${escapeHtml(f.label)}</a>`
     )
     .join('')}</div>`;
 
+  const needsCount = actionQueue.length;
   const stats = `
-    <div class="stats">
-      <div class="stat-card"><div class="label">I pilot</div><div class="value">${summary.in_pilot}</div></div>
+    <div class="stats stats-band">
+      <div class="stat-card${needsCount > 0 ? ' stat-alert' : ''}"><div class="label">Behöver dig</div><div class="value ${needsCount > 0 ? 'bad' : 'good'}">${needsCount}</div></div>
+      <div class="stat-card"><div class="label">Aktiva</div><div class="value">${summary.in_pilot}</div></div>
       <div class="stat-card"><div class="label">Levererar</div><div class="value good">${summary.delivering}</div></div>
       <div class="stat-card"><div class="label">Klart</div><div class="value good">${summary.done}</div></div>
-      <div class="stat-card"><div class="label">Behöver dig</div><div class="value ${summary.needs_human + summary.open_escalations > 0 ? 'bad' : ''}">${summary.needs_human + summary.open_escalations}</div></div>
       <div class="stat-card"><div class="label">Avtal mottagna</div><div class="value">${summary.contracts}</div></div>
       <div class="stat-card"><div class="label">Snittsvarstid</div><div class="value">${summary.avg_reply_days === null ? '—' : summary.avg_reply_days + ' d'}</div></div>
     </div>
   `;
+
+  // --- Action-first queues ---
+  const queueRow = (item, badgeHtml) => `<a class="queue-row" data-pane-link href="/arenden/${item.conv_id}">
+      <span class="q-kommun">${escapeHtml(item.kommun_namn)} <span class="muted">· ${escapeHtml(item.role)}</span></span>
+      <span class="q-mid">${badgeHtml}</span>
+      <span class="q-age muted" title="${escapeHtml(item.since ?? '')}">${escapeHtml(fmtAgo(item.since))}</span>
+    </a>`;
+
+  const actionSection = `
+    <section class="board-section">
+      <h2>Behöver dig <span class="count">${actionQueue.length}</span></h2>
+      ${actionQueue.length === 0
+        ? '<div class="empty-state">Inget kräver din uppmärksamhet just nu. 🎉</div>'
+        : `<div class="queue queue-alert">${actionQueue.map((a) =>
+            queueRow(a, `<span class="q-action">${escapeHtml(a.action)}</span>`)).join('')}</div>`}
+    </section>`;
+
+  const waitingSection = `
+    <section class="board-section">
+      <h2>Pågår · väntar <span class="count">${waiting.length}</span></h2>
+      ${waiting.length === 0
+        ? '<div class="empty-state">Inga öppna ärenden väntar på svar.</div>'
+        : `<div class="queue">${waiting.map((w) =>
+            queueRow(w, `${stateBadge(w.state)} ${fmtFollowUpBadge(w.follow_up_at, w.follow_up_source) ?? ''}`)).join('')}</div>`}
+    </section>`;
+
+  const searchForm = `
+    <form class="table-search" method="get" action="/">
+      <input type="search" name="q" value="${escapeHtml(q)}" placeholder="Sök kommun eller kod…" autocomplete="off">
+      ${activeFilter !== 'active' ? `<input type="hidden" name="filter" value="${escapeHtml(activeFilter)}">` : ''}
+    </form>`;
 
   const tableRows = rows.length === 0
     ? '<tr class="empty-row"><td colspan="8">Inga kommuner matchar filtret.</td></tr>'
@@ -628,39 +825,53 @@ export function renderOverview({ summary, rows, filter, sort, order, totalKommun
         })
         .join('');
 
-  const headerArgs = { currentSort: sort, currentOrder: order, filter };
+  const headerArgs = { currentSort: sort, currentOrder: order, filter: activeFilter };
   const body = `
+    <div class="page-head"><h1>Översikt</h1></div>
     ${stats}
-    ${filterBar}
-    <table>
-      <thead>
-        <tr>
-          ${sortHeader({ ...headerArgs, key: 'kommun_namn', label: 'Kommun' })}
-          ${sortHeader({ ...headerArgs, key: 'lan', label: 'Län' })}
-          ${sortHeader({ ...headerArgs, key: 'folkmangd', label: 'Folkmängd', align: 'right' })}
-          ${sortHeader({ ...headerArgs, key: 'state', label: 'Status' })}
-          ${sortHeader({ ...headerArgs, key: 'contracts', label: 'Avtal', align: 'right' })}
-          ${sortHeader({ ...headerArgs, key: 'open_escalations', label: 'Esk.', align: 'right' })}
-          ${sortHeader({ ...headerArgs, key: 'follow_up', label: 'Återkommer' })}
-          ${sortHeader({ ...headerArgs, key: 'last_activity', label: 'Senaste aktivitet' })}
-        </tr>
-      </thead>
-      <tbody>${tableRows}</tbody>
-    </table>
+    <div class="board">
+      ${actionSection}
+      ${waitingSection}
+    </div>
+    <section class="board-section">
+      <h2>Alla kommuner</h2>
+      ${searchForm}
+      ${filterBar}
+      <table>
+        <thead>
+          <tr>
+            ${sortHeader({ ...headerArgs, key: 'kommun_namn', label: 'Kommun' })}
+            ${sortHeader({ ...headerArgs, key: 'lan', label: 'Län' })}
+            ${sortHeader({ ...headerArgs, key: 'folkmangd', label: 'Folkmängd', align: 'right' })}
+            ${sortHeader({ ...headerArgs, key: 'state', label: 'Status' })}
+            ${sortHeader({ ...headerArgs, key: 'contracts', label: 'Avtal', align: 'right' })}
+            ${sortHeader({ ...headerArgs, key: 'open_escalations', label: 'Esk.', align: 'right' })}
+            ${sortHeader({ ...headerArgs, key: 'follow_up', label: 'Återkommer' })}
+            ${sortHeader({ ...headerArgs, key: 'last_activity', label: 'Senaste aktivitet' })}
+          </tr>
+        </thead>
+        <tbody>${tableRows}</tbody>
+      </table>
+    </section>
   `;
 
-  return layout({ title: 'Översikt', body, currentPath: '/', heartbeat });
+  return layout({ title: 'Översikt', body, currentPath: '/', heartbeat, partial, escalationCount });
 }
 
 // ---- Kommun detail ----
 
-function renderEscalationForm(esc, gmailReady) {
+function renderEscalationForm(esc, gmailReady, returnTo = null) {
   const disabled = gmailReady ? '' : 'disabled';
   const warn = gmailReady ? '' : '<span class="send-warning">⚠️ Gmail-token saknas — kör <code>npm run pilot-auth</code></span>';
+  // When rendered inside a swappable pane, forms post via fetch and return to
+  // `returnTo` (so the operator stays on the case). Otherwise they full-reload.
+  const paneAttrs = returnTo ? ` data-pane-form data-return="${escapeHtml(returnTo)}"` : '';
+  const returnField = returnTo ? `<input type="hidden" name="return" value="${escapeHtml(returnTo)}">` : '';
   // Two forms in the card: edit-and-send (uses textarea contents) + skip.
   // Keeping subject editable lets the user fix a wrong "Re:" prefix.
   return `
-    <form class="action-form" method="post" action="/escalations/${esc.id}">
+    <form class="action-form" method="post" action="/escalations/${esc.id}"${paneAttrs}>
+      ${returnField}
       <div class="field">
         <label>Ämne</label>
         <input type="text" name="subject" value="${escapeHtml(esc.draft_subject ?? '')}">
@@ -674,16 +885,17 @@ function renderEscalationForm(esc, gmailReady) {
         ${warn}
       </div>
     </form>
-    <form method="post" action="/escalations/${esc.id}" style="margin-top:8px">
+    <form method="post" action="/escalations/${esc.id}" style="margin-top:8px"${paneAttrs}>
+      ${returnField}
       <input type="hidden" name="action" value="skip">
       <button class="btn btn-secondary" type="submit"
         onclick="return confirm('Hoppa över denna eskalering utan att svara?')">Hoppa över</button>
     </form>`;
 }
 
-export function renderCompose({ kommun, draft, availableRoles = [], selectedRole, candidateEmails = [], gmailReady = false, env = {}, heartbeat = null }) {
+export function renderCompose({ kommun, draft, availableRoles = [], selectedRole, candidateEmails = [], gmailReady = false, env = {}, heartbeat = null, partial = false, escalationCount = 0 }) {
   if (!kommun) {
-    return layout({ title: 'Saknad kommun', body: '<p>Hittade inte kommunen.</p>', currentPath: '/', heartbeat });
+    return layout({ title: 'Saknad kommun', body: '<p>Hittade inte kommunen.</p>', currentPath: '/', heartbeat, partial, escalationCount });
   }
   const backLinks = `<p><a href="/">← Översikt</a> · <a href="/kommun/${escapeHtml(kommun.kommun_kod)}">${escapeHtml(kommun.kommun_namn)} kommun (detalj)</a></p>`;
 
@@ -695,7 +907,7 @@ export function renderCompose({ kommun, draft, availableRoles = [], selectedRole
       ${backLinks}
       <h2>${escapeHtml(kommun.kommun_namn)} kommun</h2>
       <p class="muted">${reason}</p>`;
-    return layout({ title: kommun.kommun_namn, body, currentPath: '/', heartbeat });
+    return layout({ title: kommun.kommun_namn, body, currentPath: '/', heartbeat, partial, escalationCount });
   }
 
   const roleTabs = availableRoles.length > 1
@@ -748,7 +960,7 @@ export function renderCompose({ kommun, draft, availableRoles = [], selectedRole
         </div>
       </div>
     </form>`;
-  return layout({ title: `Skicka — ${kommun.kommun_namn}`, body, currentPath: '/', heartbeat });
+  return layout({ title: `Skicka — ${kommun.kommun_namn}`, body, currentPath: '/', heartbeat, partial, escalationCount });
 }
 
 // Derive a short "what happens next" string per case. Used in the sidebar.
@@ -863,9 +1075,9 @@ function fmtBytes(n) {
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function renderKommunDetail({ kommun, conversations, messagesByConv, attachmentsByMsg, escalationsByConv, signatures, followUpByConv = {}, initialDrafts = {}, gmailReady = false, vendorSlugsByName = new Map(), handoffContacts = [], heartbeat = null }) {
+export function renderKommunDetail({ kommun, conversations, messagesByConv, attachmentsByMsg, escalationsByConv, signatures, followUpByConv = {}, initialDrafts = {}, gmailReady = false, vendorSlugsByName = new Map(), handoffContacts = [], heartbeat = null, partial = false, escalationCount = 0 }) {
   if (!kommun) {
-    return layout({ title: 'Saknad kommun', body: '<p>Hittade inte kommunen.</p>', currentPath: '/', heartbeat });
+    return layout({ title: 'Saknad kommun', body: '<p>Hittade inte kommunen.</p>', currentPath: '/', heartbeat, partial, escalationCount });
   }
 
   // ----- Aggregations for the sidebar + bottom sections -----
@@ -1043,50 +1255,166 @@ export function renderKommunDetail({ kommun, conversations, messagesByConv, atta
     </div>`;
 
   const body = `<div class="kommun-page">${sidebar}${mainColumn}</div>`;
-  return layout({ title: kommun.kommun_namn, body, currentPath: '/', heartbeat });
+  return layout({ title: kommun.kommun_namn, body, currentPath: '/', heartbeat, partial, escalationCount });
 }
 
-// ---- Escalations queue ----
+// ---- Ärenden (master–detail) ----
 
-export function renderEscalations({ items, gmailReady = false, heartbeat = null }) {
-  const body = items.length === 0
-    ? '<p class="muted">Inga öppna eskaleringar. ✨</p>'
-    : items.map((e) => `
-        <div class="card">
-          <h3>
-            <a class="kommun-link" href="/kommun/${escapeHtml(e.kommun_kod)}">${escapeHtml(e.kommun_namn)}</a>
-            <span class="muted">· ${escapeHtml(e.role)}</span>
-            · <span class="badge" style="background:#a855f71a;color:#a855f7">${escapeHtml(e.draft_template ?? 'free_form')}</span>
-            · <span class="muted">${escapeHtml(fmtAgo(e.created_at))}</span>
-          </h3>
-          <div class="muted">${escapeHtml(e.reason)}</div>
-          ${e.inbound_body ? `
-            <div style="margin-top:8px">Inkommande:</div>
-            <div class="body-quote body-quote-inbound">${escapeHtml(e.inbound_body)}</div>` : ''}
-          ${renderEscalationForm(e, gmailReady)}
-        </div>`).join('');
+const ARENDEN_BUCKETS = [
+  { key: 'behover_dig', label: 'Behöver dig' },
+  { key: 'oppna', label: 'Öppna' },
+  { key: 'stangda', label: 'Stängda' },
+];
 
-  return layout({ title: 'Eskaleringar', body: `<h2>Öppna eskaleringar (${items.length})</h2>${body}`, currentPath: '/escalations', heartbeat });
+function caseBucket(c) {
+  if (c.state === 'NEEDS_HUMAN' || (c.open_esc ?? 0) > 0) return 'behover_dig';
+  if (CASE_STATUS[c.state]?.terminal) return 'stangda';
+  return 'oppna';
+}
+
+// Gmail-style inbox rows: leading status dot, bold sender, subject + grey
+// snippet, date on the right. Grouped under the status buckets.
+function renderCaseList(cases, selectedId) {
+  if (cases.length === 0) return '<div class="empty-state">Inga ärenden ännu.</div>';
+  const groups = { behover_dig: [], oppna: [], stangda: [] };
+  for (const c of cases) groups[caseBucket(c)].push(c);
+  return ARENDEN_BUCKETS.map((b) => {
+    const items = groups[b.key];
+    if (items.length === 0) return '';
+    return `<div class="case-group">
+      <div class="case-group-head">${escapeHtml(b.label)} <span class="count">${items.length}</span></div>
+      ${items.map((c) => {
+        const dot = b.key === 'behover_dig' ? 'bad' : (b.key === 'stangda' ? 'muted' : 'ok');
+        const date = b.key === 'oppna'
+          ? (fmtFollowUpBadge(c.follow_up_at, c.follow_up_source) ?? `<span class="muted">${escapeHtml(fmtAgo(c.since))}</span>`)
+          : `<span class="muted">${escapeHtml(fmtAgo(c.since))}</span>`;
+        const unread = b.key === 'behover_dig' ? ' unread' : '';
+        return `<a class="mail-row${unread}${c.conv_id === selectedId ? ' active' : ''}" data-pane-link href="/arenden/${c.conv_id}">
+          <span class="mail-dot ${dot}"></span>
+          <span class="mail-sender">${escapeHtml(c.kommun_namn)} <span class="muted">· ${escapeHtml(c.role)}</span></span>
+          <span class="mail-line"><span class="mail-subject">${escapeHtml(c.subject ?? '')}</span>${c.snippet ? ` <span class="mail-snippet">— ${escapeHtml(c.snippet)}</span>` : ''}</span>
+          <span class="mail-date">${date}</span>
+        </a>`;
+      }).join('')}
+    </div>`;
+  }).join('');
+}
+
+// Split a raw From/To header ("Display Name <a@b.se>" or "a@b.se") into parts.
+function parseAddr(raw) {
+  if (!raw) return { name: '', email: '' };
+  const m = String(raw).match(/^\s*"?([^"<]*?)"?\s*<([^>]+)>\s*$/);
+  if (m) return { name: m[1].trim(), email: m[2].trim() };
+  return { name: '', email: String(raw).trim() };
+}
+
+// One Gmail-style message block. Latest message is expanded; older ones are
+// collapsed to a header (sender · snippet · date) you click to open.
+function threadMessage(m, attachments, sig, expanded) {
+  const isOut = m.direction === 'outbound';
+  const from = parseAddr(m.from_email);
+  const to = parseAddr(m.to_email);
+  const name = isOut ? 'Du' : (from.name || from.email || 'Avsändare');
+  const initial = (name || '?').trim().charAt(0).toUpperCase() || '?';
+  const date = m.received_at
+    ? `${m.received_at.slice(0, 10)} ${m.received_at.slice(11, 16)} · ${fmtAgo(m.received_at)}`
+    : '';
+  const addr = isOut
+    ? `till ${to.email || m.to_email || ''}`
+    : (from.email ? `<${from.email}>` : '');
+  const snippet = (m.body_text ?? '').replace(/\s+/g, ' ').trim().slice(0, 100);
+  const atts = (attachments ?? [])
+    .map((a) => `<a class="msg-att" href="/attachments/${a.id}" target="_blank" rel="noopener">📎 ${escapeHtml(a.filename)}</a>`)
+    .join('');
+  return `<div class="msg msg-${m.direction}">
+    <div class="msg-head" data-collapse aria-expanded="${expanded ? 'true' : 'false'}">
+      <span class="avatar avatar-${m.direction}">${escapeHtml(initial)}</span>
+      <div class="msg-who">
+        <span class="msg-from">${escapeHtml(name)} <span class="msg-addr muted">${escapeHtml(addr)}</span></span>
+        ${expanded ? '' : `<span class="msg-snippet muted">${escapeHtml(snippet)}</span>`}
+      </div>
+      <span class="msg-date muted">${escapeHtml(date)}</span>
+    </div>
+    <div class="msg-body" data-collapse-target${expanded ? '' : ' hidden'}>
+      <div class="msg-text">${escapeHtml(m.body_text ?? '')}</div>
+      ${atts ? `<div class="msg-atts">${atts}</div>` : ''}
+    </div>
+  </div>`;
+}
+
+function renderCaseDetailPane(selected, gmailReady) {
+  if (!selected) return '<div class="detail-empty"><p class="muted">Välj ett ärende i listan till vänster.</p></div>';
+  const { conv, messages, attachmentsByMsg, signatures, escalations, follow_up } = selected;
+  const returnTo = `/arenden/${conv.id}`;
+  const duration = caseDuration(conv, messages);
+  const fuBadge = fmtFollowUpBadge(follow_up?.date, follow_up?.source);
+  const subject = messages.find((m) => m.subject)?.subject ?? `Begäran — ${conv.kommun_namn}`;
+
+  const thread = messages.length
+    ? messages.map((m, i) => threadMessage(m, attachmentsByMsg[m.id], signatures[m.id], i === messages.length - 1)).join('')
+    : '<p class="muted">Inga meddelanden ännu.</p>';
+
+  // Suggested reply (Gmail-style reply box) for each open escalation.
+  const replyBoxes = escalations.map((e) => `
+    <div class="reply-box">
+      <div class="reply-head">
+        <span class="avatar avatar-outbound">↩</span>
+        <span class="muted">Föreslaget svar till <strong>${escapeHtml(conv.contact_email ?? '')}</strong></span>
+        ${intentBadge(e.classifier_class ?? 'unknown')}
+      </div>
+      ${renderEscalationForm(e, gmailReady, returnTo)}
+    </div>`).join('');
+
+  return `<div class="thread">
+    <div class="thread-head">
+      <div class="thread-title-row">
+        <h2 class="thread-subject">${escapeHtml(subject)}</h2>
+        ${caseStatusBadge(conv.state)}
+      </div>
+      <div class="thread-meta muted">
+        <strong>${escapeHtml(conv.kommun_namn)} · ${escapeHtml(conv.role)}</strong>
+        · ${escapeHtml(conv.contact_email ?? '')}
+        ${conv.arendenummer ? `· Ärendenr ${escapeHtml(conv.arendenummer)}` : ''}
+        ${duration ? `· ${escapeHtml(duration)}` : ''}
+        ${fuBadge ? `· Återkommer ${fuBadge}` : ''}
+        · <a href="/kommun/${escapeHtml(conv.kommun_kod)}" data-pane-link>Kommunprofil →</a>
+      </div>
+    </div>
+    <div class="thread-msgs">${thread}</div>
+    ${replyBoxes}
+    ${renderCaseActions(conv, gmailReady, returnTo)}
+  </div>`;
+}
+
+export function renderArenden({ cases = [], selected = null, selectedId = null, gmailReady = false, heartbeat = null, partial = false, escalationCount = 0 }) {
+  const body = `
+    <div class="page-head"><h1>Ärenden</h1></div>
+    <div class="master-detail">
+      <aside class="md-list">${renderCaseList(cases, selectedId)}</aside>
+      <div class="md-detail">${renderCaseDetailPane(selected, gmailReady)}</div>
+    </div>`;
+  return layout({ title: 'Ärenden', body, currentPath: '/arenden', heartbeat, partial, escalationCount });
 }
 
 // ---- Activity feed ----
+// (Escalations are handled inside Ärenden — the old /escalations page redirects there.)
 
-export function renderActivity({ events, heartbeat = null }) {
+export function renderActivity({ events, heartbeat = null, partial = false, escalationCount = 0 }) {
   const body = events.length === 0
-    ? '<p class="muted">Ingen aktivitet ännu.</p>'
+    ? '<div class="empty-state">Ingen aktivitet ännu.</div>'
     : `<table>
         <thead><tr><th>Tid</th><th>Kommun</th><th>Roll</th><th>Händelse</th><th>Detalj</th></tr></thead>
         <tbody>
           ${events.map((e) => `<tr>
             <td><span title="${escapeHtml(e.timestamp)}">${escapeHtml(fmtAgo(e.timestamp))}</span></td>
-            <td><a href="/kommun/${escapeHtml(e.kommun_kod)}">${escapeHtml(e.kommun_namn)}</a></td>
+            <td><a href="/kommun/${escapeHtml(e.kommun_kod)}" data-pane-link>${escapeHtml(e.kommun_namn)}</a></td>
             <td>${escapeHtml(e.role)}</td>
             <td>${escapeHtml(e.event)}</td>
             <td class="muted">${escapeHtml(e.detail ?? '')}</td>
           </tr>`).join('')}
         </tbody>
       </table>`;
-  return layout({ title: 'Aktivitet', body: `<h2>Senaste aktivitet (${events.length})</h2>${body}`, currentPath: '/activity', heartbeat });
+  return layout({ title: 'Aktivitet', body: `<div class="page-head"><h1>Aktivitet</h1><span class="muted">senaste ${events.length}</span></div>${body}`, currentPath: '/activity', heartbeat, partial, escalationCount });
 }
 
 function activeBadge(periodEnd) {
@@ -1097,54 +1425,50 @@ function activeBadge(periodEnd) {
     : `<span class="pill pill-overdue">utgånget ${escapeHtml(periodEnd)}</span>`;
 }
 
-export function renderVendors({ vendors = [], heartbeat = null } = {}) {
-  const rows = vendors.map((v) => `
-    <tr>
-      <td><a href="/leverantor/${escapeHtml(v.slug)}">${escapeHtml(v.name)}</a></td>
-      <td><div class="tag-list">${v.products.map((p) => `<span class="tag">${escapeHtml(p)}</span>`).join('')}</div></td>
-      <td>${v.contract_count}</td>
-      <td>${v.kommun_count}</td>
-      <td>${escapeHtml(v.last_contract_at?.slice(0, 10) ?? '—')}</td>
-    </tr>`).join('');
-  const body = `
-    <div class="card">
-      <h3>Leverantörer (${vendors.length})</h3>
-      ${vendors.length === 0
-        ? '<p class="muted">Inga leverantörer ännu — kör <code>npm run analyse-contracts</code>.</p>'
-        : `<table class="contracts-table">
-            <thead><tr><th>Leverantör</th><th>Produkter</th><th>Avtal</th><th>Kommuner</th><th>Senaste avtal</th></tr></thead>
-            <tbody>${rows}</tbody>
-          </table>`}
-    </div>`;
-  return layout({ title: 'Leverantörer', body, currentPath: '/leverantorer', heartbeat });
+// Product chips, capped so a prolific vendor doesn't flood the list pane.
+function chipRow(products, cap = 10) {
+  const list = products ?? [];
+  const shown = list.slice(0, cap);
+  const extra = list.length - shown.length;
+  return `<div class="chip-row">${shown.map((p) => `<span class="tag">${escapeHtml(p)}</span>`).join('')}${
+    extra > 0 ? `<span class="tag tag-more">+${extra} till</span>` : ''}</div>`;
 }
 
-export function renderVendorDetail({ vendor, contracts = [], heartbeat = null } = {}) {
-  if (!vendor) {
-    return layout({
-      title: 'Okänd leverantör',
-      body: '<div class="card"><h3>Okänd leverantör</h3><p><a href="/leverantorer">← Leverantörer</a></p></div>',
-      currentPath: '/leverantorer', heartbeat,
-    });
+function renderVendorListPane(vendors, selectedSlug) {
+  if (vendors.length === 0) {
+    return '<div class="empty-state">Inga leverantörer ännu — kör <code>npm run analyse-contracts</code>.</div>';
   }
+  return vendors.map((v) => `
+    <a class="vendor-item${v.slug === selectedSlug ? ' active' : ''}" data-pane-link href="/leverantor/${escapeHtml(v.slug)}">
+      <div class="vi-head"><span class="vi-name">${escapeHtml(v.name)}</span>
+        <span class="muted">${v.contract_count} avtal · ${v.kommun_count} kommuner</span></div>
+      ${chipRow(v.products, 6)}
+    </a>`).join('');
+}
+
+function renderVendorDetailPane(selected) {
+  if (!selected || !selected.vendor) {
+    return '<div class="detail-empty"><p class="muted">Välj en leverantör i listan till vänster.</p></div>';
+  }
+  const { vendor, contracts = [] } = selected;
   const allProducts = [...new Set(contracts.flatMap((c) => c.products))];
   const kommuner = [...new Map(contracts.map((c) => [c.kommun_kod, c.kommun_namn])).entries()];
   const rows = contracts.map((c) => `
     <tr>
-      <td><a href="/kommun/${escapeHtml(c.kommun_kod)}">${escapeHtml(c.kommun_namn)}</a></td>
+      <td><a href="/kommun/${escapeHtml(c.kommun_kod)}" data-pane-link>${escapeHtml(c.kommun_namn)}</a></td>
       <td>${escapeHtml(c.received_at?.slice(0, 10) ?? '')}</td>
       <td><a href="/attachments/${c.attachment_id}" target="_blank" rel="noopener">📎 ${escapeHtml(c.filename)}</a></td>
-      <td><div class="tag-list">${c.products.map((p) => `<span class="tag">${escapeHtml(p)}</span>`).join('')}</div></td>
+      <td>${chipRow(c.products, 6)}</td>
       <td>${escapeHtml(c.avtalsvarde ?? '—')}</td>
       <td>${activeBadge(c.period_end)}</td>
     </tr>`).join('');
-  const body = `
-    <p><a href="/leverantorer">← Leverantörer</a></p>
-    <div class="card">
-      <h3>${escapeHtml(vendor.name)}</h3>
-      ${allProducts.length ? `<div class="tag-list" style="margin:6px 0">${allProducts.map((p) => `<span class="tag">${escapeHtml(p)}</span>`).join('')}</div>` : ''}
-      <p class="muted">${contracts.length} avtal · ${kommuner.length} kommun(er): ${kommuner.map(([kod, namn]) => `<a href="/kommun/${escapeHtml(kod)}">${escapeHtml(namn)}</a>`).join(', ')}</p>
+  return `<div class="case-detail">
+    <div class="case-header"><h3>${escapeHtml(vendor.name)}</h3></div>
+    <div class="case-meta">
+      <span>${contracts.length} avtal · ${kommuner.length} kommun(er)</span>
+      <span>${kommuner.map(([kod, namn]) => `<a href="/kommun/${escapeHtml(kod)}" data-pane-link>${escapeHtml(namn)}</a>`).join(', ')}</span>
     </div>
+    ${allProducts.length ? `<div class="card"><h3>Produkter</h3>${chipRow(allProducts, 50)}</div>` : ''}
     <div class="card">
       <h3>Avtal (${contracts.length})</h3>
       <table class="contracts-table">
@@ -1152,5 +1476,14 @@ export function renderVendorDetail({ vendor, contracts = [], heartbeat = null } 
         <tbody>${rows}</tbody>
       </table>
     </div>`;
-  return layout({ title: vendor.name, body, currentPath: '/leverantorer', heartbeat });
+}
+
+export function renderVendors({ vendors = [], selected = null, selectedSlug = null, heartbeat = null, partial = false, escalationCount = 0 } = {}) {
+  const body = `
+    <div class="page-head"><h1>Leverantörer</h1><span class="muted">${vendors.length} st</span></div>
+    <div class="master-detail">
+      <aside class="md-list">${renderVendorListPane(vendors, selectedSlug)}</aside>
+      <div class="md-detail">${renderVendorDetailPane(selected)}</div>
+    </div>`;
+  return layout({ title: 'Leverantörer', body, currentPath: '/leverantorer', heartbeat, partial, escalationCount });
 }

@@ -3,7 +3,8 @@ import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { openDb } from '../src/storage.js';
-import { createDashboardApp } from '../src/dashboard.js';
+import { createDashboardApp, buildActionQueue, buildWaiting, applyFilter, buildOverviewRows } from '../src/dashboard.js';
+import { layout } from '../src/dashboard-views.js';
 
 let tmp, db, dbPath, muniPath;
 
@@ -53,15 +54,36 @@ async function get(app, path) {
   });
 }
 
+// Like get(), but does not follow redirects — returns status + Location.
+async function getNoRedirect(app, path) {
+  return new Promise((resolve, reject) => {
+    const server = app.listen(0, () => {
+      const port = server.address().port;
+      fetch(`http://127.0.0.1:${port}${path}`, { redirect: 'manual' }).then(async (r) => {
+        server.close(() => resolve({ status: r.status, location: r.headers.get('location') }));
+      }).catch((e) => server.close(() => reject(e)));
+    });
+  });
+}
+
 describe('dashboard / overview', () => {
-  it('shows all kommuner with "ej kontaktad" when no pilot data exists', async () => {
+  it('shows all kommuner with "ej kontaktad" under ?filter=all', async () => {
     const app = appWithFakes();
-    const res = await get(app, '/');
+    // Home now defaults to active kommuner; the full 290-list is behind ?filter=all
+    const res = await get(app, '/?filter=all');
     expect(res.status).toBe(200);
     expect(res.text).toContain('Malå');
     expect(res.text).toContain('Boxholm');
     expect(res.text).toContain('Testkommun');
     expect(res.text).toContain('ej kontaktad');
+  });
+
+  it('default home hides never-contacted kommuner and shows the queue heading', async () => {
+    const app = appWithFakes();
+    const res = await get(app, '/');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Behöver dig');
+    expect(res.text).not.toContain('Boxholm'); // never contacted → not in the active default
   });
 
   it('shows pilot state when a conversation exists', async () => {
@@ -118,30 +140,50 @@ describe('dashboard / kommun detail', () => {
   });
 });
 
-describe('dashboard / escalations', () => {
-  it('lists open escalations across kommuner', async () => {
+describe('dashboard / arenden (master-detail)', () => {
+  it('GET /escalations redirects into the Ärenden behöver-dig bucket', async () => {
+    const res = await getNoRedirect(appWithFakes(), '/escalations');
+    expect(res.status).toBe(302);
+    expect(res.location).toContain('/arenden');
+  });
+
+  it('GET /arenden lists cases grouped by bucket', async () => {
     const cid = db.createConversation({
       kommun_kod: '2418', kommun_namn: 'Malå', role: 'central',
       contact_email: 'kommun@mala.se', scheduled_send_at: '2026-05-24T10:00:00Z',
     });
-    db.recordEscalation({
-      conversation_id: cid, reason: 'classifier=unknown',
-      draft_template: 'free_form', draft_body: '(ingen draft)',
-    });
-    const app = appWithFakes();
-    const res = await get(app, '/escalations');
+    db.recordEscalation({ conversation_id: cid, reason: 'classifier=unknown', draft_template: 'free_form', draft_body: '(ingen draft)' });
+    const res = await get(appWithFakes(), '/arenden');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('class="master-detail"');
     expect(res.text).toContain('Malå');
-    expect(res.text).toContain('free_form');
-    // The card now embeds an editable form pointing at the action endpoint
-    expect(res.text).toContain(`action="/escalations/`);
+    expect(res.text).toContain('Behöver dig');
+  });
+
+  it('GET /arenden/:id renders the case detail with the escalation form and a collapsed timeline', async () => {
+    const cid = db.createConversation({
+      kommun_kod: '2418', kommun_namn: 'Malå', role: 'central',
+      contact_email: 'kommun@mala.se', scheduled_send_at: '2026-05-24T10:00:00Z',
+    });
+    db.updateConversationState(cid, 'SENT', { last_outbound_at: '2026-05-24T10:00:00Z' });
+    db.recordMessage({
+      conversation_id: cid, gmail_message_id: 'm1', direction: 'inbound',
+      from_email: 'k@mala.se', to_email: 'me@x.com', subject: 'Re: Begäran',
+      body_text: 'Hej, vi återkommer.', classification: 'delay_promise', classification_confidence: 0.8,
+      received_at: '2026-05-24T11:00:00Z', attachment_count: 0,
+    });
+    db.recordEscalation({ conversation_id: cid, reason: 'classifier=unknown', draft_template: 'free_form', draft_subject: 'Re: Begäran', draft_body: '(ingen draft)' });
+    const res = await get(appWithFakes(), `/arenden/${cid}`);
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('data-collapse-target');     // timeline body collapsed
+    expect(res.text).toContain('action="/escalations/');    // send form present
     expect(res.text).toContain('Skicka');
     expect(res.text).toContain('Hoppa över');
   });
 
-  it('shows the empty state when there are no open escalations', async () => {
-    const app = appWithFakes();
-    const res = await get(app, '/escalations');
-    expect(res.text).toMatch(/Inga öppna eskaleringar/);
+  it('GET /arenden shows an empty state when there are no cases', async () => {
+    const res = await get(appWithFakes(), '/arenden');
+    expect(res.text).toMatch(/Inga ärenden ännu/);
   });
 });
 
@@ -231,11 +273,12 @@ function seedVendorWithContract() {
 }
 
 describe('vendor pages', () => {
-  it('/leverantorer lists vendors with counts and links', async () => {
+  it('/leverantorer lists vendors with counts and links in a master-detail view', async () => {
     seedVendorWithContract();
     const app = appWithFakes();
     const res = await get(app, '/leverantorer');
     expect(res.status).toBe(200);
+    expect(res.text).toContain('class="master-detail"');
     expect(res.text).toContain('Skolon');
     expect(res.text).toContain('href="/leverantor/skolon"');
     expect(res.text).toContain('Skolon Plattform');
@@ -330,5 +373,122 @@ describe('compose candidates prefer handoff addresses', () => {
     const res = await get(app, '/kommun/2418/compose?role=central');
     expect(res.text).toContain('registrator@mala.se');
     expect(res.text.indexOf('registrator@mala.se')).toBeLessThan(res.text.indexOf('central@mala.se'));
+  });
+});
+
+describe('app shell', () => {
+  it('full layout has a sidebar nav, theme bootstrap, app.js, no meta-refresh', () => {
+    const html = layout({ title: 'X', body: '<p>hi</p>', currentPath: '/' });
+    expect(html).toMatch(/<!doctype html>/i);
+    expect(html).toContain('class="sidebar"');
+    expect(html).toContain('href="/arenden"');
+    expect(html).toContain('id="content"');
+    expect(html).toContain('/app.js');
+    expect(html).toContain("localStorage.getItem('pilot-theme')");
+    expect(html).not.toMatch(/http-equiv="refresh"/);
+  });
+
+  it('partial layout returns only the inner body fragment', () => {
+    const html = layout({ title: 'X', body: '<p>hi</p>', currentPath: '/', partial: true });
+    expect(html).toBe('<p>hi</p>');
+    expect(html).not.toMatch(/<!doctype/i);
+    expect(html).not.toContain('class="sidebar"');
+  });
+});
+
+describe('partial responses', () => {
+  it('GET /?partial=1 returns a fragment, not a full document', async () => {
+    const res = await get(appWithFakes(), '/?partial=1');
+    expect(res.status).toBe(200);
+    expect(res.text).not.toMatch(/<!doctype/i);
+    expect(res.text).not.toContain('class="sidebar"');
+  });
+  it('GET / (no partial) returns the full shell', async () => {
+    const res = await get(appWithFakes(), '/');
+    expect(res.text).toContain('class="sidebar"');
+  });
+  it('serves /app.js', async () => {
+    const res = await get(appWithFakes(), '/app.js');
+    expect(res.status).toBe(200);
+  });
+});
+
+describe('home buckets', () => {
+  it('buildActionQueue surfaces a conversation with an open escalation', () => {
+    const cid = db.createConversation({
+      kommun_kod: '2418', kommun_namn: 'Malå', role: 'central', contact_email: 'k@mala.se',
+      scheduled_send_at: '2026-05-24T10:00:00Z',
+    });
+    db.recordEscalation({ conversation_id: cid, reason: 'handoff', draft_template: 'free_form', draft_subject: 'Re', draft_body: 'b' });
+    const q = buildActionQueue(db);
+    expect(q.some((x) => x.conv_id === cid && x.kommun_kod === '2418')).toBe(true);
+  });
+
+  it('buildWaiting surfaces an open SENT case but not one with an open escalation', () => {
+    const waitingId = db.createConversation({ kommun_kod: '2418', kommun_namn: 'Malå', role: 'central', contact_email: 'k@mala.se', scheduled_send_at: '2026-05-24T10:00:00Z' });
+    db.updateConversationState(waitingId, 'SENT', { last_outbound_at: '2026-05-24T10:00:00Z' });
+    const escId = db.createConversation({ kommun_kod: '0560', kommun_namn: 'Boxholm', role: 'central', contact_email: 'k@box.se', scheduled_send_at: '2026-05-24T10:00:00Z' });
+    db.updateConversationState(escId, 'SENT', {});
+    db.recordEscalation({ conversation_id: escId, reason: 'x', draft_template: 'free_form', draft_body: 'b' });
+    const w = buildWaiting(db);
+    expect(w.some((x) => x.conv_id === waitingId)).toBe(true);
+    expect(w.some((x) => x.conv_id === escId)).toBe(false); // in the action queue instead
+  });
+
+  it("applyFilter('active') drops never-contacted kommuner", () => {
+    db.createConversation({ kommun_kod: '2418', kommun_namn: 'Malå', role: 'central', contact_email: 'k@mala.se', scheduled_send_at: '2026-05-24T10:00:00Z' });
+    const munis = JSON.parse(require('node:fs').readFileSync(muniPath, 'utf8'));
+    const rows = buildOverviewRows(munis, db);
+    const active = applyFilter(rows, 'active');
+    expect(active.every((r) => r.states.length > 0)).toBe(true);
+    expect(active.some((r) => r.kommun_kod === '2418')).toBe(true);
+    expect(active.some((r) => r.kommun_kod === '0560')).toBe(false);
+  });
+});
+
+describe('polish', () => {
+  it('case detail uses an intent badge, not a raw intent/action debug string', async () => {
+    const cid = db.createConversation({
+      kommun_kod: '2418', kommun_namn: 'Malå', role: 'central',
+      contact_email: 'kommun@mala.se', scheduled_send_at: '2026-05-24T10:00:00Z',
+    });
+    db.recordEscalation({ conversation_id: cid, reason: 'intent=handoff action=escalate confidence=0.92', draft_template: 'free_form', classifier_class: 'handoff', draft_body: 'b' });
+    const res = await get(appWithFakes(), `/arenden/${cid}`);
+    expect(res.text).not.toMatch(/intent=\w+ action=/); // no debug string in the UI
+    expect(res.text).toContain('class="badge"');         // a real badge instead
+  });
+
+  it('activity feed shows a designed empty state when there is nothing', async () => {
+    const res = await get(appWithFakes(), '/activity');
+    expect(res.text).toMatch(/Ingen aktivitet ännu/);
+  });
+});
+
+describe('arenden gmail look', () => {
+  it('list uses Gmail-style mail rows; detail is a thread with a reply box', async () => {
+    const cid = db.createConversation({
+      kommun_kod: '2418', kommun_namn: 'Malå', role: 'central',
+      contact_email: 'kommun@mala.se', scheduled_send_at: '2026-05-24T10:00:00Z',
+    });
+    db.recordMessage({
+      conversation_id: cid, gmail_message_id: 'o1', direction: 'outbound',
+      from_email: 'me@x.com', to_email: 'kommun@mala.se', subject: 'Begäran om allmänna handlingar',
+      body_text: 'Hej, vi begär...', classification: null, classification_confidence: null,
+      received_at: '2026-05-24T10:00:00Z', attachment_count: 0,
+    });
+    db.recordMessage({
+      conversation_id: cid, gmail_message_id: 'i1', direction: 'inbound',
+      from_email: 'kommun@mala.se', to_email: 'me@x.com', subject: 'Re: Begäran',
+      body_text: 'Hej, vi återkommer.', classification: 'delay_promise', classification_confidence: 0.8,
+      received_at: '2026-05-26T09:00:00Z', attachment_count: 0,
+    });
+    db.recordEscalation({ conversation_id: cid, reason: 'x', draft_template: 'free_form', draft_subject: 'Re: Begäran', draft_body: 'utkast' });
+    const list = await get(appWithFakes(), '/arenden');
+    expect(list.text).toContain('class="mail-row');     // Gmail inbox rows
+    const detail = await get(appWithFakes(), `/arenden/${cid}`);
+    expect(detail.text).toContain('class="thread"');     // Gmail thread
+    expect(detail.text).toContain('class="msg ');        // stacked message blocks
+    expect(detail.text).toContain('class="reply-box"');  // suggested reply box
+    expect(detail.text).toContain('kommun@mala.se');     // sender address shown
   });
 });

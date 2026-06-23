@@ -12,12 +12,11 @@ import { buildOAuthClient, loadStoredToken, makeGmail } from './gmail.js';
 import { sendApprovedReply, sendInitial, renderInitialDraft } from './send-reply.js';
 import {
   renderOverview,
+  renderArenden,
   renderKommunDetail,
-  renderEscalations,
   renderActivity,
   renderCompose,
   renderVendors,
-  renderVendorDetail,
   mergeContacts,
 } from './dashboard-views.js';
 
@@ -252,7 +251,7 @@ function buildSummary(rows) {
 
 function applyFilter(rows, filter) {
   if (!filter || filter === 'all') return rows;
-  if (filter === 'in-pilot') return rows.filter((r) => r.states.length > 0);
+  if (filter === 'in-pilot' || filter === 'active') return rows.filter((r) => r.states.length > 0);
   if (filter === 'needs-attention') return rows.filter((r) => r.states.some((s) => s.state === 'NEEDS_HUMAN') || r.open_escalations > 0);
   if (filter === 'delivering') return rows.filter((r) => r.states.some((s) => s.state === 'DELIVERING'));
   if (filter === 'done') return rows.filter((r) => r.states.some((s) => s.state === 'DONE'));
@@ -338,6 +337,111 @@ function parseSignatureJson(json) {
   try { return JSON.parse(json); } catch { return null; }
 }
 
+// The "what just happened, when" timestamp for a case row.
+function caseSince(c) {
+  return c.last_outbound_at && c.state_changed_at && c.last_outbound_at > c.state_changed_at
+    ? c.last_outbound_at : c.state_changed_at;
+}
+
+// Cases needing a human right now: any open escalation, or state NEEDS_HUMAN.
+// One entry per conversation, oldest-waiting first. Each carries conv_id so the
+// home queue links straight into the Ärenden detail pane.
+export function buildActionQueue(db) {
+  if (!db) return [];
+  const out = [];
+  for (const c of db.listAllConversations()) {
+    const openEsc = db.raw
+      .prepare("SELECT * FROM escalations WHERE conversation_id = ? AND status = 'open' ORDER BY id DESC")
+      .all(c.id);
+    if (c.state !== 'NEEDS_HUMAN' && openEsc.length === 0) continue;
+    out.push({
+      conv_id: c.id,
+      kommun_kod: c.kommun_kod,
+      kommun_namn: c.kommun_namn,
+      role: c.role,
+      state: c.state,
+      action: openEsc.length > 0 ? escalationActionLabel(openEsc[0]) : 'granska och svara',
+      since: caseSince(c),
+    });
+  }
+  return out.sort((a, b) => (a.since ?? '').localeCompare(b.since ?? ''));
+}
+
+// Open cases that are progressing on their own (waiting on the kommun), i.e. NOT
+// in the action queue. Soonest follow-up first.
+const WAITING_STATES = new Set(['INITIAL', 'SENT', 'ACK_RECEIVED', 'AWAITING_PRECISION', 'DELIVERING']);
+export function buildWaiting(db) {
+  if (!db) return [];
+  const out = [];
+  for (const c of db.listAllConversations()) {
+    if (c.state === 'NEEDS_HUMAN' || !WAITING_STATES.has(c.state)) continue;
+    const openEsc = db.raw
+      .prepare("SELECT COUNT(*) n FROM escalations WHERE conversation_id = ? AND status = 'open'")
+      .get(c.id).n;
+    if (openEsc > 0) continue; // belongs in the action queue
+    const fu = effectiveFollowUp(c);
+    out.push({
+      conv_id: c.id,
+      kommun_kod: c.kommun_kod,
+      kommun_namn: c.kommun_namn,
+      role: c.role,
+      state: c.state,
+      follow_up_at: fu.date,
+      follow_up_source: fu.source,
+      since: caseSince(c),
+    });
+  }
+  return out.sort((a, b) => (a.follow_up_at ?? '9999-12-31').localeCompare(b.follow_up_at ?? '9999-12-31'));
+}
+
+// One row per conversation for the Ärenden list pane (Gmail-inbox style:
+// sender · subject · snippet · date), with the latest message previewed.
+function loadCaseSummaries(db) {
+  if (!db) return [];
+  return db.listAllConversations().map((c) => {
+    const open_esc = db.raw
+      .prepare("SELECT COUNT(*) n FROM escalations WHERE conversation_id = ? AND status = 'open'")
+      .get(c.id).n;
+    const last = db.raw
+      .prepare('SELECT subject, body_text, direction FROM messages WHERE conversation_id = ? ORDER BY received_at DESC, id DESC LIMIT 1')
+      .get(c.id);
+    const fu = effectiveFollowUp(c);
+    return {
+      conv_id: c.id, kommun_kod: c.kommun_kod, kommun_namn: c.kommun_namn, role: c.role,
+      state: c.state, open_esc, follow_up_at: fu.date, follow_up_source: fu.source, since: caseSince(c),
+      subject: last?.subject ?? 'Begäran om allmänna handlingar',
+      snippet: (last?.body_text ?? '').replace(/\s+/g, ' ').trim().slice(0, 100),
+      last_direction: last?.direction ?? null,
+    };
+  });
+}
+
+// Full detail for one conversation (Ärenden detail pane).
+function loadCaseDetail(db, convId) {
+  if (!db) return null;
+  const conv = db.getConversation(convId);
+  if (!conv) return null;
+  const messages = db.raw
+    .prepare('SELECT * FROM messages WHERE conversation_id = ? ORDER BY received_at, id').all(convId);
+  const attachmentsByMsg = {};
+  const signatures = {};
+  for (const m of messages) {
+    const atts = db.raw.prepare('SELECT * FROM attachments WHERE message_id = ?').all(m.id);
+    if (atts.length) attachmentsByMsg[m.id] = atts;
+    if (m.signature_extracted) {
+      const sig = parseSignatureJson(m.signature_extracted);
+      if (sig) signatures[m.id] = sig;
+    }
+  }
+  const escalations = db.raw
+    .prepare("SELECT * FROM escalations WHERE conversation_id = ? AND status = 'open' ORDER BY created_at DESC")
+    .all(convId);
+  return { conv, messages, attachmentsByMsg, signatures, escalations, follow_up: effectiveFollowUp(conv) };
+}
+
+// Exported for tests + the Ärenden routes.
+export { buildOverviewRows, applyFilter };
+
 // ---- Route handlers ----
 
 export function createDashboardApp({
@@ -349,16 +453,38 @@ export function createDashboardApp({
 } = {}) {
   const app = express();
   app.use(express.urlencoded({ extended: false, limit: '1mb' }));
+  app.use(express.static('public'));
   const hb = () => (db && typeof db.getHeartbeat === 'function' ? db.getHeartbeat() : null);
+  // A client pane-swap request asks for just the content fragment.
+  const isPartial = (req) => req.query.partial === '1' || req.get('X-Partial') === '1';
+  // Cases needing a human — drives the sidebar badge + quiet-poll updates.
+  // Counts conversations (not raw escalations) so it matches the home queue.
+  const escCount = () => {
+    try { return buildActionQueue(db).length; }
+    catch { return 0; }
+  };
+  // After an action, return to where the form was submitted from (e.g. the
+  // Ärenden case pane) when it passed a `return`; otherwise the kommun page.
+  const backTo = (req, fallback) => {
+    const r = typeof req.body.return === 'string' ? req.body.return : '';
+    return r && r.startsWith('/') ? r : fallback;
+  };
 
   app.get('/', (req, res) => {
     const municipalities = municipalitiesLoader();
     const rows = buildOverviewRows(municipalities, db);
     const summary = buildSummary(rows);
-    const filter = req.query.filter ?? 'all';
+    // Home defaults to active kommuner; full 290-list is behind ?filter=all.
+    const filter = req.query.filter ?? 'active';
     const sort = typeof req.query.sort === 'string' ? req.query.sort : null;
     const order = typeof req.query.order === 'string' ? req.query.order : null;
-    const filtered = sortRows(applyFilter(rows, filter), { sort, order });
+    const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+    let filtered = sortRows(applyFilter(rows, filter), { sort, order });
+    if (q) {
+      const ql = q.toLowerCase();
+      filtered = filtered.filter((r) =>
+        r.kommun_namn.toLowerCase().includes(ql) || r.kommun_kod.includes(ql));
+    }
     res.set('Content-Type', 'text/html; charset=utf-8');
     res.send(renderOverview({
       summary,
@@ -366,8 +492,11 @@ export function createDashboardApp({
       filter,
       sort,
       order,
+      q,
       totalKommuner: municipalities.length,
-      heartbeat: hb(),
+      actionQueue: buildActionQueue(db),
+      waiting: buildWaiting(db),
+      heartbeat: hb(), partial: isPartial(req), escalationCount: escCount(),
     }));
   });
 
@@ -392,7 +521,7 @@ export function createDashboardApp({
     const kommun = municipalities.find((m) => m.kommun_kod === req.params.kod);
     if (!kommun) {
       res.status(404).set('Content-Type', 'text/html; charset=utf-8');
-      return res.send(renderKommunDetail({ kommun: null }));
+      return res.send(renderKommunDetail({ kommun: null, partial: isPartial(req), escalationCount: escCount() }));
     }
 
     const conversations = db
@@ -457,7 +586,7 @@ export function createDashboardApp({
       gmailReady: !!gmailClient,
       vendorSlugsByName,
       handoffContacts,
-      heartbeat: hb(),
+      heartbeat: hb(), partial: isPartial(req), escalationCount: escCount(),
     }));
   });
 
@@ -466,7 +595,7 @@ export function createDashboardApp({
     const kommun = municipalities.find((m) => m.kommun_kod === req.params.kod);
     if (!kommun) {
       res.status(404).set('Content-Type', 'text/html; charset=utf-8');
-      return res.send(renderCompose({ kommun: null, env }));
+      return res.send(renderCompose({ kommun: null, env, partial: isPartial(req), escalationCount: escCount() }));
     }
 
     const conversations = db
@@ -507,33 +636,48 @@ export function createDashboardApp({
       candidateEmails,
       gmailReady: !!gmailClient,
       env,
-      heartbeat: hb(),
+      heartbeat: hb(), partial: isPartial(req), escalationCount: escCount(),
     }));
   });
 
-  app.get('/escalations', (req, res) => {
-    if (!db) {
-      res.set('Content-Type', 'text/html; charset=utf-8');
-      return res.send(renderEscalations({ items: [] }));
-    }
-    const items = db.raw.prepare(`
-      SELECT e.id, e.reason, e.draft_template, e.draft_subject, e.draft_body, e.created_at,
-             c.kommun_kod, c.kommun_namn, c.role,
-             m.body_text as inbound_body
-      FROM escalations e
-      JOIN conversations c ON c.id = e.conversation_id
-      LEFT JOIN messages m ON m.id = e.message_id
-      WHERE e.status = 'open'
-      ORDER BY e.created_at
-    `).all();
+  // Ärenden (master–detail). The list pane is every conversation grouped by
+  // bucket; the detail pane is one selected case (timeline + reply actions).
+  app.get('/arenden', (req, res) => {
     res.set('Content-Type', 'text/html; charset=utf-8');
-    res.send(renderEscalations({ items, gmailReady: !!gmailClient, heartbeat: hb() }));
+    res.send(renderArenden({
+      cases: loadCaseSummaries(db),
+      selected: null,
+      gmailReady: !!gmailClient,
+      heartbeat: hb(), partial: isPartial(req), escalationCount: escCount(),
+    }));
   });
+
+  app.get('/arenden/:id', (req, res) => {
+    const cases = loadCaseSummaries(db);
+    const detail = loadCaseDetail(db, parseInt(req.params.id, 10));
+    res.set('Content-Type', 'text/html; charset=utf-8');
+    if (!detail) {
+      return res.status(404).send(renderArenden({
+        cases, selected: null, gmailReady: !!gmailClient,
+        heartbeat: hb(), partial: isPartial(req), escalationCount: escCount(),
+      }));
+    }
+    res.send(renderArenden({
+      cases, selected: detail, selectedId: detail.conv.id, gmailReady: !!gmailClient,
+      heartbeat: hb(), partial: isPartial(req), escalationCount: escCount(),
+    }));
+  });
+
+  // Lightweight count endpoint for the sidebar badge's quiet poll.
+  app.get('/api/escalation-count', (req, res) => res.json({ count: escCount() }));
+
+  // Escalations are now handled inside Ärenden — redirect old links there.
+  app.get('/escalations', (req, res) => res.redirect('/arenden?bucket=behover-dig'));
 
   app.get('/activity', (req, res) => {
     if (!db) {
       res.set('Content-Type', 'text/html; charset=utf-8');
-      return res.send(renderActivity({ events: [], heartbeat: hb() }));
+      return res.send(renderActivity({ events: [], heartbeat: hb(), partial: isPartial(req), escalationCount: escCount() }));
     }
     // Recent inbound + outbound messages + state changes (rough activity feed)
     const events = db.raw.prepare(`
@@ -557,22 +701,28 @@ export function createDashboardApp({
           ? (e.subject ?? '')
           : `${e.classification ?? 'okänt'} — ${e.subject ?? ''}`,
       })),
-      heartbeat: hb(),
+      heartbeat: hb(), partial: isPartial(req), escalationCount: escCount(),
     }));
   });
 
   app.get('/leverantorer', (req, res) => {
     const vendors = db ? db.listVendorsOverview() : [];
     res.set('Content-Type', 'text/html; charset=utf-8');
-    res.send(renderVendors({ vendors, heartbeat: hb() }));
+    res.send(renderVendors({ vendors, selected: null, heartbeat: hb(), partial: isPartial(req), escalationCount: escCount() }));
   });
 
   app.get('/leverantor/:slug', (req, res) => {
+    const vendors = db ? db.listVendorsOverview() : [];
     const vendor = db ? db.getVendorBySlug(req.params.slug) : null;
     res.set('Content-Type', 'text/html; charset=utf-8');
-    if (!vendor) return res.status(404).send(renderVendorDetail({ vendor: null, heartbeat: hb() }));
+    if (!vendor) {
+      return res.status(404).send(renderVendors({ vendors, selected: null, heartbeat: hb(), partial: isPartial(req), escalationCount: escCount() }));
+    }
     const contracts = db.listContractsForVendor(vendor.id);
-    res.send(renderVendorDetail({ vendor, contracts, heartbeat: hb() }));
+    res.send(renderVendors({
+      vendors, selected: { vendor, contracts }, selectedSlug: req.params.slug,
+      heartbeat: hb(), partial: isPartial(req), escalationCount: escCount(),
+    }));
   });
 
   // --- Action endpoints (outbound email) ---
@@ -597,7 +747,7 @@ export function createDashboardApp({
         draft_template: esc.draft_template, draft_body: esc.draft_body,
         decision: 'skip', final_body: null,
       });
-      return res.redirect(`/kommun/${conv.kommun_kod}`);
+      return res.redirect(backTo(req, `/kommun/${conv.kommun_kod}`));
     }
 
     if (action !== 'send' && action !== 'edit') {
@@ -619,7 +769,7 @@ export function createDashboardApp({
     } catch (e) {
       return res.status(500).send(`Send failed: ${escapeForError(e.message)}`);
     }
-    res.redirect(`/kommun/${conv.kommun_kod}`);
+    res.redirect(backTo(req, `/kommun/${conv.kommun_kod}`));
   });
 
   // Manually close a case (or mark it as a dead-end). POST /conversations/:id/close
@@ -632,7 +782,7 @@ export function createDashboardApp({
     if (!conv) return res.status(404).send('Case not found');
     const targetState = req.body.state === 'DEAD_END' ? 'DEAD_END' : 'DONE';
     db.updateConversationState(convId, targetState, {});
-    res.redirect(`/kommun/${conv.kommun_kod}`);
+    res.redirect(backTo(req, `/kommun/${conv.kommun_kod}`));
   });
 
   // Reopen a previously-closed case. Sets state back to ACK_RECEIVED so
@@ -643,7 +793,7 @@ export function createDashboardApp({
     const conv = db.getConversation(convId);
     if (!conv) return res.status(404).send('Case not found');
     db.updateConversationState(convId, 'ACK_RECEIVED', {});
-    res.redirect(`/kommun/${conv.kommun_kod}`);
+    res.redirect(backTo(req, `/kommun/${conv.kommun_kod}`));
   });
 
   // Send T-INITIAL to a kommun that doesn't have a conversation yet.

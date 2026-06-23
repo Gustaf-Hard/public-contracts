@@ -1,16 +1,5 @@
 {
-  "active_pilot_kommun_kods": ["9999"],
-  "rehearsal_kommuner": [
-    {
-      "kommun_kod": "9999",
-      "kommun_namn": "Testkommun",
-      "lan": "Testlän",
-      "folkmangd": 0,
-      "contacts": [
-        { "role": "central", "email": "gustaf.hard@gmail.com" },
-        { "role": "utbildning", "email": "gustaf.hard@gmail.com" }
-      ]
-    }
-  ],
+  "active_pilot_kommun_kods": [],
+  "rehearsal_kommuner": [],
   "live_kommun_kods": ["2418", "1438", "0509", "2404", "0560"]
 }
