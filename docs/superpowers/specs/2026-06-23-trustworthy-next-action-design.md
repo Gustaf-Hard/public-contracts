@@ -46,6 +46,16 @@ delivery > clarification > delay_promise > auto_ack > handoff > dead_end > unkno
 
 **Hard guard (`src/tick.js` + `src/dashboard.js` send path).** Assert the invariant at two choke points: (a) the daemon refuses to open a second open escalation on a conversation (supersede first); (b) the dashboard's `POST /escalations/:id` re-checks `status='open'` immediately before sending (it already does) and additionally refuses if a *newer* open escalation exists for the same conversation.
 
+### Phase 1 — Inbound-matching robustness
+
+The reply to an outreach often comes from a *different person* at the kommun than we contacted (handoff). Today inbound is matched by Gmail thread OR by `sameEmailDomain(parsed.from, conv.contact_email)` (`src/tick.js`), which already captures a same-domain handoff (e.g. `barn.utbildning@arboga.se` matches a conversation contacted at `arboga.kommun@arboga.se`). Two gaps remain:
+
+1. **Fetch window must follow the outage, not a fixed 7 days.** The query is hard-coded `to:<us> -from:<us> newer_than:7d`. If the daemon is down longer than 7 days (it has been ~15 days on `invalid_grant`), replies that arrived in the gap are **silently skipped on recovery** — permanent data loss, including delivered contracts. Fix: derive the window from `getTickHealth().last_success_at` (minus a safety margin, e.g. 1 day), falling back to a wide window (e.g. `newer_than:30d`) when there's no recorded success. Never narrower than the time since the last successful fetch.
+
+2. **Match handoff addresses on any domain.** `sameEmailDomain` only catches same-domain handoffs; a department replying from a different domain (a school's own domain, an outsourced IT provider) is missed — even though the analyser already extracts `handoff_to_email` into `analysis_json`. Fix: maintain a per-conversation set of **known reply addresses** (the original contact + every extracted `handoff_to_email`), and match inbound `from` against that set (exact address or its domain) in addition to thread/contact-domain.
+
+**Deferred (noted, not built):** cross-role misattribution — when one kommun has multiple conversations (e.g. `central` + `utbildning`) sharing a domain, a domain-only match can attach a reply to the wrong role. No kommun has >1 conversation yet; when that changes, tie-break by (thread match → handoff-address match → most-recently-active conversation).
+
 **One-time cleanup.** A small idempotent step (in `04-patch-data.js` style, or a guarded migration) that, for every conversation with >1 open escalation, keeps the highest-precedence/newest one and marks the rest `superseded`. Fixes the existing Ale case.
 
 ### Phase 1 — Freshness honesty (the trust fix)
@@ -56,6 +66,8 @@ delivery > clarification > delay_promise > auto_ack > handoff > dead_end > unkno
 - Render a **prominent banner** in the content region (not just the small sidebar pill): `⚠️ Data kan vara inaktuell — inkommande mejl har inte bearbetats sedan <datum>. Statusarna nedan visar senast kända läge.` Include the cause when known (`invalid_grant` → "Gmail-token måste förnyas: kör `npm run pilot-auth`").
 - **Visually qualify derived statuses** while stale: status badges and the "Behöver dig" framing get a muted/`senast känt`-treatment (e.g. reduced opacity + a `(ej verifierat)` title) so they don't read as current truth.
 - The sidebar heartbeat pill keys off `getTickHealth().stale` (successful tick), not "any tick ran," so a daemon that's up but failing on Gmail shows **red**, not green.
+
+**Surface ignored attachments (`src/dashboard-views.js`).** A message can carry `attachment_count > 0` while the pipeline stored nothing because it only keeps PDFs/zips (`if (!isPdf && !isZip) continue;` in `src/tick.js`) — e.g. Arboga's inbound has `attachment_count = 1` (a logo PNG) and zero stored attachments. Show a small per-message note when `attachment_count` exceeds the stored count — *"N bilaga ignorerad (ej PDF)"* — so a skipped attachment is never silently invisible and the operator can tell "just a logo" from "a missed document."
 
 ### Phase 2 — Wait / Nästa-steg operator levers (built on the invariant)
 
@@ -80,6 +92,8 @@ Unchanged ingestion; the changes are: tick groups inbound per conversation and s
 - `conversation.js`: precedence ordering is a pure function — table-test each pair.
 - `tick.js`: two inbound (delivery + unknown) on one conversation → exactly one open escalation, and it's the `delivery` one (regression test for the Ale bug); a new escalation supersedes a prior open one.
 - `storage.js`: `getTickHealth()` — success/stale/never cases against seeded heartbeats.
+- `tick.js` inbound matching: a reply whose `from` is a different same-domain address (e.g. `barn.utbildning@arboga.se` vs contact `arboga.kommun@arboga.se`) attaches to the conversation; a reply from an extracted `handoff_to_email` on a *different* domain also attaches; the fetch window derived from `last_success_at` covers a >7-day gap (a 12-day-old reply is still fetched after a 15-day outage).
+- `dashboard`/views: a message with `attachment_count` greater than stored attachments shows the "ignorerad" note.
 - `dashboard`: stale health → banner present + statuses carry the qualified markup; healthy → no banner. Send guard refuses when a newer open escalation exists.
 - Cleanup step: conversation with 2 open escalations → 1 open + 1 superseded, highest-precedence kept.
 
