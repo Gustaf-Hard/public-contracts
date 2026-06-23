@@ -85,6 +85,67 @@
     loadPane(url, false);
   });
 
+  // --- Health modal: dismiss (per session) + in-app Gmail re-auth ---
+  var HEALTH_DISMISS_KEY = 'pilot-health-dismissed';
+
+  function hideHealthModal() {
+    var m = document.querySelector('[data-health-modal]');
+    if (m) m.remove();
+  }
+
+  // If dismissed earlier this session, don't nag again until a full reload in a
+  // new session.
+  try {
+    if (sessionStorage.getItem(HEALTH_DISMISS_KEY)) hideHealthModal();
+  } catch (_) {}
+
+  document.addEventListener('click', function (e) {
+    if (e.target.closest && e.target.closest('[data-dismiss-modal]')) {
+      try { sessionStorage.setItem(HEALTH_DISMISS_KEY, '1'); } catch (_) {}
+      hideHealthModal();
+      return;
+    }
+    var btn = e.target.closest && e.target.closest('[data-reauth]');
+    if (!btn) return;
+    var status = document.querySelector('[data-reauth-status]');
+    btn.disabled = true;
+    if (status) { status.hidden = false; status.className = 'modal-status'; status.textContent = 'Startar…'; }
+    fetch('/auth/gmail/start', { method: 'POST' })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (!data.consentUrl) throw new Error(data.error || 'Kunde inte starta');
+        window.open(data.consentUrl, '_blank', 'noopener');
+        if (status) {
+          status.innerHTML = 'Väntar på Google-inloggning… om fliken inte öppnades: ' +
+            '<a href="' + data.consentUrl + '" target="_blank" rel="noopener">öppna inloggning</a>';
+        }
+        pollReauth(status);
+      })
+      .catch(function (err) {
+        btn.disabled = false;
+        if (status) { status.className = 'modal-status err'; status.textContent = 'Fel: ' + err.message; }
+      });
+  });
+
+  function pollReauth(status) {
+    var tries = 0;
+    var iv = setInterval(function () {
+      tries++;
+      fetch('/auth/gmail/status').then(function (r) { return r.json(); }).then(function (s) {
+        if (s.status === 'success') {
+          clearInterval(iv);
+          try { sessionStorage.setItem(HEALTH_DISMISS_KEY, '1'); } catch (_) {}
+          if (status) { status.className = 'modal-status ok'; status.textContent = '✅ Gmail återanslutet. Daemonen hämtar nya mejl inom 15 min.'; }
+        } else if (s.status === 'error') {
+          clearInterval(iv);
+          if (status) { status.className = 'modal-status err'; status.textContent = 'Misslyckades: ' + (s.error || 'okänt fel'); }
+        } else if (tries > 150) {
+          clearInterval(iv); // ~5 min
+        }
+      }).catch(function () {});
+    }, 2000);
+  }
+
   // Quiet background poll — replaces the old full-page <meta refresh>. Keeps the
   // sidebar escalation badge fresh WITHOUT touching the open pane. Skips while a
   // field is focused so it can never disturb a half-typed reply.
