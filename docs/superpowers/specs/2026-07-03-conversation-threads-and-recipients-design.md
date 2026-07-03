@@ -90,20 +90,27 @@ On every message ingest, upsert the thread row for
 `last_inbound_at` from the latest inbound, and — **only when
 `status_source = 'auto'`** — recompute `status`:
 
-Using two explicit classification sets (drawn from the existing classifier /
-LLM `intent` values):
+Using two explicit sets over the **stored legacy `classification` values**
+(`auto_ack`, `clarification`, `delivery`, `dead_end`, `unknown` — the LLM intents
+`handoff`/`fee_demand`/`delay_promise` are already folded into these by
+`analysisToLegacyClassification`):
 
-- `SUBSTANCE = {delivery, precision, handoff}` — a real human response.
-- `NOISE = {auto_ack, unknown}` — acknowledgements and unclassifiable boilerplate.
+- `SUBSTANCE = {delivery, clarification}` — a real registrator engagement that
+  we act on.
+- `NOISE = {auto_ack}` — automatic diarium acknowledgements only.
 
 - → **`primary`** if the thread has any inbound with attachments, or any inbound
   whose classification is in `SUBSTANCE`.
 - → **`muted`** if the thread has ≥1 inbound and *all* of its inbound are in
   `NOISE` with no attachments.
-- → **`neutral`** before any inbound (outbound-only thread), or if no rule fires.
+- → **`neutral`** otherwise — including `unknown` and `dead_end`, and
+  outbound-only threads.
 
-If the classifier gains new intent values, they default to `neutral` (escalates,
-does not mute) until explicitly added to a set — the safe direction.
+Critically, `unknown` is **not** muted: in the legacy taxonomy it carries
+handoffs and fee demands that must escalate to a human. Muting is reserved for
+pure diarium auto-acks, plus any thread the operator manually mutes. New/unmapped
+classifications default to `neutral` (escalates, does not mute) — the safe
+direction.
 
 A manual override sets `status_source = 'manual'`; inference never touches such
 rows again.
