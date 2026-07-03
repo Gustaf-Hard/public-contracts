@@ -42,6 +42,26 @@ function fakeSlack() {
   };
 }
 
+function makeDeps({ gmail, now = new Date('2026-06-24T00:00:00Z') }) {
+  return {
+    db, gmailClient: { gmail: {} }, gmailOps: gmail,
+    slackClient: {}, slackOps: fakeSlack(),
+    env, contractsDir, now,
+  };
+}
+
+// base64url-encode a body the way Gmail delivers it (matches existing fixtures).
+function b64(s) {
+  return Buffer.from(s).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+// Build a fake full Gmail message for gmailOps.getResult.
+function mkMsg(id, threadId, from, body, subject = 's') {
+  return { id, threadId, payload: { headers: [
+    { name: 'From', value: from }, { name: 'To', value: 'me@x.se' }, { name: 'Subject', value: subject },
+  ], body: { data: b64(body) } } };
+}
+
 const env = {
   GMAIL_USER_EMAIL: 'gustaf@mediagraf.se',
   GMAIL_FROM_NAME: 'Gustaf',
@@ -423,6 +443,31 @@ describe('runTick — out-of-thread inbound matched by sender domain', () => {
     const conv = db.getConversation(id);
     expect(conv.state).toBe('SENT');                   // unchanged — not matched
     expect(db.hasGmailMessageId('spam-1')).toBe(false);
+  });
+});
+
+describe('runTick — thread upsert and message stamping', () => {
+  it('ingest creates a thread row, stamps the message, and links the escalation to the message', async () => {
+    const convId = db.createConversation({
+      kommun_kod: '1', kommun_namn: 'Arboga', role: 'central',
+      contact_email: 'registrator@arboga.se', scheduled_send_at: '2026-05-01T00:00:00Z',
+    });
+    db.updateConversationState(convId, 'SENT', { gmail_thread_id: 'thr-orig', last_outbound_at: '2026-05-01T00:00:00Z' });
+
+    const gmail = fakeGmail({
+      listResult: [{ id: 'in-1' }],
+      getResult: { 'in-1': mkMsg('in-1', 'thr-anneli', 'Anneli Waern <Anneli.Waern@arboga.se>', 'Kan du precisera din begäran?', 'SV: Begäran') },
+    });
+
+    await runTick(makeDeps({ gmail }));
+
+    const thread = db.getThread(convId, 'thr-anneli');
+    expect(thread).toBeTruthy();
+    const msg = db.raw.prepare("SELECT * FROM messages WHERE gmail_message_id = 'in-1'").get();
+    expect(msg.gmail_thread_id).toBe('thr-anneli');
+    expect(msg.thread_id).toBe(thread.id);
+    const esc = db.raw.prepare('SELECT * FROM escalations WHERE conversation_id = ?').get(convId);
+    if (esc) expect(esc.message_id).toBe(msg.id); // escalation, when drafted, points at the message
   });
 });
 

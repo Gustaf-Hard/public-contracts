@@ -45,7 +45,7 @@ async function dispatchInitial(conv, deps) {
   log?.(`SENT T-INITIAL → ${conv.kommun_namn}/${conv.role}`);
 }
 
-async function escalateWithDraft({ conv, parsedInbound, classification, previousState, draftTemplate, llmDraft, reason, deps }) {
+async function escalateWithDraft({ conv, parsedInbound, messageId = null, classification, previousState, draftTemplate, llmDraft, reason, deps }) {
   const { db, slackClient, slackOps, env, log } = deps;
   let subject = '(no subject)';
   let body = '';
@@ -69,7 +69,7 @@ async function escalateWithDraft({ conv, parsedInbound, classification, previous
 
   const escId = db.recordEscalation({
     conversation_id: conv.id,
-    message_id: null,
+    message_id: messageId,
     reason,
     draft_template: draftTemplate,
     draft_subject: subject,
@@ -158,6 +158,13 @@ export async function runTick(deps) {
       });
 
       const sig = extractSignature(parsed.body);
+      const thread = db.upsertThread({
+        conversation_id: conv.id,
+        gmail_thread_id: full.threadId,
+        counterparty_email: parsed.from,
+        counterparty_name: parsed.from,
+        last_inbound_at: now.toISOString(),
+      });
       const messageId = db.recordMessage({
         conversation_id: conv.id, gmail_message_id: m.id, direction: 'inbound',
         from_email: parsed.from, to_email: parsed.to,
@@ -166,6 +173,8 @@ export async function runTick(deps) {
         received_at: now.toISOString(), attachment_count: parsed.attachments.length,
         signature_extracted: sig,
         analysis_json: analysis ?? null,
+        gmail_thread_id: full.threadId,
+        thread_id: thread.id,
       });
 
       // Save attachments. Kommuner deliver contracts either as a PDF directly
@@ -221,7 +230,7 @@ export async function runTick(deps) {
           ? `llm intent=${analysis.intent} action=${analysis.suggested_action} confidence=${(analysis.confidence ?? 0).toFixed(2)}`
           : `classifier=${classification.class} confidence=${classification.confidence.toFixed(2)}`;
         await escalateWithDraft({
-          conv: updated, parsedInbound: parsed, classification,
+          conv: updated, parsedInbound: parsed, messageId, classification,
           previousState,
           draftTemplate,
           llmDraft,
