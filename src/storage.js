@@ -38,6 +38,20 @@ CREATE TABLE IF NOT EXISTS messages (
 );
 CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id);
 
+CREATE TABLE IF NOT EXISTS threads (
+  id INTEGER PRIMARY KEY,
+  conversation_id INTEGER NOT NULL REFERENCES conversations(id),
+  gmail_thread_id TEXT NOT NULL,
+  counterparty_email TEXT,
+  counterparty_name TEXT,
+  status TEXT NOT NULL DEFAULT 'neutral',
+  status_source TEXT NOT NULL DEFAULT 'auto',
+  last_inbound_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(conversation_id, gmail_thread_id)
+);
+CREATE INDEX IF NOT EXISTS idx_threads_conversation ON threads(conversation_id);
+
 CREATE TABLE IF NOT EXISTS attachments (
   id INTEGER PRIMARY KEY,
   message_id INTEGER NOT NULL REFERENCES messages(id),
@@ -147,6 +161,12 @@ export function openDb(path) {
     if (!msgCols.includes('analysis_json')) {
       db.exec('ALTER TABLE messages ADD COLUMN analysis_json TEXT');
     }
+    if (!msgCols.includes('gmail_thread_id')) {
+      db.exec('ALTER TABLE messages ADD COLUMN gmail_thread_id TEXT');
+    }
+    if (!msgCols.includes('thread_id')) {
+      db.exec('ALTER TABLE messages ADD COLUMN thread_id INTEGER');
+    }
     const hbCols = db.prepare("PRAGMA table_info(daemon_heartbeat)").all().map((r) => r.name);
     if (!hbCols.includes('last_success_at')) {
       db.exec('ALTER TABLE daemon_heartbeat ADD COLUMN last_success_at TEXT');
@@ -201,8 +221,9 @@ export function openDb(path) {
       INSERT INTO messages (
         conversation_id, gmail_message_id, direction, from_email, to_email,
         subject, body_text, classification, classification_confidence,
-        received_at, attachment_count, signature_extracted, analysis_json
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        received_at, attachment_count, signature_extracted, analysis_json,
+        gmail_thread_id, thread_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const sigJson = m.signature_extracted
       ? (typeof m.signature_extracted === 'string' ? m.signature_extracted : JSON.stringify(m.signature_extracted))
@@ -213,7 +234,8 @@ export function openDb(path) {
     const r = stmt.run(
       m.conversation_id, m.gmail_message_id, m.direction, m.from_email, m.to_email,
       m.subject, m.body_text, m.classification, m.classification_confidence,
-      m.received_at, m.attachment_count, sigJson, analysisJson
+      m.received_at, m.attachment_count, sigJson, analysisJson,
+      m.gmail_thread_id ?? null, m.thread_id ?? null
     );
     return Number(r.lastInsertRowid);
   }
@@ -224,6 +246,50 @@ export function openDb(path) {
 
   function hasGmailMessageId(gmailMessageId) {
     return !!db.prepare('SELECT 1 FROM messages WHERE gmail_message_id = ?').get(gmailMessageId);
+  }
+
+  function getMessageById(id) {
+    return db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
+  }
+
+  function upsertThread({ conversation_id, gmail_thread_id, counterparty_email = null, counterparty_name = null, last_inbound_at = null }) {
+    const existing = db.prepare(
+      'SELECT * FROM threads WHERE conversation_id = ? AND gmail_thread_id = ?'
+    ).get(conversation_id, gmail_thread_id);
+    if (existing) {
+      db.prepare(`
+        UPDATE threads SET
+          counterparty_email = COALESCE(?, counterparty_email),
+          counterparty_name  = COALESCE(?, counterparty_name),
+          last_inbound_at    = COALESCE(?, last_inbound_at)
+        WHERE id = ?
+      `).run(counterparty_email, counterparty_name, last_inbound_at, existing.id);
+      return db.prepare('SELECT * FROM threads WHERE id = ?').get(existing.id);
+    }
+    const r = db.prepare(`
+      INSERT INTO threads (conversation_id, gmail_thread_id, counterparty_email, counterparty_name, last_inbound_at)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(conversation_id, gmail_thread_id, counterparty_email, counterparty_name, last_inbound_at);
+    return db.prepare('SELECT * FROM threads WHERE id = ?').get(Number(r.lastInsertRowid));
+  }
+
+  function getThread(conversation_id, gmail_thread_id) {
+    return db.prepare('SELECT * FROM threads WHERE conversation_id = ? AND gmail_thread_id = ?')
+      .get(conversation_id, gmail_thread_id);
+  }
+
+  function getThreadById(id) {
+    return db.prepare('SELECT * FROM threads WHERE id = ?').get(id);
+  }
+
+  function listThreadsForConversation(conversation_id) {
+    return db.prepare(
+      "SELECT * FROM threads WHERE conversation_id = ? ORDER BY last_inbound_at DESC NULLS LAST, id"
+    ).all(conversation_id);
+  }
+
+  function setThreadStatus(id, status, source = 'manual') {
+    db.prepare('UPDATE threads SET status = ?, status_source = ? WHERE id = ?').run(status, source, id);
   }
 
   function recordAttachment(a) {
@@ -484,6 +550,12 @@ export function openDb(path) {
     recordMessage,
     listMessages,
     hasGmailMessageId,
+    getMessageById,
+    upsertThread,
+    getThread,
+    getThreadById,
+    listThreadsForConversation,
+    setThreadStatus,
     recordAttachment,
     recordEscalation,
     listOpenEscalations,

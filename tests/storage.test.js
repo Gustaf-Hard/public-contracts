@@ -187,6 +187,54 @@ describe('decisions', () => {
   });
 });
 
+describe('threads', () => {
+  it('creates the threads table and upserts idempotently by (conversation_id, gmail_thread_id)', () => {
+    const db = openDb(':memory:');
+    db.migrate();
+    const convId = db.createConversation({
+      kommun_kod: '1', kommun_namn: 'X', role: 'central',
+      contact_email: 'k@x.se', scheduled_send_at: '2026-01-01T00:00:00Z',
+    });
+    const t1 = db.upsertThread({
+      conversation_id: convId, gmail_thread_id: 'thr-a',
+      counterparty_email: 'a@x.se', counterparty_name: 'A', last_inbound_at: '2026-06-01T00:00:00Z',
+    });
+    expect(t1.status).toBe('neutral');
+    expect(t1.status_source).toBe('auto');
+    const t2 = db.upsertThread({
+      conversation_id: convId, gmail_thread_id: 'thr-a',
+      counterparty_email: 'a2@x.se', last_inbound_at: '2026-06-02T00:00:00Z',
+    });
+    expect(t2.id).toBe(t1.id);                 // same row
+    expect(t2.counterparty_email).toBe('a2@x.se');
+    expect(t2.last_inbound_at).toBe('2026-06-02T00:00:00Z');
+    expect(db.listThreadsForConversation(convId)).toHaveLength(1);
+  });
+
+  it('setThreadStatus persists status + source; recordMessage stores thread ids', () => {
+    const db = openDb(':memory:');
+    db.migrate();
+    const convId = db.createConversation({
+      kommun_kod: '1', kommun_namn: 'X', role: 'central',
+      contact_email: 'k@x.se', scheduled_send_at: '2026-01-01T00:00:00Z',
+    });
+    const t = db.upsertThread({ conversation_id: convId, gmail_thread_id: 'thr-a' });
+    db.setThreadStatus(t.id, 'muted', 'manual');
+    expect(db.getThreadById(t.id).status).toBe('muted');
+    expect(db.getThreadById(t.id).status_source).toBe('manual');
+    const mid = db.recordMessage({
+      conversation_id: convId, gmail_message_id: 'g1', direction: 'inbound',
+      from_email: 'a@x.se', to_email: 'me@x.se', subject: 's', body_text: 'b',
+      classification: 'delivery', classification_confidence: 0.9,
+      received_at: '2026-06-01T00:00:00Z', attachment_count: 1,
+      gmail_thread_id: 'thr-a', thread_id: t.id,
+    });
+    const m = db.getMessageById(mid);
+    expect(m.gmail_thread_id).toBe('thr-a');
+    expect(m.thread_id).toBe(t.id);
+  });
+});
+
 describe('getTickHealth', () => {
   it('is stale with no successful tick yet', () => {
     const h = db.getTickHealth();
