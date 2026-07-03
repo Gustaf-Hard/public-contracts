@@ -533,7 +533,7 @@ const baseCss = `
   .thread-status { font-size: 11px; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--border); }
   .thread-status-primary { color: var(--accent); border-color: var(--accent); }
   .thread-status-muted { color: var(--fg-muted); }
-  .btn-link { background: none; border: none; color: var(--accent); cursor: pointer; font-size: 12px; padding: 0; }
+  .thread-group .btn-link { background: none; border: none; color: var(--accent); cursor: pointer; font-size: 12px; padding: 0; }
 </style>
 `;
 

@@ -607,6 +607,20 @@ describe('thread-grouped case view', () => {
     expect(res.text).toMatch(/primary/); // status chip label
     expect(res.text).toMatch(/muted/);
   });
+
+  it('renders Ogrupperat section for messages with null thread_id', async () => {
+    const kommun_kod = '2418';
+    const convId = db.createConversation({ kommun_kod, kommun_namn: 'Malå', role: 'central', contact_email: 'registrator@mala.se', scheduled_send_at: '2026-05-01T00:00:00Z' });
+    db.updateConversationState(convId, 'DELIVERING', { gmail_thread_id: 'thr-known' });
+    const t = db.upsertThread({ conversation_id: convId, gmail_thread_id: 'thr-known', counterparty_email: 'known@x.se', counterparty_name: 'Known Person' });
+    db.recordMessage({ conversation_id: convId, gmail_message_id: 'k-1', direction: 'inbound', from_email: 'known@x.se', to_email: 'me@x.se', subject: 'SV', body_text: 'known-message-body', classification: 'auto_ack', classification_confidence: 0.9, received_at: '2026-06-01T00:00:00Z', attachment_count: 0, gmail_thread_id: 'thr-known', thread_id: t.id });
+    db.recordMessage({ conversation_id: convId, gmail_message_id: 'orp-1', direction: 'inbound', from_email: 'anon@x.se', to_email: 'me@x.se', subject: 'Utan tråd', body_text: 'orphan-message-body', classification: null, classification_confidence: null, received_at: '2026-05-28T00:00:00Z', attachment_count: 0, gmail_thread_id: null, thread_id: null });
+
+    const app = createDashboardApp({ db, municipalitiesLoader: () => [{ kommun_kod, kommun_namn: 'Malå', lan: 'X', folkmangd: 1, contacts: [] }] });
+    const res = await get(app, `/kommun/${kommun_kod}`);
+    expect(res.text).toContain('Ogrupperat');
+    expect(res.text).toContain('orphan-message-body');
+  });
 });
 
 describe('thread status toggle', () => {
