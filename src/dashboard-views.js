@@ -808,6 +808,10 @@ function renderEscalationForm(esc, gmailReady, returnTo = null) {
     <form class="action-form" method="post" action="/escalations/${esc.id}"${paneAttrs}>
       ${returnField}
       <div class="field">
+        <label>Till</label>
+        <input type="email" name="to" value="${escapeHtml(esc.recipient ?? '')}">
+      </div>
+      <div class="field">
         <label>Ämne</label>
         <input type="text" name="subject" value="${escapeHtml(esc.draft_subject ?? '')}">
       </div>

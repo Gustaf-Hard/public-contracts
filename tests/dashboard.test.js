@@ -142,6 +142,26 @@ describe('dashboard / kommun detail', () => {
     expect(res.status).toBe(404);
     expect(res.text).toContain('Hittade inte');
   });
+
+  it('reply form shows an editable Till: field prefilled with the thread counterparty', async () => {
+    const convId = db.createConversation({
+      kommun_kod: '2418', kommun_namn: 'Malå', role: 'central',
+      contact_email: 'registrator@mala.se', scheduled_send_at: '2026-05-01T00:00:00Z',
+    });
+    db.updateConversationState(convId, 'DELIVERING', { gmail_thread_id: 'thr-orig' });
+    const t = db.upsertThread({ conversation_id: convId, gmail_thread_id: 'thr-h', counterparty_email: 'handlaggare@mala.se' });
+    const mid = db.recordMessage({
+      conversation_id: convId, gmail_message_id: 'in-1', direction: 'inbound',
+      from_email: 'handlaggare@mala.se', to_email: 'me@x.se', subject: 'SV', body_text: 'x',
+      classification: 'precision', classification_confidence: 0.9, received_at: '2026-06-01T00:00:00Z',
+      attachment_count: 0, gmail_thread_id: 'thr-h', thread_id: t.id,
+    });
+    db.recordEscalation({ conversation_id: convId, message_id: mid, reason: 'r', draft_template: 'T_PRECISION', draft_subject: 'Re: SV', draft_body: 'svar' });
+
+    const app = createDashboardApp({ db, municipalitiesLoader: () => [{ kommun_kod: '2418', kommun_namn: 'Malå', lan: 'X', folkmangd: 1, contacts: [] }] });
+    const res = await get(app, '/kommun/2418');
+    expect(res.text).toMatch(/name="to"[^>]*value="handlaggare@mala\.se"/);
+  });
 });
 
 describe('dashboard / arenden (master-detail)', () => {

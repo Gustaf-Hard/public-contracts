@@ -11,6 +11,7 @@ import { effectiveFollowUp, TERMINAL_STATES } from './conversation.js';
 import { buildOAuthClient, loadStoredToken, makeGmail } from './gmail.js';
 import { beginReauth } from './gmail-auth.js';
 import { sendApprovedReply, sendInitial, renderInitialDraft } from './send-reply.js';
+import { resolveReplyRecipient } from './threads.js';
 import {
   renderOverview,
   renderArenden,
@@ -430,6 +431,13 @@ function loadCaseSummaries(db) {
   });
 }
 
+// Resolve the best reply-to address for an escalation.
+function escalationRecipient(db, esc, conv) {
+  const triggeringMessage = esc.message_id ? db.getMessageById(esc.message_id) : null;
+  const primaryThreads = db.listThreadsForConversation(conv.id).filter((t) => t.status === 'primary');
+  return resolveReplyRecipient({ triggeringMessage, conv, primaryThreads }).to;
+}
+
 // Full detail for one conversation (Ärenden detail pane).
 function loadCaseDetail(db, convId) {
   if (!db) return null;
@@ -449,7 +457,8 @@ function loadCaseDetail(db, convId) {
   }
   const escalations = db.raw
     .prepare("SELECT * FROM escalations WHERE conversation_id = ? AND status = 'open' ORDER BY created_at DESC")
-    .all(convId);
+    .all(convId)
+    .map((e) => ({ ...e, recipient: escalationRecipient(db, e, conv) }));
   return { conv, messages, attachmentsByMsg, signatures, escalations, follow_up: effectiveFollowUp(conv) };
 }
 
@@ -568,7 +577,8 @@ export function createDashboardApp({
         }
         escalationsByConv[conv.id] = db.raw
           .prepare("SELECT * FROM escalations WHERE conversation_id = ? AND status = 'open' ORDER BY created_at DESC")
-          .all(conv.id);
+          .all(conv.id)
+          .map((e) => ({ ...e, recipient: escalationRecipient(db, e, conv) }));
       }
     }
 
@@ -806,7 +816,7 @@ export function createDashboardApp({
     try {
       await sendApprovedReply({
         db, gmail: gmailClient, env, conv, esc,
-        finalBody, finalSubject,
+        finalBody, finalSubject, finalTo: req.body.to,
         decision: action === 'send' ? 'approve_unmodified' : 'edit',
       });
     } catch (e) {
