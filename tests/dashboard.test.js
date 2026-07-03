@@ -588,6 +588,27 @@ describe('health modal', () => {
   });
 });
 
+describe('thread-grouped case view', () => {
+  it('groups the case view by thread with a status chip and a toggle form', async () => {
+    const convId = db.createConversation({ kommun_kod: '2418', kommun_namn: 'Arboga', role: 'central', contact_email: 'registrator@arboga.se', scheduled_send_at: '2026-05-01T00:00:00Z' });
+    db.updateConversationState(convId, 'DELIVERING', { gmail_thread_id: 'thr-orig' });
+    const tA = db.upsertThread({ conversation_id: convId, gmail_thread_id: 'thr-anneli', counterparty_email: 'Anneli.Waern@arboga.se', counterparty_name: 'Anneli Waern' });
+    db.setThreadStatus(tA.id, 'primary', 'auto');
+    const tR = db.upsertThread({ conversation_id: convId, gmail_thread_id: 'thr-reg', counterparty_email: 'arboga.kommun@arboga.se', counterparty_name: 'Arboga kommun' });
+    db.setThreadStatus(tR.id, 'muted', 'auto');
+    db.recordMessage({ conversation_id: convId, gmail_message_id: 'ann-1', direction: 'inbound', from_email: 'Anneli.Waern@arboga.se', to_email: 'me@x.se', subject: 'SV', body_text: 'avtal', classification: 'delivery', classification_confidence: 0.9, received_at: '2026-06-23T00:00:00Z', attachment_count: 10, gmail_thread_id: 'thr-anneli', thread_id: tA.id });
+    db.recordMessage({ conversation_id: convId, gmail_message_id: 'reg-1', direction: 'inbound', from_email: 'arboga.kommun@arboga.se', to_email: 'me@x.se', subject: 'ack', body_text: 'mottaget', classification: 'auto_ack', classification_confidence: 0.9, received_at: '2026-06-08T00:00:00Z', attachment_count: 0, gmail_thread_id: 'thr-reg', thread_id: tR.id });
+
+    const app = createDashboardApp({ db, municipalitiesLoader: () => [{ kommun_kod: '2418', kommun_namn: 'Arboga', lan: 'X', folkmangd: 1, contacts: [] }] });
+    const res = await get(app, '/kommun/2418');
+    expect(res.text).toContain('Anneli Waern');
+    expect(res.text).toContain('Arboga kommun');
+    expect(res.text).toMatch(/action="\/threads\/\d+\/status"/); // toggle present
+    expect(res.text).toMatch(/primary/); // status chip label
+    expect(res.text).toMatch(/muted/);
+  });
+});
+
 describe('thread status toggle', () => {
   it('POST /threads/:id/status sets a manual status', async () => {
     const convId = db.createConversation({ kommun_kod: '2418', kommun_namn: 'Malå', role: 'central', contact_email: 'k@mala.se', scheduled_send_at: '2026-05-01T00:00:00Z' });

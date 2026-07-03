@@ -458,8 +458,12 @@ function loadCaseDetail(db, convId) {
   const escalations = db.raw
     .prepare("SELECT * FROM escalations WHERE conversation_id = ? AND status = 'open' ORDER BY created_at DESC")
     .all(convId)
-    .map((e) => ({ ...e, recipient: escalationRecipient(db, e, conv) }));
-  return { conv, messages, attachmentsByMsg, signatures, escalations, follow_up: effectiveFollowUp(conv) };
+    .map((e) => {
+      const trigMsg = e.message_id ? db.getMessageById(e.message_id) : null;
+      return { ...e, recipient: escalationRecipient(db, e, conv), thread_id: trigMsg?.thread_id ?? null };
+    });
+  const threads = db.listThreadsForConversation(convId);
+  return { conv, messages, attachmentsByMsg, signatures, escalations, threads, follow_up: effectiveFollowUp(conv) };
 }
 
 // Exported for tests + the Ärenden routes.
@@ -562,6 +566,7 @@ export function createDashboardApp({
     const escalationsByConv = {};
     const signatures = {};
     const followUpByConv = {};
+    const threadsByConv = {};
     if (db) {
       for (const conv of conversations) {
         followUpByConv[conv.id] = effectiveFollowUp(conv);
@@ -578,7 +583,11 @@ export function createDashboardApp({
         escalationsByConv[conv.id] = db.raw
           .prepare("SELECT * FROM escalations WHERE conversation_id = ? AND status = 'open' ORDER BY created_at DESC")
           .all(conv.id)
-          .map((e) => ({ ...e, recipient: escalationRecipient(db, e, conv) }));
+          .map((e) => {
+            const trigMsg = e.message_id ? db.getMessageById(e.message_id) : null;
+            return { ...e, recipient: escalationRecipient(db, e, conv), thread_id: trigMsg?.thread_id ?? null };
+          });
+        threadsByConv[conv.id] = db.listThreadsForConversation(conv.id);
       }
     }
 
@@ -612,6 +621,7 @@ export function createDashboardApp({
       escalationsByConv,
       signatures,
       followUpByConv,
+      threadsByConv,
       initialDrafts,
       gmailReady: !!gmailClient,
       vendorSlugsByName,

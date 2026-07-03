@@ -527,6 +527,13 @@ const baseCss = `
   .modal-actions { display: flex; gap: 10px; margin-top: 18px; }
   .modal-status { font-size: 13px; padding: 10px 12px; border-radius: var(--r-2); background: var(--bg-elev-2); margin: 4px 0 0; }
   .modal-status.ok { color: var(--good); } .modal-status.err { color: var(--bad); }
+  .thread-group { border: 1px solid var(--border); border-radius: 8px; margin: 10px 0; padding: 10px 12px; }
+  .thread-group.thread-muted { opacity: 0.72; }
+  .thread-group .thread-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; padding-bottom: 0; border-bottom: none; }
+  .thread-status { font-size: 11px; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--border); }
+  .thread-status-primary { color: var(--accent); border-color: var(--accent); }
+  .thread-status-muted { color: var(--fg-muted); }
+  .btn-link { background: none; border: none; color: var(--accent); cursor: pointer; font-size: 12px; padding: 0; }
 </style>
 `;
 
@@ -1014,7 +1021,7 @@ function fmtBytes(n) {
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function renderKommunDetail({ kommun, conversations, messagesByConv, attachmentsByMsg, escalationsByConv, signatures, followUpByConv = {}, initialDrafts = {}, gmailReady = false, vendorSlugsByName = new Map(), handoffContacts = [], heartbeat = null, partial = false, escalationCount = 0 }) {
+export function renderKommunDetail({ kommun, conversations, messagesByConv, attachmentsByMsg, escalationsByConv, signatures, followUpByConv = {}, threadsByConv = {}, initialDrafts = {}, gmailReady = false, vendorSlugsByName = new Map(), handoffContacts = [], heartbeat = null, partial = false, escalationCount = 0 }) {
   if (!kommun) {
     return layout({ title: 'Saknad kommun', body: '<p>Hittade inte kommunen.</p>', currentPath: '/', heartbeat, partial, escalationCount });
   }
@@ -1153,16 +1160,31 @@ export function renderKommunDetail({ kommun, conversations, messagesByConv, atta
           ? `<span>⏳ Nästa kontakt: <strong>${escapeHtml(fu.date)}</strong> · ${followUpBadge}</span>`
           : '';
 
-        // Gmail-style thread — identical rendering to the Ärenden tab
-        // (renderCaseDetailPane), so a conversation looks the same wherever
-        // it's viewed. Last message expanded, earlier ones collapsed.
-        const thread = msgs.length
-          ? msgs.map((m, i) => threadMessage(m, attachmentsByMsg[m.id], signatures[m.id], i === msgs.length - 1)).join('')
-          : '<p class="muted">Inga meddelanden ännu.</p>';
+        // Gmail-style thread grouped by thread_id — identical rendering to the
+        // Ärenden tab (renderCaseDetailPane), so a conversation looks the same
+        // wherever it's viewed.
+        const convThreads = threadsByConv[conv.id] ?? [];
+        // Build escalationsByThread for this conversation.
+        const escByThread = new Map();
+        for (const e of escs) {
+          const tid = e.thread_id ?? null;
+          if (!escByThread.has(tid)) escByThread.set(tid, []);
+          escByThread.get(tid).push(e);
+        }
+        const thread = convThreads.length
+          ? renderThreadGroups(convThreads, msgs, attachmentsByMsg, signatures, escByThread, gmailReady)
+          : (msgs.length
+              ? msgs.map((m, i) => threadMessage(m, attachmentsByMsg[m.id], signatures[m.id], i === msgs.length - 1)).join('')
+              : '<p class="muted">Inga meddelanden ännu.</p>');
 
-        const escHtml = escs.length === 0 ? '' : `
-          <h4 style="margin:18px 0 6px;font-size:13px">⚠️ Öppna eskaleringar (${escs.length})</h4>
-          ${escs.map((e) => `
+        // Only show separate escalation cards for escalations not tied to a thread
+        // (ungrouped). Thread-tied ones are rendered inside renderThreadGroups.
+        const ungroupedEscs = convThreads.length
+          ? (escByThread.get(null) ?? [])
+          : escs;
+        const escHtml = ungroupedEscs.length === 0 ? '' : `
+          <h4 style="margin:18px 0 6px;font-size:13px">⚠️ Öppna eskaleringar (${ungroupedEscs.length})</h4>
+          ${ungroupedEscs.map((e) => `
             <div class="card" style="background:var(--bg-elev-2);margin-top:6px">
               <strong>${escapeHtml(e.draft_template ?? 'free_form')}</strong> · <span class="muted">${escapeHtml(e.reason)}</span>
               ${renderEscalationForm(e, gmailReady)}
@@ -1285,20 +1307,76 @@ function threadMessage(m, attachments, sig, expanded) {
   </div>`;
 }
 
+// A status chip + manual toggle for one thread.
+function threadStatusControls(t) {
+  const label = { primary: '★ primary', muted: 'muted', neutral: 'neutral' }[t.status] ?? t.status;
+  const next = t.status === 'muted' ? 'primary' : 'muted';
+  const nextLabel = next === 'muted' ? 'mute' : 'make primary';
+  return `<span class="thread-status thread-status-${escapeHtml(t.status)}">${escapeHtml(label)}</span>
+    <form method="post" action="/threads/${t.id}/status" style="display:inline" data-pane-form>
+      <input type="hidden" name="status" value="${escapeHtml(next)}">
+      <button type="submit" class="btn-link">${escapeHtml(nextLabel)}</button>
+    </form>`;
+}
+
+// Group messages by thread_id and render each thread with a header. Messages
+// with no thread_id (pre-backfill) fall into an "Övrigt" group keyed by null.
+function renderThreadGroups(threads, messages, attachmentsByMsg, signatures, escalationsByThread, gmailReady) {
+  const byThread = new Map();
+  for (const m of messages) {
+    const key = m.thread_id ?? 'none';
+    if (!byThread.has(key)) byThread.set(key, []);
+    byThread.get(key).push(m);
+  }
+  const groups = threads.map((t) => {
+    const msgs = byThread.get(t.id) ?? [];
+    const collapsed = t.status === 'muted';
+    const parsed = parseAddr(t.counterparty_name || t.counterparty_email || '');
+    const displayName = parsed.name || parsed.email || t.counterparty_email || 'Okänd';
+    const displayEmail = t.counterparty_email || '';
+    const header = `<div class="thread-head">
+      <strong>${escapeHtml(displayName)}</strong>
+      <span class="muted">${escapeHtml(displayEmail)}</span>
+      ${threadStatusControls(t)}
+    </div>`;
+    const body = msgs.map((m, i) => threadMessage(m, attachmentsByMsg[m.id], signatures[m.id], !collapsed && i === msgs.length - 1)).join('');
+    const replies = collapsed ? '' : (escalationsByThread.get(t.id) ?? []).map((e) => renderEscalationForm(e, gmailReady)).join('');
+    return `<section class="thread-group thread-${escapeHtml(t.status)}">${header}${body}${replies}</section>`;
+  });
+  // Orphan messages (thread_id null — only before backfill) must never vanish.
+  const orphans = byThread.get('none') ?? [];
+  if (orphans.length) {
+    const body = orphans.map((m, i) => threadMessage(m, attachmentsByMsg[m.id], signatures[m.id], i === orphans.length - 1)).join('');
+    groups.push(`<section class="thread-group"><div class="thread-head"><span class="muted">Ogrupperat</span></div>${body}</section>`);
+  }
+  return groups.join('');
+}
+
 function renderCaseDetailPane(selected, gmailReady) {
   if (!selected) return '<div class="detail-empty"><p class="muted">Välj ett ärende i listan till vänster.</p></div>';
-  const { conv, messages, attachmentsByMsg, signatures, escalations, follow_up } = selected;
+  const { conv, messages, attachmentsByMsg, signatures, escalations, threads = [], follow_up } = selected;
   const returnTo = `/arenden/${conv.id}`;
   const duration = caseDuration(conv, messages);
   const fuBadge = fmtFollowUpBadge(follow_up?.date, follow_up?.source);
   const subject = messages.find((m) => m.subject)?.subject ?? `Begäran — ${conv.kommun_namn}`;
 
-  const thread = messages.length
-    ? messages.map((m, i) => threadMessage(m, attachmentsByMsg[m.id], signatures[m.id], i === messages.length - 1)).join('')
-    : '<p class="muted">Inga meddelanden ännu.</p>';
+  // Build escalationsByThread: group escalations under their triggering message's thread_id.
+  const escalationsByThread = new Map();
+  for (const e of escalations) {
+    const tid = e.thread_id ?? null;
+    if (!escalationsByThread.has(tid)) escalationsByThread.set(tid, []);
+    escalationsByThread.get(tid).push(e);
+  }
 
-  // Suggested reply (Gmail-style reply box) for each open escalation.
-  const replyBoxes = escalations.map((e) => `
+  const thread = threads.length
+    ? renderThreadGroups(threads, messages, attachmentsByMsg, signatures, escalationsByThread, gmailReady)
+    : (messages.length
+        ? messages.map((m, i) => threadMessage(m, attachmentsByMsg[m.id], signatures[m.id], i === messages.length - 1)).join('')
+        : '<p class="muted">Inga meddelanden ännu.</p>');
+
+  // Suggested reply (Gmail-style reply box) for escalations not tied to any thread.
+  const ungroupedEscalations = escalationsByThread.get(null) ?? (threads.length === 0 ? escalations : []);
+  const replyBoxes = ungroupedEscalations.map((e) => `
     <div class="reply-box">
       <div class="reply-head">
         <span class="avatar avatar-outbound">↩</span>
