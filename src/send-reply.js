@@ -5,6 +5,7 @@
 
 import { sendMessage as gmailSend } from './gmail.js';
 import { T_INITIAL } from './templates.js';
+import { resolveReplyRecipient } from './threads.js';
 
 function fromHeader(env) {
   return `${env.GMAIL_FROM_NAME} <${env.GMAIL_USER_EMAIL}>`;
@@ -14,14 +15,21 @@ function fromHeader(env) {
 // possibly-edited body; we send via Gmail, record outbound, advance side
 // effects (followup_count, receipt_sent), resolve the escalation, and log
 // the decision.
-export async function sendApprovedReply({ db, gmail, env, conv, esc, finalBody, finalSubject, decision }) {
+export async function sendApprovedReply({ db, gmail, env, conv, esc, finalBody, finalSubject, finalTo, decision, gmailSendImpl = gmailSend }) {
   const subject = finalSubject ?? esc.draft_subject ?? 'Re: Begäran om allmänna handlingar';
-  const sent = await gmailSend(gmail, {
+  const triggeringMessage = esc.message_id ? db.getMessageById(esc.message_id) : null;
+  // primaryThreads is empty until Phase 2 sets statuses; then a follow-up nudge
+  // with no triggering message routes to the single primary thread.
+  const primaryThreads = db.listThreadsForConversation(conv.id).filter((t) => t.status === 'primary');
+  const resolved = resolveReplyRecipient({ triggeringMessage, conv, primaryThreads });
+  const to = (typeof finalTo === 'string' && finalTo.trim()) ? finalTo.trim() : resolved.to;
+  const threadId = resolved.threadId ?? conv.gmail_thread_id;
+  const sent = await gmailSendImpl(gmail, {
     from: fromHeader(env),
-    to: conv.contact_email,
+    to,
     subject,
     body: finalBody,
-    threadId: conv.gmail_thread_id,
+    threadId,
   });
   const nowIso = new Date().toISOString();
   db.recordMessage({
@@ -29,13 +37,15 @@ export async function sendApprovedReply({ db, gmail, env, conv, esc, finalBody, 
     gmail_message_id: sent.id,
     direction: 'outbound',
     from_email: env.GMAIL_USER_EMAIL,
-    to_email: conv.contact_email,
+    to_email: to,
     subject,
     body_text: finalBody,
     classification: null,
     classification_confidence: null,
     received_at: nowIso,
     attachment_count: 0,
+    gmail_thread_id: sent.threadId ?? threadId,
+    thread_id: triggeringMessage?.thread_id ?? null,
   });
   const patch = { last_outbound_at: nowIso };
   if (esc.draft_template === 'T_RECEIPT') patch.receipt_sent = 1;
