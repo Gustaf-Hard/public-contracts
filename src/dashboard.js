@@ -825,6 +825,20 @@ export function createDashboardApp({
     res.redirect(backTo(req, `/kommun/${conv.kommun_kod}`));
   });
 
+  // Manually flip a thread's primary/muted/neutral status. POST /threads/:id/status
+  app.post('/threads/:id/status', (req, res) => {
+    if (!db) return res.status(503).send('No DB');
+    const t = db.getThreadById(parseInt(req.params.id, 10));
+    if (!t) return res.status(404).send('Thread not found');
+    const status = req.body.status;
+    if (!['primary', 'muted', 'neutral'].includes(status)) {
+      return res.status(400).send(`Unknown status: ${status}`);
+    }
+    db.setThreadStatus(t.id, status, 'manual');
+    const kod = db.getConversation(t.conversation_id)?.kommun_kod ?? '';
+    return res.redirect(backTo(req, `/kommun/${kod}`));
+  });
+
   // Manually close a case (or mark it as a dead-end). POST /conversations/:id/close
   // with body { state: 'DONE' | 'DEAD_END' }. Records the decision and updates
   // state_changed_at so case-duration math works.

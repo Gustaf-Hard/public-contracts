@@ -223,6 +223,23 @@ async function getRaw(app, path) {
   });
 }
 
+async function postForm(app, path, fields) {
+  return new Promise((resolve, reject) => {
+    const server = app.listen(0, () => {
+      const port = server.address().port;
+      fetch(`http://127.0.0.1:${port}${path}`, {
+        method: 'POST',
+        redirect: 'manual',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams(fields).toString(),
+      }).then(async (r) => {
+        const text = await r.text();
+        server.close(() => resolve({ status: r.status, text, location: r.headers.get('location') }));
+      }).catch((e) => server.close(() => reject(e)));
+    });
+  });
+}
+
 function seedPdfAttachment({ filename = 'Avtal X.pdf', savedPath = null } = {}) {
   const convId = db.createConversation({
     kommun_kod: '2418', kommun_namn: 'Malå', role: 'central',
@@ -568,5 +585,17 @@ describe('health modal', () => {
     const res = await get(appWithFakes(), '/api/health');
     expect(res.status).toBe(200);
     expect(JSON.parse(res.text).stale).toBe(true);
+  });
+});
+
+describe('thread status toggle', () => {
+  it('POST /threads/:id/status sets a manual status', async () => {
+    const convId = db.createConversation({ kommun_kod: '2418', kommun_namn: 'Malå', role: 'central', contact_email: 'k@mala.se', scheduled_send_at: '2026-05-01T00:00:00Z' });
+    const t = db.upsertThread({ conversation_id: convId, gmail_thread_id: 'thr-a' });
+    const app = createDashboardApp({ db, municipalitiesLoader: () => [] });
+    const res = await postForm(app, `/threads/${t.id}/status`, { status: 'muted', return: '/arenden' });
+    expect([302, 303]).toContain(res.status);
+    expect(db.getThreadById(t.id).status).toBe('muted');
+    expect(db.getThreadById(t.id).status_source).toBe('manual');
   });
 });
