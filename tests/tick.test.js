@@ -563,3 +563,26 @@ describe('runTick — zip attachments are expanded into inner PDFs', () => {
     expect(atts.map((a) => a.filename)).toEqual(['Avtal LexiFlow.pdf']);
   });
 });
+
+describe('runTick — muted thread suppresses escalation', () => {
+  it('suppresses escalation for a muted thread but not for an equivalent non-muted one', async () => {
+    const spy = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue(null);
+
+    // Control: non-muted thread receives an escalating (unknown) message.
+    const ctrl = db.createConversation({ kommun_kod: '1', kommun_namn: 'Ctrl', role: 'central', contact_email: 'k@ctrl.se', scheduled_send_at: '2026-05-01T00:00:00Z' });
+    db.updateConversationState(ctrl, 'SENT', { gmail_thread_id: 'thr-ctrl', last_outbound_at: '2026-05-01T00:00:00Z' });
+    await runTick(makeDeps({ gmail: fakeGmail({ listResult: [{ id: 'c-1' }], getResult: { 'c-1': mkMsg('c-1', 'thr-ctrl', 'someone@ctrl.se', 'Hej, kan du ringa mig?') } }) }));
+    expect(db.raw.prepare('SELECT COUNT(*) c FROM escalations WHERE conversation_id = ?').get(ctrl).c).toBeGreaterThan(0);
+
+    // Muted: pre-create the thread, mute it manually, then the same message arrives.
+    const conv = db.createConversation({ kommun_kod: '2', kommun_namn: 'Arboga', role: 'central', contact_email: 'registrator@arboga.se', scheduled_send_at: '2026-05-01T00:00:00Z' });
+    db.updateConversationState(conv, 'SENT', { gmail_thread_id: 'thr-orig', last_outbound_at: '2026-05-01T00:00:00Z' });
+    const t = db.upsertThread({ conversation_id: conv, gmail_thread_id: 'thr-reg', counterparty_email: 'arboga.kommun@arboga.se' });
+    db.setThreadStatus(t.id, 'muted', 'manual');
+    await runTick(makeDeps({ gmail: fakeGmail({ listResult: [{ id: 'reg-9' }], getResult: { 'reg-9': mkMsg('reg-9', 'thr-reg', 'AR Arboga kommun <arboga.kommun@arboga.se>', 'Hej, kan du ringa mig?') } }) }));
+    expect(db.raw.prepare("SELECT * FROM messages WHERE gmail_message_id = 'reg-9'").get()).toBeTruthy(); // still ingested
+    expect(db.raw.prepare('SELECT COUNT(*) c FROM escalations WHERE conversation_id = ?').get(conv).c).toBe(0); // no escalation
+
+    spy.mockRestore();
+  });
+});

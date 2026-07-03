@@ -243,7 +243,8 @@ export async function runTick(deps) {
           llmDraft = { body: analysis.draft_reply };
         }
 
-        if (draftTemplate) {
+        const threadStatus = db.getThreadById(thread.id)?.status ?? 'neutral';
+        if (draftTemplate && threadStatus !== 'muted') {
           const reason = analysis
             ? `llm intent=${analysis.intent} action=${analysis.suggested_action} confidence=${(analysis.confidence ?? 0).toFixed(2)}`
             : `classifier=${classification.class} confidence=${classification.confidence.toFixed(2)}`;
