@@ -133,102 +133,6 @@ function caseDuration(conv, messages, now = new Date()) {
   return d === null ? null : `öppet sedan ${d} dag${d === 1 ? '' : 'ar'}`;
 }
 
-// Build a chronologically sorted list of timeline events for one case.
-// Sources: outbound + inbound messages (each with attachments + LLM analysis),
-// plus the closed-state event when the case is terminal.
-function buildTimeline(conv, messages, attachmentsByMsg, signatures = {}) {
-  const events = [];
-  for (const m of messages) {
-    const ts = m.received_at;
-    if (m.direction === 'outbound') {
-      events.push({
-        ts,
-        icon: '📤',
-        title: m.subject?.startsWith('Re:') ? 'Svar skickat' : (m.subject?.startsWith('Påminnelse') ? 'Påminnelse skickad' : 'Begäran skickad'),
-        sub: m.subject ?? '',
-        body: m.body_text,
-        bodyClass: 'body-quote-outbound',
-      });
-    } else {
-      const analysis = parseJsonSafe(m.analysis_json);
-      const intent = analysis?.intent ?? m.classification ?? 'inkommande';
-      const conf = (analysis?.confidence ?? m.classification_confidence ?? 0).toFixed(2);
-      events.push({
-        ts,
-        icon: '📥',
-        title: `Svar mottaget · ${INTENT_LABELS[intent] ?? intent}`,
-        rawIntent: intent, // included verbatim so test assertions / log scrapers can match
-        sub: analysis?.summary ?? m.subject ?? '',
-        body: m.body_text,
-        bodyClass: 'body-quote-inbound',
-        confidence: conf,
-        analysis,
-        signature: signatures[m.id] ?? null,
-      });
-      for (const att of attachmentsByMsg[m.id] ?? []) {
-        events.push({
-          ts,
-          icon: '📎',
-          title: 'Avtal mottaget',
-          sub: att.filename,
-          link: `/attachments/${att.id}`,
-        });
-      }
-    }
-  }
-  if (CASE_STATUS[conv.state]?.terminal) {
-    events.push({
-      ts: conv.state_changed_at,
-      icon: conv.state === 'DONE' ? '🏁' : '🚫',
-      title: conv.state === 'DONE' ? 'Ärende stängt — klart' : 'Ärende markerat som återvändsgränd',
-    });
-  }
-  // Stable sort by timestamp, ties broken by insertion order
-  return events
-    .map((e, i) => ({ ...e, _i: i }))
-    .sort((a, b) => (a.ts ?? '').localeCompare(b.ts ?? '') || a._i - b._i);
-}
-
-function renderTimeline(events) {
-  if (events.length === 0) return '<p class="muted">Ingen aktivitet ännu.</p>';
-  return `<ul class="timeline">${events.map((e) => {
-    const date = e.ts ? e.ts.slice(0, 10) : '';
-    const time = e.ts ? e.ts.slice(11, 16) : '';
-    const analysisBlock = e.analysis ? `
-      <details style="margin-top:6px">
-        <summary class="muted" style="font-size:11px">LLM-analys (${e.confidence}) · klass: ${escapeHtml(e.rawIntent ?? '')}</summary>
-        <div style="margin-top:4px;font-size:12px">
-          ${e.analysis.extracted?.arendenummer ? `<div>Ärendenummer: <code>${escapeHtml(e.analysis.extracted.arendenummer)}</code></div>` : ''}
-          ${e.analysis.extracted?.promised_response_date ? `<div>Utlovat datum: <strong>${escapeHtml(e.analysis.extracted.promised_response_date)}</strong></div>` : ''}
-          ${e.analysis.extracted?.handoff_to_email ? `<div>Hänvisar till: <code>${escapeHtml(e.analysis.extracted.handoff_to_email)}</code></div>` : ''}
-          ${e.analysis.draft_reply ? `<details><summary>Föreslaget svar</summary><div class="body-quote body-quote-outbound" style="margin-top:4px">${escapeHtml(e.analysis.draft_reply)}</div></details>` : ''}
-        </div>
-      </details>` : (e.rawIntent ? `<div class="ev-sub muted" style="font-size:11px">Klass: ${escapeHtml(e.rawIntent)}</div>` : '');
-    const sigBlock = e.signature ? `
-      <details style="margin-top:6px">
-        <summary class="muted" style="font-size:11px">Extraherad kontaktinfo</summary>
-        <dl class="signature-fields" style="margin-top:4px">
-          ${e.signature.name        ? `<dt>Namn</dt><dd>${escapeHtml(e.signature.name)}</dd>` : ''}
-          ${e.signature.title       ? `<dt>Titel</dt><dd>${escapeHtml(e.signature.title)}</dd>` : ''}
-          ${e.signature.forvaltning ? `<dt>Förvaltning</dt><dd>${escapeHtml(e.signature.forvaltning)}</dd>` : ''}
-          ${e.signature.email       ? `<dt>E-post</dt><dd>${escapeHtml(e.signature.email)}</dd>` : ''}
-          ${e.signature.phone       ? `<dt>Telefon</dt><dd>${escapeHtml(e.signature.phone)}</dd>` : ''}
-        </dl>
-      </details>` : '';
-    return `<li class="timeline-item">
-      <div class="timeline-date" title="${escapeHtml(e.ts ?? '')}">${escapeHtml(date)}<br>${escapeHtml(time)}<br><span class="muted">${escapeHtml(fmtAgo(e.ts))}</span></div>
-      <div class="timeline-icon">${e.icon}</div>
-      <div class="timeline-body">
-        <div class="ev-title">${escapeHtml(e.title)}</div>
-        ${e.sub ? `<div class="ev-sub">${e.link ? `<a href="${escapeHtml(e.link)}" target="_blank" rel="noopener">${escapeHtml(e.sub)}</a>` : escapeHtml(e.sub)}</div>` : ''}
-        ${e.body ? `<button type="button" class="collapse-toggle" data-collapse aria-expanded="false">Visa meddelande</button><div class="body-quote ${e.bodyClass}" data-collapse-target hidden>${escapeHtml(e.body)}</div>` : ''}
-        ${analysisBlock}
-        ${sigBlock}
-      </div>
-    </li>`;
-  }).join('')}</ul>`;
-}
-
 function renderCaseActions(conv, gmailReady, returnTo = null) {
   const paneAttrs = returnTo ? ` data-pane-form data-return="${escapeHtml(returnTo)}"` : '';
   const returnField = returnTo ? `<input type="hidden" name="return" value="${escapeHtml(returnTo)}">` : '';
@@ -503,21 +407,12 @@ const baseCss = `
   .quick-actions { display: flex; flex-direction: column; gap: 6px; }
   .quick-actions a { font-size: 12px; padding: 6px 10px; border-radius: 6px; background: var(--bg-elev-2); border: 1px solid var(--border); color: var(--fg); text-decoration: none; display: flex; align-items: center; gap: 6px; }
   .quick-actions a:hover { border-color: var(--accent); color: var(--accent); }
-  /* Case card + timeline */
+  /* Case card */
   .case-header { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
   .case-header h3 { margin: 0; font-size: 15px; font-weight: 600; flex: 1; min-width: 200px; }
   .case-meta { color: var(--fg-muted); font-size: 12px; display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0 0 12px; }
   .case-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
   .case-actions form { display: inline-block; margin: 0; }
-  .timeline { list-style: none; padding: 0; margin: 0; }
-  .timeline-item { display: grid; grid-template-columns: 90px 28px 1fr; gap: 10px; padding: 8px 0; border-bottom: 1px dashed var(--border); }
-  .timeline-item:last-child { border-bottom: none; }
-  .timeline-date { color: var(--fg-muted); font-size: 11px; font-variant-numeric: tabular-nums; padding-top: 2px; }
-  .timeline-icon { font-size: 16px; line-height: 1.2; }
-  .timeline-body { font-size: 13px; }
-  .timeline-body .ev-title { font-weight: 500; }
-  .timeline-body .ev-sub { color: var(--fg-muted); font-size: 12px; margin-top: 2px; }
-  .timeline-body .body-quote { margin: 6px 0 4px; max-height: 160px; }
   footer { margin-top: 60px; padding: 20px 24px; text-align: center; color: var(--fg-muted); font-size: 11px; border-top: 1px solid var(--border); }
   /* Page heading + KPI band */
   .page-head { display: flex; align-items: baseline; gap: 12px; margin: 0 0 var(--sp-4); }
@@ -1254,8 +1149,12 @@ export function renderKommunDetail({ kommun, conversations, messagesByConv, atta
           ? `<span>⏳ Nästa kontakt: <strong>${escapeHtml(fu.date)}</strong> · ${followUpBadge}</span>`
           : '';
 
-        const events = buildTimeline(conv, msgs, attachmentsByMsg, signatures);
-        const timeline = renderTimeline(events);
+        // Gmail-style thread — identical rendering to the Ärenden tab
+        // (renderCaseDetailPane), so a conversation looks the same wherever
+        // it's viewed. Last message expanded, earlier ones collapsed.
+        const thread = msgs.length
+          ? msgs.map((m, i) => threadMessage(m, attachmentsByMsg[m.id], signatures[m.id], i === msgs.length - 1)).join('')
+          : '<p class="muted">Inga meddelanden ännu.</p>';
 
         const escHtml = escs.length === 0 ? '' : `
           <h4 style="margin:18px 0 6px;font-size:13px">⚠️ Öppna eskaleringar (${escs.length})</h4>
@@ -1277,8 +1176,8 @@ export function renderKommunDetail({ kommun, conversations, messagesByConv, atta
               ${duration ? `<span>⌛ ${escapeHtml(duration)}</span>` : ''}
               ${followUpLine}
             </div>
-            <h4 style="margin:14px 0 8px;font-size:13px">Tidslinje</h4>
-            ${timeline}
+            <h4 style="margin:14px 0 8px;font-size:13px">Konversation</h4>
+            <div class="thread-msgs">${thread}</div>
             ${escHtml}
             ${renderCaseActions(conv, gmailReady)}
           </div>`;

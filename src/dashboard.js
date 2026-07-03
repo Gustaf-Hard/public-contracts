@@ -88,6 +88,19 @@ export function escalationActionLabel(esc) {
   return labels[esc?.draft_template] ?? 'granska och svara';
 }
 
+// Build a valid Content-Disposition header for a download. HTTP header values
+// are limited to ISO-8859-1, but contract filenames routinely contain code
+// points >255 — notably decomposed (NFD) Swedish accents from macOS/Gmail,
+// where "ä" is "a" + U+0308. Emit an ASCII-only `filename=` fallback for legacy
+// clients plus an RFC 5987 `filename*=UTF-8''` for the real unicode name.
+export function contentDisposition(filename, disposition = 'inline') {
+  const name = String(filename).replace(/[/\\]/g, '_');
+  const ascii = name.replace(/[^\x20-\x7e]/g, '_').replace(/["]/g, '_');
+  const encoded = encodeURIComponent(name).replace(/['()*!]/g,
+    (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase());
+  return `${disposition}; filename="${ascii}"; filename*=UTF-8''${encoded}`;
+}
+
 // Build a short "what happened / what's next" tooltip line per case for the
 // overview hover. ~1-2 sentences. Pure derivation, no DB I/O. `openEsc` is the
 // latest open escalation row (or undefined) — used to spell out the action when
@@ -519,7 +532,7 @@ export function createDashboardApp({
     if (!full.startsWith(base + path.sep)) return res.status(404).send('Not found');
     if (!existsSync(full)) return res.status(404).send('Not found');
     res.set('Content-Type', att.mime_type || 'application/pdf');
-    res.set('Content-Disposition', `inline; filename="${att.filename.replace(/["\\\r\n]/g, '')}"`);
+    res.set('Content-Disposition', contentDisposition(att.filename, 'inline'));
     res.sendFile(full);
   });
 

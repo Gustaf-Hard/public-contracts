@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { openDb } from '../src/storage.js';
-import { createDashboardApp, buildActionQueue, buildWaiting, applyFilter, buildOverviewRows } from '../src/dashboard.js';
+import { createDashboardApp, buildActionQueue, buildWaiting, applyFilter, buildOverviewRows, contentDisposition } from '../src/dashboard.js';
 import { layout } from '../src/dashboard-views.js';
 
 let tmp, db, dbPath, muniPath;
@@ -129,7 +129,11 @@ describe('dashboard / kommun detail', () => {
     expect(res.text).toContain('Malå');
     expect(res.text).toContain('Mikaela Radgren');
     expect(res.text).toContain('Enhetschef');
-    expect(res.text).toContain('auto_ack');
+    // The kommun page now renders the same Gmail-style thread as /arenden:
+    // thread markup is present, and raw classifier labels (auto_ack) are not
+    // surfaced here any more — consistency with the Ärenden tab.
+    expect(res.text).toContain('thread-msgs');
+    expect(res.text).not.toContain('auto_ack');
   });
 
   it('404-style fallback for unknown kommun_kod', async () => {
@@ -221,6 +225,20 @@ function seedPdfAttachment({ filename = 'Avtal X.pdf', savedPath = null } = {}) 
   return { convId, attId, contractsDir };
 }
 
+describe('contentDisposition', () => {
+  it('emits an ASCII fallback plus an RFC 5987 utf-8 name, with no chars >255', () => {
+    const cd = contentDisposition('Avtal inläsningstjänst – ILT.pdf');
+    expect([...cd].every((c) => c.charCodeAt(0) <= 255)).toBe(true);
+    expect(cd).toMatch(/^inline; filename="[\x20-\x7e]*"; filename\*=UTF-8''/);
+  });
+
+  it('strips path separators and double-quotes from the ascii fallback', () => {
+    const cd = contentDisposition('a/b\\c"d.pdf');
+    const ascii = cd.match(/filename="([^"]*)"/)[1];
+    expect(ascii).not.toMatch(/["/\\]/);
+  });
+});
+
 describe('GET /attachments/:id', () => {
   it('serves the PDF inline with correct headers', async () => {
     const { attId, contractsDir } = seedPdfAttachment();
@@ -236,6 +254,19 @@ describe('GET /attachments/:id', () => {
     const { contractsDir } = seedPdfAttachment();
     const app = createDashboardApp({ db, municipalitiesLoader: () => [], contractsDir });
     expect((await getRaw(app, '/attachments/99999')).status).toBe(404);
+  });
+
+  it('serves a filename with decomposed (NFD) Swedish chars without an invalid-header crash', async () => {
+    // macOS/Gmail filenames are often NFD: "ä" = "a" + U+0308 (combining
+    // diaeresis, code point 776 > 255), which node rejects in a header.
+    const nfd = 'Avtal inläsningstjänst - ILT education.pdf';
+    const { attId, contractsDir } = seedPdfAttachment({ filename: nfd });
+    const app = createDashboardApp({ db, municipalitiesLoader: () => [], contractsDir });
+    const res = await getRaw(app, `/attachments/${attId}`);
+    expect(res.status).toBe(200);
+    const cd = res.headers.get('content-disposition');
+    expect(cd).toContain('inline');
+    expect(cd).toContain("filename*=UTF-8''"); // RFC 5987 unicode name present
   });
 
   it('404 when saved_path escapes contractsDir', async () => {
