@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { resolveReplyRecipient } from '../src/threads.js';
+import { resolveReplyRecipient, inferThreadStatus } from '../src/threads.js';
 import { openDb } from '../src/storage.js';
 import { backfillThreads } from '../src/backfill-threads.js';
 
@@ -53,5 +53,22 @@ describe('backfillThreads', () => {
 
     const r2 = await backfillThreads({ db, gmail: {}, gmailOps }); // idempotent
     expect(r2.updated).toBe(0);
+  });
+});
+
+describe('inferThreadStatus', () => {
+  it('primary when any inbound has attachments or a SUBSTANCE classification', () => {
+    expect(inferThreadStatus([{ classification: 'auto_ack', attachment_count: 0 }, { classification: 'auto_ack', attachment_count: 3 }])).toBe('primary'); // attachments win
+    expect(inferThreadStatus([{ classification: 'delivery', attachment_count: 0 }])).toBe('primary');
+    expect(inferThreadStatus([{ classification: 'clarification', attachment_count: 0 }])).toBe('primary');
+  });
+  it('muted only when every inbound is auto_ack with no attachments', () => {
+    expect(inferThreadStatus([{ classification: 'auto_ack', attachment_count: 0 }, { classification: 'auto_ack', attachment_count: 0 }])).toBe('muted');
+  });
+  it('neutral for no inbound, unknown, dead_end, or unmapped', () => {
+    expect(inferThreadStatus([])).toBe('neutral');
+    expect(inferThreadStatus([{ classification: 'unknown', attachment_count: 0 }])).toBe('neutral'); // handoff/fee-demand — needs a human, never muted
+    expect(inferThreadStatus([{ classification: 'dead_end', attachment_count: 0 }])).toBe('neutral');
+    expect(inferThreadStatus([{ classification: 'weird_new_intent', attachment_count: 0 }])).toBe('neutral');
   });
 });
