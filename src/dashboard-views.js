@@ -1340,7 +1340,11 @@ function renderThreadGroups(threads, messages, attachmentsByMsg, signatures, esc
       ${threadStatusControls(t)}
     </div>`;
     const body = msgs.map((m, i) => threadMessage(m, attachmentsByMsg[m.id], signatures[m.id], !collapsed && i === msgs.length - 1)).join('');
-    const replies = collapsed ? '' : (escalationsByThread.get(t.id) ?? []).map((e) => renderEscalationForm(e, gmailReady)).join('');
+    // Open escalations are pending actions — always render their reply forms,
+    // even on a muted thread. Muting suppresses NEW suggestions at ingest; it
+    // must never hide an escalation that was already opened (e.g. before the
+    // operator muted the thread), or the action silently disappears.
+    const replies = (escalationsByThread.get(t.id) ?? []).map((e) => renderEscalationForm(e, gmailReady)).join('');
     return `<section class="thread-group thread-${escapeHtml(t.status)}">${header}${body}${replies}</section>`;
   });
   // Orphan messages (thread_id null — only before backfill) must never vanish.

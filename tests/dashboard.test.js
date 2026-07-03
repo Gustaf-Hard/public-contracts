@@ -621,6 +621,25 @@ describe('thread-grouped case view', () => {
     expect(res.text).toContain('Ogrupperat');
     expect(res.text).toContain('orphan-message-body');
   });
+
+  it('keeps an open escalation visible even when its thread is muted', async () => {
+    // A thread can be muted manually AFTER an escalation was already opened on
+    // it (ingest-time muting skips escalation creation, so a pending escalation
+    // predates the mute). That open escalation is a real action and must stay
+    // visible — muting suppresses NEW suggestions, not existing ones.
+    const kommun_kod = '2418';
+    const convId = db.createConversation({ kommun_kod, kommun_namn: 'Malå', role: 'central', contact_email: 'registrator@mala.se', scheduled_send_at: '2026-05-01T00:00:00Z' });
+    db.updateConversationState(convId, 'DELIVERING', { gmail_thread_id: 'thr-m' });
+    const t = db.upsertThread({ conversation_id: convId, gmail_thread_id: 'thr-m', counterparty_email: 'handlaggare@mala.se', counterparty_name: 'Handläggare' });
+    const mid = db.recordMessage({ conversation_id: convId, gmail_message_id: 'm-1', direction: 'inbound', from_email: 'handlaggare@mala.se', to_email: 'me@x.se', subject: 'SV', body_text: 'fråga', classification: 'clarification', classification_confidence: 0.9, received_at: '2026-06-01T00:00:00Z', attachment_count: 0, gmail_thread_id: 'thr-m', thread_id: t.id });
+    db.recordEscalation({ conversation_id: convId, message_id: mid, reason: 'r', draft_template: 'T_PRECISION', draft_subject: 'Re: SV', draft_body: 'utkast-svar-som-vantar' });
+    db.setThreadStatus(t.id, 'muted', 'manual'); // operator mutes AFTER the escalation exists
+
+    const app = createDashboardApp({ db, municipalitiesLoader: () => [{ kommun_kod, kommun_namn: 'Malå', lan: 'X', folkmangd: 1, contacts: [] }] });
+    const res = await get(app, `/kommun/${kommun_kod}`);
+    expect(res.text).toMatch(/action="\/escalations\/\d+"/); // reply form still rendered
+    expect(res.text).toContain('utkast-svar-som-vantar'); // its draft body is visible
+  });
 });
 
 describe('thread status toggle', () => {
