@@ -114,5 +114,12 @@ export async function startDaemon({ env = process.env, log = console.log } = {})
   });
 
   const port = parseInt(env.SLACK_INTERACTIVITY_PORT ?? '3000', 10);
-  app.listen(port, () => log(`Slack interactivity listener on :${port}`));
+  const server = app.listen(port, () => log(`Slack interactivity listener on :${port}`));
+  // The Slack webhook is non-essential to the core tick loop. A bind failure
+  // (EADDRINUSE etc.) must NOT take down cron ticking — without this handler
+  // the unhandled 'error' event crashes the whole daemon, silently stopping
+  // ingestion (this happened: :3000 was held by Docker). Log and carry on.
+  server.on('error', (e) => {
+    log(`Slack interactivity listener could not bind :${port} (${e.code}); continuing without it. Set SLACK_INTERACTIVITY_PORT to a free port to enable Slack approvals.`);
+  });
 }
