@@ -471,6 +471,29 @@ describe('runTick — thread upsert and message stamping', () => {
   });
 });
 
+describe('runTick — inbound fetch efficiency', () => {
+  it('fetches the inbound list once and getMessage at most once per new message across conversations', async () => {
+    const c1 = db.createConversation({ kommun_kod: '1', kommun_namn: 'A', role: 'central', contact_email: 'k@a.se', scheduled_send_at: '2026-05-01T00:00:00Z' });
+    const c2 = db.createConversation({ kommun_kod: '2', kommun_namn: 'B', role: 'central', contact_email: 'k@b.se', scheduled_send_at: '2026-05-01T00:00:00Z' });
+    db.updateConversationState(c1, 'SENT', { gmail_thread_id: 'thr-1', last_outbound_at: '2026-05-01T00:00:00Z' });
+    db.updateConversationState(c2, 'SENT', { gmail_thread_id: 'thr-2', last_outbound_at: '2026-05-01T00:00:00Z' });
+
+    const gmail = fakeGmail({
+      listResult: [{ id: 'm1' }, { id: 'm2' }, { id: 'm3' }],
+      getResult: {
+        m1: mkMsg('m1', 'thr-1', 'x@a.se', 'Hej, kan du ringa mig?'),
+        m2: mkMsg('m2', 'thr-9', 'y@nomatch.se', 'Hej, kan du ringa mig?'),
+        m3: mkMsg('m3', 'thr-2', 'z@b.se', 'Hej, kan du ringa mig?'),
+      },
+    });
+
+    await runTick(makeDeps({ gmail }));
+
+    expect(gmail.listInboundQuery).toHaveBeenCalledTimes(1);
+    expect(gmail.getMessage).toHaveBeenCalledTimes(3); // once per new message, NOT 3×2
+  });
+});
+
 describe('runTick — zip attachments are expanded into inner PDFs', () => {
   it('extracts PDF entries from a zipped inbound attachment and saves them', async () => {
     const id = db.createConversation({

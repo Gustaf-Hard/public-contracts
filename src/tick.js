@@ -110,133 +110,141 @@ export async function runTick(deps) {
 
   // 2. Inbound processing — fetch new messages on tracked threads
   const active = db.listAllConversations().filter((c) => c.gmail_thread_id);
-  for (const conv of active) {
+  if (active.length) {
     const list = await gmailOps.listInboundQuery(
       gmailClient.gmail,
-      // Stopgap window widened from 7d → 30d so recovery after a multi-day
-      // outage still catches replies that arrived during the blackout (e.g.
-      // Arboga's contracts, delivered 16 Jun while the daemon was blind).
-      // Proper fix: derive the window from the last successful tick (see spec).
+      // Widened to 30d so post-outage backlog is caught; see spec. Fetched ONCE
+      // per tick (not once per conversation) to keep cold-start ticks fast.
       `to:${env.GMAIL_USER_EMAIL} -from:${env.GMAIL_USER_EMAIL} newer_than:30d`
     );
+    // Pre-fetch each not-yet-recorded message exactly once, then match against
+    // every conversation using the already-parsed content.
+    const fetched = [];
     for (const m of list) {
       if (db.hasGmailMessageId(m.id)) continue;
       const full = await gmailOps.getMessage(gmailClient.gmail, m.id);
       if (!full) continue;
-      const parsed = parseInboundMessage(full);
-      // Associate the message with this conversation by Gmail thread OR by
-      // sender domain == the kommun's contact domain. Kommuner often forward or
-      // reply with a changed subject, which Gmail threads separately; matching
-      // on thread alone silently dropped those (incl. delivered contracts).
-      const threadMatch = full.threadId === conv.gmail_thread_id;
-      const domainMatch = sameEmailDomain(parsed.from, conv.contact_email);
-      if (!threadMatch && !domainMatch) continue;
+      fetched.push({ id: m.id, full, parsed: parseInboundMessage(full) });
+    }
 
-      // Try LLM analysis first; fall back to the regex classifier on null.
-      // Both produce a legacy-shaped classification object the FSM can consume.
-      const lastOutboundMs = conv.last_outbound_at ? new Date(conv.last_outbound_at).getTime() : null;
-      const daysSinceLastOutbound = lastOutboundMs != null
-        ? Math.floor((now.getTime() - lastOutboundMs) / (1000 * 60 * 60 * 24))
-        : null;
-      const analysis = await analyseMessage(parsed.body, {
-        kommun_namn: conv.kommun_namn,
-        role: conv.role,
-        conversation_state: conv.state,
-        days_since_last_outbound: daysSinceLastOutbound,
-        today_iso: now.toISOString().slice(0, 10),
-      }, { env });
-      const classification = analysis
-        ? analysisToLegacyClassification(analysis)
-        : classify({
-            from: parsed.from, subject: parsed.subject, body: parsed.body,
-            attachment_count: parsed.attachments.length,
-          });
+    for (const conv of active) {
+      for (const item of fetched) {
+        if (db.hasGmailMessageId(item.id)) continue; // recorded under an earlier conv
+        const { full, parsed } = item;
+        // Associate the message with this conversation by Gmail thread OR by
+        // sender domain == the kommun's contact domain. Kommuner often forward or
+        // reply with a changed subject, which Gmail threads separately; matching
+        // on thread alone silently dropped those (incl. delivered contracts).
+        const threadMatch = full.threadId === conv.gmail_thread_id;
+        const domainMatch = sameEmailDomain(parsed.from, conv.contact_email);
+        if (!threadMatch && !domainMatch) continue;
 
-      const isCloser = /samtliga avtal/i.test(parsed.body);
-      const transition = nextActionForClassification(conv.state, classification.class, {
-        receipt_sent: !!conv.receipt_sent, is_closer: isCloser,
-      });
+        // Try LLM analysis first; fall back to the regex classifier on null.
+        // Both produce a legacy-shaped classification object the FSM can consume.
+        const lastOutboundMs = conv.last_outbound_at ? new Date(conv.last_outbound_at).getTime() : null;
+        const daysSinceLastOutbound = lastOutboundMs != null
+          ? Math.floor((now.getTime() - lastOutboundMs) / (1000 * 60 * 60 * 24))
+          : null;
+        const analysis = await analyseMessage(parsed.body, {
+          kommun_namn: conv.kommun_namn,
+          role: conv.role,
+          conversation_state: conv.state,
+          days_since_last_outbound: daysSinceLastOutbound,
+          today_iso: now.toISOString().slice(0, 10),
+        }, { env });
+        const classification = analysis
+          ? analysisToLegacyClassification(analysis)
+          : classify({
+              from: parsed.from, subject: parsed.subject, body: parsed.body,
+              attachment_count: parsed.attachments.length,
+            });
 
-      const sig = extractSignature(parsed.body);
-      const thread = db.upsertThread({
-        conversation_id: conv.id,
-        gmail_thread_id: full.threadId,
-        counterparty_email: parsed.from,
-        counterparty_name: parsed.from,
-        last_inbound_at: now.toISOString(),
-      });
-      const messageId = db.recordMessage({
-        conversation_id: conv.id, gmail_message_id: m.id, direction: 'inbound',
-        from_email: parsed.from, to_email: parsed.to,
-        subject: parsed.subject, body_text: parsed.body,
-        classification: classification.class, classification_confidence: classification.confidence,
-        received_at: now.toISOString(), attachment_count: parsed.attachments.length,
-        signature_extracted: sig,
-        analysis_json: analysis ?? null,
-        gmail_thread_id: full.threadId,
-        thread_id: thread.id,
-      });
+        const isCloser = /samtliga avtal/i.test(parsed.body);
+        const transition = nextActionForClassification(conv.state, classification.class, {
+          receipt_sent: !!conv.receipt_sent, is_closer: isCloser,
+        });
 
-      // Save attachments. Kommuner deliver contracts either as a PDF directly
-      // or zipped — expand zips into their inner PDFs so each is saved and
-      // analysed like any other attachment.
-      for (const att of parsed.attachments) {
-        const fn = att.filename?.toLowerCase() ?? '';
-        const isPdf = att.mime_type === 'application/pdf' || fn.endsWith('.pdf');
-        const isZip = att.mime_type === 'application/zip'
-          || att.mime_type === 'application/x-zip-compressed' || fn.endsWith('.zip');
-        if (!isPdf && !isZip) continue;
-        const buf = await gmailOps.fetchAttachment(gmailClient.gmail, m.id, att.attachment_id);
-        const entries = isZip
-          ? extractPdfsFromZip(buf).map((e) => ({ filename: e.filename, data: e.data, mime_type: 'application/pdf' }))
-          : [{ filename: att.filename, data: buf, mime_type: att.mime_type }];
-        for (const entry of entries) {
-          const saved = await saveAttachment(entry.data, {
-            kommun_kod: conv.kommun_kod, kommun_namn: conv.kommun_namn, role: conv.role,
-            received_at: now.toISOString(), from_email: parsed.from, from_name: null,
-            gmail_message_id: m.id, gmail_thread_id: parsed.gmail_thread_id,
-            subject: parsed.subject, original_filename: entry.filename, mime_type: entry.mime_type,
-          }, { baseDir: deps.contractsDir });
-          db.recordAttachment({
-            message_id: messageId, filename: entry.filename,
-            saved_path: saved.saved_path, mime_type: entry.mime_type, size_bytes: saved.size_bytes,
+        const sig = extractSignature(parsed.body);
+        const thread = db.upsertThread({
+          conversation_id: conv.id,
+          gmail_thread_id: full.threadId,
+          counterparty_email: parsed.from,
+          counterparty_name: parsed.from,
+          last_inbound_at: now.toISOString(),
+        });
+        const messageId = db.recordMessage({
+          conversation_id: conv.id, gmail_message_id: item.id, direction: 'inbound',
+          from_email: parsed.from, to_email: parsed.to,
+          subject: parsed.subject, body_text: parsed.body,
+          classification: classification.class, classification_confidence: classification.confidence,
+          received_at: now.toISOString(), attachment_count: parsed.attachments.length,
+          signature_extracted: sig,
+          analysis_json: analysis ?? null,
+          gmail_thread_id: full.threadId,
+          thread_id: thread.id,
+        });
+
+        // Save attachments. Kommuner deliver contracts either as a PDF directly
+        // or zipped — expand zips into their inner PDFs so each is saved and
+        // analysed like any other attachment.
+        for (const att of parsed.attachments) {
+          const fn = att.filename?.toLowerCase() ?? '';
+          const isPdf = att.mime_type === 'application/pdf' || fn.endsWith('.pdf');
+          const isZip = att.mime_type === 'application/zip'
+            || att.mime_type === 'application/x-zip-compressed' || fn.endsWith('.zip');
+          if (!isPdf && !isZip) continue;
+          const buf = await gmailOps.fetchAttachment(gmailClient.gmail, item.id, att.attachment_id);
+          const entries = isZip
+            ? extractPdfsFromZip(buf).map((e) => ({ filename: e.filename, data: e.data, mime_type: 'application/pdf' }))
+            : [{ filename: att.filename, data: buf, mime_type: att.mime_type }];
+          for (const entry of entries) {
+            const saved = await saveAttachment(entry.data, {
+              kommun_kod: conv.kommun_kod, kommun_namn: conv.kommun_namn, role: conv.role,
+              received_at: now.toISOString(), from_email: parsed.from, from_name: null,
+              gmail_message_id: item.id, gmail_thread_id: parsed.gmail_thread_id,
+              subject: parsed.subject, original_filename: entry.filename, mime_type: entry.mime_type,
+            }, { baseDir: deps.contractsDir });
+            db.recordAttachment({
+              message_id: messageId, filename: entry.filename,
+              saved_path: saved.saved_path, mime_type: entry.mime_type, size_bytes: saved.size_bytes,
+            });
+          }
+        }
+
+        // State transition is bookkeeping — happens automatically. Outbound is gated.
+        const previousState = conv.state;
+        const patch = {};
+        if (classification.extracted?.arendenummer) patch.arendenummer = classification.extracted.arendenummer;
+        // When the kommun says "we'll get back to you by date X", honor it.
+        if (analysis?.follow_up_at) patch.follow_up_at = analysis.follow_up_at;
+        db.updateConversationState(conv.id, transition.nextState, patch);
+        const updated = db.getConversation(conv.id);
+
+        // Outbound: never auto-sent in v1. Draft a template and escalate to Slack.
+        // If the LLM produced a draft_reply, prefer it over the canned template.
+        let draftTemplate = null;
+        let llmDraft = null;
+        if (transition.action === 'send_precision') draftTemplate = 'T_PRECISION';
+        else if (transition.action === 'send_receipt' && !updated.receipt_sent) draftTemplate = 'T_RECEIPT';
+        else if (transition.action === 'escalate') draftTemplate = 'free_form';
+
+        if (draftTemplate && analysis?.draft_reply) {
+          llmDraft = { body: analysis.draft_reply };
+        }
+
+        if (draftTemplate) {
+          const reason = analysis
+            ? `llm intent=${analysis.intent} action=${analysis.suggested_action} confidence=${(analysis.confidence ?? 0).toFixed(2)}`
+            : `classifier=${classification.class} confidence=${classification.confidence.toFixed(2)}`;
+          await escalateWithDraft({
+            conv: updated, parsedInbound: parsed, messageId, classification,
+            previousState,
+            draftTemplate,
+            llmDraft,
+            reason,
+            deps,
           });
         }
-      }
-
-      // State transition is bookkeeping — happens automatically. Outbound is gated.
-      const previousState = conv.state;
-      const patch = {};
-      if (classification.extracted?.arendenummer) patch.arendenummer = classification.extracted.arendenummer;
-      // When the kommun says "we'll get back to you by date X", honor it.
-      if (analysis?.follow_up_at) patch.follow_up_at = analysis.follow_up_at;
-      db.updateConversationState(conv.id, transition.nextState, patch);
-      const updated = db.getConversation(conv.id);
-
-      // Outbound: never auto-sent in v1. Draft a template and escalate to Slack.
-      // If the LLM produced a draft_reply, prefer it over the canned template.
-      let draftTemplate = null;
-      let llmDraft = null;
-      if (transition.action === 'send_precision') draftTemplate = 'T_PRECISION';
-      else if (transition.action === 'send_receipt' && !updated.receipt_sent) draftTemplate = 'T_RECEIPT';
-      else if (transition.action === 'escalate') draftTemplate = 'free_form';
-
-      if (draftTemplate && analysis?.draft_reply) {
-        llmDraft = { body: analysis.draft_reply };
-      }
-
-      if (draftTemplate) {
-        const reason = analysis
-          ? `llm intent=${analysis.intent} action=${analysis.suggested_action} confidence=${(analysis.confidence ?? 0).toFixed(2)}`
-          : `classifier=${classification.class} confidence=${classification.confidence.toFixed(2)}`;
-        await escalateWithDraft({
-          conv: updated, parsedInbound: parsed, messageId, classification,
-          previousState,
-          draftTemplate,
-          llmDraft,
-          reason,
-          deps,
-        });
       }
     }
   }
