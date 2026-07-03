@@ -1,5 +1,6 @@
 import { T_INITIAL, T_PRECISION, T_RECEIPT, T_FOLLOWUP_NUDGE, T_FOLLOWUP_CLOSE } from './templates.js';
 import { classify } from './classifier.js';
+import { inferThreadStatus } from './threads.js';
 import { nextActionForClassification, staleAction } from './conversation.js';
 import { parseInboundMessage, sameEmailDomain } from './gmail.js';
 import { buildEscalationBlocks } from './slack.js';
@@ -183,6 +184,16 @@ export async function runTick(deps) {
           gmail_thread_id: full.threadId,
           thread_id: thread.id,
         });
+
+        // Recompute the thread's auto status from all its inbound messages.
+        // Never clobber a manual override.
+        const threadRow = db.getThreadById(thread.id);
+        if (threadRow?.status_source === 'auto') {
+          const inbound = db.listMessages(conv.id)
+            .filter((mm) => mm.direction === 'inbound' && mm.thread_id === thread.id)
+            .map((mm) => ({ classification: mm.classification, attachment_count: mm.attachment_count }));
+          db.setThreadStatus(thread.id, inferThreadStatus(inbound), 'auto');
+        }
 
         // Save attachments. Kommuner deliver contracts either as a PDF directly
         // or zipped — expand zips into their inner PDFs so each is saved and

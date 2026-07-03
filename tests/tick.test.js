@@ -57,7 +57,7 @@ function b64(s) {
 
 // Build a fake full Gmail message for gmailOps.getResult.
 function mkMsg(id, threadId, from, body, subject = 's') {
-  return { id, threadId, payload: { headers: [
+  return { id, threadId, payload: { mimeType: 'text/plain', headers: [
     { name: 'From', value: from }, { name: 'To', value: 'me@x.se' }, { name: 'Subject', value: subject },
   ], body: { data: b64(body) } } };
 }
@@ -491,6 +491,30 @@ describe('runTick — inbound fetch efficiency', () => {
 
     expect(gmail.listInboundQuery).toHaveBeenCalledTimes(1);
     expect(gmail.getMessage).toHaveBeenCalledTimes(3); // once per new message, NOT 3×2
+  });
+});
+
+describe('runTick — thread status inference on ingest', () => {
+  it('auto-classifies a thread on ingest and never overrides a manual status', async () => {
+    // Force the regex classifier (no LLM) so the test is deterministic.
+    // 'Ärendenummer: K9999001' → auto_ack → muted (no attachments).
+    const spy = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue(null);
+
+    const convId = db.createConversation({ kommun_kod: '1', kommun_namn: 'Arboga', role: 'central', contact_email: 'registrator@arboga.se', scheduled_send_at: '2026-05-01T00:00:00Z' });
+    db.updateConversationState(convId, 'SENT', { gmail_thread_id: 'thr-orig', last_outbound_at: '2026-05-01T00:00:00Z' });
+
+    // First ingest: an auto-ack (Ärendenummer…) with no attachments → auto-muted.
+    await runTick(makeDeps({ gmail: fakeGmail({ listResult: [{ id: 'reg-1' }], getResult: { 'reg-1': mkMsg('reg-1', 'thr-reg', 'arboga.kommun@arboga.se', 'Ärendenummer: K9999001') } }) }));
+    const t = db.getThread(convId, 'thr-reg');
+    expect(t.status).toBe('muted');
+    expect(t.status_source).toBe('auto');
+
+    // Manual override to primary, then another auto-ack arrives → stays primary.
+    db.setThreadStatus(t.id, 'primary', 'manual');
+    await runTick(makeDeps({ gmail: fakeGmail({ listResult: [{ id: 'reg-2' }], getResult: { 'reg-2': mkMsg('reg-2', 'thr-reg', 'arboga.kommun@arboga.se', 'Ärendenummer: K9999002') } }) }));
+    expect(db.getThreadById(t.id).status).toBe('primary'); // manual not overwritten
+
+    spy.mockRestore();
   });
 });
 
