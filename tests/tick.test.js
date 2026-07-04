@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { openDb } from '../src/storage.js';
 import { runTick, runDailyFollowup } from '../src/tick.js';
 import * as analyseMod from '../src/analyse-message.js';
+import { storeContractAnalysis } from '../src/analyse-contract.js';
 
 let tmp, db, baseDir, contractsDir;
 beforeEach(() => {
@@ -42,11 +43,11 @@ function fakeSlack() {
   };
 }
 
-function makeDeps({ gmail, now = new Date('2026-06-24T00:00:00Z') }) {
+function makeDeps({ gmail, now = new Date('2026-06-24T00:00:00Z'), analyseContracts } = {}) {
   return {
     db, gmailClient: { gmail: {} }, gmailOps: gmail,
     slackClient: {}, slackOps: fakeSlack(),
-    env, contractsDir, now,
+    env, contractsDir, now, analyseContracts,
   };
 }
 
@@ -584,5 +585,54 @@ describe('runTick — muted thread suppresses escalation', () => {
     expect(db.raw.prepare('SELECT COUNT(*) c FROM escalations WHERE conversation_id = ?').get(conv).c).toBe(0); // no escalation
 
     spy.mockRestore();
+  });
+});
+
+describe('runTick — contract-aware delivery draft', () => {
+  it('drafts T_REQUEST_MISSING (not T_RECEIPT) when a delivery lacks the actual avtal', async () => {
+    const convId = db.createConversation({ kommun_kod: '1', kommun_namn: 'Arjeplog', role: 'central', contact_email: 'kommun@arjeplog.se', scheduled_send_at: '2026-05-01T00:00:00Z' });
+    db.updateConversationState(convId, 'SENT', { gmail_thread_id: 'thr-p', last_outbound_at: '2026-05-01T00:00:00Z' });
+
+    // Force the delivery classification + an LLM draft that must be overridden.
+    const spy = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue({
+      intent: 'delivery', confidence: 0.9, summary: 'Svar bifogat.',
+      suggested_action: 'send_receipt', draft_reply: 'Tack så mycket för avtalen!', follow_up_at: null,
+      extracted: {},
+    });
+
+    // A message with one PDF attachment.
+    const msg = {
+      id: 'in-1', threadId: 'thr-p',
+      payload: { headers: [
+        { name: 'From', value: 'Stoltz Pernilla <Pernilla.Stoltz@arjeplog.se>' },
+        { name: 'To', value: 'me@x.se' }, { name: 'Subject', value: 'Svar' },
+      ], mimeType: 'multipart/mixed', parts: [
+        { mimeType: 'text/plain', body: { data: b64('Bifogat finner du svar.') } },
+        { mimeType: 'application/pdf', filename: 'Svar.pdf', body: { attachmentId: 'att-1', size: 100 } },
+      ] },
+    };
+
+    // Stub the inline analyzer: mark this message's attachment as a följebrev
+    // naming Quiculum (doc_attached=false), so received=[] and missing=[Quiculum].
+    const analyseContracts = async ({ db: d, onlyMessageId }) => {
+      const atts = d.raw.prepare('SELECT id FROM attachments WHERE message_id = ?').all(onlyMessageId);
+      for (const a of atts) {
+        storeContractAnalysis(d, a.id, {
+          is_contract: false, document_type: 'följebrev_sammanställning', vendor_name: null,
+          products: [], avtalsvarde: null, valuta: null, period_start: null, period_end: null,
+          summary: 'följebrev', confidence: 0.9,
+          mentioned_agreements: [{ vendor: 'Quiculum', product: null, doc_attached: false }],
+        }, { model: 'test' });
+      }
+      return atts.length;
+    };
+
+    await runTick(makeDeps({ gmail: fakeGmail({ listResult: [{ id: 'in-1' }], getResult: { 'in-1': msg }, }), analyseContracts }));
+    spy.mockRestore();
+
+    const esc = db.raw.prepare('SELECT * FROM escalations WHERE conversation_id = ?').get(convId);
+    expect(esc.draft_template).toBe('T_REQUEST_MISSING');
+    expect(esc.draft_body).toMatch(/Quiculum/);
+    expect(esc.draft_body).not.toMatch(/Tack så mycket för avtalen!/); // LLM draft overridden
   });
 });

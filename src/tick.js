@@ -1,4 +1,4 @@
-import { T_INITIAL, T_PRECISION, T_RECEIPT, T_FOLLOWUP_NUDGE, T_FOLLOWUP_CLOSE } from './templates.js';
+import { T_INITIAL, T_PRECISION, T_RECEIPT, T_FOLLOWUP_NUDGE, T_FOLLOWUP_CLOSE, T_REQUEST_MISSING, computeReceivedMissing, chooseDeliveryReply } from './templates.js';
 import { classify } from './classifier.js';
 import { inferThreadStatus } from './threads.js';
 import { nextActionForClassification, staleAction } from './conversation.js';
@@ -9,7 +9,7 @@ import { extractSignature } from './extract-signature.js';
 import { analyseMessage, analysisToLegacyClassification } from './analyse-message.js';
 import { analysePendingContracts } from './analyse-contract.js';
 
-const TEMPLATES = { T_INITIAL, T_PRECISION, T_RECEIPT, T_FOLLOWUP_NUDGE, T_FOLLOWUP_CLOSE };
+const TEMPLATES = { T_INITIAL, T_PRECISION, T_RECEIPT, T_FOLLOWUP_NUDGE, T_FOLLOWUP_CLOSE, T_REQUEST_MISSING };
 
 function fromHeader(env) {
   return `${env.GMAIL_FROM_NAME} <${env.GMAIL_USER_EMAIL}>`;
@@ -23,6 +23,8 @@ function tplCtx(conv, env, extra = {}) {
     from_name: env.GMAIL_FROM_NAME,
     thread_subject: extra.thread_subject ?? 'Begäran om allmänna handlingar – avtal för digitala verktyg',
     days_since_send: extra.days_since_send ?? 0,
+    received: extra.received ?? [],
+    missing: extra.missing ?? [],
   };
 }
 
@@ -46,7 +48,7 @@ async function dispatchInitial(conv, deps) {
   log?.(`SENT T-INITIAL → ${conv.kommun_namn}/${conv.role}`);
 }
 
-async function escalateWithDraft({ conv, parsedInbound, messageId = null, classification, previousState, draftTemplate, llmDraft, reason, deps }) {
+async function escalateWithDraft({ conv, parsedInbound, messageId = null, classification, previousState, draftTemplate, llmDraft, reason, templateCtx = {}, deps }) {
   const { db, slackClient, slackOps, env, log } = deps;
   let subject = '(no subject)';
   let body = '';
@@ -62,6 +64,7 @@ async function escalateWithDraft({ conv, parsedInbound, messageId = null, classi
     const ctx = tplCtx(conv, env, {
       thread_subject: parsedInbound?.subject?.replace(/^Re: /, '') ?? undefined,
       days_since_send: deps.daysSinceSend ?? 0,
+      ...templateCtx,
     });
     const rendered = TEMPLATES[draftTemplate](ctx);
     subject = rendered.subject;
@@ -243,6 +246,26 @@ export async function runTick(deps) {
           llmDraft = { body: analysis.draft_reply };
         }
 
+        // Contract-aware delivery: a "delivery" reply must reflect what the
+        // attachments actually contain, not the email body. Analyse this
+        // message's attachments inline, then request the specific missing avtal
+        // instead of blindly thanking for contracts.
+        let templateCtx = {};
+        if (draftTemplate === 'T_RECEIPT') {
+          const analyseContracts = deps.analyseContracts ?? analysePendingContracts;
+          try {
+            await analyseContracts({ db, env, log: deps.log, onlyMessageId: messageId });
+          } catch (e) {
+            deps.log?.(`inline contract analysis error: ${e.message}`);
+          }
+          const { received, missing } = computeReceivedMissing(db.listContractInfoForMessage(messageId));
+          if (chooseDeliveryReply({ received, missing }).template === 'T_REQUEST_MISSING') {
+            draftTemplate = 'T_REQUEST_MISSING';
+            llmDraft = null; // the PDF-blind LLM draft must not win here
+            templateCtx = { received, missing };
+          }
+        }
+
         const threadStatus = db.getThreadById(thread.id)?.status ?? 'neutral';
         if (draftTemplate && threadStatus !== 'muted') {
           const reason = analysis
@@ -254,6 +277,7 @@ export async function runTick(deps) {
             draftTemplate,
             llmDraft,
             reason,
+            templateCtx,
             deps,
           });
         }
