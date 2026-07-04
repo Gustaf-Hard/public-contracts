@@ -99,6 +99,31 @@ describe('storeContractAnalysis', () => {
   });
 });
 
+describe('analyseContractPdf — document_type + mentioned_agreements', () => {
+  it('returns document_type and mentioned_agreements when the model provides them', async () => {
+    const letter = {
+      is_contract: false, document_type: 'följebrev_sammanställning',
+      vendor_name: null, products: [], avtalsvarde: null, valuta: null,
+      period_start: null, period_end: null, summary: 'Följebrev som listar avtal.',
+      confidence: 0.9,
+      mentioned_agreements: [
+        { vendor: 'Quiculum', product: 'Quiculum', doc_attached: false },
+        { vendor: 'Teachiq', product: 'Exam.net', doc_attached: false },
+      ],
+    };
+    const client = fakeClientReturning(letter);
+    const result = await analyseContractPdf(pdf, ctx, { env: { ANTHROPIC_API_KEY: 'sk' }, client });
+    expect(result.document_type).toBe('följebrev_sammanställning');
+    expect(result.is_contract).toBe(false);
+    expect(result.mentioned_agreements.map((m) => m.vendor)).toEqual(['Quiculum', 'Teachiq']);
+    expect(result.mentioned_agreements.every((m) => m.doc_attached === false)).toBe(true);
+    // The request schema advertises the new fields as required.
+    const schema = client.messages.create.mock.calls[0][0].output_config.format.schema;
+    expect(schema.required).toContain('document_type');
+    expect(schema.required).toContain('mentioned_agreements');
+  });
+});
+
 describe('analysePendingContracts', () => {
   it('analyses each pending PDF and stores results; second run is a no-op', async () => {
     const tmp = mkdtempSync(join(tmpdir(), 'ac-'));

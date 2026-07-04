@@ -12,27 +12,30 @@ import { resolve } from 'node:path';
 
 const DEFAULT_MODEL = 'claude-opus-4-8';
 
-const SYSTEM_PROMPT = `Du analyserar avtals-PDF:er som svenska kommuner lämnat ut efter en begäran om allmänna handlingar om digitala verktyg i utbildningsförvaltningen.
+const SYSTEM_PROMPT = `Du analyserar PDF:er som svenska kommuner lämnat ut efter en begäran om allmänna handlingar om digitala verktyg i utbildningsförvaltningen.
 
-Din uppgift: avgör om dokumentet är ett avtal och extrahera strukturerade fält.
+Din uppgift: avgör dokumentets typ, om det är ett avtal, och extrahera strukturerade fält.
 
 Regler:
-- is_contract: true för avtal/kontrakt/ramavtal (även underskrivna beställningar). false för bilagor utan avtalsinnehåll (prislistor, sekretessbeslut, följebrev).
+- document_type: "avtal" för avtal/kontrakt/ramavtal/underskrivna beställningar. "följebrev_sammanställning" för svarsbrev eller tabeller som RÄKNAR UPP avtal/leverantörer utan att själva innehålla avtalstexten (t.ex. "Svar på begäran om allmän handling" med en tabell över leverantörer och kostnader). "prislista", "sekretessbeslut" eller "övrigt" för annat.
+- is_contract: true ENDAST när document_type = "avtal". false för följebrev_sammanställning, prislista, sekretessbeslut och övrigt. Ett brev som hänvisar till "bifogat avtal" är INTE självt ett avtal.
 - vendor_name: leverantörens kanoniska företagsnamn utan bolagsform — "Skolon", inte "Skolon AB". null om oklart.
-- products: namngivna produkter/tjänster som avtalet omfattar (t.ex. "Skolon Plattform", "Google Workspace for Education"). Tom array om inga kan identifieras.
-- avtalsvarde: avtalets värde eller årskostnad som text som den står i avtalet (t.ex. "120 000 kr/år"). null om det inte framgår.
+- products: namngivna produkter/tjänster som avtalet omfattar. Tom array om inga kan identifieras.
+- avtalsvarde: avtalets värde eller årskostnad som text (t.ex. "120 000 kr/år"). null om det inte framgår.
 - valuta: "SEK" etc. null om det inte framgår.
-- period_start / period_end: avtalstidens start- och slutdatum som ISO-datum (YYYY-MM-DD). null om det inte framgår. Om avtalet förlängs automatiskt: använd innevarande periods slutdatum.
-- summary: 1-2 meningar på svenska om vad avtalet gäller.
+- period_start / period_end: avtalstidens start- och slutdatum som ISO-datum (YYYY-MM-DD). null om det inte framgår. Vid automatisk förlängning: använd innevarande periods slutdatum.
+- summary: 1-2 meningar på svenska om vad dokumentet gäller.
+- mentioned_agreements: lista de avtal/leverantörer som dokumentet NÄMNER, med { vendor, product, doc_attached }. doc_attached = true endast om själva avtalshandlingen finns i DETTA dokument; false när dokumentet bara refererar till eller sammanställer avtalet utan att innehålla det. Tom array om inga nämns.
 - confidence: 0.9+ = mycket säker, 0.7-0.9 = ganska säker, <0.7 = osäker.
 - Svara ENBART med JSON som matchar schemat.`;
 
 const CONTRACT_SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['is_contract', 'vendor_name', 'products', 'avtalsvarde', 'valuta', 'period_start', 'period_end', 'summary', 'confidence'],
+  required: ['is_contract', 'document_type', 'vendor_name', 'products', 'avtalsvarde', 'valuta', 'period_start', 'period_end', 'summary', 'confidence', 'mentioned_agreements'],
   properties: {
     is_contract: { type: 'boolean' },
+    document_type: { type: 'string', enum: ['avtal', 'följebrev_sammanställning', 'prislista', 'sekretessbeslut', 'övrigt'] },
     vendor_name: { anyOf: [{ type: 'string' }, { type: 'null' }] },
     products: { type: 'array', items: { type: 'string' } },
     avtalsvarde: { anyOf: [{ type: 'string' }, { type: 'null' }] },
@@ -41,6 +44,19 @@ const CONTRACT_SCHEMA = {
     period_end: { anyOf: [{ type: 'string' }, { type: 'null' }] },
     summary: { type: 'string' },
     confidence: { type: 'number' },
+    mentioned_agreements: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['vendor', 'product', 'doc_attached'],
+        properties: {
+          vendor: { type: 'string' },
+          product: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+          doc_attached: { type: 'boolean' },
+        },
+      },
+    },
   },
 };
 
