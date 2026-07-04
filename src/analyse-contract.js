@@ -139,7 +139,7 @@ export function storeContractAnalysis(db, attachmentId, analysis, { model } = {}
 // Analyse every PDF attachment that has no contracts row yet. Errors on one
 // PDF never block the others, and never throw to the caller (tick safety).
 // Returns the number of attachments successfully analysed+stored.
-export async function analysePendingContracts({ db, env = process.env, client = null, log = null, force = false, onlyId = null } = {}) {
+export async function analysePendingContracts({ db, env = process.env, client = null, log = null, force = false, onlyId = null, onlyMessageId = null } = {}) {
   if (!client && !(env.ANTHROPIC_API_KEY && env.ANTHROPIC_API_KEY.trim())) return 0;
 
   let pending = force
@@ -153,6 +153,7 @@ export async function analysePendingContracts({ db, env = process.env, client = 
       `).all()
     : db.listPendingContractAttachments();
   if (onlyId != null) pending = pending.filter((a) => a.id === onlyId);
+  if (onlyMessageId != null) pending = pending.filter((a) => a.message_id === onlyMessageId);
 
   const model = env.ANTHROPIC_CONTRACT_MODEL ?? DEFAULT_MODEL;
   let done = 0;

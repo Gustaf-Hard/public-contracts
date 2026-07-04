@@ -262,3 +262,24 @@ describe('getTickHealth', () => {
     expect(db.getTickHealth({ now: future, thresholdMin: 60 }).stale).toBe(true);
   });
 });
+
+describe('listContractInfoForMessage', () => {
+  it('returns is_contract, vendor_name (via vendor_id) and analysis_json per analyzed attachment', () => {
+    const db = openDb(':memory:');
+    db.migrate();
+    const convId = db.createConversation({ kommun_kod: '1', kommun_namn: 'X', role: 'central', contact_email: 'k@x.se', scheduled_send_at: '2026-01-01T00:00:00Z' });
+    const msgId = db.recordMessage({ conversation_id: convId, gmail_message_id: 'm1', direction: 'inbound', from_email: 'a@x.se', to_email: 'me@x.se', subject: 's', body_text: 'b', classification: 'delivery', classification_confidence: 0.9, received_at: '2026-06-01T00:00:00Z', attachment_count: 2 });
+    const a1 = db.recordAttachment({ message_id: msgId, filename: 'avtal.pdf', saved_path: '/x/avtal.pdf', mime_type: 'application/pdf', size_bytes: 10 });
+    const a2 = db.recordAttachment({ message_id: msgId, filename: 'brev.pdf', saved_path: '/x/brev.pdf', mime_type: 'application/pdf', size_bytes: 10 });
+    const v = db.upsertVendor('Skolon');
+    db.recordContract({ attachment_id: a1, vendor_id: v.id, is_contract: 1, summary: 'avtal', analysis_json: { mentioned_agreements: [] } });
+    db.recordContract({ attachment_id: a2, vendor_id: null, is_contract: 0, summary: 'brev', analysis_json: { mentioned_agreements: [{ vendor: 'Quiculum', product: null, doc_attached: false }] } });
+
+    const rows = db.listContractInfoForMessage(msgId);
+    expect(rows).toHaveLength(2);
+    const contract = rows.find((r) => r.is_contract === 1);
+    expect(contract.vendor_name).toBe('Skolon');
+    const letter = rows.find((r) => r.is_contract === 0);
+    expect(JSON.parse(letter.analysis_json).mentioned_agreements[0].vendor).toBe('Quiculum');
+  });
+});

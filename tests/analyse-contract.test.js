@@ -156,3 +156,30 @@ describe('analysePendingContracts', () => {
     db.close(); rmSync(tmp, { recursive: true, force: true });
   });
 });
+
+describe('analysePendingContracts onlyMessageId', () => {
+  it('analyses only the attachments of the given message', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'ac-'));
+    try {
+      const db = openDb(join(tmp, 'pilot.db'));
+      db.migrate();
+      const convId = db.createConversation({ kommun_kod: '1', kommun_namn: 'X', role: 'central', contact_email: 'k@x.se', scheduled_send_at: '2026-01-01T00:00:00Z' });
+      const seedMsgWithPdf = (name) => {
+        const msgId = db.recordMessage({ conversation_id: convId, gmail_message_id: `gm-${name}`, direction: 'inbound', from_email: 'a@x.se', to_email: 'me@x.se', subject: 's', body_text: '', classification: null, classification_confidence: null, received_at: '2026-06-01T00:00:00Z', attachment_count: 1 });
+        const p = join(tmp, `${name}.pdf`);
+        writeFileSync(p, '%PDF-1.4 fake');
+        db.recordAttachment({ message_id: msgId, filename: `${name}.pdf`, saved_path: p, mime_type: 'application/pdf', size_bytes: 12 });
+        return msgId;
+      };
+      const mA = seedMsgWithPdf('a');
+      seedMsgWithPdf('b');
+
+      const client = fakeClientReturning({ ...GOOD, document_type: 'avtal', mentioned_agreements: [] });
+      const done = await analysePendingContracts({ db, env: { ANTHROPIC_API_KEY: 'sk' }, client, onlyMessageId: mA });
+      expect(done).toBe(1);
+      expect(client.messages.create).toHaveBeenCalledTimes(1);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+});

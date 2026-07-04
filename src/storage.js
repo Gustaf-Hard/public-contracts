@@ -453,6 +453,17 @@ export function openDb(path) {
     `).all();
   }
 
+  function listContractInfoForMessage(messageId) {
+    return db.prepare(`
+      SELECT c.is_contract AS is_contract, v.name AS vendor_name, c.analysis_json AS analysis_json
+      FROM attachments a
+      JOIN contracts c ON c.attachment_id = a.id
+      LEFT JOIN vendors v ON v.id = c.vendor_id
+      WHERE a.message_id = ?
+      ORDER BY a.id
+    `).all(messageId);
+  }
+
   function productsForContractIds(ids) {
     if (ids.length === 0) return new Map();
     const rows = db.prepare(`
@@ -572,6 +583,7 @@ export function openDb(path) {
     recordContract,
     linkContractProduct,
     listPendingContractAttachments,
+    listContractInfoForMessage,
     listContractsForVendor,
     listVendorsOverview,
     getVendorBySlug,
