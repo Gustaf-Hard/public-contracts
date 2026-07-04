@@ -70,6 +70,21 @@
     t.setAttribute('aria-expanded', String(!tgt.hidden));
   });
 
+  // Thread accordion: a [data-thread-toggle] header shows/hides its sibling
+  // [data-thread-body] (the full conversation). Clicks on inner controls — the
+  // status-toggle form, links, buttons, inputs — are ignored so they keep
+  // working without also collapsing the thread.
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest) return;
+    var head = e.target.closest('[data-thread-toggle]');
+    if (!head) return;
+    if (e.target.closest('form, a, button, input, textarea, select')) return;
+    var body = head.parentElement.querySelector('[data-thread-body]');
+    if (!body) return;
+    body.hidden = !body.hidden;
+    head.setAttribute('aria-expanded', String(!body.hidden));
+  });
+
   // Light/dark theme toggle, persisted in localStorage (applied pre-paint by
   // the inline bootstrap in <head>).
   document.addEventListener('click', function (e) {

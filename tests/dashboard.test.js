@@ -608,6 +608,27 @@ describe('thread-grouped case view', () => {
     expect(res.text).toMatch(/muted/);
   });
 
+  it('renders threads as collapsed rows (accordion), newest first, body hidden until expanded', async () => {
+    const convId = db.createConversation({ kommun_kod: '2418', kommun_namn: 'Arboga', role: 'central', contact_email: 'registrator@arboga.se', scheduled_send_at: '2026-05-01T00:00:00Z' });
+    db.updateConversationState(convId, 'DELIVERING', { gmail_thread_id: 'thr-old' });
+    // Older thread (earlier last_inbound_at)
+    const tOld = db.upsertThread({ conversation_id: convId, gmail_thread_id: 'thr-old', counterparty_email: 'old@arboga.se', counterparty_name: 'Old Sender', last_inbound_at: '2026-06-08T00:00:00Z' });
+    db.recordMessage({ conversation_id: convId, gmail_message_id: 'old-1', direction: 'inbound', from_email: 'old@arboga.se', to_email: 'me@x.se', subject: 'gammalt', body_text: 'gammalt-svar', classification: 'auto_ack', classification_confidence: 0.9, received_at: '2026-06-08T00:00:00Z', attachment_count: 0, gmail_thread_id: 'thr-old', thread_id: tOld.id });
+    // Newer thread (later last_inbound_at)
+    const tNew = db.upsertThread({ conversation_id: convId, gmail_thread_id: 'thr-new', counterparty_email: 'new@arboga.se', counterparty_name: 'New Sender', last_inbound_at: '2026-06-23T00:00:00Z' });
+    db.recordMessage({ conversation_id: convId, gmail_message_id: 'new-1', direction: 'inbound', from_email: 'new@arboga.se', to_email: 'me@x.se', subject: 'nytt', body_text: 'nytt-svar', classification: 'delivery', classification_confidence: 0.9, received_at: '2026-06-23T00:00:00Z', attachment_count: 3, gmail_thread_id: 'thr-new', thread_id: tNew.id });
+
+    const app = createDashboardApp({ db, municipalitiesLoader: () => [{ kommun_kod: '2418', kommun_namn: 'Arboga', lan: 'X', folkmangd: 1, contacts: [] }] });
+    const res = await get(app, '/kommun/2418');
+    // Accordion structure: each thread has a clickable header + a hidden body.
+    expect(res.text).toMatch(/data-thread-toggle/);
+    expect(res.text).toMatch(/data-thread-body/);
+    // Newest thread renders before the older one.
+    expect(res.text.indexOf('New Sender')).toBeLessThan(res.text.indexOf('Old Sender'));
+    // Collapsed preview shows the latest message snippet in each row.
+    expect(res.text).toContain('nytt-svar');
+  });
+
   it('renders Ogrupperat section for messages with null thread_id', async () => {
     const kommun_kod = '2418';
     const convId = db.createConversation({ kommun_kod, kommun_namn: 'Malå', role: 'central', contact_email: 'registrator@mala.se', scheduled_send_at: '2026-05-01T00:00:00Z' });

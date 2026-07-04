@@ -527,9 +527,18 @@ const baseCss = `
   .modal-actions { display: flex; gap: 10px; margin-top: 18px; }
   .modal-status { font-size: 13px; padding: 10px 12px; border-radius: var(--r-2); background: var(--bg-elev-2); margin: 4px 0 0; }
   .modal-status.ok { color: var(--good); } .modal-status.err { color: var(--bad); }
-  .thread-group { border: 1px solid var(--border); border-radius: 8px; margin: 10px 0; padding: 10px 12px; }
+  .thread-group { border: 1px solid var(--border); border-radius: 8px; margin: 10px 0; overflow: hidden; }
   .thread-group.thread-muted { opacity: 0.72; }
-  .thread-group .thread-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; padding-bottom: 0; border-bottom: none; }
+  /* Collapsed thread row: clickable inbox-style header, hidden body until opened. */
+  .thread-group .thread-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 10px 12px; cursor: pointer; margin: 0; border-bottom: none; }
+  .thread-group .thread-head:hover { background: var(--bg-elev-2); }
+  .thread-group[data-open] .thread-head, .thread-group .thread-head[aria-expanded="true"] { border-bottom: 1px solid var(--border); }
+  .thread-head-main { flex: 1; min-width: 0; }
+  .thread-head-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .thread-email { font-size: 12px; }
+  .thread-preview { font-size: 12px; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .thread-head-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; font-size: 11px; white-space: nowrap; }
+  .thread-body { padding: 8px 12px 12px; }
   .thread-status { font-size: 11px; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--border); }
   .thread-status-primary { color: var(--accent); border-color: var(--accent); }
   .thread-status-muted { color: var(--fg-muted); }
@@ -1319,8 +1328,23 @@ function threadStatusControls(t) {
     </form>`;
 }
 
-// Group messages by thread_id and render each thread with a header. Messages
-// with no thread_id (pre-backfill) fall into an "Övrigt" group keyed by null.
+// A compact preview line for a collapsed thread row: latest message's snippet,
+// its date, and the message count — so the row is informative without opening.
+function threadPreview(msgs) {
+  const latest = msgs[msgs.length - 1];
+  if (!latest) return { snippet: 'Inga meddelanden', date: '', count: 0 };
+  const who = latest.direction === 'outbound' ? 'Du: ' : '';
+  const snippet = who + (latest.body_text ?? '').replace(/\s+/g, ' ').trim().slice(0, 90);
+  const date = latest.received_at ? `${latest.received_at.slice(0, 10)} · ${fmtAgo(latest.received_at)}` : '';
+  return { snippet, date, count: msgs.length };
+}
+
+// Render each thread as a collapsed accordion row (clickable header + hidden
+// body), newest thread first (threads arrive ordered by last_inbound_at DESC).
+// Clicking a row reveals the full conversation + reply boxes. The header uses a
+// dedicated data-thread-toggle/data-thread-body pair so it never clashes with
+// the per-message data-collapse toggles inside the body. Messages with no
+// thread_id (pre-backfill) render in an always-visible "Ogrupperat" section.
 function renderThreadGroups(threads, messages, attachmentsByMsg, signatures, escalationsByThread, gmailReady) {
   const byThread = new Map();
   for (const m of messages) {
@@ -1330,22 +1354,31 @@ function renderThreadGroups(threads, messages, attachmentsByMsg, signatures, esc
   }
   const groups = threads.map((t) => {
     const msgs = byThread.get(t.id) ?? [];
-    const collapsed = t.status === 'muted';
     const parsed = parseAddr(t.counterparty_name || t.counterparty_email || '');
     const displayName = parsed.name || parsed.email || t.counterparty_email || 'Okänd';
     const displayEmail = t.counterparty_email || '';
-    const header = `<div class="thread-head">
-      <strong>${escapeHtml(displayName)}</strong>
-      <span class="muted">${escapeHtml(displayEmail)}</span>
-      ${threadStatusControls(t)}
+    const pv = threadPreview(msgs);
+    const header = `<div class="thread-head" data-thread-toggle aria-expanded="false">
+      <div class="thread-head-main">
+        <div class="thread-head-top">
+          <strong>${escapeHtml(displayName)}</strong>
+          <span class="muted thread-email">${escapeHtml(displayEmail)}</span>
+          ${threadStatusControls(t)}
+        </div>
+        <div class="thread-preview muted">${escapeHtml(pv.snippet)}</div>
+      </div>
+      <div class="thread-head-meta muted">
+        <span>${escapeHtml(pv.date)}</span>
+        <span class="thread-count">${pv.count} meddelanden</span>
+      </div>
     </div>`;
-    const body = msgs.map((m, i) => threadMessage(m, attachmentsByMsg[m.id], signatures[m.id], !collapsed && i === msgs.length - 1)).join('');
+    const msgHtml = msgs.map((m, i) => threadMessage(m, attachmentsByMsg[m.id], signatures[m.id], i === msgs.length - 1)).join('');
     // Open escalations are pending actions — always render their reply forms,
     // even on a muted thread. Muting suppresses NEW suggestions at ingest; it
     // must never hide an escalation that was already opened (e.g. before the
     // operator muted the thread), or the action silently disappears.
     const replies = (escalationsByThread.get(t.id) ?? []).map((e) => renderEscalationForm(e, gmailReady)).join('');
-    return `<section class="thread-group thread-${escapeHtml(t.status)}">${header}${body}${replies}</section>`;
+    return `<section class="thread-group thread-${escapeHtml(t.status)}">${header}<div class="thread-body" data-thread-body hidden>${msgHtml}${replies}</div></section>`;
   });
   // Orphan messages (thread_id null — only before backfill) must never vanish.
   const orphans = byThread.get('none') ?? [];
