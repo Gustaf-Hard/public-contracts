@@ -492,6 +492,14 @@ describe('home buckets', () => {
     expect(q.some((x) => x.conv_id === cid && x.kommun_kod === '2418')).toBe(true);
   });
 
+  it('buildActionQueue excludes DONE/DEAD_END cases even with a lingering open escalation', () => {
+    const done = db.createConversation({ kommun_kod: '2418', kommun_namn: 'Malå', role: 'central', contact_email: 'k@mala.se', scheduled_send_at: '2026-05-24T10:00:00Z' });
+    db.updateConversationState(done, 'DONE', {});
+    db.recordEscalation({ conversation_id: done, reason: 'stale handoff', draft_template: 'free_form', draft_subject: 'Re', draft_body: 'b' });
+    const q = buildActionQueue(db);
+    expect(q.some((x) => x.conv_id === done)).toBe(false); // closed case is not pending work
+  });
+
   it('buildWaiting surfaces an open SENT case but not one with an open escalation', () => {
     const waitingId = db.createConversation({ kommun_kod: '2418', kommun_namn: 'Malå', role: 'central', contact_email: 'k@mala.se', scheduled_send_at: '2026-05-24T10:00:00Z' });
     db.updateConversationState(waitingId, 'SENT', { last_outbound_at: '2026-05-24T10:00:00Z' });
@@ -660,6 +668,22 @@ describe('thread-grouped case view', () => {
     const res = await get(app, `/kommun/${kommun_kod}`);
     expect(res.text).toMatch(/action="\/escalations\/\d+"/); // reply form still rendered
     expect(res.text).toContain('utkast-svar-som-vantar'); // its draft body is visible
+  });
+});
+
+describe('closing a case resolves its escalations', () => {
+  it('POST /conversations/:id/close resolves open escalations so no stale action lingers', async () => {
+    const convId = db.createConversation({ kommun_kod: '2418', kommun_namn: 'Malå', role: 'central', contact_email: 'k@mala.se', scheduled_send_at: '2026-05-01T00:00:00Z' });
+    db.updateConversationState(convId, 'DELIVERING', { gmail_thread_id: 'thr-x' });
+    const escId = db.recordEscalation({ conversation_id: convId, reason: 'handoff', draft_template: 'free_form', draft_subject: 'Re', draft_body: 'b' });
+    const app = createDashboardApp({ db, municipalitiesLoader: () => [{ kommun_kod: '2418', kommun_namn: 'Malå', lan: 'X', folkmangd: 1, contacts: [] }] });
+
+    const res = await postForm(app, `/conversations/${convId}/close`, { state: 'DONE', return: `/kommun/2418` });
+    expect([302, 303]).toContain(res.status);
+    expect(db.getConversation(convId).state).toBe('DONE');
+    const esc = db.raw.prepare('SELECT status FROM escalations WHERE id = ?').get(escId);
+    expect(esc.status).not.toBe('open'); // resolved on close
+    expect(buildActionQueue(db).some((x) => x.conv_id === convId)).toBe(false);
   });
 });
 

@@ -365,6 +365,9 @@ export function buildActionQueue(db) {
   if (!db) return [];
   const out = [];
   for (const c of db.listAllConversations()) {
+    // A closed case is never pending work — skip it even if a stale escalation
+    // lingers (e.g. legacy data, or one created before the case was closed).
+    if (c.state === 'DONE' || c.state === 'DEAD_END') continue;
     const openEsc = db.raw
       .prepare("SELECT * FROM escalations WHERE conversation_id = ? AND status = 'open' ORDER BY id DESC")
       .all(c.id);
@@ -859,6 +862,12 @@ export function createDashboardApp({
     if (!conv) return res.status(404).send('Case not found');
     const targetState = req.body.state === 'DEAD_END' ? 'DEAD_END' : 'DONE';
     db.updateConversationState(convId, targetState, {});
+    // Closing the case makes any open escalation obsolete — resolve them so
+    // they stop showing as pending work (in the case view and the action queue).
+    const openEscs = db.raw
+      .prepare("SELECT id FROM escalations WHERE conversation_id = ? AND status = 'open'")
+      .all(convId);
+    for (const e of openEscs) db.resolveEscalation(e.id, { status: 'resolved_closed' });
     res.redirect(backTo(req, `/kommun/${conv.kommun_kod}`));
   });
 
