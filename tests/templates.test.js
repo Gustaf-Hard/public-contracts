@@ -6,6 +6,7 @@ import {
   T_FOLLOWUP_NUDGE,
   T_FOLLOWUP_CLOSE,
 } from '../src/templates.js';
+import { T_REQUEST_MISSING, computeReceivedMissing, chooseDeliveryReply } from '../src/templates.js';
 
 const ctx = {
   kommun_namn: 'Malå',
@@ -94,5 +95,52 @@ describe('T_FOLLOWUP_CLOSE', () => {
     const m = T_FOLLOWUP_CLOSE(ctx);
     expect(m.body).toMatch(/ytterligare avtal/);
     expect(m.body).toMatch(/slutförd/);
+  });
+});
+
+describe('computeReceivedMissing', () => {
+  it('splits received (is_contract) vs missing (mentioned, doc_attached=false), deduped', () => {
+    const rows = [
+      { is_contract: 1, vendor_name: 'Skolon', analysis_json: JSON.stringify({ mentioned_agreements: [] }) },
+      { is_contract: 0, vendor_name: null, analysis_json: JSON.stringify({ mentioned_agreements: [
+        { vendor: 'Quiculum', product: null, doc_attached: false },
+        { vendor: 'Teachiq', product: 'Exam.net', doc_attached: false },
+        { vendor: 'Skolon', product: null, doc_attached: false }, // already received → excluded
+      ] }) },
+    ];
+    expect(computeReceivedMissing(rows)).toEqual({ received: ['Skolon'], missing: ['Quiculum', 'Teachiq'] });
+  });
+
+  it('handles object analysis_json and no mentions', () => {
+    const rows = [{ is_contract: 1, vendor_name: 'Google', analysis_json: { mentioned_agreements: [] } }];
+    expect(computeReceivedMissing(rows)).toEqual({ received: ['Google'], missing: [] });
+  });
+});
+
+describe('chooseDeliveryReply', () => {
+  it('picks T_RECEIPT when nothing is missing, T_REQUEST_MISSING otherwise', () => {
+    expect(chooseDeliveryReply({ received: ['Skolon'], missing: [] }).template).toBe('T_RECEIPT');
+    expect(chooseDeliveryReply({ received: [], missing: ['Quiculum'] }).template).toBe('T_REQUEST_MISSING');
+    expect(chooseDeliveryReply({ received: ['Skolon'], missing: ['Quiculum'] }).template).toBe('T_REQUEST_MISSING');
+  });
+});
+
+describe('T_REQUEST_MISSING', () => {
+  const base = { thread_subject: 'Begäran', from_name: 'Gustaf Hård af Segerstad', from_email: 'gustaf@mediagraf.se' };
+  it('acknowledges received and names missing when both present', () => {
+    const m = T_REQUEST_MISSING({ ...base, received: ['Skolon'], missing: ['Quiculum', 'Teachiq'] });
+    expect(m.subject).toBe('Re: Begäran');
+    expect(m.body).toMatch(/Tack för avtalen gällande Skolon/);
+    expect(m.body).toMatch(/Quiculum och Teachiq/);
+    expect(m.body).toMatch(/Gustaf Hård af Segerstad/);
+  });
+  it('asks for the documents when nothing real arrived', () => {
+    const m = T_REQUEST_MISSING({ ...base, received: [], missing: ['Quiculum'] });
+    expect(m.body).toMatch(/inte (vara )?bifogade/);
+    expect(m.body).toMatch(/Quiculum/);
+  });
+  it('falls back to a generic ask when there are no names', () => {
+    const m = T_REQUEST_MISSING({ ...base, received: [], missing: [] });
+    expect(m.body).toMatch(/faktiska avtalshandlingarna/);
   });
 });

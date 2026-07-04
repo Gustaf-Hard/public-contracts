@@ -99,3 +99,58 @@ export function T_FOLLOWUP_CLOSE(ctx) {
     ].join('\n'),
   };
 }
+
+// Join a list the Swedish way: "A", "A och B", "A, B och C".
+function listSv(items) {
+  if (items.length <= 1) return items[0] ?? '';
+  return items.slice(0, -1).join(', ') + ' och ' + items[items.length - 1];
+}
+
+// Which reply to draft for a delivery, from what actually arrived.
+export function chooseDeliveryReply({ received = [], missing = [] } = {}) {
+  return { template: missing.length > 0 ? 'T_REQUEST_MISSING' : 'T_RECEIPT' };
+}
+
+// Derive received (real contracts) vs missing (named but undocumented) vendors
+// from the contract-analysis rows of one delivery's attachments.
+export function computeReceivedMissing(rows = []) {
+  const received = [];
+  const seen = new Set();
+  for (const r of rows) {
+    if (r.is_contract && r.vendor_name) {
+      const k = r.vendor_name.toLowerCase();
+      if (!seen.has(k)) { seen.add(k); received.push(r.vendor_name); }
+    }
+  }
+  const missing = [];
+  const seenMissing = new Set(seen); // never ask for something already received
+  for (const r of rows) {
+    let a = r.analysis_json;
+    if (typeof a === 'string') { try { a = JSON.parse(a); } catch { a = null; } }
+    for (const m of a?.mentioned_agreements ?? []) {
+      if (m && m.doc_attached === false && m.vendor) {
+        const k = m.vendor.toLowerCase();
+        if (!seenMissing.has(k)) { seenMissing.add(k); missing.push(m.vendor); }
+      }
+    }
+  }
+  return { received, missing };
+}
+
+// Follow-up when a delivery lacks (some of) the actual avtal documents.
+export function T_REQUEST_MISSING(ctx) {
+  const received = ctx.received ?? [];
+  const missing = ctx.missing ?? [];
+  let ask;
+  if (missing.length && received.length) {
+    ask = `Tack för avtalen gällande ${listSv(received)}. Jag saknar dock ännu de faktiska avtalshandlingarna för ${listSv(missing)} — kan ni skicka dem?`;
+  } else if (missing.length) {
+    ask = `Tack för ert svar. Själva avtalshandlingarna verkar dock inte vara bifogade — kan ni skicka de fullständiga avtalen för ${listSv(missing)}?`;
+  } else {
+    ask = 'Tack för ert svar. Jag ser dock inte de faktiska avtalshandlingarna bifogade — kan ni skicka de fullständiga avtalen?';
+  }
+  return {
+    subject: `Re: ${ctx.thread_subject}`,
+    body: ['Hej,', '', ask, '', signature(ctx)].join('\n'),
+  };
+}
