@@ -14,6 +14,6 @@ auth.setCredentials(loadStoredToken(TOKEN_PATH));
 const gmail = makeGmail(auth);
 const gmailOps = { getMessage };
 
-const r = await backfillThreads({ db, gmail, gmailOps });
-console.log(`Backfill complete: scanned ${r.scanned}, updated ${r.updated}.`);
+const r = await backfillThreads({ db, gmail, gmailOps, log: (m) => console.log(`  ${m}`) });
+console.log(`Backfill complete: scanned ${r.scanned}, updated ${r.updated}, skipped ${r.skipped}, classified ${r.classified}.`);
 process.exit(0);

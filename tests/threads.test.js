@@ -51,8 +51,36 @@ describe('backfillThreads', () => {
     expect(ann.gmail_thread_id).toBe('thr-anneli');
     expect(ann.thread_id).toBeTruthy();
 
+    // Backfill classifies each touched thread like live ingest: Anneli's thread
+    // (delivery + 10 attachments) → primary; the registrator auto_ack → muted.
+    expect(r.classified).toBe(2);
+    expect(db.getThread(convId, 'thr-anneli').status).toBe('primary');
+    expect(db.getThread(convId, 'thr-orig').status).toBe('muted');
+
     const r2 = await backfillThreads({ db, gmail: {}, gmailOps }); // idempotent
     expect(r2.updated).toBe(0);
+  });
+
+  it('skips a message whose getMessage fails (e.g. deleted → 404) without aborting the run', async () => {
+    const db = openDb(':memory:');
+    db.migrate();
+    const convId = db.createConversation({ kommun_kod: '1', kommun_namn: 'Arboga', role: 'central', contact_email: 'r@arboga.se', scheduled_send_at: '2026-05-01T00:00:00Z' });
+    db.recordMessage({ conversation_id: convId, gmail_message_id: 'gone-1', direction: 'outbound', from_email: 'me@x.se', to_email: 'r@arboga.se', subject: 'x', body_text: '', classification: null, classification_confidence: null, received_at: '2026-05-01T00:00:00Z', attachment_count: 0 });
+    db.recordMessage({ conversation_id: convId, gmail_message_id: 'ok-1', direction: 'inbound', from_email: 'r@arboga.se', to_email: 'me@x.se', subject: 'SV', body_text: 'avtal', classification: 'delivery', classification_confidence: 0.9, received_at: '2026-06-23T00:00:00Z', attachment_count: 3 });
+
+    const gmailOps = {
+      getMessage: vi.fn(async (g, id) => {
+        if (id === 'gone-1') { const e = new Error('Requested entity was not found.'); e.status = 404; throw e; }
+        return { id, threadId: 'thr-ok' };
+      }),
+    };
+    const logs = [];
+    const r = await backfillThreads({ db, gmail: {}, gmailOps, log: (m) => logs.push(m) });
+
+    expect(r.updated).toBe(1);   // the fetchable one still processed
+    expect(r.skipped).toBe(1);   // the 404 counted, not fatal
+    expect(logs.some((m) => m.includes('gone-1'))).toBe(true);
+    expect(db.raw.prepare("SELECT gmail_thread_id FROM messages WHERE gmail_message_id = 'ok-1'").get().gmail_thread_id).toBe('thr-ok');
   });
 });
 
