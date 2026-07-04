@@ -255,14 +255,15 @@ export async function runTick(deps) {
           const analyseContracts = deps.analyseContracts ?? analysePendingContracts;
           try {
             await analyseContracts({ db, env, log: deps.log, onlyMessageId: messageId });
+            const { received, missing } = computeReceivedMissing(db.listContractInfoForMessage(messageId));
+            if (chooseDeliveryReply({ received, missing }).template === 'T_REQUEST_MISSING') {
+              draftTemplate = 'T_REQUEST_MISSING';
+              llmDraft = null; // the PDF-blind LLM draft must not win here
+              templateCtx = { received, missing };
+            }
           } catch (e) {
             deps.log?.(`inline contract analysis error: ${e.message}`);
-          }
-          const { received, missing } = computeReceivedMissing(db.listContractInfoForMessage(messageId));
-          if (chooseDeliveryReply({ received, missing }).template === 'T_REQUEST_MISSING') {
-            draftTemplate = 'T_REQUEST_MISSING';
-            llmDraft = null; // the PDF-blind LLM draft must not win here
-            templateCtx = { received, missing };
+            // fall back to T_RECEIPT with the existing llmDraft — never crash the tick
           }
         }
 

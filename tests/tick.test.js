@@ -635,4 +635,38 @@ describe('runTick — contract-aware delivery draft', () => {
     expect(esc.draft_body).toMatch(/Quiculum/);
     expect(esc.draft_body).not.toMatch(/Tack så mycket för avtalen!/); // LLM draft overridden
   });
+
+  it('falls back to T_RECEIPT with LLM draft when analyseContracts throws', async () => {
+    const convId = db.createConversation({ kommun_kod: '2', kommun_namn: 'Bjurholm', role: 'central', contact_email: 'kommun@bjurholm.se', scheduled_send_at: '2026-05-01T00:00:00Z' });
+    db.updateConversationState(convId, 'SENT', { gmail_thread_id: 'thr-q', last_outbound_at: '2026-05-01T00:00:00Z' });
+
+    const spy = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue({
+      intent: 'delivery', confidence: 0.9, summary: 'Svar bifogat.',
+      suggested_action: 'send_receipt', draft_reply: 'Tack för leveransen!', follow_up_at: null,
+      extracted: {},
+    });
+
+    const msg = {
+      id: 'in-2', threadId: 'thr-q',
+      payload: { headers: [
+        { name: 'From', value: 'Svensson Anna <anna.svensson@bjurholm.se>' },
+        { name: 'To', value: 'me@x.se' }, { name: 'Subject', value: 'Svar' },
+      ], mimeType: 'multipart/mixed', parts: [
+        { mimeType: 'text/plain', body: { data: b64('Se bifogad fil.') } },
+        { mimeType: 'application/pdf', filename: 'Avtal.pdf', body: { attachmentId: 'att-2', size: 200 } },
+      ] },
+    };
+
+    // Injected analyseContracts throws — the tick must not crash and must fall back to T_RECEIPT.
+    const analyseContracts = async () => { throw new Error('llm timeout'); };
+
+    await expect(
+      runTick(makeDeps({ gmail: fakeGmail({ listResult: [{ id: 'in-2' }], getResult: { 'in-2': msg } }), analyseContracts }))
+    ).resolves.not.toThrow();
+    spy.mockRestore();
+
+    const esc = db.raw.prepare('SELECT * FROM escalations WHERE conversation_id = ?').get(convId);
+    expect(esc.draft_template).toBe('T_RECEIPT');
+    expect(esc.draft_body).toContain('Tack för leveransen!');
+  });
 });
