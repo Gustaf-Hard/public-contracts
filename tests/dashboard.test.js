@@ -616,6 +616,24 @@ describe('thread-grouped case view', () => {
     expect(res.text).toMatch(/muted/);
   });
 
+  it('attaches an escalation to its thread by recipient (no message_id) and flags it light red', async () => {
+    const convId = db.createConversation({ kommun_kod: '2418', kommun_namn: 'Arjeplog', role: 'central', contact_email: 'kommun@arjeplog.se', scheduled_send_at: '2026-05-01T00:00:00Z' });
+    db.updateConversationState(convId, 'DELIVERING', { gmail_thread_id: 'thr-p' });
+    const t = db.upsertThread({ conversation_id: convId, gmail_thread_id: 'thr-p', counterparty_email: 'Stoltz Pernilla <Pernilla.Stoltz@arjeplog.se>', counterparty_name: 'Stoltz Pernilla' });
+    db.setThreadStatus(t.id, 'primary', 'auto');
+    db.recordMessage({ conversation_id: convId, gmail_message_id: 'p-1', direction: 'inbound', from_email: 'Pernilla.Stoltz@arjeplog.se', to_email: 'me@x.se', subject: 'Svar', body_text: 'avtal bifogat', classification: 'delivery', classification_confidence: 0.9, received_at: '2026-06-29T00:00:00Z', attachment_count: 2, gmail_thread_id: 'thr-p', thread_id: t.id });
+    // Legacy escalation: no message_id, but recipient resolves to Pernilla.
+    db.recordEscalation({ conversation_id: convId, reason: 'delivery', draft_template: 'T_RECEIPT', draft_subject: 'Re: Svar', draft_body: 'tack-mottaget' });
+
+    const app = createDashboardApp({ db, municipalitiesLoader: () => [{ kommun_kod: '2418', kommun_namn: 'Arjeplog', lan: 'X', folkmangd: 1, contacts: [] }] });
+    const res = await get(app, '/kommun/2418');
+    // The escalation attaches to Pernilla's thread, which is flagged needs-action.
+    expect(res.text).toMatch(/thread-group[^"]*thread-needs-action/);
+    // The reply form renders inside a thread body, NOT in a separate bottom block.
+    expect(res.text).not.toContain('Öppna eskaleringar');
+    expect(res.text).toContain('tack-mottaget');
+  });
+
   it('renders threads as collapsed rows (accordion), newest first, body hidden until expanded', async () => {
     const convId = db.createConversation({ kommun_kod: '2418', kommun_namn: 'Arboga', role: 'central', contact_email: 'registrator@arboga.se', scheduled_send_at: '2026-05-01T00:00:00Z' });
     db.updateConversationState(convId, 'DELIVERING', { gmail_thread_id: 'thr-old' });

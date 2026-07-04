@@ -529,6 +529,9 @@ const baseCss = `
   .modal-status.ok { color: var(--good); } .modal-status.err { color: var(--bad); }
   .thread-group { border: 1px solid var(--border); border-radius: 8px; margin: 10px 0; overflow: hidden; }
   .thread-group.thread-muted { opacity: 0.72; }
+  /* A thread with a pending escalation needs the operator — light-red tint. */
+  .thread-group.thread-needs-action { background: rgba(220, 38, 38, 0.06); border-color: rgba(220, 38, 38, 0.45); opacity: 1; }
+  .thread-group.thread-needs-action .thread-head:hover { background: rgba(220, 38, 38, 0.10); }
   /* Collapsed thread row: clickable inbox-style header, hidden body until opened. */
   .thread-group .thread-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 10px 12px; cursor: pointer; margin: 0; border-bottom: none; }
   .thread-group .thread-head:hover { background: var(--bg-elev-2); }
@@ -1173,13 +1176,9 @@ export function renderKommunDetail({ kommun, conversations, messagesByConv, atta
         // Ärenden tab (renderCaseDetailPane), so a conversation looks the same
         // wherever it's viewed.
         const convThreads = threadsByConv[conv.id] ?? [];
-        // Build escalationsByThread for this conversation.
-        const escByThread = new Map();
-        for (const e of escs) {
-          const tid = e.thread_id ?? null;
-          if (!escByThread.has(tid)) escByThread.set(tid, []);
-          escByThread.get(tid).push(e);
-        }
+        // Group escalations under their thread (by triggering message, else by
+        // recipient↔counterparty match — see groupEscalationsByThread).
+        const escByThread = groupEscalationsByThread(escs, convThreads);
         const thread = convThreads.length
           ? renderThreadGroups(convThreads, msgs, attachmentsByMsg, signatures, escByThread, gmailReady)
           : (msgs.length
@@ -1328,6 +1327,30 @@ function threadStatusControls(t) {
     </form>`;
 }
 
+// Associate each open escalation with a thread: by its triggering message's
+// thread_id when known, else by matching its resolved recipient against a
+// thread's counterparty email (handles legacy escalations with no message_id).
+// Escalations matching no thread land under the null key (rendered separately).
+function groupEscalationsByThread(escalations, threads) {
+  const emailOf = (s) => parseAddr(s || '').email.toLowerCase();
+  const byCounterparty = new Map();
+  for (const t of threads) {
+    const em = emailOf(t.counterparty_email);
+    if (em && !byCounterparty.has(em)) byCounterparty.set(em, t.id);
+  }
+  const map = new Map();
+  for (const e of escalations) {
+    let tid = e.thread_id ?? null;
+    if (tid == null) {
+      const match = byCounterparty.get(emailOf(e.recipient));
+      if (match != null) tid = match;
+    }
+    if (!map.has(tid)) map.set(tid, []);
+    map.get(tid).push(e);
+  }
+  return map;
+}
+
 // A compact preview line for a collapsed thread row: latest message's snippet,
 // its date, and the message count — so the row is informative without opening.
 function threadPreview(msgs) {
@@ -1377,8 +1400,11 @@ function renderThreadGroups(threads, messages, attachmentsByMsg, signatures, esc
     // even on a muted thread. Muting suppresses NEW suggestions at ingest; it
     // must never hide an escalation that was already opened (e.g. before the
     // operator muted the thread), or the action silently disappears.
-    const replies = (escalationsByThread.get(t.id) ?? []).map((e) => renderEscalationForm(e, gmailReady)).join('');
-    return `<section class="thread-group thread-${escapeHtml(t.status)}">${header}<div class="thread-body" data-thread-body hidden>${msgHtml}${replies}</div></section>`;
+    const threadEscs = escalationsByThread.get(t.id) ?? [];
+    const replies = threadEscs.map((e) => renderEscalationForm(e, gmailReady)).join('');
+    // A thread with a pending escalation needs the operator — flag it light red.
+    const needsAction = threadEscs.length > 0 ? ' thread-needs-action' : '';
+    return `<section class="thread-group thread-${escapeHtml(t.status)}${needsAction}">${header}<div class="thread-body" data-thread-body hidden>${msgHtml}${replies}</div></section>`;
   });
   // Orphan messages (thread_id null — only before backfill) must never vanish.
   const orphans = byThread.get('none') ?? [];
@@ -1397,13 +1423,9 @@ function renderCaseDetailPane(selected, gmailReady) {
   const fuBadge = fmtFollowUpBadge(follow_up?.date, follow_up?.source);
   const subject = messages.find((m) => m.subject)?.subject ?? `Begäran — ${conv.kommun_namn}`;
 
-  // Build escalationsByThread: group escalations under their triggering message's thread_id.
-  const escalationsByThread = new Map();
-  for (const e of escalations) {
-    const tid = e.thread_id ?? null;
-    if (!escalationsByThread.has(tid)) escalationsByThread.set(tid, []);
-    escalationsByThread.get(tid).push(e);
-  }
+  // Group escalations under their thread (by triggering message, else by
+  // recipient↔counterparty match — see groupEscalationsByThread).
+  const escalationsByThread = groupEscalationsByThread(escalations, threads);
 
   const thread = threads.length
     ? renderThreadGroups(threads, messages, attachmentsByMsg, signatures, escalationsByThread, gmailReady)
