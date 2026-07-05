@@ -73,9 +73,12 @@ describe('OAuth state + PKCE (L3)', () => {
     expect(url.searchParams.get('code_challenge_method')).toBe('S256');
 
     // CSRF'd code injection: right path, wrong state → 400 + rejected flow.
+    // Attach the rejection handler before triggering it, or `done` is briefly
+    // rejected-without-handler and Node emits an unhandledRejection.
+    const rejected = expect(done).rejects.toThrow(/state mismatch/);
     const res = await fetch(`http://127.0.0.1:${port}/oauth2callback?code=evil&state=wrong`);
     expect(res.status).toBe(400);
-    await expect(done).rejects.toThrow(/state mismatch/);
+    await rejected;
   });
 });
 
