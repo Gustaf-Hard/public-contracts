@@ -111,30 +111,47 @@ export function chooseDeliveryReply({ received = [], missing = [] } = {}) {
   return { template: missing.length > 0 ? 'T_REQUEST_MISSING' : 'T_RECEIPT' };
 }
 
-// Derive received (real contracts) vs missing (named but undocumented) vendors
-// from the contract-analysis rows of one delivery's attachments.
+// Derive received (real contracts), missing (named but undocumented), and all
+// (every vendor named anywhere in the delivery) from a delivery's contract rows.
 export function computeReceivedMissing(rows = []) {
+  const all = [];
+  const seenAll = new Set();
+  const addAll = (name) => {
+    if (!name) return;
+    const k = name.toLowerCase();
+    if (!seenAll.has(k)) { seenAll.add(k); all.push(name); }
+  };
+
+  // Parse each row's analysis_json once.
+  const parsed = rows.map((r) => {
+    let a = r.analysis_json;
+    if (typeof a === 'string') { try { a = JSON.parse(a); } catch { a = null; } }
+    return { r, a };
+  });
+
   const received = [];
   const seen = new Set();
-  for (const r of rows) {
+  for (const { r } of parsed) {
+    if (r.vendor_name) addAll(r.vendor_name);
     if (r.is_contract && r.vendor_name) {
       const k = r.vendor_name.toLowerCase();
       if (!seen.has(k)) { seen.add(k); received.push(r.vendor_name); }
     }
   }
+
   const missing = [];
   const seenMissing = new Set(seen); // never ask for something already received
-  for (const r of rows) {
-    let a = r.analysis_json;
-    if (typeof a === 'string') { try { a = JSON.parse(a); } catch { a = null; } }
+  for (const { a } of parsed) {
     for (const m of a?.mentioned_agreements ?? []) {
+      if (m && m.vendor) addAll(m.vendor);
       if (m && m.doc_attached === false && m.vendor) {
         const k = m.vendor.toLowerCase();
         if (!seenMissing.has(k)) { seenMissing.add(k); missing.push(m.vendor); }
       }
     }
   }
-  return { received, missing };
+
+  return { received, missing, all };
 }
 
 // Follow-up when a delivery lacks (some of) the actual avtal documents.

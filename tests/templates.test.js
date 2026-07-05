@@ -108,12 +108,30 @@ describe('computeReceivedMissing', () => {
         { vendor: 'Skolon', product: null, doc_attached: false }, // already received → excluded
       ] }) },
     ];
-    expect(computeReceivedMissing(rows)).toEqual({ received: ['Skolon'], missing: ['Quiculum', 'Teachiq'] });
+    expect(computeReceivedMissing(rows)).toMatchObject({ received: ['Skolon'], missing: ['Quiculum', 'Teachiq'] });
   });
 
   it('handles object analysis_json and no mentions', () => {
     const rows = [{ is_contract: 1, vendor_name: 'Google', analysis_json: { mentioned_agreements: [] } }];
-    expect(computeReceivedMissing(rows)).toEqual({ received: ['Google'], missing: [] });
+    expect(computeReceivedMissing(rows)).toMatchObject({ received: ['Google'], missing: [] });
+  });
+});
+
+describe('computeReceivedMissing — all vendors', () => {
+  it('returns all = union of received and every mentioned vendor (incl doc_attached=true)', () => {
+    const rows = [
+      { is_contract: 1, vendor_name: 'Quiculum', analysis_json: JSON.stringify({ mentioned_agreements: [
+        { vendor: 'Quiculum', product: null, doc_attached: true },
+        { vendor: 'Teachiq', product: null, doc_attached: false },
+      ] }) },
+      { is_contract: 0, vendor_name: null, analysis_json: JSON.stringify({ mentioned_agreements: [
+        { vendor: 'LäroMedia Bokhandel Örebro', product: null, doc_attached: false },
+      ] }) },
+    ];
+    const { received, missing, all } = computeReceivedMissing(rows);
+    expect(received).toEqual(['Quiculum']);
+    expect(missing).toEqual(['Teachiq', 'LäroMedia Bokhandel Örebro']);
+    expect(all).toEqual(['Quiculum', 'Teachiq', 'LäroMedia Bokhandel Örebro']);
   });
 });
 
