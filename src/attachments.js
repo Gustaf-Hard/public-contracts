@@ -24,6 +24,27 @@ export function extractPdfsFromZip(buffer) {
   return out;
 }
 
+// De-duplicate filenames within one message. Two same-named PDFs (e.g. zip
+// subfolders a/avtal.pdf and b/avtal.pdf that both flatten to avtal.pdf)
+// would otherwise overwrite the same saved path, leaving two DB rows pointing
+// at one file. Second and later occurrences get " (2)", " (3)"… before the
+// extension. Case-insensitive, since the saved filesystem may be.
+export function dedupeFilenames(entries) {
+  const used = new Map();
+  return entries.map((e) => {
+    const name = e.filename || 'attachment';
+    const key = name.toLowerCase();
+    const n = (used.get(key) ?? 0) + 1;
+    used.set(key, n);
+    if (n === 1) return e;
+    const dot = name.lastIndexOf('.');
+    const renamed = dot > 0
+      ? `${name.slice(0, dot)} (${n})${name.slice(dot)}`
+      : `${name} (${n})`;
+    return { ...e, filename: renamed };
+  });
+}
+
 export function safeFilename(name) {
   // First, replace path separators with underscores
   let safe = name.replace(/[/\\]+/g, '_');

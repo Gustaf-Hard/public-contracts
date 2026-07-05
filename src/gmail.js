@@ -90,10 +90,10 @@ function headerValue(headers, name) {
   return h?.value ?? '';
 }
 
-function walkParts(payload, plainOut, attsOut) {
+function walkParts(payload, plainOut, attsOut, htmlOut) {
   if (!payload) return;
   if (payload.parts) {
-    for (const p of payload.parts) walkParts(p, plainOut, attsOut);
+    for (const p of payload.parts) walkParts(p, plainOut, attsOut, htmlOut);
     return;
   }
   if (payload.filename && payload.body?.attachmentId) {
@@ -108,13 +108,47 @@ function walkParts(payload, plainOut, attsOut) {
   if (payload.mimeType === 'text/plain' && payload.body?.data) {
     plainOut.push(parseBase64Url.decode(payload.body.data));
   }
+  if (payload.mimeType === 'text/html' && payload.body?.data) {
+    htmlOut.push(parseBase64Url.decode(payload.body.data));
+  }
+}
+
+// Minimal HTML → plain text for HTML-only inbound (many kommun mail systems
+// send no text/plain alternative). Not a full renderer: strips style/script,
+// turns structural tags into newlines, drops the rest of the tags, decodes
+// the entities that actually occur in Swedish mail.
+export function htmlToText(html) {
+  let s = String(html ?? '');
+  s = s.replace(/<style[\s\S]*?<\/style>/gi, '').replace(/<script[\s\S]*?<\/script>/gi, '');
+  s = s.replace(/<head[\s\S]*?<\/head>/gi, '');
+  s = s.replace(/<br\s*\/?>/gi, '\n');
+  s = s.replace(/<\/(p|div|tr|li|h[1-6]|table|blockquote)>/gi, '\n');
+  s = s.replace(/<[^>]+>/g, '');
+  s = s.replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)));
+  s = s.replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(parseInt(d, 10)));
+  const entities = {
+    nbsp: ' ', amp: '&', lt: '<', gt: '>', quot: '"', apos: "'",
+    aring: 'å', Aring: 'Å', auml: 'ä', Auml: 'Ä', ouml: 'ö', Ouml: 'Ö',
+    eacute: 'é', Eacute: 'É', uuml: 'ü', Uuml: 'Ü',
+  };
+  s = s.replace(/&([a-zA-Z]+);/g, (m, name) => entities[name] ?? m);
+  s = s.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n');
+  return s.trim();
 }
 
 export function parseInboundMessage(message) {
   const headers = message.payload?.headers ?? [];
   const plain = [];
+  const html = [];
   const attachments = [];
-  walkParts(message.payload, plain, attachments);
+  walkParts(message.payload, plain, attachments, html);
+  // Prefer text/plain; fall back to stripped text/html so an HTML-only reply
+  // still reaches the LLM/classifier instead of parsing to an empty body.
+  const body = plain.length > 0 ? plain.join('\n') : htmlToText(html.join('\n'));
+  // Gmail's internalDate is the authoritative delivery time (ms epoch as a
+  // string). Processing time must never be stored as received_at — a post-
+  // outage backlog would corrupt every days-since computation downstream.
+  const internalMs = message.internalDate != null ? parseInt(message.internalDate, 10) : NaN;
   return {
     gmail_message_id: message.id,
     gmail_thread_id: message.threadId,
@@ -125,8 +159,9 @@ export function parseInboundMessage(message) {
     message_id_header: headerValue(headers, 'Message-Id'),
     in_reply_to: headerValue(headers, 'In-Reply-To'),
     references: headerValue(headers, 'References'),
-    body: plain.join('\n'),
+    body,
     attachments,
+    internal_date: Number.isFinite(internalMs) ? new Date(internalMs).toISOString() : null,
   };
 }
 
