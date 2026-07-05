@@ -11,6 +11,8 @@ data/pilot.db
 data/pilot.db-journal
 data/pilot.db-wal
 data/pilot.db-shm
+# DB backups are PII stores (registrator names, direct emails, correspondence)
+data/pilot.db.bak-*
 data/contracts/
 ~/.config/mediagraf/
 *.gmail-token.json

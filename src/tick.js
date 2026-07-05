@@ -637,7 +637,10 @@ export async function runDailyFollowup(deps) {
       await escalateWithDraft({
         conv,
         parsedInbound: null,
-        classification: null,
+        // Follow-up drafts get a synthetic classifier class so their decisions
+        // can form a graduating (class, state) pair — NULL never graduates
+        // (review M3).
+        classification: { class: 'followup_stale', confidence: null },
         previousState: conv.state,
         draftTemplate,
         reason,

@@ -887,7 +887,7 @@ export function createDashboardApp({
   // Manually close a case (or mark it as a dead-end). POST /conversations/:id/close
   // with body { state: 'DONE' | 'DEAD_END' }. Records the decision and updates
   // state_changed_at so case-duration math works.
-  app.post('/conversations/:id/close', (req, res) => {
+  app.post('/conversations/:id/close', async (req, res) => {
     if (!db) return res.status(503).send('No DB');
     const convId = parseInt(req.params.id, 10);
     const conv = db.getConversation(convId);
@@ -897,10 +897,22 @@ export function createDashboardApp({
     db.updateConversationState(convId, targetState, { follow_up_at: null });
     // Closing the case makes any open escalation obsolete — resolve them so
     // they stop showing as pending work (in the case view and the action queue).
+    // Each one also writes a decision row (review M3): "human closed instead of
+    // sending this draft" is graduation signal, not noise.
     const openEscs = db.raw
-      .prepare("SELECT id FROM escalations WHERE conversation_id = ? AND status = 'open'")
+      .prepare("SELECT * FROM escalations WHERE conversation_id = ? AND status = 'open'")
       .all(convId);
-    for (const e of openEscs) db.resolveEscalation(e.id, { status: 'resolved_closed' });
+    for (const e of openEscs) {
+      db.resolveEscalation(e.id, { status: 'resolved_closed' });
+      db.recordDecision({
+        escalation_id: e.id, conversation_id: conv.id,
+        conversation_state: e.previous_state ?? conv.state,
+        classifier_class: e.classifier_class ?? null, classifier_confidence: e.classifier_confidence ?? null,
+        draft_template: e.draft_template, draft_body: e.draft_body ?? '',
+        decision: 'closed', final_body: null,
+      });
+      await stripSlackButtons(e, conv.kommun_namn, 'resolved_closed');
+    }
     res.redirect(backTo(req, `/kommun/${conv.kommun_kod}`));
   });
 
@@ -953,11 +965,17 @@ function escapeForError(s) {
   return String(s).replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' })[c]);
 }
 
-export function startDashboard({ port = parseInt(process.env.PILOT_DASHBOARD_PORT ?? '3100', 10) } = {}) {
+export function startDashboard({
+  port = parseInt(process.env.PILOT_DASHBOARD_PORT ?? '3100', 10),
+  // Loopback only (review H6): the dashboard is unauthenticated and can send
+  // email as the operator + read the full PII corpus. Never expose it on the
+  // LAN by default; set PILOT_DASHBOARD_HOST explicitly to override.
+  host = process.env.PILOT_DASHBOARD_HOST ?? '127.0.0.1',
+} = {}) {
   const app = createDashboardApp();
   return new Promise((resolve) => {
-    const server = app.listen(port, () => {
-      console.log(`Pilot dashboard listening on http://localhost:${port}`);
+    const server = app.listen(port, host, () => {
+      console.log(`Pilot dashboard listening on http://${host}:${port}`);
       resolve(server);
     });
   });

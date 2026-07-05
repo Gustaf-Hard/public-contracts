@@ -140,7 +140,9 @@ export async function sendApprovedReply({ db, gmail, env, conv, esc, finalBody, 
   db.recordDecision({
     escalation_id: esc.id,
     conversation_id: conv.id,
-    conversation_state: conv.state,
+    // Pair key for graduation = the state the draft was created FOR, not the
+    // state after the FSM auto-advanced (review M3).
+    conversation_state: esc.previous_state ?? conv.state,
     classifier_class: esc.classifier_class ?? null,
     classifier_confidence: esc.classifier_confidence ?? null,
     draft_template: esc.draft_template,

@@ -15,7 +15,11 @@ import Anthropic from '@anthropic-ai/sdk';
 
 const DEFAULT_MODEL = 'claude-haiku-4-5';
 
-const SYSTEM_PROMPT = `Du analyserar inkommande e-postsvar från svenska kommunregistratorer. En automatisk bot skickar förfrågningar om allmänna handlingar (offentlighetsprincipen, 2 kap. tryckfrihetsförordningen) avseende avtal för digitala verktyg och läromedel i skolan. Boten skickar sina förfrågningar via gustaf.hard@gmail.com å Mediagrafs vägnar.
+// The outbound identity (signature + sender address) comes from env, never
+// hardcoded (review M8): drafts must sign whatever GMAIL_FROM_NAME /
+// GMAIL_USER_EMAIL the daemon actually sends as. Exported for tests.
+export function buildSystemPrompt({ from_name, from_email }) {
+  return `Du analyserar inkommande e-postsvar från svenska kommunregistratorer. En automatisk bot skickar förfrågningar om allmänna handlingar (offentlighetsprincipen, 2 kap. tryckfrihetsförordningen) avseende avtal för digitala verktyg och läromedel i skolan. Boten skickar sina förfrågningar via ${from_email} å Mediagrafs vägnar.
 
 Ditt jobb är att kategorisera registratorns svar och förbereda ett kort, artigt svar på svenska som den mänskliga operatören kan godkänna eller redigera.
 
@@ -40,7 +44,7 @@ Ditt jobb är att kategorisera registratorns svar och förbereda ett kort, artig
 
 # draft_reply
 
-Skriv alltid ett konkret förslag på svar på svenska, även för "wait"-fall (om vi senare bestämmer oss för att svara). Var artig och kort. Använd "Hej," utan personnamn. Avsluta med "Med vänliga hälsningar,\\nGustaf Hård af Segerstad\\ngustaf.hard@gmail.com". Boten är inte en advokat — undvik översjälvsäkra formuleringar.
+Skriv alltid ett konkret förslag på svar på svenska, även för "wait"-fall (om vi senare bestämmer oss för att svara). Var artig och kort. Använd "Hej," utan personnamn. Avsluta med "Med vänliga hälsningar,\\n${from_name}\\n${from_email}". Boten är inte en advokat — undvik översjälvsäkra formuleringar.
 
 # is_final_delivery
 
@@ -61,37 +65,38 @@ Inkommande:
 > Tack för din begäran. Ärendenummer: K202642713. Vi återkommer.
 
 Output:
-{"intent":"auto_ack","confidence":0.95,"summary":"Automatiskt mottagningskvitto med ärendenummer K202642713.","extracted":{"arendenummer":"K202642713","promised_response_days":null,"promised_response_date":null,"handoff_to_email":null,"handoff_to_forvaltning":null,"questions":null,"mentioned_vendors":null},"suggested_action":"wait","is_final_delivery":false,"draft_reply":"Hej,\\n\\nTack för bekräftelsen. Jag inväntar handlingarna.\\n\\nMed vänliga hälsningar,\\nGustaf Hård af Segerstad\\ngustaf.hard@gmail.com","follow_up_at":null}
+{"intent":"auto_ack","confidence":0.95,"summary":"Automatiskt mottagningskvitto med ärendenummer K202642713.","extracted":{"arendenummer":"K202642713","promised_response_days":null,"promised_response_date":null,"handoff_to_email":null,"handoff_to_forvaltning":null,"questions":null,"mentioned_vendors":null},"suggested_action":"wait","is_final_delivery":false,"draft_reply":"Hej,\\n\\nTack för bekräftelsen. Jag inväntar handlingarna.\\n\\nMed vänliga hälsningar,\\n${from_name}\\n${from_email}","follow_up_at":null}
 
 Inkommande:
 > Hej, för att kunna hjälpa dig på bästa sätt önskar jag veta: avser begäran en viss tidsperiod, och gäller den specifika system eller leverantörer?
 
 Output:
-{"intent":"clarification","confidence":0.9,"summary":"Registratorn ber om precisering kring tidsperiod och specifika system.","extracted":{"arendenummer":null,"promised_response_days":null,"promised_response_date":null,"handoff_to_email":null,"handoff_to_forvaltning":null,"questions":["Avser begäran en viss tidsperiod?","Gäller den specifika system eller leverantörer?"],"mentioned_vendors":null},"suggested_action":"send_precision","is_final_delivery":false,"draft_reply":"Hej,\\n\\nTack för snabbt svar! Jag preciserar:\\n\\nJag efterfrågar aktiva avtal (ej utgångna) avseende digitala verktyg inom utbildningsförvaltningen, inklusive lärplattformar, digitala läromedel och administrativa system. Jag önskar de fullständiga avtalshandlingarna i PDF-format.\\n\\nMed vänliga hälsningar,\\nGustaf Hård af Segerstad\\ngustaf.hard@gmail.com","follow_up_at":null}
+{"intent":"clarification","confidence":0.9,"summary":"Registratorn ber om precisering kring tidsperiod och specifika system.","extracted":{"arendenummer":null,"promised_response_days":null,"promised_response_date":null,"handoff_to_email":null,"handoff_to_forvaltning":null,"questions":["Avser begäran en viss tidsperiod?","Gäller den specifika system eller leverantörer?"],"mentioned_vendors":null},"suggested_action":"send_precision","is_final_delivery":false,"draft_reply":"Hej,\\n\\nTack för snabbt svar! Jag preciserar:\\n\\nJag efterfrågar aktiva avtal (ej utgångna) avseende digitala verktyg inom utbildningsförvaltningen, inklusive lärplattformar, digitala läromedel och administrativa system. Jag önskar de fullständiga avtalshandlingarna i PDF-format.\\n\\nMed vänliga hälsningar,\\n${from_name}\\n${from_email}","follow_up_at":null}
 
 Inkommande:
 > Hej, vi behöver cirka 10 arbetsdagar för att ta fram materialet. Återkommer senast 2026-06-08.
 
 Output:
-{"intent":"delay_promise","confidence":0.95,"summary":"Kommunen utlovar svar inom 10 arbetsdagar, senast 2026-06-08.","extracted":{"arendenummer":null,"promised_response_days":10,"promised_response_date":"2026-06-08","handoff_to_email":null,"handoff_to_forvaltning":null,"questions":null,"mentioned_vendors":null},"suggested_action":"wait","is_final_delivery":false,"draft_reply":"Hej,\\n\\nTack för uppdateringen. Jag inväntar handlingarna senast 8 juni.\\n\\nMed vänliga hälsningar,\\nGustaf Hård af Segerstad\\ngustaf.hard@gmail.com","follow_up_at":"2026-06-11"}
+{"intent":"delay_promise","confidence":0.95,"summary":"Kommunen utlovar svar inom 10 arbetsdagar, senast 2026-06-08.","extracted":{"arendenummer":null,"promised_response_days":10,"promised_response_date":"2026-06-08","handoff_to_email":null,"handoff_to_forvaltning":null,"questions":null,"mentioned_vendors":null},"suggested_action":"wait","is_final_delivery":false,"draft_reply":"Hej,\\n\\nTack för uppdateringen. Jag inväntar handlingarna senast 8 juni.\\n\\nMed vänliga hälsningar,\\n${from_name}\\n${from_email}","follow_up_at":"2026-06-11"}
 
 Inkommande:
 > Hej, dessa avtal hanteras av stadsledningskontoret. Vänligen kontakta dem på registrator@stadsledningen.kommun.se.
 
 Output:
-{"intent":"handoff","confidence":0.95,"summary":"Hänvisas till stadsledningskontoret på registrator@stadsledningen.kommun.se.","extracted":{"arendenummer":null,"promised_response_days":null,"promised_response_date":null,"handoff_to_email":"registrator@stadsledningen.kommun.se","handoff_to_forvaltning":"stadsledningskontoret","questions":null,"mentioned_vendors":null},"suggested_action":"escalate","is_final_delivery":false,"draft_reply":"Hej,\\n\\nTack för hänvisningen. Jag tar kontakt med stadsledningskontoret separat.\\n\\nMed vänliga hälsningar,\\nGustaf Hård af Segerstad\\ngustaf.hard@gmail.com","follow_up_at":null}
+{"intent":"handoff","confidence":0.95,"summary":"Hänvisas till stadsledningskontoret på registrator@stadsledningen.kommun.se.","extracted":{"arendenummer":null,"promised_response_days":null,"promised_response_date":null,"handoff_to_email":"registrator@stadsledningen.kommun.se","handoff_to_forvaltning":"stadsledningskontoret","questions":null,"mentioned_vendors":null},"suggested_action":"escalate","is_final_delivery":false,"draft_reply":"Hej,\\n\\nTack för hänvisningen. Jag tar kontakt med stadsledningskontoret separat.\\n\\nMed vänliga hälsningar,\\n${from_name}\\n${from_email}","follow_up_at":null}
 
 Inkommande:
 > Här bifogas avtalet med Skolon och Google Workspace-avtalet. Hör av dig om något saknas.
 
 Output:
-{"intent":"delivery","confidence":0.9,"summary":"Levererar avtal med Skolon och Google Workspace.","extracted":{"arendenummer":null,"promised_response_days":null,"promised_response_date":null,"handoff_to_email":null,"handoff_to_forvaltning":null,"questions":null,"mentioned_vendors":["Skolon","Google Workspace"]},"suggested_action":"send_receipt","is_final_delivery":false,"draft_reply":"Hej,\\n\\nTack så mycket för avtalen — jag har tagit emot dem. Är detta samtliga avtal eller är fler på väg?\\n\\nMed vänliga hälsningar,\\nGustaf Hård af Segerstad\\ngustaf.hard@gmail.com","follow_up_at":null}
+{"intent":"delivery","confidence":0.9,"summary":"Levererar avtal med Skolon och Google Workspace.","extracted":{"arendenummer":null,"promised_response_days":null,"promised_response_date":null,"handoff_to_email":null,"handoff_to_forvaltning":null,"questions":null,"mentioned_vendors":["Skolon","Google Workspace"]},"suggested_action":"send_receipt","is_final_delivery":false,"draft_reply":"Hej,\\n\\nTack så mycket för avtalen — jag har tagit emot dem. Är detta samtliga avtal eller är fler på väg?\\n\\nMed vänliga hälsningar,\\n${from_name}\\n${from_email}","follow_up_at":null}
 
 # Viktigt
 
 - Svara ENBART med JSON som matchar schemat. Inga inledande/avslutande kommentarer.
 - Om något fält inte kan extraheras från svaret: använd null (eller [] för arrays där det är meningsfullt — eller null om listan vore tom).
 - För confidence: 0.9+ = mycket säker, 0.7-0.9 = ganska säker, <0.7 = osäker (intent bör vara "unknown").`;
+}
 
 const ANALYSIS_SCHEMA = {
   type: 'object',
@@ -170,13 +175,19 @@ export async function analyseMessage(body, ctx, { env = process.env, client = nu
   if (!sdkClient) return null;
 
   const model = env.ANTHROPIC_ANALYSIS_MODEL ?? DEFAULT_MODEL;
+  // Identity from env (review M8) — stable per process, so prompt caching
+  // still applies across calls.
+  const systemPrompt = buildSystemPrompt({
+    from_name: (env.GMAIL_FROM_NAME ?? '').trim() || 'Mediagraf',
+    from_email: (env.GMAIL_USER_EMAIL ?? '').trim(),
+  });
 
   try {
     const response = await sdkClient.messages.create({
       model,
       max_tokens: 1024,
       system: [
-        { type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } },
+        { type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } },
       ],
       messages: [
         { role: 'user', content: userPromptFor(ctx, body) },

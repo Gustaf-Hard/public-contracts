@@ -177,13 +177,17 @@ export function extractEmailDomain(addr) {
   return domain || null;
 }
 
-// True when two email addresses share the same domain (case-insensitive).
-// Used to associate a kommun's reply with its conversation even when the
-// kommun forwarded/replied in a new Gmail thread.
+// True when two email addresses share the same domain, or one's domain is a
+// subdomain of the other's (case-insensitive). Used to associate a kommun's
+// reply with its conversation even when the kommun forwarded/replied in a new
+// Gmail thread — including from a förvaltning subdomain
+// (utbildning.<kommun>.se vs @<kommun>.se, review L2). The dot-anchored
+// endsWith keeps look-alike domains out (xvasteras.se ≠ vasteras.se).
 export function sameEmailDomain(a, b) {
   const da = extractEmailDomain(a);
-  const db = extractEmailDomain(b);
-  return !!da && !!db && da === db;
+  const dbb = extractEmailDomain(b);
+  if (!da || !dbb) return false;
+  return da === dbb || da.endsWith('.' + dbb) || dbb.endsWith('.' + da);
 }
 
 export function buildOAuthClient(env) {
