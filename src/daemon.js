@@ -147,7 +147,7 @@ export async function startDaemon({ env = process.env, log = console.log } = {})
     getMessage: gmailGet,
     fetchAttachment,
   };
-  const slackOps = { postEscalation, postAlert };
+  const slackOps = { postEscalation, postAlert, updateEscalationResolved };
 
   // Known-unmatched inbound (spam, newsletters, out-of-scope senders): skip
   // re-fetching and re-alerting within this process's lifetime (review H5/L5).

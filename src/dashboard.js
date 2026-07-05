@@ -893,7 +893,8 @@ export function createDashboardApp({
     const conv = db.getConversation(convId);
     if (!conv) return res.status(404).send('Case not found');
     const targetState = req.body.state === 'DEAD_END' ? 'DEAD_END' : 'DONE';
-    db.updateConversationState(convId, targetState, {});
+    // A closed case has no live follow-up promise (review M10).
+    db.updateConversationState(convId, targetState, { follow_up_at: null });
     // Closing the case makes any open escalation obsolete — resolve them so
     // they stop showing as pending work (in the case view and the action queue).
     const openEscs = db.raw

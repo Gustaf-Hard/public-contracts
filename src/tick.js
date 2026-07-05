@@ -1,6 +1,6 @@
 import { T_INITIAL, T_PRECISION, T_RECEIPT, T_FOLLOWUP_NUDGE, T_FOLLOWUP_CLOSE, T_REQUEST_MISSING, computeReceivedMissing, chooseDeliveryReply } from './templates.js';
 import { matchWatchlist } from './watchlist.js';
-import { classify } from './classifier.js';
+import { classify, isCloserText } from './classifier.js';
 import { inferThreadStatus } from './threads.js';
 import { nextActionForClassification, staleAction } from './conversation.js';
 import { parseInboundMessage, sameEmailDomain } from './gmail.js';
@@ -133,6 +133,29 @@ async function recoverStuckSends(deps) {
 
 async function escalateWithDraft({ conv, parsedInbound, messageId = null, classification, previousState, draftTemplate, llmDraft, reason, templateCtx = {}, watchlistVendors = [], deps }) {
   const { db, slackClient, slackOps, env, log } = deps;
+
+  // "At most one open next-action per conversation. Always." (2026-06-23 spec,
+  // review H1). A fresher draft supersedes any open escalation: its status
+  // flips to 'superseded' (so a stale approve fails the atomic claim) and its
+  // Slack buttons are stripped best-effort.
+  for (const existing of db.listOpenEscalationsForConversation(conv.id)) {
+    db.resolveEscalation(existing.id, {
+      status: 'superseded',
+      resolved_text: 'superseded by a newer escalation for this conversation',
+    });
+    if (existing.slack_ts && slackOps?.updateEscalationResolved && env.SLACK_CHANNEL_ID) {
+      try {
+        await slackOps.updateEscalationResolved(slackClient, {
+          channel: env.SLACK_CHANNEL_ID, ts: existing.slack_ts,
+          kommun_namn: conv.kommun_namn, status: 'superseded',
+        });
+      } catch (e) {
+        log?.(`chat.update failed for superseded escalation ${existing.id}: ${e.message}`);
+      }
+    }
+    log?.(`SUPERSEDED escalation ${existing.id} for ${conv.kommun_namn}/${conv.role}`);
+  }
+
   let subject = '(no subject)';
   let body = '';
   if (llmDraft) {
@@ -276,7 +299,11 @@ async function ingestMessage({ conv, item, deps }) {
         attachment_count: parsed.attachments.length,
       });
 
-  const isCloser = /samtliga avtal/i.test(parsed.body);
+  // "This was everything" comes from the LLM's own judgment of the
+  // registrator's text; the regex fallback runs only on the UNQUOTED body so
+  // our own quoted receipt ("Är detta samtliga avtal…?") can never close a
+  // case (review M9).
+  const isCloser = analysis ? analysis.is_final_delivery === true : isCloserText(parsed.body);
   const transition = nextActionForClassification(conv.state, classification.class, {
     receipt_sent: !!conv.receipt_sent, is_closer: isCloser,
   });
@@ -358,6 +385,10 @@ async function ingestMessage({ conv, item, deps }) {
     if (classification.extracted?.arendenummer) patch.arendenummer = classification.extracted.arendenummer;
     // When the kommun says "we'll get back to you by date X", honor it.
     if (analysis?.follow_up_at) patch.follow_up_at = analysis.follow_up_at;
+    // A closed case has no live follow-up promise (review M10).
+    if (transition.nextState === 'DONE' || transition.nextState === 'DEAD_END') {
+      patch.follow_up_at = null;
+    }
     db.updateConversationState(conv.id, transition.nextState, patch);
 
     return { thread, messageId };
@@ -413,6 +444,23 @@ async function dispatchEscalationForIngest(pending, deps) {
     } catch (e) {
       deps.log?.(`inline contract analysis error: ${e.message}`);
       // fall back to T_RECEIPT with the existing llmDraft — never crash the tick
+    }
+  } else if (!draftTemplate && classification.class === 'delivery' && parsed.attachments.length > 0) {
+    // Watchlist on later deliveries (review M5): once receipt_sent=1 a delivery
+    // draws no receipt draft, but a watchlisted vendor arriving in a second
+    // batch must still be held for conscious authoring — not analysed silently.
+    const analyseContracts = deps.analyseContracts ?? analysePendingContracts;
+    try {
+      await analyseContracts({ db, env, log: deps.log, onlyMessageId: messageId });
+      const { all } = computeReceivedMissing(db.listContractInfoForMessage(messageId));
+      watchlistVendors = matchWatchlist(all);
+      if (watchlistVendors.length > 0) {
+        draftTemplate = 'free_form';
+        llmDraft = null;
+      }
+    } catch (e) {
+      deps.log?.(`watchlist contract analysis error: ${e.message}`);
+      // never crash the tick; step 3 will analyse the PDFs anyway
     }
   }
 
@@ -564,6 +612,11 @@ export async function runDailyFollowup(deps) {
   const todayIso = now.toISOString().slice(0, 10);
   const all = db.listAllConversations();
   for (const conv of all) {
+    // At most one open next-action per conversation (review H1): while an
+    // escalation sits unapproved, the daily loop must not mint a duplicate
+    // draft every day it stays open.
+    if (db.listOpenEscalationsForConversation(conv.id).length > 0) continue;
+
     const days = daysBetween(new Date(conv.state_changed_at), now);
     const action = staleAction(conv.state, days, conv.followup_count, {
       today: todayIso,

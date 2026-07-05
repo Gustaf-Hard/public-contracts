@@ -33,6 +33,34 @@ const DEAD_END_PATTERNS = [
 
 const ARENDENUMMER_RE = /Ärendenummer\s*[:\-]\s*([Kk]\d{6,})/i;
 
+// Strip quoted reply content so patterns never match OUR OWN text echoed back
+// (a kommun reply usually quotes the T_RECEIPT question "Är detta samtliga
+// avtal…?"). Drops '>'-prefixed lines and everything after common Swedish/
+// Outlook/Gmail reply markers.
+export function stripQuotedText(body) {
+  const lines = String(body ?? '').split('\n');
+  const out = [];
+  for (const line of lines) {
+    const t = line.trim();
+    if (/^-{2,}\s*Ursprungligt meddelande\s*-{2,}/i.test(t)) break; // Outlook sv
+    if (/^-{2,}\s*Original Message\s*-{2,}/i.test(t)) break;
+    if (/^(Den|On) .{4,80}skrev.*:$/i.test(t)) break; // Gmail sv "Den … skrev X:"
+    if (/^Från:\s/i.test(t) || /^From:\s/i.test(t)) break; // forwarded header block
+    if (t.startsWith('>')) continue;
+    out.push(line);
+  }
+  return out.join('\n');
+}
+
+// Fallback "this was everything" detector over the UNQUOTED part of the body
+// (review M9): used only when no LLM analysis is available. Deliberately the
+// strict declarative shape — a question ("Är detta samtliga avtal?") does not
+// match.
+const CLOSER_RE = /(detta var |dessa var |det var |var )samtliga avtal|inga (fler|ytterligare) avtal/i;
+export function isCloserText(body) {
+  return CLOSER_RE.test(stripQuotedText(body));
+}
+
 const THRESHOLD = 0.6;
 const DELIVERY_THRESHOLD = 0.5;
 const MARGIN = 0.2;
