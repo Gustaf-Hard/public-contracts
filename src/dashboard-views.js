@@ -464,6 +464,7 @@ const baseCss = `
   .case-detail .case-header h3 { font-size: 18px; }
   .card.card-alert { border-color: var(--bad); }
   .esc-reason { margin-bottom: 8px; }
+  .esc-watchlist { margin-bottom: 8px; padding: 6px 10px; border-radius: 6px; background: #fde8e8; color: #9b1c1c; font-weight: 600; }
   hr.soft { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
   .collapse-toggle { background: none; border: none; color: var(--accent); font: inherit; font-size: 12px;
     cursor: pointer; padding: 4px 0; }
@@ -814,7 +815,7 @@ export function renderOverview({ summary, rows, filter, sort, order, totalKommun
 
 // ---- Kommun detail ----
 
-function renderEscalationForm(esc, gmailReady, returnTo = null) {
+export function renderEscalationForm(esc, gmailReady, returnTo = null) {
   const disabled = gmailReady ? '' : 'disabled';
   const warn = gmailReady ? '' : '<span class="send-warning">⚠️ Gmail-token saknas — kör <code>npm run pilot-auth</code></span>';
   // When rendered inside a swappable pane, forms post via fetch and return to
@@ -823,7 +824,12 @@ function renderEscalationForm(esc, gmailReady, returnTo = null) {
   const returnField = returnTo ? `<input type="hidden" name="return" value="${escapeHtml(returnTo)}">` : '';
   // Two forms in the card: edit-and-send (uses textarea contents) + skip.
   // Keeping subject editable lets the user fix a wrong "Re:" prefix.
+  const watchVendors = (() => { try { return JSON.parse(esc.watchlist_vendors ?? '[]'); } catch { return []; } })();
+  const watchBanner = Array.isArray(watchVendors) && watchVendors.length
+    ? `<div class="esc-watchlist">⚠️ Bevakad leverantör: ${escapeHtml(watchVendors.join(', '))} — kontrollera innan du svarar.</div>`
+    : '';
   return `
+    ${watchBanner}
     <form class="action-form" method="post" action="/escalations/${esc.id}"${paneAttrs}>
       ${returnField}
       <div class="field">

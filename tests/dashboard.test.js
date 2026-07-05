@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { openDb } from '../src/storage.js';
 import { createDashboardApp, buildActionQueue, buildWaiting, applyFilter, buildOverviewRows, contentDisposition } from '../src/dashboard.js';
-import { layout } from '../src/dashboard-views.js';
+import { layout, renderEscalationForm } from '../src/dashboard-views.js';
 
 let tmp, db, dbPath, muniPath;
 
@@ -702,6 +702,18 @@ describe('closing a case resolves its escalations', () => {
     const esc = db.raw.prepare('SELECT status FROM escalations WHERE id = ?').get(escId);
     expect(esc.status).not.toBe('open'); // resolved on close
     expect(buildActionQueue(db).some((x) => x.conv_id === convId)).toBe(false);
+  });
+});
+
+describe('renderEscalationForm watchlist banner', () => {
+  it('shows the banner when watchlist_vendors is set', () => {
+    const html = renderEscalationForm({ id: 1, recipient: 'a@x.se', draft_subject: 'Re', draft_body: '', watchlist_vendors: JSON.stringify(['Binogi']) }, true);
+    expect(html).toMatch(/Bevakad leverantör/);
+    expect(html).toMatch(/Binogi/);
+  });
+  it('omits the banner when watchlist_vendors is absent', () => {
+    const html = renderEscalationForm({ id: 1, recipient: 'a@x.se', draft_subject: 'Re', draft_body: 'x' }, true);
+    expect(html).not.toMatch(/Bevakad leverantör/);
   });
 });
 
