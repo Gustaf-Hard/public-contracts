@@ -1,4 +1,5 @@
 import { T_INITIAL, T_PRECISION, T_RECEIPT, T_FOLLOWUP_NUDGE, T_FOLLOWUP_CLOSE, T_REQUEST_MISSING, computeReceivedMissing, chooseDeliveryReply } from './templates.js';
+import { matchWatchlist } from './watchlist.js';
 import { classify } from './classifier.js';
 import { inferThreadStatus } from './threads.js';
 import { nextActionForClassification, staleAction } from './conversation.js';
@@ -48,7 +49,7 @@ async function dispatchInitial(conv, deps) {
   log?.(`SENT T-INITIAL → ${conv.kommun_namn}/${conv.role}`);
 }
 
-async function escalateWithDraft({ conv, parsedInbound, messageId = null, classification, previousState, draftTemplate, llmDraft, reason, templateCtx = {}, deps }) {
+async function escalateWithDraft({ conv, parsedInbound, messageId = null, classification, previousState, draftTemplate, llmDraft, reason, templateCtx = {}, watchlistVendors = [], deps }) {
   const { db, slackClient, slackOps, env, log } = deps;
   let subject = '(no subject)';
   let body = '';
@@ -81,6 +82,7 @@ async function escalateWithDraft({ conv, parsedInbound, messageId = null, classi
     classifier_class: classification?.class ?? null,
     classifier_confidence: classification?.confidence ?? null,
     previous_state: previousState ?? null,
+    watchlist_vendors: watchlistVendors.length ? JSON.stringify(watchlistVendors) : null,
   });
 
   if (slackOps && env.SLACK_CHANNEL_ID) {
@@ -91,6 +93,7 @@ async function escalateWithDraft({ conv, parsedInbound, messageId = null, classi
       reply_text: parsedInbound?.body ?? '(no inbound)',
       draft_reply: `Subject: ${subject}\n\n${body}`,
       gmail_thread_id: conv.gmail_thread_id ?? '(no thread)',
+      watchlist_vendors: watchlistVendors,
     });
     const posted = await slackOps.postEscalation(slackClient, {
       channel: env.SLACK_CHANNEL_ID,
@@ -247,16 +250,22 @@ export async function runTick(deps) {
         }
 
         // Contract-aware delivery: a "delivery" reply must reflect what the
-        // attachments actually contain, not the email body. Analyse this
-        // message's attachments inline, then request the specific missing avtal
-        // instead of blindly thanking for contracts.
+        // attachments actually contain. A watchlisted vendor supersedes the
+        // contract-aware draft and holds the reply for conscious authoring.
         let templateCtx = {};
+        let watchlistVendors = [];
         if (draftTemplate === 'T_RECEIPT') {
           const analyseContracts = deps.analyseContracts ?? analysePendingContracts;
           try {
             await analyseContracts({ db, env, log: deps.log, onlyMessageId: messageId });
-            const { received, missing } = computeReceivedMissing(db.listContractInfoForMessage(messageId));
-            if (chooseDeliveryReply({ received, missing }).template === 'T_REQUEST_MISSING') {
+            const { received, missing, all } = computeReceivedMissing(db.listContractInfoForMessage(messageId));
+            watchlistVendors = matchWatchlist(all);
+            if (watchlistVendors.length > 0) {
+              // Hold: no sendable draft, so the operator consciously authors the reply.
+              draftTemplate = 'free_form';
+              llmDraft = null;
+              templateCtx = {};
+            } else if (chooseDeliveryReply({ received, missing }).template === 'T_REQUEST_MISSING') {
               draftTemplate = 'T_REQUEST_MISSING';
               llmDraft = null; // the PDF-blind LLM draft must not win here
               templateCtx = { received, missing };
@@ -269,9 +278,12 @@ export async function runTick(deps) {
 
         const threadStatus = db.getThreadById(thread.id)?.status ?? 'neutral';
         if (draftTemplate && threadStatus !== 'muted') {
-          const reason = analysis
+          let reason = analysis
             ? `llm intent=${analysis.intent} action=${analysis.suggested_action} confidence=${(analysis.confidence ?? 0).toFixed(2)}`
             : `classifier=${classification.class} confidence=${classification.confidence.toFixed(2)}`;
+          if (watchlistVendors.length > 0) {
+            reason = `⚠️ BEVAKAD LEVERANTÖR: ${watchlistVendors.join(', ')} | ${reason}`;
+          }
           await escalateWithDraft({
             conv: updated, parsedInbound: parsed, messageId, classification,
             previousState,
@@ -279,6 +291,7 @@ export async function runTick(deps) {
             llmDraft,
             reason,
             templateCtx,
+            watchlistVendors,
             deps,
           });
         }

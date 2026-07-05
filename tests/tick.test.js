@@ -636,6 +636,49 @@ describe('runTick — contract-aware delivery draft', () => {
     expect(esc.draft_body).not.toMatch(/Tack så mycket för avtalen!/); // LLM draft overridden
   });
 
+  it('holds the draft (free_form) and flags watchlist vendors when a delivery names one', async () => {
+    const convId = db.createConversation({ kommun_kod: '1', kommun_namn: 'Testkommun', role: 'central', contact_email: 'kommun@test.se', scheduled_send_at: '2026-05-01T00:00:00Z' });
+    db.updateConversationState(convId, 'SENT', { gmail_thread_id: 'thr-w', last_outbound_at: '2026-05-01T00:00:00Z' });
+
+    const spy = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue({
+      intent: 'delivery', confidence: 0.9, summary: 'Svar bifogat.',
+      suggested_action: 'send_receipt', draft_reply: 'Tack för avtalen!', follow_up_at: null, extracted: {},
+    });
+
+    const msg = {
+      id: 'in-w', threadId: 'thr-w',
+      payload: { headers: [
+        { name: 'From', value: 'Kommun <kommun@test.se>' },
+        { name: 'To', value: 'me@x.se' }, { name: 'Subject', value: 'Svar' },
+      ], mimeType: 'multipart/mixed', parts: [
+        { mimeType: 'text/plain', body: { data: b64('Bifogat finner du svar.') } },
+        { mimeType: 'application/pdf', filename: 'Svar.pdf', body: { attachmentId: 'att-w', size: 100 } },
+      ] },
+    };
+
+    // Inline analyzer marks this delivery's attachment as a Binogi contract.
+    const analyseContracts = async ({ db: d, onlyMessageId }) => {
+      const atts = d.raw.prepare('SELECT id FROM attachments WHERE message_id = ?').all(onlyMessageId);
+      for (const a of atts) {
+        storeContractAnalysis(d, a.id, {
+          is_contract: true, document_type: 'avtal', vendor_name: 'Binogi',
+          products: [], avtalsvarde: null, valuta: null, period_start: null, period_end: null,
+          summary: 'avtal', confidence: 0.9, mentioned_agreements: [],
+        }, { model: 'test' });
+      }
+      return atts.length;
+    };
+
+    await runTick(makeDeps({ gmail: fakeGmail({ listResult: [{ id: 'in-w' }], getResult: { 'in-w': msg } }), analyseContracts }));
+    spy.mockRestore();
+
+    const esc = db.raw.prepare('SELECT * FROM escalations WHERE conversation_id = ?').get(convId);
+    expect(esc.draft_template).toBe('free_form');
+    expect(JSON.parse(esc.watchlist_vendors)).toEqual(['Binogi']);
+    expect(esc.reason).toMatch(/BEVAKAD LEVERANTÖR/);
+    expect(esc.draft_body).not.toMatch(/Tack för avtalen!/); // LLM draft not used
+  });
+
   it('falls back to T_RECEIPT with LLM draft when analyseContracts throws', async () => {
     const convId = db.createConversation({ kommun_kod: '2', kommun_namn: 'Bjurholm', role: 'central', contact_email: 'kommun@bjurholm.se', scheduled_send_at: '2026-05-01T00:00:00Z' });
     db.updateConversationState(convId, 'SENT', { gmail_thread_id: 'thr-q', last_outbound_at: '2026-05-01T00:00:00Z' });
