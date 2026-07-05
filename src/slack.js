@@ -5,10 +5,15 @@ export function makeSlackClient(token) {
   return new WebClient(token);
 }
 
-export function buildEscalationBlocks({ escalation_id, kommun_namn, from_email, reply_text, draft_reply, gmail_thread_id }) {
+export function buildEscalationBlocks({ escalation_id, kommun_namn, from_email, reply_text, draft_reply, gmail_thread_id, watchlist_vendors = [] }) {
   const idStr = String(escalation_id);
-  return [
+  const blocks = [
     { type: 'header', text: { type: 'plain_text', text: `Eskalering: ${kommun_namn}` } },
+  ];
+  if (watchlist_vendors.length > 0) {
+    blocks.push({ type: 'section', text: { type: 'mrkdwn', text: `⚠️ *BEVAKAD LEVERANTÖR:* ${watchlist_vendors.join(', ')} — kontrollera innan du svarar.` } });
+  }
+  blocks.push(
     {
       type: 'section',
       fields: [
@@ -26,7 +31,8 @@ export function buildEscalationBlocks({ escalation_id, kommun_namn, from_email, 
         { type: 'button', action_id: 'esc_skip', value: idStr, text: { type: 'plain_text', text: 'Skip' }, style: 'danger' },
       ],
     },
-  ];
+  );
+  return blocks;
 }
 
 export async function postEscalation(slack, { channel, blocks, fallbackText }) {

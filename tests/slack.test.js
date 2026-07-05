@@ -52,6 +52,20 @@ describe('verifySlackSignature', () => {
   });
 });
 
+describe('buildEscalationBlocks watchlist banner', () => {
+  const base = { escalation_id: 1, kommun_namn: 'Arjeplog', from_email: 'a@x.se', reply_text: 'hej', draft_reply: 'svar', gmail_thread_id: 't1' };
+  it('adds a BEVAKAD LEVERANTÖR banner when watchlist_vendors present', () => {
+    const blocks = buildEscalationBlocks({ ...base, watchlist_vendors: ['Binogi', 'Nationalencyklopedin'] });
+    const texts = blocks.map((b) => b.text?.text ?? '').join('\n');
+    expect(texts).toMatch(/BEVAKAD LEVERANTÖR:.*Binogi.*Nationalencyklopedin/);
+  });
+  it('omits the banner when no watchlist vendors', () => {
+    const blocks = buildEscalationBlocks(base);
+    const texts = blocks.map((b) => b.text?.text ?? '').join('\n');
+    expect(texts).not.toMatch(/BEVAKAD/);
+  });
+});
+
 describe('parseInteractivityPayload', () => {
   it('extracts action_id, value, and trigger_id from form-encoded payload', () => {
     const payload = {
