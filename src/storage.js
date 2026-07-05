@@ -77,6 +77,7 @@ CREATE TABLE IF NOT EXISTS escalations (
   classifier_class TEXT,
   classifier_confidence REAL,
   previous_state TEXT,
+  watchlist_vendors TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_escalations_status ON escalations(status);
@@ -170,6 +171,10 @@ export function openDb(path) {
     const hbCols = db.prepare("PRAGMA table_info(daemon_heartbeat)").all().map((r) => r.name);
     if (!hbCols.includes('last_success_at')) {
       db.exec('ALTER TABLE daemon_heartbeat ADD COLUMN last_success_at TEXT');
+    }
+    const escCols = db.prepare("PRAGMA table_info(escalations)").all().map((r) => r.name);
+    if (!escCols.includes('watchlist_vendors')) {
+      db.exec('ALTER TABLE escalations ADD COLUMN watchlist_vendors TEXT');
     }
   }
 
@@ -302,13 +307,14 @@ export function openDb(path) {
 
   function recordEscalation(e) {
     const r = db.prepare(`
-      INSERT INTO escalations (conversation_id, message_id, reason, draft_template, draft_subject, draft_body, slack_ts, classifier_class, classifier_confidence, previous_state)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO escalations (conversation_id, message_id, reason, draft_template, draft_subject, draft_body, slack_ts, classifier_class, classifier_confidence, previous_state, watchlist_vendors)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       e.conversation_id, e.message_id ?? null, e.reason,
       e.draft_template ?? null, e.draft_subject ?? null, e.draft_body ?? null,
       e.slack_ts ?? null,
-      e.classifier_class ?? null, e.classifier_confidence ?? null, e.previous_state ?? null
+      e.classifier_class ?? null, e.classifier_confidence ?? null, e.previous_state ?? null,
+      e.watchlist_vendors ?? null
     );
     return Number(r.lastInsertRowid);
   }

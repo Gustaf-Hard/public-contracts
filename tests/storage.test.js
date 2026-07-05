@@ -283,3 +283,36 @@ describe('listContractInfoForMessage', () => {
     expect(JSON.parse(letter.analysis_json).mentioned_agreements[0].vendor).toBe('Quiculum');
   });
 });
+
+describe('escalations watchlist_vendors', () => {
+  it('persists and returns watchlist_vendors', () => {
+    const db = openDb(':memory:'); db.migrate();
+    const convId = db.createConversation({ kommun_kod: '1', kommun_namn: 'X', role: 'central', contact_email: 'k@x.se', scheduled_send_at: '2026-01-01T00:00:00Z' });
+    const id = db.recordEscalation({ conversation_id: convId, reason: 'r', draft_template: 'free_form', draft_body: '(ingen draft)', watchlist_vendors: JSON.stringify(['Binogi', 'Nationalencyklopedin']) });
+    const esc = db.listOpenEscalations().find((e) => e.id === id);
+    expect(JSON.parse(esc.watchlist_vendors)).toEqual(['Binogi', 'Nationalencyklopedin']);
+  });
+
+  it('defaults watchlist_vendors to null when omitted', () => {
+    const db = openDb(':memory:'); db.migrate();
+    const convId = db.createConversation({ kommun_kod: '1', kommun_namn: 'X', role: 'central', contact_email: 'k@x.se', scheduled_send_at: '2026-01-01T00:00:00Z' });
+    const id = db.recordEscalation({ conversation_id: convId, reason: 'r', draft_template: 'T_RECEIPT', draft_body: 'x' });
+    const esc = db.listOpenEscalations().find((e) => e.id === id);
+    expect(esc.watchlist_vendors).toBeNull();
+  });
+
+  it('adds watchlist_vendors to a pre-existing escalations table (migration)', () => {
+    const db = openDb(':memory:');
+    // Simulate an old DB: escalations without the new column.
+    db.raw.exec('DROP TABLE IF EXISTS escalations');
+    db.raw.exec(`CREATE TABLE escalations (
+      id INTEGER PRIMARY KEY, conversation_id INTEGER, message_id INTEGER, reason TEXT NOT NULL,
+      draft_template TEXT, draft_subject TEXT, draft_body TEXT, slack_ts TEXT,
+      status TEXT NOT NULL DEFAULT 'open', resolved_at TEXT, resolved_text TEXT,
+      classifier_class TEXT, classifier_confidence REAL, previous_state TEXT, created_at TEXT
+    )`);
+    db.migrate();
+    const cols = db.raw.prepare('PRAGMA table_info(escalations)').all().map((r) => r.name);
+    expect(cols).toContain('watchlist_vendors');
+  });
+});
