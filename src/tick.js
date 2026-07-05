@@ -29,12 +29,37 @@ function tplCtx(conv, env, extra = {}) {
   };
 }
 
+// Two-phase T-INITIAL dispatch (autopilot review C2/C3): atomically claim the
+// row INITIAL → SENDING before the Gmail call, finalize to SENT after. A crash
+// between Gmail accepting and the finalize leaves a SENDING row that is never
+// auto-resent — recoverStuckSends escalates it to a human instead. A racing
+// tick/process loses the claim and does nothing.
 async function dispatchInitial(conv, deps) {
   const { db, gmailClient, gmailOps, env, now, log } = deps;
+  if (!db.claimConversationForInitialSend(conv.id)) {
+    log?.(`SKIP T-INITIAL → ${conv.kommun_namn}/${conv.role}: claimed elsewhere`);
+    return;
+  }
   const msg = T_INITIAL(tplCtx(conv, env));
-  const sent = await gmailOps.sendMessage(gmailClient.gmail, {
-    from: fromHeader(env), to: conv.contact_email, subject: msg.subject, body: msg.body,
-  });
+  let sent;
+  try {
+    sent = await gmailOps.sendMessage(gmailClient.gmail, {
+      from: fromHeader(env), to: conv.contact_email, subject: msg.subject, body: msg.body,
+    });
+  } catch (e) {
+    // Ambiguous outcome (Gmail may have accepted). Park as NEEDS_HUMAN, never
+    // auto-retry. previous_state 'SENT' so resolving the escalation lands the
+    // case where staleness rules watch it, instead of re-queuing a canned send.
+    db.updateConversationState(conv.id, 'NEEDS_HUMAN', {});
+    await escalateWithDraft({
+      conv: db.getConversation(conv.id), parsedInbound: null, classification: null,
+      previousState: 'SENT', draftTemplate: 'free_form',
+      reason: `T-INITIAL send failed: ${e.message} — verify in Gmail Sent before retrying`,
+      deps,
+    });
+    log?.(`T-INITIAL send FAILED → ${conv.kommun_namn}/${conv.role}: ${e.message}`);
+    return;
+  }
   db.updateConversationState(conv.id, 'SENT', {
     gmail_thread_id: sent.threadId,
     last_outbound_at: now.toISOString(),
@@ -47,6 +72,63 @@ async function dispatchInitial(conv, deps) {
     received_at: now.toISOString(), attachment_count: 0,
   });
   log?.(`SENT T-INITIAL → ${conv.kommun_namn}/${conv.role}`);
+}
+
+// SQLite datetime('now') → 'YYYY-MM-DD HH:MM:SS' (UTC, no zone). Normalize.
+function parseDbTime(s) {
+  if (!s) return null;
+  const t = new Date(s.includes('T') ? s : s.replace(' ', 'T') + 'Z');
+  return Number.isNaN(t.getTime()) ? null : t;
+}
+
+// In-flight rows older than this are considered orphaned by a crash. Long
+// enough that a legitimately slow send from the *other* process (dashboard vs
+// daemon share the DB) is never mistaken for a crash.
+const STUCK_SEND_MIN = 15;
+
+// Recover from crashes mid-send (autopilot review C2). Two shapes:
+//  - conversations stuck in SENDING: the T-INITIAL claim happened but the
+//    finalize never did → escalate to a human; never auto-resend.
+//  - escalations stuck in 'sending': an approve claimed the row but the
+//    finalize never did → park as 'send_unconfirmed' + Slack alert; never
+//    auto-retry, never reopen.
+async function recoverStuckSends(deps) {
+  const { db, slackClient, slackOps, env, now, log } = deps;
+  const cutoff = now.getTime() - STUCK_SEND_MIN * 60 * 1000;
+
+  for (const conv of db.listConversationsByState('SENDING')) {
+    const claimedAt = parseDbTime(conv.state_changed_at);
+    if (claimedAt && claimedAt.getTime() > cutoff) continue; // possibly in flight elsewhere
+    db.updateConversationState(conv.id, 'NEEDS_HUMAN', {});
+    await escalateWithDraft({
+      conv: db.getConversation(conv.id), parsedInbound: null, classification: null,
+      previousState: 'SENT', draftTemplate: 'free_form',
+      reason: 'T-INITIAL send unconfirmed (process died mid-send?) — check Gmail Sent before retrying',
+      deps,
+    });
+    log?.(`RECOVERED stuck SENDING → NEEDS_HUMAN: ${conv.kommun_namn}/${conv.role}`);
+  }
+
+  for (const esc of db.listEscalationsByStatus('sending')) {
+    const claimedAt = parseDbTime(esc.resolved_at); // claim stamp while status='sending'
+    if (claimedAt && claimedAt.getTime() > cutoff) continue;
+    db.resolveEscalation(esc.id, {
+      status: 'send_unconfirmed',
+      resolved_text: 'claimed for sending but never finalized (crash mid-send?)',
+    });
+    const conv = db.getConversation(esc.conversation_id);
+    if (slackOps?.postAlert && env.SLACK_CHANNEL_ID) {
+      try {
+        await slackOps.postAlert(slackClient, {
+          channel: env.SLACK_CHANNEL_ID,
+          text: `⚠️ Eskalering ${esc.id} (${conv?.kommun_namn ?? '?'}) claimades för sändning men slutfördes aldrig. Kontrollera Skickat i Gmail innan du gör om något — svaret kan redan ha gått iväg.`,
+        });
+      } catch (e) {
+        log?.(`postAlert failed for stuck escalation ${esc.id}: ${e.message}`);
+      }
+    }
+    log?.(`RECOVERED stuck sending escalation ${esc.id} → send_unconfirmed`);
+  }
 }
 
 async function escalateWithDraft({ conv, parsedInbound, messageId = null, classification, previousState, draftTemplate, llmDraft, reason, templateCtx = {}, watchlistVendors = [], deps }) {
@@ -108,6 +190,10 @@ async function escalateWithDraft({ conv, parsedInbound, messageId = null, classi
 
 export async function runTick(deps) {
   const { db, gmailClient, gmailOps, env, now } = deps;
+
+  // 0. Crash recovery — surface any send that was claimed but never finalized
+  // before dispatching anything new.
+  await recoverStuckSends(deps);
 
   // 1. Initial dispatch — anything scheduled for now or earlier
   const dueInitial = db.listConversationsDueForInitialSend(now.toISOString());

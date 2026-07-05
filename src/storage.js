@@ -354,6 +354,52 @@ export function openDb(path) {
     `).run(status, resolved_text, id);
   }
 
+  // Atomically claim an open escalation for sending. Returns true when this
+  // caller won the claim (exactly one row moved open → sending); false when the
+  // escalation was already resolved, already claimed, or doesn't exist. This is
+  // the send-path idempotency guard: every surface (Slack approve, dashboard
+  // approve, CLI) must claim before calling Gmail, so a double click, a Slack
+  // retry, or two racing processes can never double-send.
+  // resolved_at doubles as the claim timestamp while status='sending' so the
+  // tick can detect claims orphaned by a crash; it is overwritten on finalize.
+  function claimEscalationForSending(id) {
+    const r = db.prepare(`
+      UPDATE escalations
+      SET status = 'sending', resolved_at = datetime('now')
+      WHERE id = ? AND status = 'open'
+    `).run(id);
+    return r.changes === 1;
+  }
+
+  function listEscalationsByStatus(status) {
+    return db.prepare('SELECT * FROM escalations WHERE status = ? ORDER BY id').all(status);
+  }
+
+  function listOpenEscalationsForConversation(conversationId) {
+    return db.prepare("SELECT * FROM escalations WHERE conversation_id = ? AND status = 'open' ORDER BY id")
+      .all(conversationId);
+  }
+
+  // Atomically claim a due INITIAL conversation for its T-INITIAL send.
+  // Two-phase outbound: the row moves INITIAL → SENDING *before* the Gmail
+  // call, so a crash between Gmail accepting and the SENT finalize leaves a
+  // SENDING row that is never auto-retried (listConversationsDueForInitialSend
+  // only selects INITIAL) — it escalates to a human instead.
+  function claimConversationForInitialSend(id) {
+    const r = db.prepare(`
+      UPDATE conversations
+      SET state = 'SENDING', state_changed_at = datetime('now')
+      WHERE id = ? AND state = 'INITIAL'
+    `).run(id);
+    return r.changes === 1;
+  }
+
+  // Run fn inside a single SQLite transaction (better-sqlite3 is synchronous,
+  // so fn must not await). Used to make per-message ingest atomic.
+  function transaction(fn) {
+    return db.transaction(fn)();
+  }
+
   function recordHeartbeat({ kind = 'tick', error = null } = {}) {
     const col = kind === 'followup' ? 'last_followup_at' : 'last_tick_at';
     // A clean tick (no error) also stamps last_success_at — that's what the
@@ -576,8 +622,13 @@ export function openDb(path) {
     recordAttachment,
     recordEscalation,
     listOpenEscalations,
+    listEscalationsByStatus,
+    listOpenEscalationsForConversation,
     getEscalationBySlackTs,
     resolveEscalation,
+    claimEscalationForSending,
+    claimConversationForInitialSend,
+    transaction,
     recordDecision,
     listDecisions,
     recordHeartbeat,
