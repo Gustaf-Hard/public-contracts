@@ -12,12 +12,31 @@ const TOKEN_PATH = process.env.GMAIL_TOKEN_PATH ?? `${process.env.HOME}/.config/
 const DB_PATH = process.env.PILOT_DB_PATH ?? 'data/pilot.db';
 const CONTRACTS_DIR = process.env.PILOT_CONTRACTS_DIR ?? 'data/contracts';
 
-// Wrap an async fn so overlapping invocations are skipped, not queued.
-// node-cron does NOT serialize async callbacks; a tick that runs longer than
-// the cron interval (LLM analysis of a big delivery) would otherwise overlap
-// the next one and double-dispatch due sends (autopilot review C3).
-export function makeExclusive(fn, { log = null, name = 'task' } = {}) {
+// Serialize escalation-mutating work across DIFFERENT tasks (hardening
+// finding 5): tick and followup both supersede/create escalations, so they
+// must never interleave — a per-function latch alone lets a long tick and the
+// daily followup mutate the same rows concurrently. makeMutex returns a
+// runner that queues functions strictly one after another; a rejected run
+// must not poison the chain.
+export function makeMutex() {
+  let tail = Promise.resolve();
+  return (fn) => {
+    const run = tail.then(fn);
+    tail = run.then(() => {}, () => {});
+    return run;
+  };
+}
+
+// Wrap an async fn so overlapping invocations OF THE SAME TASK are skipped,
+// not queued. node-cron does NOT serialize async callbacks; a tick that runs
+// longer than the cron interval (LLM analysis of a big delivery) would
+// otherwise overlap the next one and double-dispatch due sends (autopilot
+// review C3). Pass a shared `mutex` (makeMutex) to additionally serialize
+// against OTHER tasks: a followup fired while a tick is in flight then waits
+// for the tick instead of racing it (skipping it would drop the daily run).
+export function makeExclusive(fn, { log = null, name = 'task', mutex = null } = {}) {
   let running = false;
+  const exec = mutex ?? ((f) => f());
   return async (...args) => {
     if (running) {
       log?.(`${name} skipped: previous run still in progress`);
@@ -25,7 +44,7 @@ export function makeExclusive(fn, { log = null, name = 'task' } = {}) {
     }
     running = true;
     try {
-      return await fn(...args);
+      return await exec(() => fn(...args));
     } finally {
       running = false;
     }
@@ -157,6 +176,11 @@ export async function startDaemon({ env = process.env, log = console.log } = {})
   // once (no schema for durable tracking; see review notes).
   const seenUnmatched = new Map();
 
+  // One mutex for ALL escalation-mutating loops (finding 5): tick and
+  // followup must never run concurrently or they can both supersede/create
+  // escalations for the same conversation.
+  const escalationMutex = makeMutex();
+
   const tickOnce = makeExclusive(async () => {
     const now = getEffectiveNow({ env, overrides });
     let err = null;
@@ -172,7 +196,7 @@ export async function startDaemon({ env = process.env, log = console.log } = {})
       log(`tick error: ${e.message}`);
     }
     db.recordHeartbeat({ kind: 'tick', error: err });
-  }, { log, name: 'tick' });
+  }, { log, name: 'tick', mutex: escalationMutex });
 
   const followupOnce = makeExclusive(async () => {
     const now = getEffectiveNow({ env, overrides });
@@ -188,7 +212,7 @@ export async function startDaemon({ env = process.env, log = console.log } = {})
       log(`followup error: ${e.message}`);
     }
     db.recordHeartbeat({ kind: 'followup', error: err });
-  }, { log, name: 'followup' });
+  }, { log, name: 'followup', mutex: escalationMutex });
 
   cron.schedule(env.PILOT_TICK_CRON ?? '*/15 * * * *', tickOnce);
   cron.schedule(env.PILOT_FOLLOWUP_CRON ?? '0 9 * * *', followupOnce);

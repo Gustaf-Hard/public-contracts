@@ -8,7 +8,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { openDb } from '../src/storage.js';
-import { createInteractivityHandler, makeExclusive } from '../src/daemon.js';
+import { createInteractivityHandler, makeExclusive, makeMutex } from '../src/daemon.js';
 import { sendApprovedReply } from '../src/send-reply.js';
 
 const SIGNING_SECRET = 'test-secret';
@@ -167,6 +167,50 @@ describe('createInteractivityHandler — approve path', () => {
     });
     await handler(req, res);
     expect(db.listDecisions()).toHaveLength(0);
+  });
+});
+
+describe('makeMutex — tick and followup never mutate escalations concurrently (finding 5)', () => {
+  it('a followup started while a tick is in flight waits and runs strictly after it', async () => {
+    const events = [];
+    let releaseTick;
+    const gate = new Promise((r) => { releaseTick = r; });
+    const mutex = makeMutex();
+    const tick = makeExclusive(async () => { events.push('tick:start'); await gate; events.push('tick:end'); }, { name: 'tick', mutex });
+    const followup = makeExclusive(async () => { events.push('followup:start'); events.push('followup:end'); }, { name: 'followup', mutex });
+
+    const pTick = tick();
+    const pFollow = followup(); // fired while the tick is mid-flight
+    await new Promise((r) => setImmediate(r));
+    expect(events).toEqual(['tick:start']); // the followup has NOT started
+
+    releaseTick();
+    await Promise.all([pTick, pFollow]);
+    expect(events).toEqual(['tick:start', 'tick:end', 'followup:start', 'followup:end']);
+  });
+
+  it('a rejected run does not poison the shared mutex', async () => {
+    const mutex = makeMutex();
+    const boom = makeExclusive(async () => { throw new Error('tick blew up'); }, { name: 'tick', mutex });
+    const ok = vi.fn(async () => 'ran');
+    const followup = makeExclusive(ok, { name: 'followup', mutex });
+    await expect(boom()).rejects.toThrow('tick blew up');
+    await expect(followup()).resolves.toBe('ran');
+    expect(ok).toHaveBeenCalledTimes(1);
+  });
+
+  it('overlapping invocations of the SAME task are still skipped, not queued', async () => {
+    const mutex = makeMutex();
+    let release;
+    const gate = new Promise((r) => { release = r; });
+    const fn = vi.fn(async () => { await gate; });
+    const tick = makeExclusive(fn, { name: 'tick', mutex });
+    const p1 = tick();
+    const r2 = await tick();
+    expect(r2).toEqual({ skipped: true });
+    release();
+    await p1;
+    expect(fn).toHaveBeenCalledTimes(1);
   });
 });
 
