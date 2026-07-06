@@ -112,6 +112,26 @@ describe('createInteractivityHandler — approve path', () => {
     expect(slack.chat.update).toHaveBeenCalled(); // buttons stripped
   });
 
+  it('acks Slack BEFORE performing the Gmail send — 3s interactivity deadline (finding 9)', async () => {
+    const { escId } = seed();
+    const { req, res } = slackRequest(approvePayload(escId));
+    const statusAtSendStart = vi.fn();
+    const handler = createInteractivityHandler({
+      db, slack: fakeSlack(), gmail: {}, env, log: () => {},
+      sendApprovedReplyImpl: async (args) => {
+        // Captured the moment the (potentially >3s) work begins: Slack must
+        // already have its 200 or the operator sees a red error for a mail
+        // that actually goes out.
+        statusAtSendStart(res.statusCode);
+        return sendApprovedReply({ ...args, gmailSendImpl: async () => ({ id: 'out-1', threadId: 'thr-1' }) });
+      },
+    });
+    await handler(req, res);
+
+    expect(statusAtSendStart).toHaveBeenCalledWith(200); // acked first…
+    expect(db.raw.prepare('SELECT status FROM escalations WHERE id=?').get(escId).status).toBe('resolved_send'); // …work still done
+  });
+
   it('a second approve click is a no-op: no second send, buttons re-stripped', async () => {
     const { escId } = seed();
     const slack = fakeSlack();

@@ -64,10 +64,15 @@ async function stripButtons(slack, env, esc, kommunNamn, status, log) {
 }
 
 // Slack interactivity handler, extracted from startDaemon so the approve path
-// is testable offline. Verifies the request signature, performs the action,
-// and only THEN acks — so a daemon crash mid-approve makes Slack retry the
-// interaction instead of silently losing the click (review L1). Retries are
-// safe: sendApprovedReply's atomic claim makes a duplicate approve a no-op.
+// is testable offline. Verifies the request signature, ACKS within Slack's
+// 3-second interactivity deadline, and only then performs the work (hardening
+// finding 9): a Gmail send can exceed 3s, and a late ack shows the operator a
+// red Slack error / failed modal submit for a mail that actually went out.
+// Acking early is crash-safe: the atomic escalation claim (open → sending)
+// means a click lost to a crash that Slack retries — or any re-entered
+// handler — fails the claim and no-ops, which is exactly what the
+// ack-after-work ordering (review L1) used to protect against before the
+// claim existed. The buttons are healed afterwards via chat.update.
 export function createInteractivityHandler({ db, slack, gmail, env, log = console.log, sendApprovedReplyImpl = sendApprovedReply, openEditModalImpl = openEditModal }) {
   return async (req, res) => {
     const body = req.body.toString('utf8');
@@ -77,12 +82,15 @@ export function createInteractivityHandler({ db, slack, gmail, env, log = consol
       return res.status(401).send('bad signature');
     }
 
+    // Ack FIRST — everything after this line may legitimately take >3s.
+    res.status(200).send('');
+
     try {
       const parsed = parseInteractivityPayload(body);
       if (parsed.type === 'block_actions') {
         const escId = parseInt(parsed.escalation_id, 10);
         const esc = db.raw.prepare('SELECT * FROM escalations WHERE id = ?').get(escId);
-        if (!esc) return res.status(200).send('');
+        if (!esc) return;
         const conv = db.getConversation(esc.conversation_id);
         if (parsed.action_id === 'esc_approve') {
           try {
@@ -141,7 +149,6 @@ export function createInteractivityHandler({ db, slack, gmail, env, log = consol
     } catch (e) {
       log(`slack interactivity error: ${e.message}`);
     }
-    res.status(200).send('');
   };
 }
 
