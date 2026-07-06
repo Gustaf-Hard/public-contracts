@@ -136,6 +136,70 @@ describe('sendApprovedReply — staleness guard', () => {
   });
 });
 
+describe('sendApprovedReply — staleness guard precision (finding 6)', () => {
+  // The realistic shape: an inbound with Gmail-millisecond received_at
+  // triggers a draft whose created_at (SQLite datetime('now')) lands in the
+  // same wall-clock second. That draft is fresh, not stale.
+  function seedWithTrigger() {
+    const convId = db.createConversation({
+      kommun_kod: '1', kommun_namn: 'Arboga', role: 'central',
+      contact_email: 'registrator@arboga.se', scheduled_send_at: '2026-05-01T00:00:00Z',
+    });
+    db.updateConversationState(convId, 'DELIVERING', { gmail_thread_id: 'thr-orig' });
+    const msgId = db.recordMessage({
+      conversation_id: convId, gmail_message_id: 'in-trig', direction: 'inbound',
+      from_email: 'a@arboga.se', to_email: 'me@x.se', subject: 's', body_text: 'leverans',
+      classification: 'delivery', classification_confidence: 0.9,
+      received_at: '2026-06-24T12:00:00.500Z', attachment_count: 1,
+    });
+    const escId = db.recordEscalation({
+      conversation_id: convId, message_id: msgId, reason: 'r',
+      draft_template: 'T_RECEIPT', draft_subject: 'Re: s', draft_body: 'tack',
+    });
+    db.raw.prepare("UPDATE escalations SET created_at='2026-06-24 12:00:00' WHERE id=?").run(escId);
+    return {
+      convId, msgId, escId,
+      conv: db.getConversation(convId),
+      esc: db.raw.prepare('SELECT * FROM escalations WHERE id = ?').get(escId),
+    };
+  }
+
+  it('the triggering inbound itself (same second, ms > 0) never makes the draft stale', async () => {
+    const { conv, esc } = seedWithTrigger();
+    const send = vi.fn(async () => ({ id: 'out-1', threadId: 'thr-orig' }));
+    await sendApprovedReply({ db, gmail: {}, env, conv, esc, finalBody: 'tack', decision: 'approve_unmodified', gmailSendImpl: send });
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  it('a different inbound within the created_at second is tolerated (whole-second DB timestamps)', async () => {
+    const { conv, esc, convId } = seedWithTrigger();
+    db.recordMessage({
+      conversation_id: convId, gmail_message_id: 'in-same-sec', direction: 'inbound',
+      from_email: 'a@arboga.se', to_email: 'me@x.se', subject: 's2', body_text: 'del 2',
+      classification: 'delivery', classification_confidence: 0.9,
+      received_at: '2026-06-24T12:00:00.900Z', attachment_count: 0,
+    });
+    const send = vi.fn(async () => ({ id: 'out-1', threadId: 'thr-orig' }));
+    await sendApprovedReply({ db, gmail: {}, env, conv, esc, finalBody: 'tack', decision: 'approve_unmodified', gmailSendImpl: send });
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  it('a genuinely newer, different inbound still blocks the unmodified approve', async () => {
+    const { conv, esc, convId } = seedWithTrigger();
+    db.recordMessage({
+      conversation_id: convId, gmail_message_id: 'in-later', direction: 'inbound',
+      from_email: 'a@arboga.se', to_email: 'me@x.se', subject: 's3', body_text: 'nytt svar',
+      classification: 'delivery', classification_confidence: 0.9,
+      received_at: '2026-06-24T12:00:01.100Z', attachment_count: 0,
+    });
+    const send = vi.fn();
+    await expect(
+      sendApprovedReply({ db, gmail: {}, env, conv, esc, finalBody: 'tack', decision: 'approve_unmodified', gmailSendImpl: send })
+    ).rejects.toMatchObject({ code: 'STALE_ESCALATION' });
+    expect(send).not.toHaveBeenCalled();
+  });
+});
+
 describe('runTick — two-phase T-INITIAL dispatch (C2/C3)', () => {
   function fakeGmail({ sendImpl } = {}) {
     return {

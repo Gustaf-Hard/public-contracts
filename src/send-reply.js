@@ -63,12 +63,21 @@ export async function sendApprovedReply({ db, gmail, env, conv, esc, finalBody, 
   // escalation open for re-review rather than parked.
   if (decision === 'approve_unmodified') {
     const escCreated = parseDbTime(esc.created_at);
-    const newestInbound = db.listMessages(conv.id)
-      .filter((m) => m.direction === 'inbound')
+    // Precision matters here (hardening finding 6):
+    //  - Exclude the inbound the draft answers (esc.message_id) — it is by
+    //    definition not "newer context", yet it usually lands in the same
+    //    wall-clock second as the draft it triggered.
+    //  - created_at is SQLite datetime('now') with whole-second resolution,
+    //    while Gmail internalDate carries milliseconds. Compare with a
+    //    one-second tolerance or a same-second inbound (ms > 0) wrongly
+    //    rejects a legitimate unmodified approve as STALE.
+    const newestOtherInbound = db.listMessages(conv.id)
+      .filter((m) => m.direction === 'inbound' && m.id !== esc.message_id)
       .map((m) => parseDbTime(m.received_at))
       .filter(Boolean)
       .sort((a, b) => b - a)[0] ?? null;
-    if (escCreated && newestInbound && newestInbound > escCreated) {
+    if (escCreated && newestOtherInbound
+        && newestOtherInbound.getTime() > escCreated.getTime() + 999) {
       throw errWithCode(
         `Escalation ${esc.id} is stale: a newer inbound arrived after the draft was created. Re-review (Edit) or skip.`,
         'STALE_ESCALATION'
