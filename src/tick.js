@@ -134,6 +134,20 @@ async function recoverStuckSends(deps) {
 async function escalateWithDraft({ conv, parsedInbound, messageId = null, classification, previousState, draftTemplate, llmDraft, reason, templateCtx = {}, watchlistVendors = [], deps }) {
   const { db, slackClient, slackOps, env, log } = deps;
 
+  // Never create a draft next to an unresolved send (hardening findings 2/3).
+  // 'sending' means another surface is mid-Gmail-call for this conversation —
+  // superseding or racing it invites a double message, so defer entirely; the
+  // next tick re-evaluates (recoverStuckSends handles it if it was a crash).
+  // 'send_failed'/'send_unconfirmed' mean Gmail MAY have accepted an earlier
+  // reply — until a human verifies in Sent, a fresh approvable draft is the
+  // exact double-message the parked status exists to prevent.
+  const unresolved = db.listActiveEscalationsForConversation(conv.id)
+    .filter((e) => e.status !== 'open');
+  if (unresolved.length > 0) {
+    log?.(`DEFER escalation for ${conv.kommun_namn}/${conv.role}: escalation ${unresolved[0].id} is ${unresolved[0].status}`);
+    return null;
+  }
+
   // "At most one open next-action per conversation. Always." (2026-06-23 spec,
   // review H1). A fresher draft supersedes any open escalation: its status
   // flips to 'superseded' (so a stale approve fails the atomic claim) and its
@@ -612,10 +626,14 @@ export async function runDailyFollowup(deps) {
   const todayIso = now.toISOString().slice(0, 10);
   const all = db.listAllConversations();
   for (const conv of all) {
-    // At most one open next-action per conversation (review H1): while an
-    // escalation sits unapproved, the daily loop must not mint a duplicate
-    // draft every day it stays open.
-    if (db.listOpenEscalationsForConversation(conv.id).length > 0) continue;
+    // At most one ACTIVE next-action per conversation (review H1 + hardening
+    // finding 2/3): while an escalation sits unapproved (open), is mid-send
+    // (sending), or is parked after an ambiguous Gmail outcome (send_failed /
+    // send_unconfirmed), the daily loop must not mint a new draft — approving
+    // it could double-message a kommun whose previous reply may already have
+    // gone out. Non-open active statuses are surfaced to the operator via
+    // Slack; the conversation needs a human, not another nudge.
+    if (db.hasActiveEscalation(conv.id)) continue;
 
     const days = daysBetween(new Date(conv.state_changed_at), now);
     const action = staleAction(conv.state, days, conv.followup_count, {

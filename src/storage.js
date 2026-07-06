@@ -1,5 +1,17 @@
 import Database from 'better-sqlite3';
 
+// Active (non-terminal) escalation statuses — the single source of truth for
+// "this conversation already has pending or unresolved outbound work":
+//   - open             awaiting a human decision
+//   - sending          a Gmail call is in flight right now
+//   - send_failed      Gmail threw mid-send — the mail MAY have gone out
+//   - send_unconfirmed a 'sending' claim was orphaned by a crash — same risk
+// While ANY of these exists, the conversation must not receive a new
+// follow-up/precision draft: approving a fresh draft next to an ambiguous
+// send is how a kommun gets double-messaged. Everything else (resolved_send,
+// resolved_edit, resolved_skip, resolved_closed, superseded) is terminal.
+export const ACTIVE_ESCALATION_STATUSES = Object.freeze(['open', 'sending', 'send_failed', 'send_unconfirmed']);
+
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS conversations (
   id INTEGER PRIMARY KEY,
@@ -380,6 +392,24 @@ export function openDb(path) {
       .all(conversationId);
   }
 
+  const activeStatusPlaceholders = ACTIVE_ESCALATION_STATUSES.map(() => '?').join(', ');
+
+  function listActiveEscalationsForConversation(conversationId) {
+    return db.prepare(
+      `SELECT * FROM escalations WHERE conversation_id = ? AND status IN (${activeStatusPlaceholders}) ORDER BY id`
+    ).all(conversationId, ...ACTIVE_ESCALATION_STATUSES);
+  }
+
+  // "Does this conversation already have pending or unresolved outbound
+  // work?" — see ACTIVE_ESCALATION_STATUSES. Every guard that decides whether
+  // a new follow-up/precision draft may be minted must use this, not a
+  // hand-rolled status='open' check (hardening findings 2/3/5-root-cause).
+  function hasActiveEscalation(conversationId) {
+    return db.prepare(
+      `SELECT 1 FROM escalations WHERE conversation_id = ? AND status IN (${activeStatusPlaceholders}) LIMIT 1`
+    ).get(conversationId, ...ACTIVE_ESCALATION_STATUSES) != null;
+  }
+
   // Atomically claim a due INITIAL conversation for its T-INITIAL send.
   // Two-phase outbound: the row moves INITIAL → SENDING *before* the Gmail
   // call, so a crash between Gmail accepting and the SENT finalize leaves a
@@ -624,6 +654,8 @@ export function openDb(path) {
     listOpenEscalations,
     listEscalationsByStatus,
     listOpenEscalationsForConversation,
+    listActiveEscalationsForConversation,
+    hasActiveEscalation,
     getEscalationBySlackTs,
     resolveEscalation,
     claimEscalationForSending,

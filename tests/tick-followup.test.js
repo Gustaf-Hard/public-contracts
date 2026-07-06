@@ -113,6 +113,74 @@ describe('runDailyFollowup — staleness drafting (M1: previously untested)', ()
   });
 });
 
+describe('active (non-terminal) escalations gate new drafts (hardening findings 2/3)', () => {
+  it('a send_failed escalation blocks the daily follow-up from minting a new draft', async () => {
+    // A Gmail error after Gmail MAY have accepted parks the escalation as
+    // send_failed. Until a human verifies in Sent, a fresh nudge draft could
+    // double-message the kommun.
+    const id = seedConv({ stateChangedAt: '2026-06-10T00:00:00Z' }); // stale ≥7d
+    const escId = db.recordEscalation({
+      conversation_id: id, message_id: null, reason: 'r',
+      draft_template: 'T_RECEIPT', draft_subject: 's', draft_body: 'b',
+    });
+    db.resolveEscalation(escId, { status: 'send_failed', resolved_text: 'send error: socket hang up' });
+
+    await runDailyFollowup(deps());
+
+    expect(db.raw.prepare('SELECT COUNT(*) n FROM escalations').get().n).toBe(1); // nothing new
+    expect(db.raw.prepare('SELECT status FROM escalations WHERE id=?').get(escId).status).toBe('send_failed');
+  });
+
+  it('an in-flight sending escalation defers the daily follow-up and is never superseded', async () => {
+    const id = seedConv({ stateChangedAt: '2026-06-10T00:00:00Z' });
+    const escId = db.recordEscalation({
+      conversation_id: id, message_id: null, reason: 'r',
+      draft_template: 'T_FOLLOWUP_NUDGE', draft_subject: 's', draft_body: 'b',
+    });
+    expect(db.claimEscalationForSending(escId)).toBe(true); // another surface is mid-Gmail-call
+
+    await runDailyFollowup(deps());
+
+    expect(db.raw.prepare('SELECT COUNT(*) n FROM escalations').get().n).toBe(1);
+    expect(db.raw.prepare('SELECT status FROM escalations WHERE id=?').get(escId).status).toBe('sending');
+  });
+
+  it('an inbound-triggered draft is deferred while a sending escalation is in flight (never superseded)', async () => {
+    const spy = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue(null);
+    const id = seedConv({ state: 'SENT' });
+    const escId = db.recordEscalation({
+      conversation_id: id, message_id: null, reason: 'r',
+      draft_template: 'T_RECEIPT', draft_subject: 's', draft_body: 'b',
+    });
+    expect(db.claimEscalationForSending(escId)).toBe(true);
+
+    // Inbound "unknown" reply that would normally mint a free_form draft.
+    const slackOps = fakeSlackOps();
+    const gmail = fakeGmail({
+      listResult: [{ id: 'in-race' }],
+      getResult: {
+        'in-race': {
+          id: 'in-race', threadId: 'thr-a',
+          payload: {
+            headers: [
+              { name: 'From', value: 'K <kansli@ale.se>' }, { name: 'To', value: 'me@x.se' },
+              { name: 'Subject', value: 'SV' },
+            ],
+            mimeType: 'text/plain', body: { data: b64('Hej, kan du ringa mig?') },
+          },
+        },
+      },
+    });
+    await runTick(deps({ gmail, slackOps }));
+    spy.mockRestore();
+
+    expect(db.hasGmailMessageId('in-race')).toBe(true); // the inbound is still ingested
+    expect(db.raw.prepare('SELECT COUNT(*) n FROM escalations').get().n).toBe(1); // draft deferred
+    expect(db.raw.prepare('SELECT status FROM escalations WHERE id=?').get(escId).status).toBe('sending');
+    expect(slackOps.posts).toHaveLength(0);
+  });
+});
+
 describe('escalateWithDraft — at most one open escalation per conversation (H1)', () => {
   it('a fresher inbound-triggered escalation supersedes the open one and strips its buttons', async () => {
     const spy = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue(null);
