@@ -332,6 +332,46 @@ describe('the closer signal (M9)', () => {
     expect(isCloserText('Vi har inga fler avtal att lämna ut.')).toBe(true);
   });
 
+  it('isCloserText: present-tense declaratives the old broad regex caught still close (finding 8)', () => {
+    expect(isCloserText('Detta är samtliga avtal vi har.')).toBe(true);
+    expect(isCloserText('Dessa är samtliga avtal inom det efterfrågade området.')).toBe(true);
+    expect(isCloserText('Det här är samtliga avtal.')).toBe(true);
+    expect(isCloserText('Bifogat var samtliga avtal.')).toBe(true);
+    expect(isCloserText('Vi har inga ytterligare avtal.')).toBe(true);
+    // …while the UNQUOTED question form still never closes a case.
+    expect(isCloserText('Är detta samtliga avtal eller är fler på väg?')).toBe(false);
+  });
+
+  it('LLM analysis null + "Detta är samtliga avtal" closes the DELIVERING case, no later nudge (finding 8)', async () => {
+    const spy = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue(null); // API error → regex path
+    const id = seedConv({ state: 'DELIVERING', receiptSent: 1, followUpAt: '2026-07-07' });
+    const gmail = fakeGmail({
+      listResult: [{ id: 'close-1' }],
+      getResult: {
+        'close-1': {
+          id: 'close-1', threadId: 'thr-a',
+          payload: {
+            headers: [
+              { name: 'From', value: 'K <kansli@ale.se>' }, { name: 'To', value: 'me@x.se' },
+              { name: 'Subject', value: 'SV' },
+            ],
+            mimeType: 'text/plain', body: { data: b64('Detta är samtliga avtal vi har.') },
+          },
+        },
+      },
+    });
+    await runTick(deps({ gmail }));
+    spy.mockRestore();
+
+    const conv = db.getConversation(id);
+    expect(conv.state).toBe('DONE');
+    expect(conv.follow_up_at).toBe(null);
+
+    // A month later the daily loop still leaves the closed case alone.
+    await runDailyFollowup(deps({ now: new Date('2026-07-30T09:00:00Z') }));
+    expect(db.raw.prepare('SELECT COUNT(*) n FROM escalations').get().n).toBe(0);
+  });
+
   it('a dead_end reply in DELIVERING that merely quotes our receipt goes DEAD_END, not DONE', async () => {
     const spy = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue(null); // regex path
     const id = seedConv({ state: 'DELIVERING', receiptSent: 1 });

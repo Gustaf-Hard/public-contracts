@@ -28,7 +28,10 @@ const DEAD_END_PATTERNS = [
   { name: 'omfattas_inte', re: /omfattas inte/i, score: 0.6 },
   { name: 'kan_ej_lamna_ut', re: /kan (vi )?inte lämna ut|kan ej lämna ut/i, score: 0.7 },
   { name: 'ligger_hos', re: /ligger hos|hanteras (centralt|hos)/i, score: 0.4 },
-  { name: 'samtliga_avtal', re: /(detta var |var )samtliga avtal/i, score: 0.8 },
+  // Declarative "these are/were all the contracts" — demonstrative + verb
+  // order so OUR OWN receipt question ("Är detta samtliga avtal…?", verb
+  // first) can never match, even when quoted back at us (finding 8).
+  { name: 'samtliga_avtal', re: /((detta|dessa|det|de)( här)? (var|är) |var )samtliga avtal/i, score: 0.8 },
 ];
 
 const ARENDENUMMER_RE = /Ärendenummer\s*[:\-]\s*([Kk]\d{6,})/i;
@@ -54,9 +57,12 @@ export function stripQuotedText(body) {
 
 // Fallback "this was everything" detector over the UNQUOTED part of the body
 // (review M9): used only when no LLM analysis is available. Deliberately the
-// strict declarative shape — a question ("Är detta samtliga avtal?") does not
-// match.
-const CLOSER_RE = /(detta var |dessa var |det var |var )samtliga avtal|inga (fler|ytterligare) avtal/i;
+// declarative shape — demonstrative BEFORE the verb — so a question
+// ("Är detta samtliga avtal?", verb first) does not match. Covers both past
+// ("Detta var samtliga avtal") and present tense ("Detta är samtliga avtal"),
+// which the pre-M9 broad /samtliga avtal/ caught and the first narrowing
+// dropped (hardening finding 8).
+const CLOSER_RE = /((detta|dessa|det|de)( här)? (var|är) |var )samtliga avtal|inga (fler|ytterligare) avtal/i;
 export function isCloserText(body) {
   return CLOSER_RE.test(stripQuotedText(body));
 }
