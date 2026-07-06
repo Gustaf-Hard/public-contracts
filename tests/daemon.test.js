@@ -168,6 +168,51 @@ describe('createInteractivityHandler — approve path', () => {
     await handler(req, res);
     expect(db.listDecisions()).toHaveLength(0);
   });
+
+  it('a racing skip never clobbers resolved_send and heals the buttons to the REAL status (finding 7)', async () => {
+    const { escId } = seed();
+    // The approve wins the race: the row is resolved_send in the DB…
+    db.resolveEscalation(escId, { status: 'resolved_send', resolved_text: 'sent' });
+    // …but the skip handler's initial read raced it and still saw 'open'.
+    // Serve that stale row for the FIRST escalations-by-id read only.
+    let staleServed = false;
+    const staleDb = {
+      ...db,
+      raw: {
+        prepare: (sql) => {
+          const stmt = db.raw.prepare(sql);
+          if (sql.includes('SELECT * FROM escalations WHERE id = ?')) {
+            return {
+              get: (...a) => {
+                const row = stmt.get(...a);
+                if (row && !staleServed) {
+                  staleServed = true;
+                  return { ...row, status: 'open' };
+                }
+                return row;
+              },
+            };
+          }
+          return stmt;
+        },
+      },
+    };
+    const slack = fakeSlack();
+    const handler = createInteractivityHandler({ db: staleDb, slack, gmail: {}, env, log: () => {} });
+    const { req, res } = slackRequest({
+      type: 'block_actions', user: { id: 'U1' },
+      actions: [{ action_id: 'esc_skip', value: String(escId) }],
+    });
+    await handler(req, res);
+
+    // THE invariant: the real outcome survives; no false skip decision.
+    expect(db.raw.prepare('SELECT status FROM escalations WHERE id=?').get(escId).status).toBe('resolved_send');
+    expect(db.listDecisions().filter((d) => d.decision === 'skip')).toHaveLength(0);
+    // The buttons heal to the CURRENT status, not to 'resolved_skip'.
+    expect(slack.chat.update).toHaveBeenCalledTimes(1);
+    expect(slack.chat.update.mock.calls[0][0].text).toContain('Skickat');
+    expect(slack.chat.update.mock.calls[0][0].text).not.toContain('Skippad');
+  });
 });
 
 describe('makeMutex — tick and followup never mutate escalations concurrently (finding 5)', () => {

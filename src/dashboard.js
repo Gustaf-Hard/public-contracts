@@ -829,15 +829,20 @@ export function createDashboardApp({
     const action = req.body.action;
 
     if (action === 'skip') {
-      db.resolveEscalation(escId, { status: 'resolved_skip' });
-      db.recordDecision({
-        escalation_id: escId, conversation_id: conv.id,
-        conversation_state: esc.previous_state ?? conv.state,
-        classifier_class: esc.classifier_class ?? null, classifier_confidence: esc.classifier_confidence ?? null,
-        draft_template: esc.draft_template, draft_body: esc.draft_body,
-        decision: 'skip', final_body: null,
-      });
-      await stripSlackButtons(esc, conv.kommun_namn, 'resolved_skip');
+      // Atomic + conditional (hardening finding 7): the open-check above is a
+      // stale read — a racing approve (Slack or a second tab) may already
+      // have resolved the row. Never clobber the real outcome with a false
+      // skip decision.
+      if (db.resolveEscalationIfOpen(escId, { status: 'resolved_skip' })) {
+        db.recordDecision({
+          escalation_id: escId, conversation_id: conv.id,
+          conversation_state: esc.previous_state ?? conv.state,
+          classifier_class: esc.classifier_class ?? null, classifier_confidence: esc.classifier_confidence ?? null,
+          draft_template: esc.draft_template, draft_body: esc.draft_body,
+          decision: 'skip', final_body: null,
+        });
+        await stripSlackButtons(esc, conv.kommun_namn, 'resolved_skip');
+      }
       return res.redirect(backTo(req, `/kommun/${conv.kommun_kod}`));
     }
 
@@ -903,7 +908,10 @@ export function createDashboardApp({
       .prepare("SELECT * FROM escalations WHERE conversation_id = ? AND status = 'open'")
       .all(convId);
     for (const e of openEscs) {
-      db.resolveEscalation(e.id, { status: 'resolved_closed' });
+      // Conditional resolve (finding 7): a racing approve between the SELECT
+      // above and here must not have its resolved_send clobbered by a false
+      // 'closed' decision.
+      if (!db.resolveEscalationIfOpen(e.id, { status: 'resolved_closed' })) continue;
       db.recordDecision({
         escalation_id: e.id, conversation_id: conv.id,
         conversation_state: e.previous_state ?? conv.state,

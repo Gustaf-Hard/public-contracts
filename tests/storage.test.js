@@ -161,6 +161,28 @@ describe('escalations', () => {
   });
 });
 
+describe('resolveEscalationIfOpen — atomic conditional resolve (finding 7)', () => {
+  function seedEscalation() {
+    const cid = db.createConversation({ kommun_kod: '7777', kommun_namn: 'T', role: 'central', contact_email: 'a@x.se', scheduled_send_at: '2026-05-19T10:00:00Z' });
+    return db.recordEscalation({ conversation_id: cid, reason: 'r', draft_template: 'free_form', draft_subject: 's', draft_body: 'b' });
+  }
+
+  it('resolves an open escalation and reports success', () => {
+    const eid = seedEscalation();
+    expect(db.resolveEscalationIfOpen(eid, { status: 'resolved_skip' })).toBe(true);
+    expect(db.raw.prepare('SELECT status FROM escalations WHERE id=?').get(eid).status).toBe('resolved_skip');
+  });
+
+  it('never clobbers a non-open escalation — resolved_send survives a racing skip', () => {
+    const eid = seedEscalation();
+    db.resolveEscalation(eid, { status: 'resolved_send', resolved_text: 'sent' });
+    expect(db.resolveEscalationIfOpen(eid, { status: 'resolved_skip' })).toBe(false);
+    const row = db.raw.prepare('SELECT status, resolved_text FROM escalations WHERE id=?').get(eid);
+    expect(row.status).toBe('resolved_send');
+    expect(row.resolved_text).toBe('sent');
+  });
+});
+
 describe('hasActiveEscalation — one notion of "non-terminal" (hardening 2/3)', () => {
   function seedEsc(status) {
     const cid = db.createConversation({

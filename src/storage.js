@@ -366,6 +366,22 @@ export function openDb(path) {
     `).run(status, resolved_text, id);
   }
 
+  // Atomically resolve an escalation only if it is still open — the same
+  // claim pattern as claimEscalationForSending, for skip/close (hardening
+  // finding 7). Returns true when this caller performed the resolve (exactly
+  // one row moved). Returns false when the escalation was already claimed or
+  // resolved elsewhere; the caller must then no-op (and re-read the current
+  // status) instead of clobbering the real outcome — e.g. a racing skip
+  // overwriting resolved_send with a false skip decision.
+  function resolveEscalationIfOpen(id, { status, resolved_text = null }) {
+    const r = db.prepare(`
+      UPDATE escalations
+      SET status = ?, resolved_text = ?, resolved_at = datetime('now')
+      WHERE id = ? AND status = 'open'
+    `).run(status, resolved_text, id);
+    return r.changes === 1;
+  }
+
   // Atomically claim an open escalation for sending. Returns true when this
   // caller won the claim (exactly one row moved open → sending); false when the
   // escalation was already resolved, already claimed, or doesn't exist. This is
@@ -658,6 +674,7 @@ export function openDb(path) {
     hasActiveEscalation,
     getEscalationBySlackTs,
     resolveEscalation,
+    resolveEscalationIfOpen,
     claimEscalationForSending,
     claimConversationForInitialSend,
     transaction,

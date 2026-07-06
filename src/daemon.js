@@ -104,8 +104,12 @@ export function createInteractivityHandler({ db, slack, gmail, env, log = consol
         } else if (parsed.action_id === 'esc_edit') {
           await openEditModalImpl(slack, { trigger_id: parsed.trigger_id, escalation_id: escId, draft_reply: esc.draft_body });
         } else if (parsed.action_id === 'esc_skip') {
-          if (esc.status === 'open') {
-            db.resolveEscalation(escId, { status: 'resolved_skip' });
+          // Atomic + conditional (hardening finding 7): `esc` was read above
+          // and may be stale — a racing approve can have resolved the row in
+          // between. Only resolve WHERE status='open'; on a lost race, no-op
+          // and heal the buttons to the CURRENT status (never write a false
+          // skip decision over resolved_send).
+          if (db.resolveEscalationIfOpen(escId, { status: 'resolved_skip' })) {
             db.recordDecision({
               escalation_id: escId, conversation_id: conv.id,
               conversation_state: esc.previous_state ?? conv.state,
@@ -113,8 +117,12 @@ export function createInteractivityHandler({ db, slack, gmail, env, log = consol
               draft_template: esc.draft_template, draft_body: esc.draft_body,
               decision: 'skip', final_body: null,
             });
+            await stripButtons(slack, env, esc, conv.kommun_namn, 'resolved_skip', log);
+          } else {
+            const current = db.raw.prepare('SELECT * FROM escalations WHERE id = ?').get(escId);
+            await stripButtons(slack, env, current ?? esc, conv.kommun_namn, current?.status ?? esc.status, log);
+            log(`skip ignored: escalation ${escId} already ${current?.status ?? 'missing'}`);
           }
-          await stripButtons(slack, env, esc, conv.kommun_namn, 'resolved_skip', log);
         }
       } else if (parsed.type === 'view_submission' && parsed.view?.callback_id === 'esc_edit_modal') {
         const escId = parseInt(parsed.view.private_metadata, 10);
