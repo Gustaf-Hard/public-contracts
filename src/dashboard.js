@@ -953,6 +953,11 @@ export function createDashboardApp({
         body,
       });
     } catch (e) {
+      // A lost INITIAL claim is an expected race (a daemon tick sent the
+      // canned T-INITIAL first), not a server error. Nothing was double-sent.
+      if (e.code === 'INITIAL_CLAIM_LOST') {
+        return res.status(409).send(escapeForError(e.message));
+      }
       return res.status(500).send(`Send failed: ${escapeForError(e.message)}`);
     }
     res.redirect(`/kommun/${kommun.kommun_kod}`);

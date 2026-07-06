@@ -186,7 +186,18 @@ export async function sendInitial({ db, gmail, env, kommun_kod, kommun_namn, rol
   // *before* the Gmail call. A failed or crashed send must never leave a due
   // INITIAL row behind — the tick would later auto-send the canned template
   // without human intent. On failure the row is parked NEEDS_HUMAN instead.
-  db.claimConversationForInitialSend(convId);
+  //
+  // The claim result is binding (hardening finding 1): a daemon tick can win
+  // the INITIAL → SENDING claim between createConversation above and here and
+  // send the canned T-INITIAL itself. Sending ours on top would double-message
+  // the kommun, so abort without touching Gmail or the row — exactly like
+  // dispatchInitial and sendApprovedReply treat a lost claim.
+  if (!db.claimConversationForInitialSend(convId)) {
+    throw errWithCode(
+      `Conversation ${convId} (${kommun_kod}/${role}) was claimed for its initial send elsewhere (daemon tick?) — already handled, not sending again.`,
+      'INITIAL_CLAIM_LOST'
+    );
+  }
   let sent;
   try {
     sent = await gmailSend(gmail, {

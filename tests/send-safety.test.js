@@ -246,6 +246,32 @@ describe('sendInitial — failed dashboard send never leaves a due INITIAL row (
     // The tick's due-initial query must not pick it up.
     expect(db.listConversationsDueForInitialSend(new Date().toISOString())).toHaveLength(0);
   });
+
+  it('aborts without calling Gmail when the INITIAL claim was won elsewhere (finding 1)', async () => {
+    const gmailSendSpy = vi.fn(async () => ({ data: { id: 'out-1', threadId: 'thr-1' } }));
+    const gmail = { users: { messages: { send: gmailSendSpy } } };
+    // Simulate the daemon tick winning the INITIAL → SENDING claim between
+    // sendInitial's createConversation and its own claim attempt: by the time
+    // sendInitial claims, the row is already SENDING and the claim fails.
+    const racingDb = {
+      ...db,
+      claimConversationForInitialSend: (id) => {
+        db.claimConversationForInitialSend(id); // the tick got there first
+        return db.claimConversationForInitialSend(id); // our attempt loses
+      },
+    };
+    await expect(sendInitial({
+      db: racingDb, gmail, env,
+      kommun_kod: '9998', kommun_namn: 'Racekommun', role: 'central',
+      contact_email: 'k@race.se', subject: 's', body: 'b',
+    })).rejects.toMatchObject({ code: 'INITIAL_CLAIM_LOST' });
+
+    expect(gmailSendSpy).not.toHaveBeenCalled(); // THE invariant: no second T-INITIAL
+    // The row stays exactly as the winner left it — not parked, not clobbered.
+    const conv = db.raw.prepare("SELECT * FROM conversations WHERE kommun_kod='9998'").get();
+    expect(conv.state).toBe('SENDING');
+    expect(db.raw.prepare("SELECT COUNT(*) n FROM messages").get().n).toBe(0);
+  });
 });
 
 describe('parseDbTime', () => {
