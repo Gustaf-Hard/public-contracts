@@ -834,7 +834,9 @@ export function renderEscalationForm(esc, gmailReady, returnTo = null) {
       ${returnField}
       <div class="field">
         <label>Till</label>
-        <input type="email" name="to" value="${escapeHtml(esc.recipient ?? '')}">
+        <!-- type=text, not email: the recipient is an RFC 5322 "Namn <adress>"
+             value, which the browser's native email validation rejects. -->
+        <input type="text" name="to" value="${escapeHtml(esc.recipient ?? '')}">
       </div>
       <div class="field">
         <label>Ämne</label>
