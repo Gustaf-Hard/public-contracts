@@ -155,7 +155,7 @@ describe('runTick — unmatched inbound is surfaced once (H5, L5)', () => {
     const spy = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue(null);
     seedConv();
     const slackOps = fakeSlackOps();
-    const seenUnmatched = new Set(); // daemon-lifetime set
+    const seenUnmatched = new Map(); // daemon-lifetime cache of match inputs
     const gmail = fakeGmail({
       listResult: [{ id: 'um-1' }],
       getResult: { 'um-1': mkMsg('um-1', 'thr-x', 'Okänd <reg@kommunalforbund.se>', 'Svar på er begäran') },
@@ -171,6 +171,61 @@ describe('runTick — unmatched inbound is surfaced once (H5, L5)', () => {
     await runTick(deps({ gmail, slackOps, seenUnmatched }));
     expect(gmail.getMessage).toHaveBeenCalledTimes(1);
     expect(slackOps.alerts).toHaveLength(1);
+    spy.mockRestore();
+  });
+});
+
+describe('runTick — previously-unmatched inbound is re-matched every tick (finding 4)', () => {
+  it('an ambiguous message is ingested on the next tick once its thread is associated — no restart needed', async () => {
+    const spy = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue(null);
+    seedConv({ role: 'central', email: 'kansli@ale.se', thread: 'thr-central' });
+    const b = seedConv({ role: 'utbildning', email: 'utbildning@ale.se', thread: 'thr-utb' });
+    const slackOps = fakeSlackOps();
+    const seenUnmatched = new Map();
+    const gmail = fakeGmail({
+      listResult: [{ id: 'amb-2' }],
+      getResult: { 'amb-2': mkMsg('amb-2', 'thr-new', 'Registrator <registrator@ale.se>', 'Ärendenummer: K1440009') },
+    });
+
+    // Tick N: two conversations share the domain → ambiguous, digested, not ingested.
+    await runTick(deps({ gmail, slackOps, seenUnmatched }));
+    expect(db.hasGmailMessageId('amb-2')).toBe(false);
+    expect(slackOps.alerts).toHaveLength(1);
+    expect(slackOps.alerts[0]).toMatch(/TVETYDIG/);
+
+    // The operator associates the Gmail thread with conversation B.
+    db.upsertThread({ conversation_id: b, gmail_thread_id: 'thr-new', counterparty_email: 'registrator@ale.se' });
+
+    // Tick N+1, same daemon process: the message must now be ingested.
+    await runTick(deps({ gmail, slackOps, seenUnmatched }));
+    expect(db.hasGmailMessageId('amb-2')).toBe(true);
+    const msg = db.raw.prepare("SELECT * FROM messages WHERE gmail_message_id='amb-2'").get();
+    expect(msg.conversation_id).toBe(b);
+    expect(db.getConversation(b).arendenummer).toBe('K1440009');
+    expect(slackOps.alerts).toHaveLength(1); // no re-alert, and it never re-digests
+    expect(seenUnmatched.has('amb-2')).toBe(false); // cache entry cleared
+    spy.mockRestore();
+  });
+
+  it('an unmatched message is ingested once a conversation for its kommun gains a matching identity', async () => {
+    const spy = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue(null);
+    seedConv({ role: 'central', email: 'kansli@ale.se', thread: 'thr-central' });
+    const slackOps = fakeSlackOps();
+    const seenUnmatched = new Map();
+    const gmail = fakeGmail({
+      listResult: [{ id: 'um-2' }],
+      getResult: { 'um-2': mkMsg('um-2', 'thr-forb', 'Reg <reg@kommunalforbund.se>', 'Här är svaret') },
+    });
+
+    await runTick(deps({ gmail, slackOps, seenUnmatched })); // no match → digested
+    expect(db.hasGmailMessageId('um-2')).toBe(false);
+
+    // A new conversation is created whose thread the message belongs to.
+    const c = seedConv({ kod: '1441', namn: 'Alingsås', role: 'central', email: 'reg@kommunalforbund.se', thread: 'thr-forb' });
+
+    await runTick(deps({ gmail, slackOps, seenUnmatched }));
+    expect(db.hasGmailMessageId('um-2')).toBe(true);
+    expect(db.raw.prepare("SELECT conversation_id FROM messages WHERE gmail_message_id='um-2'").get().conversation_id).toBe(c);
     spy.mockRestore();
   });
 });

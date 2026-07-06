@@ -149,11 +149,13 @@ export async function startDaemon({ env = process.env, log = console.log } = {})
   };
   const slackOps = { postEscalation, postAlert, updateEscalationResolved };
 
-  // Known-unmatched inbound (spam, newsletters, out-of-scope senders): skip
-  // re-fetching and re-alerting within this process's lifetime (review H5/L5).
-  // In-memory only — a restart re-checks them once (no schema for durable
-  // tracking; see review notes).
-  const seenUnmatched = new Set();
+  // Known-unmatched inbound (spam, newsletters, out-of-scope senders): alert
+  // once and skip re-FETCHING within this process's lifetime (review H5/L5),
+  // but keep the {threadId, from} match inputs so every tick re-attempts
+  // matching (hardening finding 4) — a manually associated thread must be
+  // ingested without a restart. In-memory only — a restart re-checks them
+  // once (no schema for durable tracking; see review notes).
+  const seenUnmatched = new Map();
 
   const tickOnce = makeExclusive(async () => {
     const now = getEffectiveNow({ env, overrides });

@@ -501,25 +501,27 @@ async function dispatchEscalationForIngest(pending, deps) {
 
 // Surface unmatched and domain-ambiguous inbound (review H5/H2) as a Slack
 // digest instead of silently re-fetching it forever. `seenUnmatched` is a
-// per-process set injected by the daemon so each message alerts once per
-// daemon lifetime — durable tracking would need a schema change, so a restart
-// re-checks (and re-alerts) once. Side effect: a message digested as
-// unmatched is not re-matched until restart, even if a conversation for its
-// kommun is created later.
+// per-process Map (gmail_message_id → cached {threadId, from} match inputs)
+// injected by the daemon so each message alerts once per daemon lifetime AND
+// is still re-attempted against matchInbound every tick without a re-fetch
+// (hardening finding 4): once the operator associates the thread — or a
+// sibling conversation resolves the ambiguity — the message is ingested on
+// the next tick, not lost until a restart. Durable tracking would need a
+// schema change, so a restart re-checks (and re-alerts) once.
 async function digestUnmatched({ unmatched, ambiguous, fetchedById, convById, seenUnmatched, deps }) {
   const { slackClient, slackOps, env, log } = deps;
   const lines = [];
   for (const id of unmatched) {
-    if (seenUnmatched.has(id)) continue;
-    seenUnmatched.add(id);
+    if (seenUnmatched.has(id)) continue; // already digested on an earlier tick
     const f = fetchedById.get(id);
+    seenUnmatched.set(id, { threadId: f.full.threadId, from: f.parsed.from });
     const atts = f.parsed.attachments.length ? ` (${f.parsed.attachments.length} bilagor)` : '';
     lines.push(`• *${f.parsed.from}* — ${f.parsed.subject || '(ämne saknas)'}${atts}`);
   }
   for (const a of ambiguous) {
     if (seenUnmatched.has(a.messageId)) continue;
-    seenUnmatched.add(a.messageId);
     const f = fetchedById.get(a.messageId);
+    seenUnmatched.set(a.messageId, { threadId: f.full.threadId, from: f.parsed.from });
     const kommuner = a.convIds
       .map((cid) => { const c = convById.get(cid); return c ? `${c.kommun_namn}/${c.role}` : `conv ${cid}`; })
       .join(', ');
@@ -556,7 +558,7 @@ export async function runTick(deps) {
   // conversations (thread first, then domain), ingest atomically, then draft.
   const active = db.listAllConversations().filter((c) => c.gmail_thread_id);
   if (active.length) {
-    const seenUnmatched = deps.seenUnmatched ?? new Set();
+    const seenUnmatched = deps.seenUnmatched ?? new Map();
     const windowDays = deriveFetchWindowDays(db.getTickHealth?.({ now })?.last_success_at ?? null, now);
     const list = await gmailOps.listInboundQuery(
       gmailClient.gmail,
@@ -566,8 +568,8 @@ export async function runTick(deps) {
     // every conversation using the already-parsed content.
     const fetched = [];
     for (const m of list) {
-      if (db.hasGmailMessageId(m.id)) continue;
-      if (seenUnmatched.has(m.id)) continue; // already digested as unmatched
+      if (db.hasGmailMessageId(m.id)) { seenUnmatched.delete(m.id); continue; }
+      if (seenUnmatched.has(m.id)) continue; // match inputs cached below — re-matched without a re-fetch
       const full = await gmailOps.getMessage(gmailClient.gmail, m.id);
       if (!full) continue;
       fetched.push({ id: m.id, full, parsed: parseInboundMessage(full) });
@@ -583,8 +585,17 @@ export async function runTick(deps) {
         ...db.listThreadsForConversation(c.id).map((t) => t.gmail_thread_id),
       ].filter(Boolean),
     }));
+    // Previously-unmatched/ambiguous ids re-enter matching every tick from the
+    // cache (hardening finding 4): a manual thread association or a resolved
+    // ambiguity must lead to ingestion in THIS process, not after a restart.
+    const cachedCandidates = [...seenUnmatched.entries()]
+      .filter(([id]) => !db.hasGmailMessageId(id))
+      .map(([id, v]) => ({ id, threadId: v.threadId, from: v.from }));
     const { matched, ambiguous, unmatched } = matchInbound(
-      fetched.map((f) => ({ id: f.id, threadId: f.full.threadId, from: f.parsed.from })),
+      [
+        ...fetched.map((f) => ({ id: f.id, threadId: f.full.threadId, from: f.parsed.from })),
+        ...cachedCandidates,
+      ],
       convInputs,
     );
     const fetchedById = new Map(fetched.map((f) => [f.id, f]));
@@ -592,7 +603,15 @@ export async function runTick(deps) {
 
     const pendingEscalations = [];
     for (const match of matched) {
-      const item = fetchedById.get(match.messageId);
+      let item = fetchedById.get(match.messageId);
+      if (!item) {
+        // A formerly-unmatched message that has just become matchable — its
+        // full content was never kept, so fetch it on demand now.
+        const full = await gmailOps.getMessage(gmailClient.gmail, match.messageId);
+        if (!full) continue; // stays cached; retried next tick
+        item = { id: match.messageId, full, parsed: parseInboundMessage(full) };
+      }
+      seenUnmatched.delete(match.messageId);
       const conv = db.getConversation(match.convId); // fresh — state may have moved this tick
       try {
         pendingEscalations.push(await ingestMessage({ conv, item, deps }));
