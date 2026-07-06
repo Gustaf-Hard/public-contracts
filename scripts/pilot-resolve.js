@@ -1,8 +1,12 @@
 #!/usr/bin/env node
+// CLI escalation resolver. Thin wrapper over the SAME code path as the Slack
+// approve and the dashboard (sendApprovedReply) — this script used to carry a
+// third, drifted copy of the send logic that bypassed resolveReplyRecipient
+// and mis-routed replies (autopilot review M7). Never duplicate send logic.
 import 'dotenv/config';
-import { google } from 'googleapis';
 import { openDb } from '../src/storage.js';
-import { buildOAuthClient, loadStoredToken, makeGmail, sendMessage } from '../src/gmail.js';
+import { buildOAuthClient, loadStoredToken, makeGmail } from '../src/gmail.js';
+import { sendApprovedReply } from '../src/send-reply.js';
 
 function arg(name) {
   const a = process.argv.find((x) => x.startsWith(`--${name}=`));
@@ -30,7 +34,8 @@ const conv = db.getConversation(esc.conversation_id);
 if (action === 'skip') {
   db.resolveEscalation(escId, { status: 'resolved_skip' });
   db.recordDecision({
-    escalation_id: escId, conversation_id: conv.id, conversation_state: conv.state,
+    escalation_id: escId, conversation_id: conv.id,
+    conversation_state: esc.previous_state ?? conv.state,
     classifier_class: esc.classifier_class ?? null, classifier_confidence: esc.classifier_confidence ?? null,
     draft_template: esc.draft_template, draft_body: esc.draft_body,
     decision: 'skip', final_body: null,
@@ -48,38 +53,15 @@ if (!stored) { console.error(`No Gmail token at ${TOKEN_PATH}`); process.exit(1)
 oauth.setCredentials(stored);
 const gmail = makeGmail(oauth);
 
-const sent = await sendMessage(gmail, {
-  from: `${process.env.GMAIL_FROM_NAME} <${process.env.GMAIL_USER_EMAIL}>`,
-  to: conv.contact_email,
-  subject: esc.draft_subject ?? 'Re: Begäran om allmänna handlingar',
-  body: replyText,
-  threadId: conv.gmail_thread_id,
-});
-const nowIso = new Date().toISOString();
-db.recordMessage({
-  conversation_id: conv.id, gmail_message_id: sent.id, direction: 'outbound',
-  from_email: process.env.GMAIL_USER_EMAIL, to_email: conv.contact_email,
-  subject: esc.draft_subject ?? 'Re: Begäran om allmänna handlingar', body_text: replyText,
-  classification: null, classification_confidence: null,
-  received_at: nowIso, attachment_count: 0,
-});
-const patch = { last_outbound_at: nowIso };
-if (esc.draft_template === 'T_RECEIPT') patch.receipt_sent = 1;
-if (esc.draft_template === 'T_FOLLOWUP_NUDGE' || esc.draft_template === 'T_FOLLOWUP_CLOSE') {
-  patch.followup_count = (conv.followup_count ?? 0) + 1;
+try {
+  const sent = await sendApprovedReply({
+    db, gmail, env: process.env, conv, esc,
+    finalBody: replyText,
+    decision: action === 'edit' ? 'edit' : 'approve_unmodified',
+  });
+  console.log(`Escalation ${escId} resolved (${action}). Sent gmail message ${sent.id}. Decision logged.`);
+} catch (e) {
+  console.error(`Resolve failed: ${e.message}`);
+  process.exitCode = 1;
 }
-const targetState = (conv.state === 'NEEDS_HUMAN' && esc.draft_template === 'free_form' && esc.previous_state)
-  ? esc.previous_state
-  : conv.state;
-db.updateConversationState(conv.id, targetState, patch);
-db.resolveEscalation(escId, { status: action === 'edit' ? 'resolved_edit' : 'resolved_send', resolved_text: replyText });
-db.recordDecision({
-  escalation_id: escId, conversation_id: conv.id, conversation_state: conv.state,
-  classifier_class: esc.classifier_class ?? null, classifier_confidence: esc.classifier_confidence ?? null,
-  draft_template: esc.draft_template, draft_body: esc.draft_body,
-  decision: action === 'edit' ? 'edit' : 'approve_unmodified',
-  final_body: replyText,
-});
-
-console.log(`Escalation ${escId} resolved (${action}). Sent gmail message ${sent.id}. Decision logged.`);
 db.close();

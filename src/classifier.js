@@ -28,10 +28,44 @@ const DEAD_END_PATTERNS = [
   { name: 'omfattas_inte', re: /omfattas inte/i, score: 0.6 },
   { name: 'kan_ej_lamna_ut', re: /kan (vi )?inte lämna ut|kan ej lämna ut/i, score: 0.7 },
   { name: 'ligger_hos', re: /ligger hos|hanteras (centralt|hos)/i, score: 0.4 },
-  { name: 'samtliga_avtal', re: /(detta var |var )samtliga avtal/i, score: 0.8 },
+  // Declarative "these are/were all the contracts" — demonstrative + verb
+  // order so OUR OWN receipt question ("Är detta samtliga avtal…?", verb
+  // first) can never match, even when quoted back at us (finding 8).
+  { name: 'samtliga_avtal', re: /((detta|dessa|det|de)( här)? (var|är) |var )samtliga avtal/i, score: 0.8 },
 ];
 
 const ARENDENUMMER_RE = /Ärendenummer\s*[:\-]\s*([Kk]\d{6,})/i;
+
+// Strip quoted reply content so patterns never match OUR OWN text echoed back
+// (a kommun reply usually quotes the T_RECEIPT question "Är detta samtliga
+// avtal…?"). Drops '>'-prefixed lines and everything after common Swedish/
+// Outlook/Gmail reply markers.
+export function stripQuotedText(body) {
+  const lines = String(body ?? '').split('\n');
+  const out = [];
+  for (const line of lines) {
+    const t = line.trim();
+    if (/^-{2,}\s*Ursprungligt meddelande\s*-{2,}/i.test(t)) break; // Outlook sv
+    if (/^-{2,}\s*Original Message\s*-{2,}/i.test(t)) break;
+    if (/^(Den|On) .{4,80}skrev.*:$/i.test(t)) break; // Gmail sv "Den … skrev X:"
+    if (/^Från:\s/i.test(t) || /^From:\s/i.test(t)) break; // forwarded header block
+    if (t.startsWith('>')) continue;
+    out.push(line);
+  }
+  return out.join('\n');
+}
+
+// Fallback "this was everything" detector over the UNQUOTED part of the body
+// (review M9): used only when no LLM analysis is available. Deliberately the
+// declarative shape — demonstrative BEFORE the verb — so a question
+// ("Är detta samtliga avtal?", verb first) does not match. Covers both past
+// ("Detta var samtliga avtal") and present tense ("Detta är samtliga avtal"),
+// which the pre-M9 broad /samtliga avtal/ caught and the first narrowing
+// dropped (hardening finding 8).
+const CLOSER_RE = /((detta|dessa|det|de)( här)? (var|är) |var )samtliga avtal|inga (fler|ytterligare) avtal/i;
+export function isCloserText(body) {
+  return CLOSER_RE.test(stripQuotedText(body));
+}
 
 const THRESHOLD = 0.6;
 const DELIVERY_THRESHOLD = 0.5;

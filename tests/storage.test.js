@@ -161,6 +161,65 @@ describe('escalations', () => {
   });
 });
 
+describe('resolveEscalationIfOpen — atomic conditional resolve (finding 7)', () => {
+  function seedEscalation() {
+    const cid = db.createConversation({ kommun_kod: '7777', kommun_namn: 'T', role: 'central', contact_email: 'a@x.se', scheduled_send_at: '2026-05-19T10:00:00Z' });
+    return db.recordEscalation({ conversation_id: cid, reason: 'r', draft_template: 'free_form', draft_subject: 's', draft_body: 'b' });
+  }
+
+  it('resolves an open escalation and reports success', () => {
+    const eid = seedEscalation();
+    expect(db.resolveEscalationIfOpen(eid, { status: 'resolved_skip' })).toBe(true);
+    expect(db.raw.prepare('SELECT status FROM escalations WHERE id=?').get(eid).status).toBe('resolved_skip');
+  });
+
+  it('never clobbers a non-open escalation — resolved_send survives a racing skip', () => {
+    const eid = seedEscalation();
+    db.resolveEscalation(eid, { status: 'resolved_send', resolved_text: 'sent' });
+    expect(db.resolveEscalationIfOpen(eid, { status: 'resolved_skip' })).toBe(false);
+    const row = db.raw.prepare('SELECT status, resolved_text FROM escalations WHERE id=?').get(eid);
+    expect(row.status).toBe('resolved_send');
+    expect(row.resolved_text).toBe('sent');
+  });
+});
+
+describe('hasActiveEscalation — one notion of "non-terminal" (hardening 2/3)', () => {
+  function seedEsc(status) {
+    const cid = db.createConversation({
+      kommun_kod: `${9000 + seedEsc.n++}`, kommun_namn: 'T', role: 'central',
+      contact_email: 'a@x.se', scheduled_send_at: '2026-05-19T10:00:00Z',
+    });
+    const eid = db.recordEscalation({
+      conversation_id: cid, reason: 'r', draft_template: 'free_form',
+      draft_subject: 's', draft_body: 'b',
+    });
+    if (status !== 'open') db.resolveEscalation(eid, { status });
+    return { cid, eid };
+  }
+  seedEsc.n = 0;
+
+  it('open, sending, send_failed and send_unconfirmed are ACTIVE', () => {
+    for (const status of ['open', 'sending', 'send_failed', 'send_unconfirmed']) {
+      const { cid } = seedEsc(status);
+      expect(db.hasActiveEscalation(cid), status).toBe(true);
+      expect(db.listActiveEscalationsForConversation(cid).map((e) => e.status)).toEqual([status]);
+    }
+  });
+
+  it('resolved_* and superseded are terminal; empty conversations are inactive', () => {
+    for (const status of ['resolved_send', 'resolved_edit', 'resolved_skip', 'resolved_closed', 'superseded']) {
+      const { cid } = seedEsc(status);
+      expect(db.hasActiveEscalation(cid), status).toBe(false);
+      expect(db.listActiveEscalationsForConversation(cid)).toEqual([]);
+    }
+    const cid = db.createConversation({
+      kommun_kod: '8999', kommun_namn: 'T', role: 'central',
+      contact_email: 'a@x.se', scheduled_send_at: '2026-05-19T10:00:00Z',
+    });
+    expect(db.hasActiveEscalation(cid)).toBe(false);
+  });
+});
+
 describe('decisions', () => {
   it('records a decision tied to an escalation', () => {
     const cid = db.createConversation({ kommun_kod: '9999', kommun_namn: 'T', role: 'utbildning', contact_email: 'a@x.se', scheduled_send_at: '2026-05-19T10:00:00Z' });

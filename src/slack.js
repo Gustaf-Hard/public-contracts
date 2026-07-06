@@ -40,6 +40,42 @@ export async function postEscalation(slack, { channel, blocks, fallbackText }) {
   return { ts: res.ts, channel: res.channel };
 }
 
+// Post a plain (button-less) alert to the escalation channel. Used for
+// operational warnings: unmatched inbound digests, send-unconfirmed
+// escalations, etc.
+export async function postAlert(slack, { channel, text }) {
+  const res = await slack.chat.postMessage({
+    channel,
+    text,
+    blocks: [{ type: 'section', text: { type: 'mrkdwn', text } }],
+  });
+  return { ts: res.ts, channel: res.channel };
+}
+
+// Replace an escalation's Slack message with a resolved (button-less) version.
+// Called after any resolution (send, edit, skip, supersede, failure) so a stale
+// Approve button can never be clicked again. The atomic DB claim is the real
+// double-send guard; this is defense-in-depth + operator UX.
+export async function updateEscalationResolved(slack, { channel, ts, kommun_namn, status, detail }) {
+  const statusText = {
+    resolved_send: '✅ Skickat (godkänt oförändrat)',
+    resolved_edit: '✅ Skickat (redigerat)',
+    resolved_skip: '⏭️ Skippad',
+    resolved_closed: '🗄️ Ärendet stängt',
+    superseded: '↪️ Ersatt av nyare eskalering',
+    send_failed: '❌ Sändning misslyckades',
+    send_unconfirmed: '⚠️ Sändning obekräftad — kontrollera Skickat i Gmail',
+  }[status] ?? status;
+  const lines = [`*Eskalering: ${kommun_namn}* — ${statusText}`];
+  if (detail) lines.push(detail);
+  await slack.chat.update({
+    channel,
+    ts,
+    text: `Eskalering: ${kommun_namn} — ${statusText}`,
+    blocks: [{ type: 'section', text: { type: 'mrkdwn', text: lines.join('\n') } }],
+  });
+}
+
 export async function openEditModal(slack, { trigger_id, escalation_id, draft_reply }) {
   await slack.views.open({
     trigger_id,

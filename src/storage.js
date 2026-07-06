@@ -1,5 +1,17 @@
 import Database from 'better-sqlite3';
 
+// Active (non-terminal) escalation statuses — the single source of truth for
+// "this conversation already has pending or unresolved outbound work":
+//   - open             awaiting a human decision
+//   - sending          a Gmail call is in flight right now
+//   - send_failed      Gmail threw mid-send — the mail MAY have gone out
+//   - send_unconfirmed a 'sending' claim was orphaned by a crash — same risk
+// While ANY of these exists, the conversation must not receive a new
+// follow-up/precision draft: approving a fresh draft next to an ambiguous
+// send is how a kommun gets double-messaged. Everything else (resolved_send,
+// resolved_edit, resolved_skip, resolved_closed, superseded) is terminal.
+export const ACTIVE_ESCALATION_STATUSES = Object.freeze(['open', 'sending', 'send_failed', 'send_unconfirmed']);
+
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS conversations (
   id INTEGER PRIMARY KEY,
@@ -354,6 +366,86 @@ export function openDb(path) {
     `).run(status, resolved_text, id);
   }
 
+  // Atomically resolve an escalation only if it is still open — the same
+  // claim pattern as claimEscalationForSending, for skip/close (hardening
+  // finding 7). Returns true when this caller performed the resolve (exactly
+  // one row moved). Returns false when the escalation was already claimed or
+  // resolved elsewhere; the caller must then no-op (and re-read the current
+  // status) instead of clobbering the real outcome — e.g. a racing skip
+  // overwriting resolved_send with a false skip decision.
+  function resolveEscalationIfOpen(id, { status, resolved_text = null }) {
+    const r = db.prepare(`
+      UPDATE escalations
+      SET status = ?, resolved_text = ?, resolved_at = datetime('now')
+      WHERE id = ? AND status = 'open'
+    `).run(status, resolved_text, id);
+    return r.changes === 1;
+  }
+
+  // Atomically claim an open escalation for sending. Returns true when this
+  // caller won the claim (exactly one row moved open → sending); false when the
+  // escalation was already resolved, already claimed, or doesn't exist. This is
+  // the send-path idempotency guard: every surface (Slack approve, dashboard
+  // approve, CLI) must claim before calling Gmail, so a double click, a Slack
+  // retry, or two racing processes can never double-send.
+  // resolved_at doubles as the claim timestamp while status='sending' so the
+  // tick can detect claims orphaned by a crash; it is overwritten on finalize.
+  function claimEscalationForSending(id) {
+    const r = db.prepare(`
+      UPDATE escalations
+      SET status = 'sending', resolved_at = datetime('now')
+      WHERE id = ? AND status = 'open'
+    `).run(id);
+    return r.changes === 1;
+  }
+
+  function listEscalationsByStatus(status) {
+    return db.prepare('SELECT * FROM escalations WHERE status = ? ORDER BY id').all(status);
+  }
+
+  function listOpenEscalationsForConversation(conversationId) {
+    return db.prepare("SELECT * FROM escalations WHERE conversation_id = ? AND status = 'open' ORDER BY id")
+      .all(conversationId);
+  }
+
+  const activeStatusPlaceholders = ACTIVE_ESCALATION_STATUSES.map(() => '?').join(', ');
+
+  function listActiveEscalationsForConversation(conversationId) {
+    return db.prepare(
+      `SELECT * FROM escalations WHERE conversation_id = ? AND status IN (${activeStatusPlaceholders}) ORDER BY id`
+    ).all(conversationId, ...ACTIVE_ESCALATION_STATUSES);
+  }
+
+  // "Does this conversation already have pending or unresolved outbound
+  // work?" — see ACTIVE_ESCALATION_STATUSES. Every guard that decides whether
+  // a new follow-up/precision draft may be minted must use this, not a
+  // hand-rolled status='open' check (hardening findings 2/3/5-root-cause).
+  function hasActiveEscalation(conversationId) {
+    return db.prepare(
+      `SELECT 1 FROM escalations WHERE conversation_id = ? AND status IN (${activeStatusPlaceholders}) LIMIT 1`
+    ).get(conversationId, ...ACTIVE_ESCALATION_STATUSES) != null;
+  }
+
+  // Atomically claim a due INITIAL conversation for its T-INITIAL send.
+  // Two-phase outbound: the row moves INITIAL → SENDING *before* the Gmail
+  // call, so a crash between Gmail accepting and the SENT finalize leaves a
+  // SENDING row that is never auto-retried (listConversationsDueForInitialSend
+  // only selects INITIAL) — it escalates to a human instead.
+  function claimConversationForInitialSend(id) {
+    const r = db.prepare(`
+      UPDATE conversations
+      SET state = 'SENDING', state_changed_at = datetime('now')
+      WHERE id = ? AND state = 'INITIAL'
+    `).run(id);
+    return r.changes === 1;
+  }
+
+  // Run fn inside a single SQLite transaction (better-sqlite3 is synchronous,
+  // so fn must not await). Used to make per-message ingest atomic.
+  function transaction(fn) {
+    return db.transaction(fn)();
+  }
+
   function recordHeartbeat({ kind = 'tick', error = null } = {}) {
     const col = kind === 'followup' ? 'last_followup_at' : 'last_tick_at';
     // A clean tick (no error) also stamps last_success_at — that's what the
@@ -576,8 +668,16 @@ export function openDb(path) {
     recordAttachment,
     recordEscalation,
     listOpenEscalations,
+    listEscalationsByStatus,
+    listOpenEscalationsForConversation,
+    listActiveEscalationsForConversation,
+    hasActiveEscalation,
     getEscalationBySlackTs,
     resolveEscalation,
+    resolveEscalationIfOpen,
+    claimEscalationForSending,
+    claimConversationForInitialSend,
+    transaction,
     recordDecision,
     listDecisions,
     recordHeartbeat,

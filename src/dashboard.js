@@ -8,9 +8,10 @@ import path from 'node:path';
 import { readFileSync, existsSync } from 'node:fs';
 import { openDb } from './storage.js';
 import { effectiveFollowUp, TERMINAL_STATES } from './conversation.js';
-import { buildOAuthClient, loadStoredToken, makeGmail } from './gmail.js';
+import { buildOAuthClient, loadStoredToken, saveToken, makeGmail } from './gmail.js';
 import { beginReauth } from './gmail-auth.js';
 import { sendApprovedReply, sendInitial, renderInitialDraft } from './send-reply.js';
+import { makeSlackClient, updateEscalationResolved } from './slack.js';
 import { resolveReplyRecipient } from './threads.js';
 import {
   renderOverview,
@@ -34,6 +35,15 @@ function loadGmail(env) {
   if (!token) return null;
   const oauth = buildOAuthClient(env);
   oauth.setCredentials(token);
+  // Persist refreshed tokens (review M12) — merge since a refresh response may
+  // omit the refresh_token.
+  oauth.on('tokens', (tokens) => {
+    try {
+      saveToken(TOKEN_PATH, { ...loadStoredToken(TOKEN_PATH), ...tokens });
+    } catch {
+      // best effort — the in-memory client still works for this process
+    }
+  });
   return makeGmail(oauth);
 }
 
@@ -480,8 +490,21 @@ export function createDashboardApp({
   gmailClient = loadGmail(process.env),
   env = process.env,
   contractsDir = process.env.PILOT_CONTRACTS_DIR ?? 'data/contracts',
+  slackClient = process.env.SLACK_BOT_TOKEN ? makeSlackClient(process.env.SLACK_BOT_TOKEN) : null,
 } = {}) {
   const app = express();
+  // Best-effort chat.update so dashboard resolutions also strip the Slack
+  // message's live buttons. The atomic DB claim is the real double-send guard.
+  const stripSlackButtons = async (esc, kommunNamn, status) => {
+    if (!slackClient || !esc?.slack_ts || !env.SLACK_CHANNEL_ID) return;
+    try {
+      await updateEscalationResolved(slackClient, {
+        channel: env.SLACK_CHANNEL_ID, ts: esc.slack_ts, kommun_namn: kommunNamn, status,
+      });
+    } catch {
+      // Slack failure never blocks the dashboard action
+    }
+  };
   app.use(express.urlencoded({ extended: false, limit: '1mb' }));
   app.use(express.static('public'));
   // Pipeline health drives the heartbeat pill + the health modal (one object,
@@ -806,13 +829,20 @@ export function createDashboardApp({
     const action = req.body.action;
 
     if (action === 'skip') {
-      db.resolveEscalation(escId, { status: 'resolved_skip' });
-      db.recordDecision({
-        escalation_id: escId, conversation_id: conv.id, conversation_state: conv.state,
-        classifier_class: esc.classifier_class ?? null, classifier_confidence: esc.classifier_confidence ?? null,
-        draft_template: esc.draft_template, draft_body: esc.draft_body,
-        decision: 'skip', final_body: null,
-      });
+      // Atomic + conditional (hardening finding 7): the open-check above is a
+      // stale read — a racing approve (Slack or a second tab) may already
+      // have resolved the row. Never clobber the real outcome with a false
+      // skip decision.
+      if (db.resolveEscalationIfOpen(escId, { status: 'resolved_skip' })) {
+        db.recordDecision({
+          escalation_id: escId, conversation_id: conv.id,
+          conversation_state: esc.previous_state ?? conv.state,
+          classifier_class: esc.classifier_class ?? null, classifier_confidence: esc.classifier_confidence ?? null,
+          draft_template: esc.draft_template, draft_body: esc.draft_body,
+          decision: 'skip', final_body: null,
+        });
+        await stripSlackButtons(esc, conv.kommun_namn, 'resolved_skip');
+      }
       return res.redirect(backTo(req, `/kommun/${conv.kommun_kod}`));
     }
 
@@ -831,8 +861,15 @@ export function createDashboardApp({
         db, gmail: gmailClient, env, conv, esc,
         finalBody, finalSubject, finalTo: req.body.to,
         decision: action === 'send' ? 'approve_unmodified' : 'edit',
+        slackClient,
       });
     } catch (e) {
+      // Claim/staleness violations are expected races, not server errors:
+      // a concurrent approve (here or via Slack) got there first, or a newer
+      // inbound arrived after the draft. Nothing was double-sent.
+      if (e.code === 'ESCALATION_NOT_OPEN' || e.code === 'STALE_ESCALATION') {
+        return res.status(409).send(escapeForError(e.message));
+      }
       return res.status(500).send(`Send failed: ${escapeForError(e.message)}`);
     }
     res.redirect(backTo(req, `/kommun/${conv.kommun_kod}`));
@@ -855,19 +892,35 @@ export function createDashboardApp({
   // Manually close a case (or mark it as a dead-end). POST /conversations/:id/close
   // with body { state: 'DONE' | 'DEAD_END' }. Records the decision and updates
   // state_changed_at so case-duration math works.
-  app.post('/conversations/:id/close', (req, res) => {
+  app.post('/conversations/:id/close', async (req, res) => {
     if (!db) return res.status(503).send('No DB');
     const convId = parseInt(req.params.id, 10);
     const conv = db.getConversation(convId);
     if (!conv) return res.status(404).send('Case not found');
     const targetState = req.body.state === 'DEAD_END' ? 'DEAD_END' : 'DONE';
-    db.updateConversationState(convId, targetState, {});
+    // A closed case has no live follow-up promise (review M10).
+    db.updateConversationState(convId, targetState, { follow_up_at: null });
     // Closing the case makes any open escalation obsolete — resolve them so
     // they stop showing as pending work (in the case view and the action queue).
+    // Each one also writes a decision row (review M3): "human closed instead of
+    // sending this draft" is graduation signal, not noise.
     const openEscs = db.raw
-      .prepare("SELECT id FROM escalations WHERE conversation_id = ? AND status = 'open'")
+      .prepare("SELECT * FROM escalations WHERE conversation_id = ? AND status = 'open'")
       .all(convId);
-    for (const e of openEscs) db.resolveEscalation(e.id, { status: 'resolved_closed' });
+    for (const e of openEscs) {
+      // Conditional resolve (finding 7): a racing approve between the SELECT
+      // above and here must not have its resolved_send clobbered by a false
+      // 'closed' decision.
+      if (!db.resolveEscalationIfOpen(e.id, { status: 'resolved_closed' })) continue;
+      db.recordDecision({
+        escalation_id: e.id, conversation_id: conv.id,
+        conversation_state: e.previous_state ?? conv.state,
+        classifier_class: e.classifier_class ?? null, classifier_confidence: e.classifier_confidence ?? null,
+        draft_template: e.draft_template, draft_body: e.draft_body ?? '',
+        decision: 'closed', final_body: null,
+      });
+      await stripSlackButtons(e, conv.kommun_namn, 'resolved_closed');
+    }
     res.redirect(backTo(req, `/kommun/${conv.kommun_kod}`));
   });
 
@@ -908,6 +961,11 @@ export function createDashboardApp({
         body,
       });
     } catch (e) {
+      // A lost INITIAL claim is an expected race (a daemon tick sent the
+      // canned T-INITIAL first), not a server error. Nothing was double-sent.
+      if (e.code === 'INITIAL_CLAIM_LOST') {
+        return res.status(409).send(escapeForError(e.message));
+      }
       return res.status(500).send(`Send failed: ${escapeForError(e.message)}`);
     }
     res.redirect(`/kommun/${kommun.kommun_kod}`);
@@ -920,11 +978,17 @@ function escapeForError(s) {
   return String(s).replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' })[c]);
 }
 
-export function startDashboard({ port = parseInt(process.env.PILOT_DASHBOARD_PORT ?? '3100', 10) } = {}) {
+export function startDashboard({
+  port = parseInt(process.env.PILOT_DASHBOARD_PORT ?? '3100', 10),
+  // Loopback only (review H6): the dashboard is unauthenticated and can send
+  // email as the operator + read the full PII corpus. Never expose it on the
+  // LAN by default; set PILOT_DASHBOARD_HOST explicitly to override.
+  host = process.env.PILOT_DASHBOARD_HOST ?? '127.0.0.1',
+} = {}) {
   const app = createDashboardApp();
   return new Promise((resolve) => {
-    const server = app.listen(port, () => {
-      console.log(`Pilot dashboard listening on http://localhost:${port}`);
+    const server = app.listen(port, host, () => {
+      console.log(`Pilot dashboard listening on http://${host}:${port}`);
       resolve(server);
     });
   });

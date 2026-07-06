@@ -21,6 +21,12 @@ export function nextActionForClassification(state, classification, opts = {}) {
     if (state === 'SENT' || state === 'ACK_RECEIVED' || state === 'AWAITING_PRECISION') {
       return { nextState: 'AWAITING_PRECISION', action: 'send_precision' };
     }
+    if (state === 'DELIVERING') {
+      // A real question from the registrator mid-delivery must get a drafted
+      // reply + escalation, not be silently swallowed (review L4). The state
+      // stays DELIVERING — the kommun is still in the middle of delivering.
+      return { nextState: 'DELIVERING', action: 'send_precision' };
+    }
     return { nextState: state, action: 'none' };
   }
 
@@ -54,8 +60,11 @@ const TERMINAL = TERMINAL_STATES;
 export function effectiveFollowUp(conv) {
   const none = { date: null, source: null };
   if (!conv) return none;
-  if (conv.follow_up_at) return { date: conv.follow_up_at, source: 'kommun_promise' };
+  // Terminal wins over a lingering kommun promise (review M10): a DONE or
+  // DEAD_END case must never show a live follow-up date, even if follow_up_at
+  // was never cleared (legacy rows).
   if (TERMINAL.has(conv.state)) return none;
+  if (conv.follow_up_at) return { date: conv.follow_up_at, source: 'kommun_promise' };
   const rule = STALE_RULES[conv.state];
   if (!rule || !conv.state_changed_at) return none;
   const t = new Date(conv.state_changed_at).getTime();

@@ -5,7 +5,12 @@
 // and persist them via saveToken.
 
 import http from 'node:http';
+import crypto from 'node:crypto';
 import { buildOAuthClient, saveToken } from './gmail.js';
+
+function b64url(buf) {
+  return buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
 
 export const OAUTH_SCOPES = [
   'https://www.googleapis.com/auth/gmail.send',
@@ -28,7 +33,20 @@ export function buildConsentUrl(env, scopes = OAUTH_SCOPES) {
 // listener on the redirect port handles the rest and then shuts itself down.
 export function beginReauth({ env, tokenPath, scopes = OAUTH_SCOPES, timeoutMs = 5 * 60 * 1000 }) {
   const oauth = buildOAuthClient(env);
-  const consentUrl = oauth.generateAuthUrl({ access_type: 'offline', prompt: 'consent', scope: scopes });
+  // CSRF + code-injection hardening (review L3): a random `state` the callback
+  // must echo, and PKCE (S256) so an injected authorization code is useless
+  // without the in-process verifier.
+  const expectedState = b64url(crypto.randomBytes(16));
+  const codeVerifier = b64url(crypto.randomBytes(32));
+  const codeChallenge = b64url(crypto.createHash('sha256').update(codeVerifier).digest());
+  const consentUrl = oauth.generateAuthUrl({
+    access_type: 'offline',
+    prompt: 'consent',
+    scope: scopes,
+    state: expectedState,
+    code_challenge: codeChallenge,
+    code_challenge_method: 'S256',
+  });
 
   const redirectUri = new URL(env.GMAIL_OAUTH_REDIRECT_URI);
   const callbackPath = redirectUri.pathname;
@@ -48,8 +66,13 @@ export function beginReauth({ env, tokenPath, scopes = OAUTH_SCOPES, timeoutMs =
       cleanup(); reject(new Error('OAuth callback received without a code'));
       return;
     }
+    if (url.searchParams.get('state') !== expectedState) {
+      res.writeHead(400); res.end('state mismatch');
+      cleanup(); reject(new Error('OAuth callback state mismatch — possible CSRF, flow aborted'));
+      return;
+    }
     try {
-      const { tokens } = await oauth.getToken(code);
+      const { tokens } = await oauth.getToken({ code, codeVerifier });
       saveToken(tokenPath, tokens);
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end('<h1>Klart ✅</h1><p>Gmail återanslutet. Du kan stänga den här fliken.</p>');

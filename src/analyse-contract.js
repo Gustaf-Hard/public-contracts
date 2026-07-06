@@ -108,9 +108,37 @@ export async function analyseContractPdf(pdfBuffer, ctx, { env = process.env, cl
   }
 }
 
+// Duplicate-contract detection (review L6, partial): the same contract re-sent
+// in a later batch becomes a second contracts row (attachment_id is the only
+// key) and double-counts market stats. Durable content-hash dedup needs a hash
+// column — a schema change, deferred — so this only WARNS when another stored
+// contract for the same kommun has the identical vendor + period, letting the
+// operator prune by hand.
+function warnOnLikelyDuplicate(db, contractId, attachmentId, vendorId, analysis, log) {
+  if (!vendorId || !analysis.is_contract) return;
+  const dupes = db.raw.prepare(`
+    SELECT c.id
+    FROM contracts c
+    JOIN attachments a ON a.id = c.attachment_id
+    JOIN messages m ON m.id = a.message_id
+    JOIN conversations conv ON conv.id = m.conversation_id
+    WHERE c.vendor_id = ? AND c.is_contract = 1 AND c.id != ?
+      AND COALESCE(c.period_start, '') = COALESCE(?, '')
+      AND COALESCE(c.period_end, '') = COALESCE(?, '')
+      AND conv.kommun_kod = (
+        SELECT conv2.kommun_kod FROM attachments a2
+        JOIN messages m2 ON m2.id = a2.message_id
+        JOIN conversations conv2 ON conv2.id = m2.conversation_id
+        WHERE a2.id = ?)
+  `).all(vendorId, contractId, analysis.period_start ?? null, analysis.period_end ?? null, attachmentId);
+  if (dupes.length > 0) {
+    log?.(`WARNING possible duplicate contract: new contract ${contractId} (${analysis.vendor_name}) matches existing row(s) ${dupes.map((d) => d.id).join(', ')} on vendor+period for the same kommun — review and prune to avoid double-counting`);
+  }
+}
+
 // Persist one analysis: vendor (case-insensitive upsert) + products + contract row.
 // Re-running for the same attachment replaces (recordContract handles that).
-export function storeContractAnalysis(db, attachmentId, analysis, { model } = {}) {
+export function storeContractAnalysis(db, attachmentId, analysis, { model, log = null } = {}) {
   let vendorId = null;
   if (analysis.is_contract && analysis.vendor_name) {
     vendorId = db.upsertVendor(analysis.vendor_name).id;
@@ -133,6 +161,7 @@ export function storeContractAnalysis(db, attachmentId, analysis, { model } = {}
       db.linkContractProduct(contractId, db.upsertProduct(vendorId, name));
     }
   }
+  warnOnLikelyDuplicate(db, contractId, attachmentId, vendorId, analysis, log);
   return contractId;
 }
 
@@ -167,7 +196,7 @@ export async function analysePendingContracts({ db, env = process.env, client = 
       kommun_namn: att.kommun_namn, filename: att.filename,
     }, { env, client });
     if (!analysis) continue; // stays pending; next run retries
-    storeContractAnalysis(db, att.id, analysis, { model });
+    storeContractAnalysis(db, att.id, analysis, { model, log });
     log?.(`CONTRACT analysed: ${att.filename} → ${analysis.is_contract ? (analysis.vendor_name ?? 'okänd leverantör') : 'ej avtal'}`);
     done += 1;
   }
