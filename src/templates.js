@@ -154,6 +154,45 @@ export function computeReceivedMissing(rows = []) {
   return { received, missing, all };
 }
 
+// Perpetual-refresh re-contact (2026-07-09 design §3.5). Human-approved via the
+// normal escalation flow. Two deliberate rules from the owner's guidance:
+//   - the renewal question NAMES the specific expiring contract(s) at review;
+//   - the net-new question stays OPEN-ENDED — we do NOT parrot our full
+//     extraction back at the kommun (asking them to confirm everything we hold).
+export function T_UPDATE(ctx) {
+  const reviewContracts = ctx.review_contracts ?? [];
+  const arende = ctx.arendenummer
+    ? ` (ärendenummer ${ctx.arendenummer})`
+    : '';
+
+  // One named sentence covering the expiring contract(s).
+  let renewalAsk;
+  if (reviewContracts.length) {
+    const named = reviewContracts.map((c) => {
+      const end = c.period_end ? ` (avtalstid t.o.m. ${c.period_end})` : '';
+      return `${c.vendor_name ?? 'okänd leverantör'}${end}`;
+    });
+    renewalAsk = `Enligt de handlingar jag tidigare fått gäller detta ert avtal med ${listSv(named)}. Har avtalet/avtalen förnyats, och kan jag i så fall ta del av det/de nu gällande avtalet/avtalen?`;
+  } else {
+    renewalAsk = 'Har något av de avtal jag tidigare fått del av förnyats sedan dess, och kan jag i så fall ta del av de nu gällande avtalen?';
+  }
+
+  return {
+    subject: `Re: ${ctx.thread_subject ?? 'Begäran om allmänna handlingar'}`,
+    body: [
+      'Hej,',
+      '',
+      `Jag återkommer angående min tidigare begäran om allmänna handlingar${arende} avseende digitala verktyg, lärplattformar och läromedel inom skola och utbildning.`,
+      '',
+      renewalAsk,
+      '',
+      'Har ni därutöver tecknat några nya avtal avseende digitala verktyg, lärplattformar eller läromedel sedan dess?',
+      '',
+      signature(ctx),
+    ].join('\n'),
+  };
+}
+
 // Follow-up when a delivery lacks (some of) the actual avtal documents.
 export function T_REQUEST_MISSING(ctx) {
   const received = ctx.received ?? [];

@@ -6,7 +6,7 @@ import {
   T_FOLLOWUP_NUDGE,
   T_FOLLOWUP_CLOSE,
 } from '../src/templates.js';
-import { T_REQUEST_MISSING, computeReceivedMissing, chooseDeliveryReply } from '../src/templates.js';
+import { T_REQUEST_MISSING, computeReceivedMissing, chooseDeliveryReply, T_UPDATE } from '../src/templates.js';
 
 const ctx = {
   kommun_namn: 'Malå',
@@ -160,5 +160,46 @@ describe('T_REQUEST_MISSING', () => {
   it('falls back to a generic ask when there are no names', () => {
     const m = T_REQUEST_MISSING({ ...base, received: [], missing: [] });
     expect(m.body).toMatch(/faktiska avtalshandlingarna/);
+  });
+});
+
+describe('T_UPDATE (perpetual refresh re-contact)', () => {
+  const base = { kommun_namn: 'Alingsås', role: 'central', thread_subject: 'Begäran om allmänna handlingar', from_name: 'Gustaf Hård af Segerstad', from_email: 'gustaf@mediagraf.se' };
+
+  it('references the prior relationship / ärende and keeps net-new OPEN-ENDED', () => {
+    const m = T_UPDATE({ ...base, arendenummer: 'KS-2026-42', review_contracts: [{ vendor_name: 'Skola24', period_end: '2026-06-30' }] });
+    // references the prior request
+    expect(m.body).toMatch(/tidigare begäran/i);
+    expect(m.body).toMatch(/KS-2026-42/);
+    // renewal question NAMES the specific expiring contract
+    expect(m.body).toMatch(/Skola24/);
+    expect(m.body).toMatch(/2026-06-30/);
+    expect(m.body).toMatch(/förnyats/);
+    // net-new stays open-ended: does NOT enumerate our full holdings
+    expect(m.body).toMatch(/nya avtal/);
+    expect(m.body).toMatch(/digitala verktyg, lärplattformar eller läromedel/);
+    expect(m.body).toMatch(/sedan dess/);
+    expect(m.body).toMatch(/Gustaf Hård af Segerstad/);
+  });
+
+  it('names multiple expiring contracts Swedish-joined', () => {
+    const m = T_UPDATE({ ...base, review_contracts: [
+      { vendor_name: 'Skola24', period_end: '2026-06-30' },
+      { vendor_name: 'Tieto', period_end: '2026-12-31' },
+    ] });
+    expect(m.body).toMatch(/Skola24/);
+    expect(m.body).toMatch(/Tieto/);
+  });
+
+  it('works with no arendenummer and no dated contract (graceful)', () => {
+    const m = T_UPDATE({ ...base, arendenummer: null, review_contracts: [{ vendor_name: 'Unikum', period_end: null }] });
+    expect(m.body).toMatch(/tidigare begäran/i);
+    expect(m.body).toMatch(/Unikum/);
+    expect(m.body).not.toMatch(/KS-/);
+  });
+
+  it('subject re-uses the thread subject with Re:', () => {
+    const m = T_UPDATE({ ...base, review_contracts: [{ vendor_name: 'Skola24', period_end: '2026-06-30' }] });
+    expect(m.subject).toMatch(/^Re: /);
   });
 });
