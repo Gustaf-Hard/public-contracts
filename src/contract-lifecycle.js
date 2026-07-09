@@ -55,3 +55,70 @@ export function computeNextReviewDate(contract, now) {
   // 3. Plain fixed-term.
   return periodEnd;
 }
+
+const MS_PER_DAY = 86400000;
+
+// Whole-day signed distance from `now` to an ISO date (positive = future).
+function dayDiffFromNow(iso, now) {
+  const t = new Date(iso + (iso.includes('T') ? '' : 'T00:00:00Z')).getTime();
+  if (Number.isNaN(t)) return null;
+  return Math.floor((t - now.getTime()) / MS_PER_DAY);
+}
+
+// THE canonical "which contracts are due per kommun" function (finding 8).
+// Both the arming (armRefresh) and the daily scan (runRefreshScan) resolve the
+// review from this ONE place — there is no parallel fork, and the horizon/grace
+// window is applied consistently so decade-old expiries (the live 2014 Tieto
+// rows) are never armed.
+//
+// Steps:
+//   1. Dedup per vendor, newest-wins by received_at — an Atea extension
+//      supersedes an old expiring Atea row instead of double-triggering.
+//   2. Resolve each surviving row's lifecycle review date (auto-renew /
+//      extension option / plain period_end) via computeNextReviewDate.
+//   3. Drop rows whose review date is more than `graceDays` in the past — a
+//      contract that ended a decade ago is dead history, not a renewal target.
+//   4. Return the soonest remaining review date, the vendor that drove it, and
+//      ALL contracts sharing that soonest date (so T_UPDATE can name them).
+//
+// The upper `horizonDays` bound is NOT applied here: firing is gated by
+// next_review_at <= today in listConversationsDueForRefresh, so a far-future
+// review is simply "not due yet" rather than discarded (which would lose the
+// arming entirely). It is accepted as an option for callers that want the
+// batch-draft semantics (renewal.nextRenewalDrafts).
+//
+// rows: [{ id, vendor_name, period_end, received_at, is_contract, auto_renews,
+//          last_cancellation_date, extension_option_until }]
+// Returns { date, source, contracts: [{ vendor_name, period_end }] }.
+export function computeKommunReview(rows, now, { graceDays = 90, horizonDays = null } = {}) {
+  if (!now) throw new Error('computeKommunReview requires an explicit now');
+  const sorted = [...(rows ?? [])].sort((a, b) =>
+    String(b.received_at ?? '').localeCompare(String(a.received_at ?? '')));
+  const newestByVendor = new Map();
+  for (const r of sorted) {
+    if (r.is_contract === 0) continue;
+    const key = (r.vendor_name ?? `__id${r.id}`).toLowerCase();
+    if (!newestByVendor.has(key)) newestByVendor.set(key, r); // first = newest (received_at DESC)
+  }
+
+  const dated = [];
+  for (const r of newestByVendor.values()) {
+    const date = computeNextReviewDate(r, now);
+    if (!date) continue;
+    const diff = dayDiffFromNow(date, now);
+    if (diff === null) continue;
+    if (diff < -graceDays) continue;            // dead history — never a renewal target
+    if (horizonDays != null && diff > horizonDays) continue; // caller-requested upper bound
+    dated.push({ row: r, date });
+  }
+  if (dated.length === 0) return { date: null, source: null, contracts: [] };
+
+  dated.sort((a, b) => a.date.localeCompare(b.date));
+  const soonest = dated[0].date;
+  const atReview = dated.filter((d) => d.date === soonest);
+  return {
+    date: soonest,
+    source: atReview[0].row.vendor_name ?? null,
+    contracts: atReview.map((d) => ({ vendor_name: d.row.vendor_name ?? null, period_end: d.row.period_end ?? null })),
+  };
+}
