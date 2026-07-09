@@ -49,6 +49,15 @@ const MAX_NUDGES = 2;
 export const TERMINAL_STATES = new Set(['DONE', 'DEAD_END', 'NEEDS_HUMAN']);
 const TERMINAL = TERMINAL_STATES;
 
+// REFRESH_DUE is a quiescent, human-gated waypoint (finding 2): the conversation
+// holds a T_UPDATE draft awaiting operator approval. It is NOT terminal (the
+// dashboard shows it as an open action, not a dead end), but the daily
+// follow-up machinery must give it DEFINED handling so it can never strand or
+// draw a nudge the kommun can't satisfy: no stale rule fires, no live follow-up
+// date. The operator either approves (→ SENT, a fresh round) or skips (the
+// refresh scan reverts it to DONE so it re-arms). Quiescent, but explicit.
+export const QUIESCENT_STATES = new Set(['REFRESH_DUE']);
+
 // Earliest date the bot will take action again, in YYYY-MM-DD, tagged with
 // where the date came from:
 //   - 'kommun_promise' — LLM extracted a promise from an inbound reply
@@ -63,7 +72,7 @@ export function effectiveFollowUp(conv) {
   // Terminal wins over a lingering kommun promise (review M10): a DONE or
   // DEAD_END case must never show a live follow-up date, even if follow_up_at
   // was never cleared (legacy rows).
-  if (TERMINAL.has(conv.state)) return none;
+  if (TERMINAL.has(conv.state) || QUIESCENT_STATES.has(conv.state)) return none;
   if (conv.follow_up_at) return { date: conv.follow_up_at, source: 'kommun_promise' };
   const rule = STALE_RULES[conv.state];
   if (!rule || !conv.state_changed_at) return none;
@@ -80,7 +89,7 @@ export function effectiveFollowUp(conv) {
 // `follow_up_at = today + 10 + 3 grace`, and this function returns 'none'
 // until that date is reached — overriding the default 7/10/14-day rules.
 export function staleAction(state, daysInState, followupCount, opts = {}) {
-  if (TERMINAL.has(state)) return 'none';
+  if (TERMINAL.has(state) || QUIESCENT_STATES.has(state)) return 'none';
   const rule = STALE_RULES[state];
   if (!rule) return 'none';
 

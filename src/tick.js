@@ -1,4 +1,5 @@
-import { T_INITIAL, T_PRECISION, T_RECEIPT, T_FOLLOWUP_NUDGE, T_FOLLOWUP_CLOSE, T_REQUEST_MISSING, computeReceivedMissing, chooseDeliveryReply } from './templates.js';
+import { T_INITIAL, T_PRECISION, T_RECEIPT, T_FOLLOWUP_NUDGE, T_FOLLOWUP_CLOSE, T_REQUEST_MISSING, T_UPDATE, computeReceivedMissing, chooseDeliveryReply } from './templates.js';
+import { computeKommunReview } from './contract-lifecycle.js';
 import { matchWatchlist } from './watchlist.js';
 import { classify, isCloserText } from './classifier.js';
 import { inferThreadStatus } from './threads.js';
@@ -10,7 +11,7 @@ import { extractSignature } from './extract-signature.js';
 import { analyseMessage, analysisToLegacyClassification } from './analyse-message.js';
 import { analysePendingContracts } from './analyse-contract.js';
 
-const TEMPLATES = { T_INITIAL, T_PRECISION, T_RECEIPT, T_FOLLOWUP_NUDGE, T_FOLLOWUP_CLOSE, T_REQUEST_MISSING };
+const TEMPLATES = { T_INITIAL, T_PRECISION, T_RECEIPT, T_FOLLOWUP_NUDGE, T_FOLLOWUP_CLOSE, T_REQUEST_MISSING, T_UPDATE };
 
 function fromHeader(env) {
   return `${env.GMAIL_FROM_NAME} <${env.GMAIL_USER_EMAIL}>`;
@@ -26,6 +27,9 @@ function tplCtx(conv, env, extra = {}) {
     days_since_send: extra.days_since_send ?? 0,
     received: extra.received ?? [],
     missing: extra.missing ?? [],
+    // Perpetual-refresh (T_UPDATE) context, forwarded when present.
+    arendenummer: extra.arendenummer ?? conv.arendenummer ?? null,
+    review_contracts: extra.review_contracts ?? [],
   };
 }
 
@@ -638,6 +642,29 @@ export async function runTick(deps) {
   } catch (e) {
     deps.log?.(`contract analysis error: ${e.message}`);
   }
+
+  // 4. Refresh arming (2026-07-09 design §3.2/§3.6) — after contracts are
+  // analysed, (re)compute next_review_at for every DONE conversation in the
+  // pilot allowlist. Idempotent; re-arms perpetually as the contract set
+  // changes. Guarded so a missing allowlist simply arms nothing.
+  const refreshAllowlist = deps.refreshAllowlist ?? [];
+  if (refreshAllowlist.length) {
+    // Group DONE conversations by kommun so a kommun with both a central and an
+    // utbildning conversation arms ONE review on ONE canonical conversation and
+    // disarms the sibling (finding 5) — never two T_UPDATEs for one kommun.
+    const byKommun = new Map();
+    for (const conv of db.listConversationsByState('DONE')) {
+      if (!byKommun.has(conv.kommun_kod)) byKommun.set(conv.kommun_kod, []);
+      byKommun.get(conv.kommun_kod).push(conv);
+    }
+    for (const convs of byKommun.values()) {
+      try {
+        armRefreshForKommun(convs, { db, now, refreshAllowlist });
+      } catch (e) {
+        deps.log?.(`refresh arming error for ${convs[0]?.kommun_namn}: ${e.message}`);
+      }
+    }
+  }
 }
 
 export async function runDailyFollowup(deps) {
@@ -690,4 +717,147 @@ export async function runDailyFollowup(deps) {
 
 function daysBetween(then, now) {
   return Math.floor((now.getTime() - then.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+// ---- Perpetual contract refresh (2026-07-09 design Part B) ----
+
+// THE canonical per-kommun review resolver now lives in contract-lifecycle.js
+// (finding 8 — one function, horizon/grace applied, no parallel fork).
+// Re-exported here for the existing import surface.
+export { computeKommunReview };
+
+// Pick the ONE canonical conversation of a kommun to carry the refresh
+// (finding 5): prefer the conversation holding the most-recent contract
+// delivery (its thread is where the kommun last actually sent avtal), tie-break
+// to role 'central', then lowest id for determinism.
+export function pickCanonicalConv(convs, db) {
+  if (convs.length <= 1) return convs[0] ?? null;
+  const lastContractAt = new Map();
+  for (const c of convs) {
+    const row = db.raw.prepare(`
+      SELECT MAX(m.received_at) AS last_at
+      FROM contracts ct
+      JOIN attachments a ON a.id = ct.attachment_id
+      JOIN messages m ON m.id = a.message_id
+      WHERE m.conversation_id = ? AND ct.is_contract = 1
+    `).get(c.id);
+    lastContractAt.set(c.id, row?.last_at ?? null);
+  }
+  return [...convs].sort((a, b) => {
+    const la = lastContractAt.get(a.id) ?? '';
+    const lb = lastContractAt.get(b.id) ?? '';
+    if (la !== lb) return lb.localeCompare(la);              // most-recent contract first
+    if (a.role !== b.role) return a.role === 'central' ? -1 : (b.role === 'central' ? 1 : 0);
+    return a.id - b.id;
+  })[0];
+}
+
+// Arm a DONE conversation for its next refresh round: compute the kommun's
+// soonest review date and store next_review_at / next_review_source. Gated by
+// the pilot allowlist. Idempotent — recomputes from the current contract set,
+// so a completed refresh round re-arms perpetually (design §3.6). No-op (and
+// leaves next_review_at null) for non-allowlisted kommuner or when no contract
+// yields a usable date — never blocks the pipeline.
+//
+// Writes via setNextReview, which touches ONLY next_review_at/next_review_source
+// and never state or state_changed_at (finding 3): re-arming is pure
+// bookkeeping and must not disturb the stale-clock the follow-up rules read.
+// Idempotent to the byte — an unchanged re-arm performs no write at all.
+export function armRefresh(conv, { db, now, refreshAllowlist = [] }) {
+  if (!conv) return;
+  if (!refreshAllowlist.includes(conv.kommun_kod)) return;
+  const rows = db.listContractsForKommun(conv.kommun_kod);
+  const { date, source } = computeKommunReview(rows, now);
+  db.setNextReview(conv.id, { next_review_at: date, next_review_source: source });
+}
+
+// Arm exactly ONE conversation per kommun (finding 5): a kommun with both a
+// central and an utbildning DONE conversation must yield ONE review and ONE
+// T_UPDATE, never two. The canonical conversation is armed with the kommun's
+// soonest review; every sibling is explicitly DISARMED (next_review_at → null)
+// so the scan can never fire it. Called once per kommun by runTick.
+export function armRefreshForKommun(convs, { db, now, refreshAllowlist = [] }) {
+  if (!convs?.length) return;
+  const kod = convs[0].kommun_kod;
+  if (!refreshAllowlist.includes(kod)) return;
+  const canonical = pickCanonicalConv(convs, db);
+  const rows = db.listContractsForKommun(kod);
+  const { date, source } = computeKommunReview(rows, now);
+  for (const c of convs) {
+    if (c.id === canonical.id) {
+      db.setNextReview(c.id, { next_review_at: date, next_review_source: source });
+    } else {
+      db.setNextReview(c.id, { next_review_at: null, next_review_source: null });
+    }
+  }
+}
+
+// Daily refresh scan — sibling of runDailyFollowup, reusing all its safety
+// machinery (one-open-action guard, escalateWithDraft supersede-or-defer,
+// atomic claim inherited from the shared escalation path). Runs under the same
+// tick/followup escalation mutex in the daemon.
+//
+// Finds DONE conversations whose next_review_at is due, that are allowlisted,
+// and that have no active escalation → moves them to REFRESH_DUE and creates
+// exactly ONE T_UPDATE escalation naming the expiring contract(s).
+export async function runRefreshScan(deps) {
+  const { db, now, refreshAllowlist = [], log } = deps;
+  const todayIso = now.toISOString().slice(0, 10);
+
+  // Heal stranded refreshes (finding 2): a REFRESH_DUE conversation with NO
+  // active escalation means its T_UPDATE was skipped/superseded/parked without
+  // a send — the operator chose not to re-contact this round. It must NOT sit
+  // in REFRESH_DUE forever; revert it to DONE so armRefresh re-arms it later.
+  // (A REFRESH_DUE conversation with an open T_UPDATE is still awaiting the
+  // operator and is left alone.) This is surface-agnostic: however the skip
+  // happened (Slack, dashboard, CLI), the next scan reconciles it.
+  for (const conv of db.listConversationsByState('REFRESH_DUE')) {
+    if (db.hasActiveEscalation(conv.id)) continue;
+    // Clear next_review_at as part of the revert so the SAME scan cannot
+    // immediately re-mint the skipped T_UPDATE. The next runTick armRefresh
+    // recomputes from the current contract set and re-arms it later.
+    db.updateConversationState(conv.id, 'DONE', { next_review_at: null, next_review_source: null });
+    log?.(`REFRESH reverted → DONE (update skipped, no active escalation): ${conv.kommun_namn}/${conv.role}`);
+  }
+
+  for (const conv of db.listConversationsDueForRefresh(todayIso)) {
+    if (!refreshAllowlist.includes(conv.kommun_kod)) continue;
+    // At most one active next-action per conversation (review H1) — never mint
+    // a refresh draft next to unresolved outbound.
+    if (db.hasActiveEscalation(conv.id)) continue;
+
+    // Recompute the review deterministically at scan time from the CURRENT
+    // contract set (finding 7) — never trust a possibly-stale next_review_at
+    // for naming. The same canonical computeKommunReview that armed it decides
+    // the soonest vendor(s) now, so a contract set that changed since arming
+    // still names the real current expiring vendor(s).
+    const rows = db.listContractsForKommun(conv.kommun_kod);
+    const { date: reviewDate, source: reviewSource, contracts: reviewContracts } =
+      computeKommunReview(rows, now);
+    // The set may have shifted so nothing is due any more (e.g. the expiring
+    // contract was superseded by an extension between arm and scan). Re-arm
+    // to the fresh date and skip — do NOT fire a T_UPDATE that names nothing.
+    if (!reviewDate || reviewDate > todayIso) {
+      db.setNextReview(conv.id, { next_review_at: reviewDate, next_review_source: reviewSource });
+      continue;
+    }
+
+    // Enter the refresh round. refresh_round increments so rounds are
+    // distinguishable; a new Gmail thread separates them naturally on send.
+    db.updateConversationState(conv.id, 'REFRESH_DUE', {
+      refresh_round: (conv.refresh_round ?? 0) + 1,
+    });
+
+    await escalateWithDraft({
+      conv: db.getConversation(conv.id),
+      parsedInbound: null,
+      classification: { class: 'refresh_due', confidence: null },
+      previousState: 'DONE',
+      draftTemplate: 'T_UPDATE',
+      reason: `contract refresh due ${reviewDate}${reviewSource ? ` (${reviewSource})` : ''}`,
+      templateCtx: { arendenummer: conv.arendenummer ?? null, review_contracts: reviewContracts },
+      deps,
+    });
+    log?.(`REFRESH escalated (T_UPDATE) → ${conv.kommun_namn}/${conv.role} due ${reviewDate}`);
+  }
 }

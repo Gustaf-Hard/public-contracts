@@ -61,7 +61,14 @@ export async function sendApprovedReply({ db, gmail, env, conv, esc, finalBody, 
 
   // Staleness guard — checked before the claim so a blocked approve leaves the
   // escalation open for re-review rather than parked.
-  if (decision === 'approve_unmodified') {
+  //
+  // A refresh (T_UPDATE) is exempt (findings 1/4): it opens a NEW outreach round
+  // and answers no inbound, so a PRIOR round's delivery is not "newer context"
+  // that should block it — it always compares stale by construction. Every other
+  // draft (including proactive follow-ups) keeps the guard: a newer inbound
+  // arriving mid-conversation must still force a re-review.
+  const isRefreshEsc = esc.draft_template === 'T_UPDATE' || conv.state === 'REFRESH_DUE';
+  if (decision === 'approve_unmodified' && !isRefreshEsc) {
     const escCreated = parseDbTime(esc.created_at);
     // Precision matters here (hardening finding 6):
     //  - Exclude the inbound the draft answers (esc.message_id) — it is by
@@ -93,12 +100,20 @@ export async function sendApprovedReply({ db, gmail, env, conv, esc, finalBody, 
     );
   }
 
+  // A refresh (T_UPDATE) opens a NEW outreach round in a NEW Gmail thread
+  // (findings 1/4): the previous round is closed (DONE), so replying in the old
+  // thread would reopen a resolved conversation. Force a fresh thread and route
+  // to the conversation's canonical contact.
+  const isRefreshSend = esc.draft_template === 'T_UPDATE' || conv.state === 'REFRESH_DUE';
+
   // primaryThreads is empty until Phase 2 sets statuses; then a follow-up nudge
   // with no triggering message routes to the single primary thread.
   const primaryThreads = db.listThreadsForConversation(conv.id).filter((t) => t.status === 'primary');
   const resolved = resolveReplyRecipient({ triggeringMessage, conv, primaryThreads });
-  const to = (typeof finalTo === 'string' && finalTo.trim()) ? finalTo.trim() : resolved.to;
-  const threadId = resolved.threadId ?? conv.gmail_thread_id;
+  const to = (typeof finalTo === 'string' && finalTo.trim())
+    ? finalTo.trim()
+    : (isRefreshSend ? conv.contact_email : resolved.to);
+  const threadId = isRefreshSend ? undefined : (resolved.threadId ?? conv.gmail_thread_id);
   let sent;
   try {
     sent = await gmailSendImpl(gmail, {
@@ -135,10 +150,31 @@ export async function sendApprovedReply({ db, gmail, env, conv, esc, finalBody, 
   if (esc.draft_template === 'T_FOLLOWUP_NUDGE' || esc.draft_template === 'T_FOLLOWUP_CLOSE') {
     patch.followup_count = (conv.followup_count ?? 0) + 1;
   }
-  const targetState =
-    conv.state === 'NEEDS_HUMAN' && esc.draft_template === 'free_form' && esc.previous_state
-      ? esc.previous_state
-      : conv.state;
+
+  // Target state resolution:
+  //  - Refresh send (REFRESH_DUE + T_UPDATE): open a fresh outreach round. The
+  //    conversation re-enters the EXISTING reply/delivery/close FSM exactly like
+  //    a first-round outreach — state → SENT, refresh_round++, a NEW gmail
+  //    thread, next_review_at cleared (findings 1/4). When this round concludes
+  //    back to DONE, armRefresh re-arms and the cycle repeats — perpetual.
+  //  - Ambiguous-outcome recovery (NEEDS_HUMAN + free_form): restore the state
+  //    the draft was created for so staleness rules resume watching it.
+  //  - Everything else: state is bookkeeping, stays put.
+  let targetState = conv.state;
+  if ((esc.draft_template === 'T_UPDATE' || conv.state === 'REFRESH_DUE')) {
+    targetState = 'SENT';
+    // refresh_round is already bumped by runRefreshScan when the conversation
+    // ENTERED this round (REFRESH_DUE), so it is NOT re-incremented here — the
+    // round number is the round we are now sending for, not the next one.
+    patch.next_review_at = null;
+    patch.next_review_source = null;
+    patch.receipt_sent = 0;   // a fresh round expects a new delivery + receipt
+    patch.followup_count = 0;  // stale-clock restarts for the new round
+    patch.follow_up_at = null;
+    patch.gmail_thread_id = sent.threadId ?? null; // the newly-opened thread
+  } else if (conv.state === 'NEEDS_HUMAN' && esc.draft_template === 'free_form' && esc.previous_state) {
+    targetState = esc.previous_state;
+  }
   db.updateConversationState(conv.id, targetState, patch);
   const resolvedStatus = decision === 'edit' ? 'resolved_edit' : 'resolved_send';
   db.resolveEscalation(esc.id, {

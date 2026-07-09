@@ -1,5 +1,6 @@
 {
   "active_pilot_kommun_kods": [],
   "rehearsal_kommuner": [],
-  "live_kommun_kods": ["2418", "1438", "0509", "2404", "0560"]
+  "live_kommun_kods": ["2418", "1438", "0509", "2404", "0560"],
+  "refresh_pilot_kommun_kods": []
 }

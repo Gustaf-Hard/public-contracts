@@ -94,6 +94,74 @@ describe('contracts', () => {
   });
 });
 
+describe('lifecycle + refresh columns (2026-07-09 perpetual-refresh design)', () => {
+  it('migrate is idempotent — running twice leaves each new column present once', () => {
+    expect(() => { db.migrate(); db.migrate(); }).not.toThrow();
+    const cCols = db.raw.prepare("PRAGMA table_info(contracts)").all().map((r) => r.name);
+    for (const col of ['auto_renews', 'renewal_term', 'last_cancellation_date', 'extension_option_until']) {
+      expect(cCols.filter((n) => n === col)).toHaveLength(1);
+    }
+    const convCols = db.raw.prepare("PRAGMA table_info(conversations)").all().map((r) => r.name);
+    for (const col of ['next_review_at', 'next_review_source', 'refresh_round']) {
+      expect(convCols.filter((n) => n === col)).toHaveLength(1);
+    }
+  });
+
+  it('recordContract round-trips the lifecycle fields (auto_renews stored as 0/1)', () => {
+    const { attId } = seedAttachment();
+    const v = db.upsertVendor('Tieto');
+    db.recordContract({
+      attachment_id: attId, vendor_id: v.id, is_contract: 1,
+      period_end: '2026-12-31', auto_renews: true, renewal_term: '1 år',
+      last_cancellation_date: '2026-09-30', extension_option_until: null,
+    });
+    const row = db.listContractsForKommun('1980').find((r) => r.vendor_name === 'Tieto');
+    expect(row.auto_renews).toBe(1);
+    expect(row.renewal_term).toBe('1 år');
+    expect(row.last_cancellation_date).toBe('2026-09-30');
+    expect(row.extension_option_until).toBeNull();
+  });
+
+  it('recordContract with auto_renews undefined stores NULL (not 0)', () => {
+    const { attId } = seedAttachment();
+    const v = db.upsertVendor('Okänd');
+    db.recordContract({ attachment_id: attId, vendor_id: v.id, is_contract: 1 });
+    const row = db.listContractsForKommun('1980')[0];
+    expect(row.auto_renews).toBeNull();
+  });
+
+  it('updateConversationState persists next_review_at / source / refresh_round', () => {
+    const id = db.createConversation({
+      kommun_kod: '1489', kommun_namn: 'Alingsås', role: 'central',
+      contact_email: 'reg@alingsas.se', scheduled_send_at: '2026-04-01T08:00:00Z',
+    });
+    db.updateConversationState(id, 'DONE', {
+      next_review_at: '2026-10-01', next_review_source: 'Skola24', refresh_round: 1,
+    });
+    const conv = db.getConversation(id);
+    expect(conv.next_review_at).toBe('2026-10-01');
+    expect(conv.next_review_source).toBe('Skola24');
+    expect(conv.refresh_round).toBe(1);
+  });
+
+  it('listConversationsDueForRefresh selects only armed DONE convs at/before today', () => {
+    const mk = (kod, state, review) => {
+      const id = db.createConversation({
+        kommun_kod: kod, kommun_namn: `K${kod}`, role: 'central',
+        contact_email: `reg@${kod}.se`, scheduled_send_at: '2026-04-01T08:00:00Z',
+      });
+      db.updateConversationState(id, state, review ? { next_review_at: review } : {});
+      return id;
+    };
+    const due = mk('0001', 'DONE', '2026-07-01');
+    mk('0002', 'DONE', '2026-08-01');       // future → not due
+    mk('0003', 'SENT', '2026-07-01');       // not DONE
+    mk('0004', 'DONE', null);               // not armed
+    const rows = db.listConversationsDueForRefresh('2026-07-09');
+    expect(rows.map((r) => r.id)).toEqual([due]);
+  });
+});
+
 describe('listVendorsOverview', () => {
   it('aggregates contract count, kommun count, products', () => {
     const { attId } = seedAttachment();

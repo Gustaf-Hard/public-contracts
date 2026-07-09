@@ -28,6 +28,9 @@ CREATE TABLE IF NOT EXISTS conversations (
   followup_count INTEGER NOT NULL DEFAULT 0,
   receipt_sent INTEGER NOT NULL DEFAULT 0,
   follow_up_at TEXT,
+  next_review_at TEXT,
+  next_review_source TEXT,
+  refresh_round INTEGER NOT NULL DEFAULT 0,
   notes TEXT,
   UNIQUE(kommun_kod, role)
 );
@@ -141,6 +144,10 @@ CREATE TABLE IF NOT EXISTS contracts (
   valuta TEXT,
   period_start TEXT,
   period_end TEXT,
+  auto_renews INTEGER,
+  renewal_term TEXT,
+  last_cancellation_date TEXT,
+  extension_option_until TEXT,
   is_contract INTEGER NOT NULL DEFAULT 1,
   summary TEXT,
   confidence REAL,
@@ -170,6 +177,18 @@ export function openDb(path) {
     if (!convCols.includes('follow_up_at')) {
       db.exec('ALTER TABLE conversations ADD COLUMN follow_up_at TEXT');
     }
+    // Perpetual-refresh arming (2026-07-09 design): distinct from follow_up_at,
+    // which the M10 fix clears on terminal states — next_review_at deliberately
+    // survives DONE so a closed case can be re-contacted.
+    if (!convCols.includes('next_review_at')) {
+      db.exec('ALTER TABLE conversations ADD COLUMN next_review_at TEXT');
+    }
+    if (!convCols.includes('next_review_source')) {
+      db.exec('ALTER TABLE conversations ADD COLUMN next_review_source TEXT');
+    }
+    if (!convCols.includes('refresh_round')) {
+      db.exec('ALTER TABLE conversations ADD COLUMN refresh_round INTEGER NOT NULL DEFAULT 0');
+    }
     const msgCols = db.prepare("PRAGMA table_info(messages)").all().map((r) => r.name);
     if (!msgCols.includes('analysis_json')) {
       db.exec('ALTER TABLE messages ADD COLUMN analysis_json TEXT');
@@ -187,6 +206,20 @@ export function openDb(path) {
     const escCols = db.prepare("PRAGMA table_info(escalations)").all().map((r) => r.name);
     if (!escCols.includes('watchlist_vendors')) {
       db.exec('ALTER TABLE escalations ADD COLUMN watchlist_vendors TEXT');
+    }
+    // Lifecycle fields for the perpetual-refresh loop (2026-07-09 design §2).
+    const contractCols = db.prepare("PRAGMA table_info(contracts)").all().map((r) => r.name);
+    if (!contractCols.includes('auto_renews')) {
+      db.exec('ALTER TABLE contracts ADD COLUMN auto_renews INTEGER');
+    }
+    if (!contractCols.includes('renewal_term')) {
+      db.exec('ALTER TABLE contracts ADD COLUMN renewal_term TEXT');
+    }
+    if (!contractCols.includes('last_cancellation_date')) {
+      db.exec('ALTER TABLE contracts ADD COLUMN last_cancellation_date TEXT');
+    }
+    if (!contractCols.includes('extension_option_until')) {
+      db.exec('ALTER TABLE contracts ADD COLUMN extension_option_until TEXT');
     }
   }
 
@@ -220,7 +253,7 @@ export function openDb(path) {
   }
 
   function updateConversationState(id, state, patch = {}) {
-    const allowed = ['gmail_thread_id', 'last_outbound_at', 'arendenummer', 'notes', 'followup_count', 'receipt_sent', 'follow_up_at'];
+    const allowed = ['gmail_thread_id', 'last_outbound_at', 'arendenummer', 'notes', 'followup_count', 'receipt_sent', 'follow_up_at', 'next_review_at', 'next_review_source', 'refresh_round'];
     const sets = ["state = ?", "state_changed_at = datetime('now')"];
     const values = [state];
     for (const k of allowed) {
@@ -231,6 +264,24 @@ export function openDb(path) {
     }
     values.push(id);
     db.prepare(`UPDATE conversations SET ${sets.join(', ')} WHERE id = ?`).run(...values);
+  }
+
+  // Set next_review_at / next_review_source WITHOUT touching state or
+  // state_changed_at (finding 3): re-arming an already-DONE conversation is
+  // pure bookkeeping — rewriting state_changed_at via updateConversationState
+  // corrupts the stale-clock the follow-up rules depend on. Idempotent: writes
+  // only when the computed review actually changed, so a no-op re-arm touches
+  // nothing at all.
+  function setNextReview(id, { next_review_at = null, next_review_source = null }) {
+    const cur = db.prepare('SELECT next_review_at, next_review_source FROM conversations WHERE id = ?').get(id);
+    if (!cur) return false;
+    if ((cur.next_review_at ?? null) === (next_review_at ?? null)
+        && (cur.next_review_source ?? null) === (next_review_source ?? null)) {
+      return false; // unchanged — no write
+    }
+    db.prepare('UPDATE conversations SET next_review_at = ?, next_review_source = ? WHERE id = ?')
+      .run(next_review_at ?? null, next_review_source ?? null, id);
+    return true;
   }
 
   function recordMessage(m) {
@@ -523,11 +574,15 @@ export function openDb(path) {
     }
     const r = db.prepare(`
       INSERT INTO contracts (attachment_id, vendor_id, avtalsvarde, valuta, period_start, period_end,
+                             auto_renews, renewal_term, last_cancellation_date, extension_option_until,
                              is_contract, summary, confidence, analysis_json, model)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       c.attachment_id, c.vendor_id ?? null, c.avtalsvarde ?? null, c.valuta ?? null,
-      c.period_start ?? null, c.period_end ?? null, c.is_contract ?? 1,
+      c.period_start ?? null, c.period_end ?? null,
+      c.auto_renews == null ? null : (c.auto_renews ? 1 : 0),
+      c.renewal_term ?? null, c.last_cancellation_date ?? null, c.extension_option_until ?? null,
+      c.is_contract ?? 1,
       c.summary ?? null, c.confidence ?? null,
       c.analysis_json != null ? JSON.stringify(c.analysis_json) : null, c.model ?? null,
     );
@@ -593,6 +648,35 @@ export function openDb(path) {
     return rows.map((r) => ({ ...r, products: prodMap.get(r.id) ?? [] }));
   }
 
+  // Every stored contract row for a kommun, with the vendor name and the
+  // lifecycle fields the refresh arming needs. Used by armRefresh to compute
+  // the soonest next_review_date (deduped per vendor, newest-wins).
+  function listContractsForKommun(kommunKod) {
+    return db.prepare(`
+      SELECT c.id, c.vendor_id, v.name AS vendor_name,
+             c.period_start, c.period_end, c.is_contract,
+             c.auto_renews, c.renewal_term, c.last_cancellation_date, c.extension_option_until,
+             m.received_at
+      FROM contracts c
+      JOIN attachments a ON a.id = c.attachment_id
+      JOIN messages m ON m.id = a.message_id
+      JOIN conversations conv ON conv.id = m.conversation_id
+      LEFT JOIN vendors v ON v.id = c.vendor_id
+      WHERE conv.kommun_kod = ?
+      ORDER BY m.received_at DESC, c.id DESC
+    `).all(kommunKod);
+  }
+
+  // DONE conversations armed with a next_review_at at or before `todayIso`.
+  // Drives the daily refresh scan.
+  function listConversationsDueForRefresh(todayIso) {
+    return db.prepare(`
+      SELECT * FROM conversations
+      WHERE state = 'DONE' AND next_review_at IS NOT NULL AND next_review_at <= ?
+      ORDER BY next_review_at, id
+    `).all(todayIso);
+  }
+
   function listVendorsOverview() {
     const rows = db.prepare(`
       SELECT v.id, v.name, v.slug,
@@ -656,6 +740,7 @@ export function openDb(path) {
     listAllConversations,
     listConversationsDueForInitialSend,
     updateConversationState,
+    setNextReview,
     recordMessage,
     listMessages,
     hasGmailMessageId,
@@ -691,6 +776,8 @@ export function openDb(path) {
     listPendingContractAttachments,
     listContractInfoForMessage,
     listContractsForVendor,
+    listContractsForKommun,
+    listConversationsDueForRefresh,
     listVendorsOverview,
     getVendorBySlug,
     listHandoffContacts,

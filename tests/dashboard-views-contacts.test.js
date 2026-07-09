@@ -34,3 +34,28 @@ describe('mergeContacts', () => {
     expect(mergeContacts(undefined, undefined)).toEqual([]);
   });
 });
+
+import { fmtNextReviewBadge } from '../src/dashboard-views.js';
+
+describe('fmtNextReviewBadge (perpetual refresh — DONE cases)', () => {
+  it('renders "Återkommer <date> — pga <vendor>" for an armed DONE case', () => {
+    const html = fmtNextReviewBadge({ state: 'DONE', next_review_at: '2026-10-01', next_review_source: 'Skola24' });
+    expect(html).toMatch(/Återkommer/);
+    expect(html).toMatch(/2026-10-01/);
+    expect(html).toMatch(/Skola24/);
+  });
+
+  it('omits the vendor clause when no source', () => {
+    const html = fmtNextReviewBadge({ state: 'DONE', next_review_at: '2026-10-01', next_review_source: null });
+    expect(html).toMatch(/2026-10-01/);
+    expect(html).not.toMatch(/pga/);
+  });
+
+  it('returns null when not armed', () => {
+    expect(fmtNextReviewBadge({ state: 'DONE', next_review_at: null })).toBeNull();
+  });
+
+  it('returns null for a non-DONE case (only closed cases show a review date)', () => {
+    expect(fmtNextReviewBadge({ state: 'SENT', next_review_at: '2026-10-01' })).toBeNull();
+  });
+});
