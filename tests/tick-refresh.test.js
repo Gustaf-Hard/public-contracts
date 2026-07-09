@@ -82,11 +82,41 @@ describe('computeKommunReview (pure) — soonest review, dedup newest-wins per v
       { id: 1, vendor_name: 'Följebrev', period_end: '2026-06-30', is_contract: 0, received_at: '2026-05-01' },
       { id: 2, vendor_name: 'Okänd', period_end: null, received_at: '2026-05-01' },
     ];
-    expect(computeKommunReview(rows, now)).toEqual({ date: null, source: null });
+    expect(computeKommunReview(rows, now)).toMatchObject({ date: null, source: null });
   });
 
   it('empty set → no review', () => {
-    expect(computeKommunReview([], now)).toEqual({ date: null, source: null });
+    expect(computeKommunReview([], now)).toMatchObject({ date: null, source: null });
+  });
+
+  // Finding 8: consolidated review logic must apply the horizon/grace window so
+  // decade-old expiries (2014 Tieto rows in the live set) are never armed.
+  it('excludes decade-old expiries (grace window) but keeps near-future ones', () => {
+    const old = computeKommunReview(
+      [{ id: 1, vendor_name: 'Tieto', period_end: '2014-12-31', received_at: '2015-01-01' }],
+      now,
+    );
+    expect(old).toMatchObject({ date: null, source: null });
+
+    const near = computeKommunReview(
+      [{ id: 2, vendor_name: 'Skola24', period_end: '2026-08-01', received_at: '2026-05-01' }],
+      now,
+    );
+    expect(near.date).toBe('2026-08-01');
+    expect(near.source).toBe('Skola24');
+  });
+
+  it('keeps a far-future review date (firing is gated by next_review_at <= today, not by compute)', () => {
+    // The newer extension supersedes the old expiring row even when it lands
+    // beyond the arming horizon — the review is simply not DUE until that date.
+    const r = computeKommunReview(
+      [
+        { id: 1, vendor_name: 'Atea', period_end: '2026-06-30', received_at: '2026-01-01' },
+        { id: 2, vendor_name: 'Atea', period_end: '2028-06-30', received_at: '2026-06-01' },
+      ],
+      now,
+    );
+    expect(r.date).toBe('2028-06-30');
   });
 });
 
@@ -116,6 +146,21 @@ describe('armRefresh — sets next_review_at on a DONE conversation (allowlist-g
     db.updateConversationState(id, 'DONE', {});
     armRefresh(db.getConversation(id), { db, now, refreshAllowlist: ['1489'] });
     expect(db.getConversation(id).next_review_at).toBeNull();
+  });
+
+  // Finding 3: setNextReview writes ONLY the review columns and is idempotent.
+  it('setNextReview does not touch state/state_changed_at and no-ops when unchanged', () => {
+    const id = seedConv('1489');
+    db.updateConversationState(id, 'DONE', {});
+    const before = db.getConversation(id).state_changed_at;
+    expect(db.setNextReview(id, { next_review_at: '2026-06-30', next_review_source: 'Skola24' })).toBe(true);
+    let conv = db.getConversation(id);
+    expect(conv.state).toBe('DONE');
+    expect(conv.state_changed_at).toBe(before);       // untouched
+    expect(conv.next_review_at).toBe('2026-06-30');
+    // Identical re-write returns false (no write performed).
+    expect(db.setNextReview(id, { next_review_at: '2026-06-30', next_review_source: 'Skola24' })).toBe(false);
+    expect(db.getConversation(id).state_changed_at).toBe(before);
   });
 });
 
