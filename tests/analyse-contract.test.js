@@ -151,6 +151,60 @@ describe('lifecycle extraction (2026-07-09 perpetual-refresh design Part A)', ()
   });
 });
 
+describe('pricing extraction (2026-07-09 vendor-data-center design §1)', () => {
+  const PRICING_FIELDS = ['annual_value_sek', 'one_time_value_sek', 'pricing_model', 'unit_price_sek', 'unit', 'quantity', 'value_incl_moms'];
+
+  it('advertises the pricing fields as required in the request schema', async () => {
+    const client = fakeClientReturning(GOOD);
+    await analyseContractPdf(pdf, ctx, { env: { ANTHROPIC_API_KEY: 'sk' }, client });
+    const schema = client.messages.create.mock.calls[0][0].output_config.format.schema;
+    for (const f of PRICING_FIELDS) {
+      expect(schema.required).toContain(f);
+      expect(schema.properties).toHaveProperty(f);
+    }
+    expect(schema.properties.pricing_model.enum ?? schema.properties.pricing_model.anyOf?.[0]?.enum)
+      .toEqual(['per_student', 'per_user', 'fixed', 'tiered', 'usage', 'one_time', 'free', 'unknown']);
+  });
+
+  it('the system prompt instructs normalization to SEK/year', async () => {
+    const client = fakeClientReturning(GOOD);
+    await analyseContractPdf(pdf, ctx, { env: { ANTHROPIC_API_KEY: 'sk' }, client });
+    const sys = client.messages.create.mock.calls[0][0].system[0].text;
+    expect(sys).toContain('annual_value_sek');
+    expect(sys).toContain('pricing_model');
+    expect(sys).toContain('unit_price_sek');
+  });
+
+  it('storeContractAnalysis persists the pricing fields (Radish per-elev)', () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'ac-'));
+    const { db, attId } = seedDbWithPdf(tmp);
+    storeContractAnalysis(db, attId, {
+      ...GOOD, vendor_name: 'Radish',
+      avtalsvarde: '2025: 40 kr/elev (3744 elever); från 2026: 95 kr/elev',
+      annual_value_sek: 149760, one_time_value_sek: null,
+      pricing_model: 'per_student', unit_price_sek: 40, unit: 'elev', quantity: 3744,
+      value_incl_moms: false,
+    }, { model: 'claude-opus-4-8' });
+    const row = db.raw.prepare('SELECT * FROM contracts WHERE attachment_id = ?').get(attId);
+    expect(row.annual_value_sek).toBe(149760);
+    expect(row.pricing_model).toBe('per_student');
+    expect(row.unit_price_sek).toBe(40);
+    expect(row.unit).toBe('elev');
+    expect(row.quantity).toBe(3744);
+    expect(row.value_incl_moms).toBe(0);
+    db.close(); rmSync(tmp, { recursive: true, force: true });
+  });
+
+  it('storeContractAnalysis with pricing fields absent stores NULLs (old-shape analysis)', () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'ac-'));
+    const { db, attId } = seedDbWithPdf(tmp);
+    storeContractAnalysis(db, attId, GOOD, { model: 'claude-opus-4-8' });
+    const row = db.raw.prepare('SELECT * FROM contracts WHERE attachment_id = ?').get(attId);
+    for (const f of PRICING_FIELDS) expect(row[f]).toBeNull();
+    db.close(); rmSync(tmp, { recursive: true, force: true });
+  });
+});
+
 describe('analysePendingContracts', () => {
   it('analyses each pending PDF and stores results; second run is a no-op', async () => {
     const tmp = mkdtempSync(join(tmpdir(), 'ac-'));

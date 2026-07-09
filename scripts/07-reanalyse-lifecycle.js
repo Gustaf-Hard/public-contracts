@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 // Backfill the perpetual-refresh lifecycle fields (auto_renews, renewal_term,
-// last_cancellation_date, extension_option_until) over already-stored contract
-// PDFs by re-running the Opus analyser (2026-07-09 design Part A §2.3).
+// last_cancellation_date, extension_option_until) AND the vendor-data-center
+// pricing fields (annual_value_sek, one_time_value_sek, pricing_model,
+// unit_price_sek, unit, quantity, value_incl_moms) over already-stored
+// contract PDFs by re-running the Opus analyser (2026-07-09 refresh design
+// Part A §2.3 + 2026-07-09 vendor-data-center design §1).
 //
 // This re-analyses EVERY PDF attachment (recordContract replaces the row in
 // place, preserving contract ids where the attachment is unchanged) so the new
