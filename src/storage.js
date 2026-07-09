@@ -266,6 +266,24 @@ export function openDb(path) {
     db.prepare(`UPDATE conversations SET ${sets.join(', ')} WHERE id = ?`).run(...values);
   }
 
+  // Set next_review_at / next_review_source WITHOUT touching state or
+  // state_changed_at (finding 3): re-arming an already-DONE conversation is
+  // pure bookkeeping — rewriting state_changed_at via updateConversationState
+  // corrupts the stale-clock the follow-up rules depend on. Idempotent: writes
+  // only when the computed review actually changed, so a no-op re-arm touches
+  // nothing at all.
+  function setNextReview(id, { next_review_at = null, next_review_source = null }) {
+    const cur = db.prepare('SELECT next_review_at, next_review_source FROM conversations WHERE id = ?').get(id);
+    if (!cur) return false;
+    if ((cur.next_review_at ?? null) === (next_review_at ?? null)
+        && (cur.next_review_source ?? null) === (next_review_source ?? null)) {
+      return false; // unchanged — no write
+    }
+    db.prepare('UPDATE conversations SET next_review_at = ?, next_review_source = ? WHERE id = ?')
+      .run(next_review_at ?? null, next_review_source ?? null, id);
+    return true;
+  }
+
   function recordMessage(m) {
     const stmt = db.prepare(`
       INSERT INTO messages (
@@ -722,6 +740,7 @@ export function openDb(path) {
     listAllConversations,
     listConversationsDueForInitialSend,
     updateConversationState,
+    setNextReview,
     recordMessage,
     listMessages,
     hasGmailMessageId,
