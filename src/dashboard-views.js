@@ -62,6 +62,18 @@ function fmtFollowUpBadge(isoDate, source = 'our_followup') {
   return `<span class="${klass}" title="${escapeHtml(title)}">${label}</span>`;
 }
 
+// Perpetual contract refresh (2026-07-09 design §3.7): a closed (DONE) case is
+// not the end of the story — it shows when the bot will re-contact the kommun
+// and which contract drove that date. Sourced from conversations.next_review_at
+// / next_review_source (NOT effectiveFollowUp, which is null on DONE by design).
+export function fmtNextReviewBadge(conv) {
+  if (!conv || conv.state !== 'DONE' || !conv.next_review_at) return null;
+  const vendorClause = conv.next_review_source
+    ? ` — pga ${escapeHtml(conv.next_review_source)}`
+    : '';
+  return `<span class="pill pill-default" title="Automatisk uppdateringsförfrågan planerad">Återkommer ${escapeHtml(conv.next_review_at)}${vendorClause}</span>`;
+}
+
 const INTENT_LABELS = {
   auto_ack: 'Mottagningskvitto',
   clarification: 'Begär precisering',
@@ -102,6 +114,7 @@ const CASE_STATUS = {
   AWAITING_PRECISION: { label: 'Öppet · väntar precisering', color: '#a855f7', terminal: false },
   DELIVERING:         { label: 'Öppet · tar emot avtal', color: '#10b981', terminal: false },
   DONE:               { label: '✅ Stängt — klart',    color: '#22c55e', terminal: true  },
+  REFRESH_DUE:        { label: '🔄 Uppdatering — väntar godkännande', color: '#0ea5e9', terminal: false },
   DEAD_END:           { label: '🚫 Återvändsgränd',    color: '#9ca3af', terminal: true  },
   NEEDS_HUMAN:        { label: '⚠️ Behöver dig',       color: '#ef4444', terminal: false },
 };
@@ -1429,6 +1442,7 @@ function renderCaseDetailPane(selected, gmailReady) {
   const returnTo = `/arenden/${conv.id}`;
   const duration = caseDuration(conv, messages);
   const fuBadge = fmtFollowUpBadge(follow_up?.date, follow_up?.source);
+  const reviewBadge = fmtNextReviewBadge(conv);
   const subject = messages.find((m) => m.subject)?.subject ?? `Begäran — ${conv.kommun_namn}`;
 
   // Group escalations under their thread (by triggering message, else by
@@ -1465,6 +1479,7 @@ function renderCaseDetailPane(selected, gmailReady) {
         ${conv.arendenummer ? `· Ärendenr ${escapeHtml(conv.arendenummer)}` : ''}
         ${duration ? `· ${escapeHtml(duration)}` : ''}
         ${fuBadge ? `· Återkommer ${fuBadge}` : ''}
+        ${reviewBadge ? `· ${reviewBadge}` : ''}
         · <a href="/kommun/${escapeHtml(conv.kommun_kod)}" data-pane-link>Kommunprofil →</a>
       </div>
     </div>
