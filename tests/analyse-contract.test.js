@@ -124,6 +124,33 @@ describe('analyseContractPdf — document_type + mentioned_agreements', () => {
   });
 });
 
+describe('lifecycle extraction (2026-07-09 perpetual-refresh design Part A)', () => {
+  it('advertises the new lifecycle fields as required in the request schema', async () => {
+    const client = fakeClientReturning({ ...GOOD, document_type: 'avtal', mentioned_agreements: [], auto_renews: false, renewal_term: null, last_cancellation_date: null, extension_option_until: null });
+    await analyseContractPdf(pdf, ctx, { env: { ANTHROPIC_API_KEY: 'sk' }, client });
+    const schema = client.messages.create.mock.calls[0][0].output_config.format.schema;
+    for (const f of ['auto_renews', 'renewal_term', 'last_cancellation_date', 'extension_option_until']) {
+      expect(schema.required).toContain(f);
+      expect(schema.properties).toHaveProperty(f);
+    }
+  });
+
+  it('storeContractAnalysis persists the lifecycle fields (Tieto auto-renew)', () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'ac-'));
+    const { db, attId } = seedDbWithPdf(tmp);
+    storeContractAnalysis(db, attId, {
+      ...GOOD, vendor_name: 'Tieto', period_end: '2026-12-31',
+      auto_renews: true, renewal_term: '1 år',
+      last_cancellation_date: '2026-09-30', extension_option_until: null,
+    }, { model: 'claude-opus-4-8' });
+    const row = db.listContractsForKommun('1980').find((r) => r.vendor_name === 'Tieto');
+    expect(row.auto_renews).toBe(1);
+    expect(row.renewal_term).toBe('1 år');
+    expect(row.last_cancellation_date).toBe('2026-09-30');
+    db.close(); rmSync(tmp, { recursive: true, force: true });
+  });
+});
+
 describe('analysePendingContracts', () => {
   it('analyses each pending PDF and stores results; second run is a no-op', async () => {
     const tmp = mkdtempSync(join(tmpdir(), 'ac-'));

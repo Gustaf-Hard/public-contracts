@@ -23,7 +23,11 @@ Regler:
 - products: namngivna produkter/tjänster som avtalet omfattar. Tom array om inga kan identifieras.
 - avtalsvarde: avtalets värde eller årskostnad som text (t.ex. "120 000 kr/år"). null om det inte framgår.
 - valuta: "SEK" etc. null om det inte framgår.
-- period_start / period_end: avtalstidens start- och slutdatum som ISO-datum (YYYY-MM-DD). null om det inte framgår. Vid automatisk förlängning: använd innevarande periods slutdatum.
+- period_start / period_end: avtalstidens start- och slutdatum som ISO-datum (YYYY-MM-DD). null om det inte framgår. Vid automatisk förlängning: använd INNEVARANDE periods slutdatum (period_end), inte det förlängda.
+- auto_renews: true om avtalet förlängs automatiskt om det inte sägs upp (t.ex. "förlängs automatiskt i ettårsperioder om det inte sägs upp"). Annars false.
+- renewal_term: förlängningsperioden som text (t.ex. "1 år", "2 år"). null om avtalet inte förlängs automatiskt eller om perioden inte framgår.
+- last_cancellation_date: sista dagen avtalet kan sägas upp (uppsägningsdag) innan det förlängs automatiskt, som ISO-datum (YYYY-MM-DD). Räkna fram från uppsägningstiden relativt period_end om det behövs. null om det inte framgår eller inte är tillämpligt.
+- extension_option_until: om avtalet innehåller en OPTION om förlängning (t.ex. "möjlighet till förlängning upp till 2027-06-14", eller "möjlighet till två års förlängning"), det slutdatum som optionen kan förlänga avtalet till, som ISO-datum. Räkna fram från period_end om endast en längd anges ("två års förlängning" → period_end + 2 år). null om ingen sådan option finns.
 - summary: 1-2 meningar på svenska om vad dokumentet gäller.
 - mentioned_agreements: lista de avtal/leverantörer som dokumentet NÄMNER, med { vendor, product, doc_attached }. doc_attached = true endast om själva avtalshandlingen finns i DETTA dokument; false när dokumentet bara refererar till eller sammanställer avtalet utan att innehålla det. Tom array om inga nämns.
 - confidence: 0.9+ = mycket säker, 0.7-0.9 = ganska säker, <0.7 = osäker.
@@ -32,7 +36,7 @@ Regler:
 const CONTRACT_SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['is_contract', 'document_type', 'vendor_name', 'products', 'avtalsvarde', 'valuta', 'period_start', 'period_end', 'summary', 'confidence', 'mentioned_agreements'],
+  required: ['is_contract', 'document_type', 'vendor_name', 'products', 'avtalsvarde', 'valuta', 'period_start', 'period_end', 'auto_renews', 'renewal_term', 'last_cancellation_date', 'extension_option_until', 'summary', 'confidence', 'mentioned_agreements'],
   properties: {
     is_contract: { type: 'boolean' },
     document_type: { type: 'string', enum: ['avtal', 'följebrev_sammanställning', 'prislista', 'sekretessbeslut', 'övrigt'] },
@@ -42,6 +46,10 @@ const CONTRACT_SCHEMA = {
     valuta: { anyOf: [{ type: 'string' }, { type: 'null' }] },
     period_start: { anyOf: [{ type: 'string' }, { type: 'null' }] },
     period_end: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+    auto_renews: { type: 'boolean' },
+    renewal_term: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+    last_cancellation_date: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+    extension_option_until: { anyOf: [{ type: 'string' }, { type: 'null' }] },
     summary: { type: 'string' },
     confidence: { type: 'number' },
     mentioned_agreements: {
@@ -150,6 +158,10 @@ export function storeContractAnalysis(db, attachmentId, analysis, { model, log =
     valuta: analysis.valuta,
     period_start: analysis.period_start,
     period_end: analysis.period_end,
+    auto_renews: analysis.auto_renews,
+    renewal_term: analysis.renewal_term,
+    last_cancellation_date: analysis.last_cancellation_date,
+    extension_option_until: analysis.extension_option_until,
     is_contract: analysis.is_contract ? 1 : 0,
     summary: analysis.summary,
     confidence: analysis.confidence,
