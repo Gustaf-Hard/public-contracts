@@ -1,4 +1,5 @@
-import { T_INITIAL, T_PRECISION, T_RECEIPT, T_FOLLOWUP_NUDGE, T_FOLLOWUP_CLOSE, T_REQUEST_MISSING, computeReceivedMissing, chooseDeliveryReply } from './templates.js';
+import { T_INITIAL, T_PRECISION, T_RECEIPT, T_FOLLOWUP_NUDGE, T_FOLLOWUP_CLOSE, T_REQUEST_MISSING, T_UPDATE, computeReceivedMissing, chooseDeliveryReply } from './templates.js';
+import { computeNextReviewDate } from './contract-lifecycle.js';
 import { matchWatchlist } from './watchlist.js';
 import { classify, isCloserText } from './classifier.js';
 import { inferThreadStatus } from './threads.js';
@@ -10,7 +11,7 @@ import { extractSignature } from './extract-signature.js';
 import { analyseMessage, analysisToLegacyClassification } from './analyse-message.js';
 import { analysePendingContracts } from './analyse-contract.js';
 
-const TEMPLATES = { T_INITIAL, T_PRECISION, T_RECEIPT, T_FOLLOWUP_NUDGE, T_FOLLOWUP_CLOSE, T_REQUEST_MISSING };
+const TEMPLATES = { T_INITIAL, T_PRECISION, T_RECEIPT, T_FOLLOWUP_NUDGE, T_FOLLOWUP_CLOSE, T_REQUEST_MISSING, T_UPDATE };
 
 function fromHeader(env) {
   return `${env.GMAIL_FROM_NAME} <${env.GMAIL_USER_EMAIL}>`;
@@ -26,6 +27,9 @@ function tplCtx(conv, env, extra = {}) {
     days_since_send: extra.days_since_send ?? 0,
     received: extra.received ?? [],
     missing: extra.missing ?? [],
+    // Perpetual-refresh (T_UPDATE) context, forwarded when present.
+    arendenummer: extra.arendenummer ?? conv.arendenummer ?? null,
+    review_contracts: extra.review_contracts ?? [],
   };
 }
 
@@ -638,6 +642,21 @@ export async function runTick(deps) {
   } catch (e) {
     deps.log?.(`contract analysis error: ${e.message}`);
   }
+
+  // 4. Refresh arming (2026-07-09 design §3.2/§3.6) — after contracts are
+  // analysed, (re)compute next_review_at for every DONE conversation in the
+  // pilot allowlist. Idempotent; re-arms perpetually as the contract set
+  // changes. Guarded so a missing allowlist simply arms nothing.
+  const refreshAllowlist = deps.refreshAllowlist ?? [];
+  if (refreshAllowlist.length) {
+    for (const conv of db.listConversationsByState('DONE')) {
+      try {
+        armRefresh(conv, { db, now, refreshAllowlist });
+      } catch (e) {
+        deps.log?.(`refresh arming error for ${conv.kommun_namn}: ${e.message}`);
+      }
+    }
+  }
 }
 
 export async function runDailyFollowup(deps) {
@@ -690,4 +709,100 @@ export async function runDailyFollowup(deps) {
 
 function daysBetween(then, now) {
   return Math.floor((now.getTime() - then.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+// ---- Perpetual contract refresh (2026-07-09 design Part B) ----
+
+// Pure: resolve a kommun's soonest next_review_date from its stored contract
+// rows. Dedup per vendor newest-wins — so an Atea extension supersedes an old
+// expiring Atea row instead of double-triggering. Non-contracts and rows with
+// no usable date are ignored. Returns { date, source } where source is the
+// vendor that drove the date. Sorts by received_at internally so it does not
+// depend on caller ordering.
+export function computeKommunReview(rows, now) {
+  if (!now) throw new Error('computeKommunReview requires an explicit now');
+  const sorted = [...(rows ?? [])].sort((a, b) =>
+    String(b.received_at ?? '').localeCompare(String(a.received_at ?? '')));
+  const newestByVendor = new Map();
+  for (const r of sorted) {
+    if (r.is_contract === 0) continue;
+    const key = (r.vendor_name ?? `__id${r.id}`).toLowerCase();
+    if (!newestByVendor.has(key)) newestByVendor.set(key, r); // first = newest (received_at DESC)
+  }
+  let best = null;
+  for (const r of newestByVendor.values()) {
+    const date = computeNextReviewDate(r, now);
+    if (!date) continue;
+    if (!best || date < best.date) best = { date, source: r.vendor_name ?? null };
+  }
+  return best ?? { date: null, source: null };
+}
+
+// Arm a DONE conversation for its next refresh round: compute the kommun's
+// soonest review date and store next_review_at / next_review_source. Gated by
+// the pilot allowlist. Idempotent — recomputes from the current contract set,
+// so a completed refresh round re-arms perpetually (design §3.6). No-op (and
+// leaves next_review_at null) for non-allowlisted kommuner or when no contract
+// yields a usable date — never blocks the pipeline.
+export function armRefresh(conv, { db, now, refreshAllowlist = [] }) {
+  if (!conv) return;
+  if (!refreshAllowlist.includes(conv.kommun_kod)) return;
+  const rows = db.listContractsForKommun(conv.kommun_kod);
+  const { date, source } = computeKommunReview(rows, now);
+  db.updateConversationState(conv.id, conv.state, {
+    next_review_at: date,
+    next_review_source: source,
+  });
+}
+
+// Daily refresh scan — sibling of runDailyFollowup, reusing all its safety
+// machinery (one-open-action guard, escalateWithDraft supersede-or-defer,
+// atomic claim inherited from the shared escalation path). Runs under the same
+// tick/followup escalation mutex in the daemon.
+//
+// Finds DONE conversations whose next_review_at is due, that are allowlisted,
+// and that have no active escalation → moves them to REFRESH_DUE and creates
+// exactly ONE T_UPDATE escalation naming the expiring contract(s).
+export async function runRefreshScan(deps) {
+  const { db, now, refreshAllowlist = [], log } = deps;
+  const todayIso = now.toISOString().slice(0, 10);
+  for (const conv of db.listConversationsDueForRefresh(todayIso)) {
+    if (!refreshAllowlist.includes(conv.kommun_kod)) continue;
+    // At most one active next-action per conversation (review H1) — never mint
+    // a refresh draft next to unresolved outbound.
+    if (db.hasActiveEscalation(conv.id)) continue;
+
+    // Which contract(s) are at review — the ones matching next_review_at, so
+    // T_UPDATE can name them. Dedup per vendor newest-wins as in the arming.
+    const rows = db.listContractsForKommun(conv.kommun_kod);
+    const seen = new Set();
+    const reviewContracts = [];
+    for (const r of rows) {
+      if (r.is_contract === 0) continue;
+      const key = (r.vendor_name ?? `__id${r.id}`).toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      if (computeNextReviewDate(r, now) === conv.next_review_at) {
+        reviewContracts.push({ vendor_name: r.vendor_name, period_end: r.period_end });
+      }
+    }
+
+    // Enter the refresh round. refresh_round increments so rounds are
+    // distinguishable; a new Gmail thread separates them naturally on send.
+    db.updateConversationState(conv.id, 'REFRESH_DUE', {
+      refresh_round: (conv.refresh_round ?? 0) + 1,
+    });
+
+    await escalateWithDraft({
+      conv: db.getConversation(conv.id),
+      parsedInbound: null,
+      classification: { class: 'refresh_due', confidence: null },
+      previousState: 'DONE',
+      draftTemplate: 'T_UPDATE',
+      reason: `contract refresh due ${conv.next_review_at}${conv.next_review_source ? ` (${conv.next_review_source})` : ''}`,
+      templateCtx: { arendenummer: conv.arendenummer ?? null, review_contracts: reviewContracts },
+      deps,
+    });
+    log?.(`REFRESH escalated (T_UPDATE) → ${conv.kommun_namn}/${conv.role} due ${conv.next_review_at}`);
+  }
 }

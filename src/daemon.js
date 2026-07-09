@@ -1,6 +1,6 @@
 import express from 'express';
 import cron from 'node-cron';
-import { runTick, runDailyFollowup } from './tick.js';
+import { runTick, runDailyFollowup, runRefreshScan } from './tick.js';
 import { openDb } from './storage.js';
 import { buildOAuthClient, loadStoredToken, saveToken, makeGmail, sendMessage as gmailSend, listInboundQuery, getMessage as gmailGet, fetchAttachment } from './gmail.js';
 // gmailSend stays imported because runTick's gmailOps below uses it.
@@ -205,6 +205,7 @@ export async function startDaemon({ env = process.env, log = console.log } = {})
         slackClient: slack, slackOps,
         env, contractsDir: CONTRACTS_DIR, now, log,
         seenUnmatched,
+        refreshAllowlist: overrides.refresh_pilot_kommun_kods ?? [],
       });
     } catch (e) {
       err = e.message;
@@ -221,6 +222,15 @@ export async function startDaemon({ env = process.env, log = console.log } = {})
         db, gmailClient: { gmail }, gmailOps,
         slackClient: slack, slackOps,
         env, contractsDir: CONTRACTS_DIR, now, log,
+      });
+      // Perpetual contract refresh (2026-07-09 design §3.3) — same daily
+      // cadence, same escalation mutex, so refresh and follow-up drafts can
+      // never race to supersede each other for the same conversation.
+      await runRefreshScan({
+        db, gmailClient: { gmail }, gmailOps,
+        slackClient: slack, slackOps,
+        env, contractsDir: CONTRACTS_DIR, now, log,
+        refreshAllowlist: overrides.refresh_pilot_kommun_kods ?? [],
       });
     } catch (e) {
       err = e.message;
