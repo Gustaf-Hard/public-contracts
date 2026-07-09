@@ -148,6 +148,13 @@ CREATE TABLE IF NOT EXISTS contracts (
   renewal_term TEXT,
   last_cancellation_date TEXT,
   extension_option_until TEXT,
+  annual_value_sek REAL,
+  one_time_value_sek REAL,
+  pricing_model TEXT,
+  unit_price_sek REAL,
+  unit TEXT,
+  quantity REAL,
+  value_incl_moms INTEGER,
   is_contract INTEGER NOT NULL DEFAULT 1,
   summary TEXT,
   confidence REAL,
@@ -220,6 +227,28 @@ export function openDb(path) {
     }
     if (!contractCols.includes('extension_option_until')) {
       db.exec('ALTER TABLE contracts ADD COLUMN extension_option_until TEXT');
+    }
+    // Structured pricing for the vendor data center (2026-07-09 design §1).
+    if (!contractCols.includes('annual_value_sek')) {
+      db.exec('ALTER TABLE contracts ADD COLUMN annual_value_sek REAL');
+    }
+    if (!contractCols.includes('one_time_value_sek')) {
+      db.exec('ALTER TABLE contracts ADD COLUMN one_time_value_sek REAL');
+    }
+    if (!contractCols.includes('pricing_model')) {
+      db.exec('ALTER TABLE contracts ADD COLUMN pricing_model TEXT');
+    }
+    if (!contractCols.includes('unit_price_sek')) {
+      db.exec('ALTER TABLE contracts ADD COLUMN unit_price_sek REAL');
+    }
+    if (!contractCols.includes('unit')) {
+      db.exec('ALTER TABLE contracts ADD COLUMN unit TEXT');
+    }
+    if (!contractCols.includes('quantity')) {
+      db.exec('ALTER TABLE contracts ADD COLUMN quantity REAL');
+    }
+    if (!contractCols.includes('value_incl_moms')) {
+      db.exec('ALTER TABLE contracts ADD COLUMN value_incl_moms INTEGER');
     }
   }
 
@@ -557,13 +586,18 @@ export function openDb(path) {
     const r = db.prepare(`
       INSERT INTO contracts (attachment_id, vendor_id, avtalsvarde, valuta, period_start, period_end,
                              auto_renews, renewal_term, last_cancellation_date, extension_option_until,
+                             annual_value_sek, one_time_value_sek, pricing_model,
+                             unit_price_sek, unit, quantity, value_incl_moms,
                              is_contract, summary, confidence, analysis_json, model)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       c.attachment_id, c.vendor_id ?? null, c.avtalsvarde ?? null, c.valuta ?? null,
       c.period_start ?? null, c.period_end ?? null,
       c.auto_renews == null ? null : (c.auto_renews ? 1 : 0),
       c.renewal_term ?? null, c.last_cancellation_date ?? null, c.extension_option_until ?? null,
+      c.annual_value_sek ?? null, c.one_time_value_sek ?? null, c.pricing_model ?? null,
+      c.unit_price_sek ?? null, c.unit ?? null, c.quantity ?? null,
+      c.value_incl_moms == null ? null : (c.value_incl_moms ? 1 : 0),
       c.is_contract ?? 1,
       c.summary ?? null, c.confidence ?? null,
       c.analysis_json != null ? JSON.stringify(c.analysis_json) : null, c.model ?? null,
@@ -647,6 +681,33 @@ export function openDb(path) {
       WHERE conv.kommun_kod = ?
       ORDER BY m.received_at DESC, c.id DESC
     `).all(kommunKod);
+  }
+
+  // Every stored contract (is_contract=1) as one flat row with vendor,
+  // kommun, pricing, lifecycle and products — the raw input for the
+  // vendor-data-center analytics layer (src/vendor-analytics.js). Vendor-less
+  // contracts are included: the vendor is unknown, but the contract is real.
+  function listContractFacts() {
+    const rows = db.prepare(`
+      SELECT c.id AS contract_id, c.vendor_id, v.name AS vendor_name, v.slug AS vendor_slug,
+             conv.kommun_kod, conv.kommun_namn,
+             c.avtalsvarde, c.valuta, c.period_start, c.period_end,
+             c.auto_renews, c.renewal_term, c.last_cancellation_date, c.extension_option_until,
+             c.annual_value_sek, c.one_time_value_sek, c.pricing_model,
+             c.unit_price_sek, c.unit, c.quantity, c.value_incl_moms,
+             c.confidence, c.summary,
+             a.id AS attachment_id, a.filename,
+             m.received_at
+      FROM contracts c
+      JOIN attachments a ON a.id = c.attachment_id
+      JOIN messages m ON m.id = a.message_id
+      JOIN conversations conv ON conv.id = m.conversation_id
+      LEFT JOIN vendors v ON v.id = c.vendor_id
+      WHERE c.is_contract = 1
+      ORDER BY v.name COLLATE NOCASE, conv.kommun_namn COLLATE NOCASE, c.id
+    `).all();
+    const prodMap = productsForContractIds(rows.map((r) => r.contract_id));
+    return rows.map((r) => ({ ...r, products: prodMap.get(r.contract_id) ?? [] }));
   }
 
   // DONE conversations armed with a next_review_at at or before `todayIso`.
@@ -758,6 +819,7 @@ export function openDb(path) {
     listContractInfoForMessage,
     listContractsForVendor,
     listContractsForKommun,
+    listContractFacts,
     listConversationsDueForRefresh,
     listVendorsOverview,
     getVendorBySlug,
