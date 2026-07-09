@@ -5,6 +5,15 @@ Live-activation steps for the perpetual-refresh feature
 branch touched the live system.** Run these under supervision, after code
 review, on the machine that holds `data/pilot.db`.
 
+> **Also activates the vendor data center**
+> (`2026-07-09-vendor-data-center-design.md`, branch `vendor-data-center`):
+> the same migration adds the structured pricing columns and the same Step-3
+> backfill populates them — no extra steps, only the extra verifications
+> marked "pricing" below. Until the backfill has run, /leverantorer still
+> works: values fall back to a conservative parse of the raw avtalsvarde
+> text (~28 of the 47 valued contracts at review time), the rest show
+> "okänt" with completeness lines.
+
 The pilot allowlist ships as `refresh_pilot_kommun_kods: ["1489","1980"]`
 (Alingsås, Västerås) in `data/pilot-overrides.json`. Only these kommuner arm
 and trigger; expanding is a config edit.
@@ -38,6 +47,8 @@ Verify the columns exist:
 
 ```bash
 sqlite3 data/pilot.db "PRAGMA table_info(contracts);"      # expect auto_renews, renewal_term, last_cancellation_date, extension_option_until
+                                                           # + pricing: annual_value_sek, one_time_value_sek, pricing_model,
+                                                           #            unit_price_sek, unit, quantity, value_incl_moms
 sqlite3 data/pilot.db "PRAGMA table_info(conversations);"  # expect next_review_at, next_review_source, refresh_round
 ```
 
@@ -63,6 +74,25 @@ Teachiq extension options):
 ```bash
 sqlite3 data/pilot.db "SELECT v.name, c.period_end, c.auto_renews, c.last_cancellation_date, c.extension_option_until FROM contracts c LEFT JOIN vendors v ON v.id=c.vendor_id WHERE c.is_contract=1 ORDER BY c.id;"
 ```
+
+Pricing spot-checks (vendor data center). Compare against the raw
+avtalsvarde text — the analyser must NOT invent numbers; a value the
+document doesn't state should be NULL:
+
+```bash
+sqlite3 data/pilot.db "SELECT v.name, c.avtalsvarde, c.annual_value_sek, c.pricing_model, c.unit_price_sek, c.unit, c.quantity FROM contracts c LEFT JOIN vendors v ON v.id=c.vendor_id WHERE c.is_contract=1 ORDER BY c.id;"
+```
+
+Known archetypes to eyeball:
+
+- "80 417 SEK per månad" → `annual_value_sek` ≈ 965 004, `pricing_model` fixed
+- Radish "40 kr/elev (3744 elever)" → per_student, unit elev, quantity 3744
+- ILT "585 649 SEK år 1, …" → tiered, current-year amount
+- "121 272 SEK" (no period) → `annual_value_sek` NULL — correct, not a failure
+- "Ingen årlig abonnemangskostnad" → free, 0
+
+Then open `/leverantorer` (Step 5) — the KPI band's "känd för X av Y avtal"
+should jump versus the pre-backfill text-parse-only completeness.
 
 ## Step 4 — Arm next_review_at for 1489 / 1980
 
