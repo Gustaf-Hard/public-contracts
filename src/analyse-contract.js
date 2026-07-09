@@ -28,6 +28,11 @@ Regler:
 - renewal_term: förlängningsperioden som text (t.ex. "1 år", "2 år"). null om avtalet inte förlängs automatiskt eller om perioden inte framgår.
 - last_cancellation_date: sista dagen avtalet kan sägas upp (uppsägningsdag) innan det förlängs automatiskt, som ISO-datum (YYYY-MM-DD). Räkna fram från uppsägningstiden relativt period_end om det behövs. null om det inte framgår eller inte är tillämpligt.
 - extension_option_until: om avtalet innehåller en OPTION om förlängning (t.ex. "möjlighet till förlängning upp till 2027-06-14", eller "möjlighet till två års förlängning"), det slutdatum som optionen kan förlänga avtalet till, som ISO-datum. Räkna fram från period_end om endast en längd anges ("två års förlängning" → period_end + 2 år). null om ingen sådan option finns.
+- annual_value_sek: avtalets kostnad normaliserad till SEK PER ÅR som tal. Månadskostnad × 12. Vid trappa/eskalerande pris ("585 649 SEK år 1, 615 767 SEK år 2"): använd INNEVARANDE avtalsårs belopp (räkna från period_start); framgår inte vilket år som gäller, använd år 1. Vid pris per enhet med angivet antal: enhetspris × antal. Vid totalsumma för flera år där årsbeloppet framgår (t.ex. "förvaltningsavgift 4 955 221 kr/år"): använd årsbeloppet. "Ingen årlig kostnad" / gratis: 0. null när årskostnaden INTE följer av dokumentet — GISSA ALDRIG, och skriv aldrig 0 för okänt. En klumpsumma utan period ("121 272 SEK") är INTE en årskostnad → null.
+- one_time_value_sek: engångskostnader i SEK (uppstart, införandeprojekt, licens vid engångsköp). null om inga framgår.
+- pricing_model: hur priset är konstruerat — "per_student" (per elev/barn), "per_user" (per användare/licens), "fixed" (fast års-/månadsbelopp), "tiered" (olika belopp per år eller volymtrappa), "usage" (rörligt efter förbrukning, t.ex. per dag/timme), "one_time" (endast engångsköp), "free" (uttryckligen kostnadsfritt), "unknown" när det inte framgår.
+- unit_price_sek / unit / quantity: vid enhetspris — priset per enhet som tal, enheten på svenska i singular ("elev", "användare"), och antalet enheter som avtalet anger. Använd innevarande nivå vid trappa. null där de inte framgår.
+- value_incl_moms: true om angivna belopp är inklusive moms, false om exklusive. null om det inte framgår.
 - summary: 1-2 meningar på svenska om vad dokumentet gäller.
 - mentioned_agreements: lista de avtal/leverantörer som dokumentet NÄMNER, med { vendor, product, doc_attached }. doc_attached = true endast om själva avtalshandlingen finns i DETTA dokument; false när dokumentet bara refererar till eller sammanställer avtalet utan att innehålla det. Tom array om inga nämns.
 - confidence: 0.9+ = mycket säker, 0.7-0.9 = ganska säker, <0.7 = osäker.
@@ -36,7 +41,7 @@ Regler:
 const CONTRACT_SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['is_contract', 'document_type', 'vendor_name', 'products', 'avtalsvarde', 'valuta', 'period_start', 'period_end', 'auto_renews', 'renewal_term', 'last_cancellation_date', 'extension_option_until', 'summary', 'confidence', 'mentioned_agreements'],
+  required: ['is_contract', 'document_type', 'vendor_name', 'products', 'avtalsvarde', 'valuta', 'period_start', 'period_end', 'auto_renews', 'renewal_term', 'last_cancellation_date', 'extension_option_until', 'annual_value_sek', 'one_time_value_sek', 'pricing_model', 'unit_price_sek', 'unit', 'quantity', 'value_incl_moms', 'summary', 'confidence', 'mentioned_agreements'],
   properties: {
     is_contract: { type: 'boolean' },
     document_type: { type: 'string', enum: ['avtal', 'följebrev_sammanställning', 'prislista', 'sekretessbeslut', 'övrigt'] },
@@ -50,6 +55,13 @@ const CONTRACT_SCHEMA = {
     renewal_term: { anyOf: [{ type: 'string' }, { type: 'null' }] },
     last_cancellation_date: { anyOf: [{ type: 'string' }, { type: 'null' }] },
     extension_option_until: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+    annual_value_sek: { anyOf: [{ type: 'number' }, { type: 'null' }] },
+    one_time_value_sek: { anyOf: [{ type: 'number' }, { type: 'null' }] },
+    pricing_model: { type: 'string', enum: ['per_student', 'per_user', 'fixed', 'tiered', 'usage', 'one_time', 'free', 'unknown'] },
+    unit_price_sek: { anyOf: [{ type: 'number' }, { type: 'null' }] },
+    unit: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+    quantity: { anyOf: [{ type: 'number' }, { type: 'null' }] },
+    value_incl_moms: { anyOf: [{ type: 'boolean' }, { type: 'null' }] },
     summary: { type: 'string' },
     confidence: { type: 'number' },
     mentioned_agreements: {
@@ -172,9 +184,13 @@ export function mergePreserving(existing, fresh) {
     changes.push(['is_contract', 'preserved 1 (new pass said 0)', 1]);
   }
 
-  // Fill-only string/date fields.
+  // Fill-only string/date/number fields — a degraded re-run (new pass null)
+  // never nulls a value we already have. Includes the pricing fields so a
+  // regressed re-analysis can't wipe a known annual value / pricing model.
   const fillOnly = ['vendor_name', 'period_start', 'period_end', 'avtalsvarde', 'valuta',
-    'renewal_term', 'last_cancellation_date', 'extension_option_until'];
+    'renewal_term', 'last_cancellation_date', 'extension_option_until',
+    'annual_value_sek', 'one_time_value_sek', 'pricing_model', 'unit_price_sek',
+    'unit', 'quantity', 'value_incl_moms'];
   for (const f of fillOnly) {
     const oldV = existing[f] ?? null;
     const newV = fresh[f] ?? null;
@@ -206,6 +222,8 @@ export function storeContractAnalysis(db, attachmentId, analysis, { model, log =
   const existing = db.raw.prepare(`
     SELECT c.is_contract, c.period_start, c.period_end, c.avtalsvarde, c.valuta,
            c.auto_renews, c.renewal_term, c.last_cancellation_date, c.extension_option_until,
+           c.annual_value_sek, c.one_time_value_sek, c.pricing_model, c.unit_price_sek,
+           c.unit, c.quantity, c.value_incl_moms,
            v.name AS vendor_name
     FROM contracts c
     LEFT JOIN vendors v ON v.id = c.vendor_id
@@ -233,6 +251,13 @@ export function storeContractAnalysis(db, attachmentId, analysis, { model, log =
     renewal_term: merged.renewal_term,
     last_cancellation_date: merged.last_cancellation_date,
     extension_option_until: merged.extension_option_until,
+    annual_value_sek: merged.annual_value_sek,
+    one_time_value_sek: merged.one_time_value_sek,
+    pricing_model: merged.pricing_model,
+    unit_price_sek: merged.unit_price_sek,
+    unit: merged.unit,
+    quantity: merged.quantity,
+    value_incl_moms: merged.value_incl_moms,
     is_contract: merged.is_contract ? 1 : 0,
     summary: merged.summary,
     confidence: merged.confidence,

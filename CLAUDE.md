@@ -142,6 +142,7 @@ permissive to paper over the change.
 - Next-action/staleness rules: `docs/superpowers/specs/2026-06-23-trustworthy-next-action-design.md`
 - Threads & recipient routing: `docs/superpowers/specs/2026-07-03-conversation-threads-and-recipients-design.md`
 - Perpetual contract refresh (lifecycle, T_UPDATE, refresh scan): `docs/superpowers/specs/2026-07-09-perpetual-contract-refresh-design.md`; live activation: `docs/superpowers/runbooks/2026-07-09-refresh-activation.md`
+- Vendor data center (/leverantorer pricing, analytics, explorer): `docs/superpowers/specs/2026-07-09-vendor-data-center-design.md` — pure analytics in `src/vendor-analytics.js`, shared client/server explorer logic in `public/explorer-core.js`
 - Collection schema/roles: `docs/superpowers/specs/2026-05-16-municipality-email-collection-design.md`
 - User-facing usage/outputs: `README.md`
 - Persistent state: `data/` (JSON/CSV committed; `pilot.db`, backups, and

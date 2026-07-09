@@ -162,6 +162,136 @@ describe('lifecycle + refresh columns (2026-07-09 perpetual-refresh design)', ()
   });
 });
 
+describe('pricing columns (2026-07-09 vendor-data-center design)', () => {
+  const PRICING_COLS = ['annual_value_sek', 'one_time_value_sek', 'pricing_model', 'unit_price_sek', 'unit', 'quantity', 'value_incl_moms'];
+
+  it('migrate is idempotent — pricing columns present exactly once after two runs', () => {
+    expect(() => { db.migrate(); db.migrate(); }).not.toThrow();
+    const cols = db.raw.prepare("PRAGMA table_info(contracts)").all().map((r) => r.name);
+    for (const col of PRICING_COLS) {
+      expect(cols.filter((n) => n === col)).toHaveLength(1);
+    }
+  });
+
+  it('migrate adds pricing columns to a pre-existing DB created without them', () => {
+    // Simulate a live DB from before this feature: contracts table without
+    // the pricing (or lifecycle) columns, then migrate — the guarded ALTERs
+    // must add them without touching existing rows.
+    const path2 = join(tmp, 'old.db');
+    const Database = db.raw.constructor;
+    const old = new Database(path2);
+    old.exec(`
+      CREATE TABLE contracts (
+        id INTEGER PRIMARY KEY,
+        attachment_id INTEGER NOT NULL UNIQUE,
+        vendor_id INTEGER,
+        avtalsvarde TEXT, valuta TEXT, period_start TEXT, period_end TEXT,
+        is_contract INTEGER NOT NULL DEFAULT 1,
+        summary TEXT, confidence REAL, analysis_json TEXT, model TEXT,
+        analyzed_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      INSERT INTO contracts (attachment_id, avtalsvarde) VALUES (1, '129 tkr/år');
+    `);
+    old.close();
+    const db2 = openDb(path2);
+    expect(() => { db2.migrate(); db2.migrate(); }).not.toThrow();
+    const cols = db2.raw.prepare("PRAGMA table_info(contracts)").all().map((r) => r.name);
+    for (const col of [...PRICING_COLS, 'auto_renews']) expect(cols).toContain(col);
+    const row = db2.raw.prepare('SELECT * FROM contracts WHERE attachment_id = 1').get();
+    expect(row.avtalsvarde).toBe('129 tkr/år');
+    expect(row.annual_value_sek).toBeNull();
+    db2.close();
+  });
+
+  it('recordContract round-trips the pricing fields', () => {
+    const { attId } = seedAttachment();
+    const v = db.upsertVendor('Radish');
+    db.recordContract({
+      attachment_id: attId, vendor_id: v.id, is_contract: 1,
+      avtalsvarde: '2025: 40 kr/elev (3744 elever)',
+      annual_value_sek: 149760, one_time_value_sek: null,
+      pricing_model: 'per_student', unit_price_sek: 40, unit: 'elev', quantity: 3744,
+      value_incl_moms: false,
+    });
+    const row = db.raw.prepare('SELECT * FROM contracts WHERE attachment_id = ?').get(attId);
+    expect(row.annual_value_sek).toBe(149760);
+    expect(row.pricing_model).toBe('per_student');
+    expect(row.unit_price_sek).toBe(40);
+    expect(row.unit).toBe('elev');
+    expect(row.quantity).toBe(3744);
+    expect(row.value_incl_moms).toBe(0);
+    expect(row.one_time_value_sek).toBeNull();
+  });
+
+  it('recordContract with pricing fields absent stores NULLs (never 0)', () => {
+    const { attId } = seedAttachment();
+    db.recordContract({ attachment_id: attId, vendor_id: null, is_contract: 1 });
+    const row = db.raw.prepare('SELECT * FROM contracts WHERE attachment_id = ?').get(attId);
+    for (const col of ['annual_value_sek', 'one_time_value_sek', 'pricing_model', 'unit_price_sek', 'unit', 'quantity', 'value_incl_moms']) {
+      expect(row[col]).toBeNull();
+    }
+  });
+
+  it('value_incl_moms true stores 1, null stays NULL', () => {
+    const a = seedAttachment({ filename: 'A.pdf' });
+    const b = seedAttachment({ filename: 'B.pdf', kommun_kod: '0180' });
+    db.recordContract({ attachment_id: a.attId, is_contract: 1, value_incl_moms: true });
+    db.recordContract({ attachment_id: b.attId, is_contract: 1, value_incl_moms: null });
+    expect(db.raw.prepare('SELECT value_incl_moms FROM contracts WHERE attachment_id = ?').get(a.attId).value_incl_moms).toBe(1);
+    expect(db.raw.prepare('SELECT value_incl_moms FROM contracts WHERE attachment_id = ?').get(b.attId).value_incl_moms).toBeNull();
+  });
+});
+
+describe('listContractFacts', () => {
+  it('returns one row per stored contract (is_contract=1) with vendor, kommun, pricing, lifecycle and products', () => {
+    const a = seedAttachment({ filename: 'Skolon.pdf' });                       // Västerås
+    const b = seedAttachment({ filename: 'Radish.pdf', kommun_kod: '0180', kommun_namn: 'Stockholm' });
+    const c = seedAttachment({ filename: 'Brev.pdf', kommun_kod: '1489', kommun_namn: 'Alingsås' });
+    const skolon = db.upsertVendor('Skolon');
+    const radish = db.upsertVendor('Radish');
+    const c1 = db.recordContract({
+      attachment_id: a.attId, vendor_id: skolon.id, is_contract: 1,
+      avtalsvarde: '170 000 SEK/år', annual_value_sek: 170000, pricing_model: 'per_user',
+      unit_price_sek: 50, unit: 'användare', quantity: 3400,
+      period_start: '2024-03-01', period_end: '2026-03-01',
+      auto_renews: true, last_cancellation_date: '2025-12-01',
+    });
+    db.linkContractProduct(c1, db.upsertProduct(skolon.id, 'Skolon Plattform'));
+    db.recordContract({
+      attachment_id: b.attId, vendor_id: radish.id, is_contract: 1,
+      pricing_model: 'per_student', period_end: '2028-12-31',
+    });
+    // Non-contract (följebrev) must be excluded.
+    db.recordContract({ attachment_id: c.attId, vendor_id: null, is_contract: 0 });
+
+    const facts = db.listContractFacts();
+    expect(facts).toHaveLength(2);
+    const f1 = facts.find((f) => f.filename === 'Skolon.pdf');
+    expect(f1).toMatchObject({
+      vendor_name: 'Skolon', vendor_slug: 'skolon',
+      kommun_kod: '1980', kommun_namn: 'Västerås',
+      annual_value_sek: 170000, pricing_model: 'per_user',
+      unit_price_sek: 50, unit: 'användare', quantity: 3400,
+      period_start: '2024-03-01', period_end: '2026-03-01',
+      auto_renews: 1, last_cancellation_date: '2025-12-01',
+    });
+    expect(f1.products).toEqual(['Skolon Plattform']);
+    expect(f1.attachment_id).toBe(a.attId);
+    const f2 = facts.find((f) => f.filename === 'Radish.pdf');
+    expect(f2.vendor_name).toBe('Radish');
+    expect(f2.annual_value_sek).toBeNull();
+    expect(f2.products).toEqual([]);
+  });
+
+  it('includes vendor-less contract rows (vendor unknown, still a contract)', () => {
+    const a = seedAttachment();
+    db.recordContract({ attachment_id: a.attId, vendor_id: null, is_contract: 1 });
+    const facts = db.listContractFacts();
+    expect(facts).toHaveLength(1);
+    expect(facts[0].vendor_name).toBeNull();
+  });
+});
+
 describe('listVendorsOverview', () => {
   it('aggregates contract count, kommun count, products', () => {
     const { attId } = seedAttachment();

@@ -5,6 +5,19 @@
   'use strict';
   var content = function () { return document.getElementById('content'); };
 
+  // The /leverantorer explorer ships as an ES module (explorer.js over the
+  // pure explorer-core.js). Scripts inside innerHTML never execute, so both
+  // the initial full load and every pane swap must (re-)init it from here.
+  // The module is cached after the first import; initExplorer() is
+  // idempotent per explorer root.
+  function initExplorerIfPresent() {
+    if (!document.querySelector('[data-explorer]')) return;
+    import('/explorer.js')
+      .then(function (m) { m.initExplorer(); })
+      .catch(function () { /* explorer stays a static table */ });
+  }
+  initExplorerIfPresent();
+
   // Swap the #content pane with the fragment for `url`. Falls back to a hard
   // navigation on any error so a failed fetch never leaves a dead pane.
   function loadPane(url, push) {
@@ -23,6 +36,7 @@
         content().scrollTop = 0;
         window.scrollTo(0, 0);
         markActive(clean);
+        initExplorerIfPresent();
       })
       .catch(function () { location.href = url; });
   }

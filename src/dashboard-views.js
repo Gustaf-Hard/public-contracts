@@ -1,5 +1,18 @@
 // HTML view layer for the pilot dashboard. Pure functions that take data
-// objects and return HTML strings. No template engine, no client-side JS.
+// objects and return HTML strings. No template engine; the only client-side
+// JS is the progressive enhancement in public/app.js and the /leverantorer
+// explorer (public/explorer.js over the pure public/explorer-core.js).
+
+// The explorer's pure logic is shared verbatim between server (initial
+// render + filter options) and browser (live slice & dice) — one source of
+// truth for bands, labels and aggregates.
+import {
+  deriveOptions,
+  aggregateFacts,
+  renewalWindow,
+  PRICING_MODEL_LABELS,
+  UNKNOWN,
+} from '../public/explorer-core.js';
 
 function escapeHtml(s) {
   if (s === null || s === undefined) return '';
@@ -560,6 +573,29 @@ const baseCss = `
   .thread-status-primary { color: var(--accent); border-color: var(--accent); }
   .thread-status-muted { color: var(--fg-muted); }
   .thread-group .btn-link { background: none; border: none; color: var(--accent); cursor: pointer; font-size: 12px; padding: 0; }
+  /* Vendor data center (/leverantorer) */
+  .stat-card .stat-sub { font-size: 11px; margin-top: 4px; }
+  .honesty-note { font-size: 12px; margin: -8px 0 20px; }
+  .explorer-controls { display: flex; flex-wrap: wrap; gap: 10px 12px; align-items: flex-end; margin: 0 0 12px;
+    background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-2); padding: 12px 14px; box-shadow: var(--shadow); }
+  .explorer-controls .x-control { display: flex; flex-direction: column; gap: 3px; font-size: 11px;
+    color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .explorer-controls select, .explorer-controls input[type=search] {
+    font: inherit; font-size: 13px; text-transform: none; letter-spacing: normal;
+    background: var(--bg-elev-2); color: var(--fg); border: 1px solid var(--border);
+    border-radius: var(--r-1); padding: 6px 8px; min-width: 120px; }
+  .explorer-controls input[type=search] { min-width: 220px; }
+  .explorer-controls select:focus, .explorer-controls input[type=search]:focus { outline: none; border-color: var(--accent); }
+  .explorer-controls .btn { padding: 6px 12px; font-size: 12px; }
+  .explorer-summary { font-size: 13px; font-weight: 600; margin: 0 0 8px; font-variant-numeric: tabular-nums; }
+  .explorer-table td, .explorer-table th { font-size: 13px; }
+  tr.x-group-row td { background: var(--bg-elev-2); font-weight: 700; font-size: 12px;
+    text-transform: uppercase; letter-spacing: .4px; }
+  tr.x-group-row td .x-group-agg { font-weight: 500; text-transform: none; letter-spacing: normal; color: var(--fg-muted); margin-left: 10px; }
+  .renewal-list { list-style: none; margin: 0; padding: 0; }
+  .renewal-item { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px dashed var(--border); font-size: 13px; }
+  .renewal-item:last-child { border-bottom: none; }
+  .renewal-date { font-variant-numeric: tabular-nums; font-weight: 600; min-width: 90px; }
 </style>
 `;
 
@@ -1537,56 +1573,330 @@ function chipRow(products, cap = 10) {
     extra > 0 ? `<span class="tag tag-more">+${extra} till</span>` : ''}</div>`;
 }
 
-function renderVendorListPane(vendors, selectedSlug) {
-  if (vendors.length === 0) {
-    return '<div class="empty-state">Inga leverantörer ännu — kör <code>npm run analyse-contracts</code>.</div>';
-  }
-  return vendors.map((v) => `
-    <a class="vendor-item${v.slug === selectedSlug ? ' active' : ''}" data-pane-link href="/leverantor/${escapeHtml(v.slug)}">
-      <div class="vi-head"><span class="vi-name">${escapeHtml(v.name)}</span>
-        <span class="muted">${v.contract_count} avtal · ${v.kommun_count} kommuner</span></div>
-      ${chipRow(v.products, 6)}
-    </a>`).join('');
+// ---- Vendor data center (2026-07-09-vendor-data-center-design.md Part 3) ----
+
+// SEK formatting. Aggregates use the compact form ("6,1 mkr/år"); table cells
+// use the full sv-SE integer ("612 500 kr/år"). Unknown is ALWAYS the word
+// "okänt" — never 0, never a dash that could read as zero.
+function fmtSekFull(n) {
+  return `${Number(n).toLocaleString('sv-SE')} kr`;
 }
 
-function renderVendorDetailPane(selected) {
-  if (!selected || !selected.vendor) {
-    return '<div class="detail-empty"><p class="muted">Välj en leverantör i listan till vänster.</p></div>';
+function fmtSekCompact(n) {
+  if (n >= 1000000) {
+    return `${(n / 1000000).toLocaleString('sv-SE', { maximumFractionDigits: 1 })} mkr`;
   }
-  const { vendor, contracts = [] } = selected;
-  const allProducts = [...new Set(contracts.flatMap((c) => c.products))];
-  const kommuner = [...new Map(contracts.map((c) => [c.kommun_kod, c.kommun_namn])).entries()];
-  const rows = contracts.map((c) => `
-    <tr>
-      <td><a href="/kommun/${escapeHtml(c.kommun_kod)}" data-pane-link>${escapeHtml(c.kommun_namn)}</a></td>
-      <td>${escapeHtml(c.received_at?.slice(0, 10) ?? '')}</td>
-      <td><a href="/attachments/${c.attachment_id}" target="_blank" rel="noopener">📎 ${escapeHtml(c.filename)}</a></td>
-      <td>${chipRow(c.products, 6)}</td>
-      <td>${escapeHtml(c.avtalsvarde ?? '—')}</td>
-      <td>${activeBadge(c.period_end)}</td>
-    </tr>`).join('');
-  return `<div class="case-detail">
-    <div class="case-header"><h3>${escapeHtml(vendor.name)}</h3></div>
-    <div class="case-meta">
-      <span>${contracts.length} avtal · ${kommuner.length} kommun(er)</span>
-      <span>${kommuner.map(([kod, namn]) => `<a href="/kommun/${escapeHtml(kod)}" data-pane-link>${escapeHtml(namn)}</a>`).join(', ')}</span>
+  if (n >= 10000) return `${Math.round(n / 1000).toLocaleString('sv-SE')} tkr`;
+  return fmtSekFull(n);
+}
+
+function annualValueCell(f) {
+  if (f.annual_value_sek == null) {
+    const title = f.avtalsvarde ? ` title="Ur avtalet: ${escapeHtml(f.avtalsvarde)}"` : '';
+    return `<span class="muted"${title}>okänt</span>`;
+  }
+  const title = f.avtalsvarde ? ` title="Ur avtalet: ${escapeHtml(f.avtalsvarde)}"` : '';
+  return `<span${title}>${escapeHtml(fmtSekFull(f.annual_value_sek))}/år</span>`;
+}
+
+function pricingModelBadge(model) {
+  if (!model) return '<span class="muted">okänt</span>';
+  const label = PRICING_MODEL_LABELS[model] ?? model;
+  return `<span class="tag">${escapeHtml(label)}</span>`;
+}
+
+// The one-line honesty statement that must accompany every aggregate.
+function completenessLine(known, total, what = 'årlig kostnad') {
+  return `<span class="muted">${escapeHtml(what)} känd för ${known} av ${total} avtal</span>`;
+}
+
+function renewalCell(f, todayIso) {
+  if (!f.next_review_date) return '<span class="muted">okänt</span>';
+  const w = renewalWindow(f, todayIso);
+  const klass = w === 'passerat' ? 'pill pill-overdue' : w === 'inom 3 mån' ? 'pill pill-default' : 'pill pill-promise';
+  return `${escapeHtml(f.next_review_date)} <span class="${klass}">${escapeHtml(w)}</span>`;
+}
+
+function lengthCell(months) {
+  return months == null ? '<span class="muted">okänt</span>' : `${months} mån`;
+}
+
+// One explorer table row. The client (public/explorer.js) re-renders rows
+// with the same columns after filtering/grouping — keep the two in sync.
+function explorerRow(f, todayIso) {
+  const vendor = f.vendor_slug
+    ? `<a href="/leverantor/${escapeHtml(f.vendor_slug)}" data-pane-link>${escapeHtml(f.vendor_name)}</a>`
+    : '<span class="muted">okänd</span>';
+  return `<tr>
+    <td>${vendor}</td>
+    <td><a href="/kommun/${escapeHtml(f.kommun_kod)}" data-pane-link>${escapeHtml(f.kommun_namn)}</a></td>
+    <td>${escapeHtml(f.lan ?? '') || '<span class="muted">—</span>'}</td>
+    <td>${(f.products ?? []).length ? escapeHtml(f.products.join(', ')) : '<span class="muted">—</span>'}</td>
+    <td class="num">${annualValueCell(f)}</td>
+    <td>${pricingModelBadge(f.pricing_model)}</td>
+    <td class="num">${lengthCell(f.contract_length_months)}</td>
+    <td>${renewalCell(f, todayIso)}</td>
+    <td>${f.attachment_id ? `<a href="/attachments/${f.attachment_id}" target="_blank" rel="noopener" title="${escapeHtml(f.filename ?? '')}">📎 PDF</a>` : ''}</td>
+  </tr>`;
+}
+
+// Aggregate line above the explorer table — mirrored by the client.
+function explorerSummaryLine(facts) {
+  const a = aggregateFacts(facts);
+  const sum = a.total_annual_sek == null
+    ? 'summa okänd'
+    : `summa ${fmtSekCompact(a.total_annual_sek)}/år (känd för ${a.value_known} av ${a.count} avtal)`;
+  return `${a.count} avtal · ${sum} · ${a.kommun_count} kommuner · ${a.vendor_count} leverantörer`;
+}
+
+const VALUE_BAND_OPTIONS = ['0 kr', '< 100 tkr', '100–500 tkr', '0,5–1 mkr', '> 1 mkr', UNKNOWN];
+const LENGTH_BAND_OPTIONS = ['≤ 1 år', '1–2 år', '2–4 år', '> 4 år', UNKNOWN];
+const RENEWAL_WINDOW_OPTIONS = ['passerat', 'inom 3 mån', 'inom 12 mån', 'senare', UNKNOWN];
+
+const GROUP_DIMENSIONS = [
+  ['', '— ingen gruppering —'],
+  ['vendor', 'Leverantör'],
+  ['lan', 'Län'],
+  ['kommun', 'Kommun'],
+  ['pricing_model', 'Prismodell'],
+  ['value_band', 'Årskostnad'],
+  ['length_band', 'Avtalslängd'],
+  ['renewal_window', 'Förnyelsefönster'],
+  ['product', 'Produkt'],
+];
+
+function selectControl({ name, label, options, labelFor = (v) => v }) {
+  const opts = options.map((v) => `<option value="${escapeHtml(v)}">${escapeHtml(labelFor(v))}</option>`).join('');
+  return `<label class="x-control">${escapeHtml(label)}
+    <select data-x-filter="${escapeHtml(name)}"><option value="">alla</option>${opts}</select>
+  </label>`;
+}
+
+// The slice & dice explorer shell. The dataset rides along as a JSON blob;
+// `</` is escaped so a hostile product/vendor string can never break out of
+// the <script> element. Without JS the initial server-rendered rows (the
+// full dataset) remain a plain readable table.
+function renderExplorer(facts, todayIso) {
+  const json = JSON.stringify(facts).replace(/</g, '\\u003c');
+  const opts = deriveOptions(facts);
+  return `
+  <section class="board-section" data-explorer data-today="${escapeHtml(todayIso)}">
+    <h2>Utforska avtalen <span class="count">${facts.length}</span></h2>
+    <script type="application/json" data-contract-facts>${json}</script>
+    <div class="explorer-controls">
+      <input type="search" data-x-filter="q" placeholder="Sök leverantör, kommun, produkt…" autocomplete="off">
+      ${selectControl({ name: 'lan', label: 'Län', options: opts.lan })}
+      ${selectControl({ name: 'vendor', label: 'Leverantör', options: opts.vendor })}
+      ${selectControl({ name: 'pricing_model', label: 'Prismodell', options: opts.pricing_model, labelFor: (v) => PRICING_MODEL_LABELS[v] ?? v })}
+      ${selectControl({ name: 'value_band', label: 'Årskostnad', options: VALUE_BAND_OPTIONS })}
+      ${selectControl({ name: 'length_band', label: 'Avtalslängd', options: LENGTH_BAND_OPTIONS })}
+      ${selectControl({ name: 'renewal_window', label: 'Förnyelse', options: RENEWAL_WINDOW_OPTIONS })}
+      ${selectControl({ name: 'product', label: 'Produkt', options: opts.product })}
+      <label class="x-control x-control-group">Gruppera efter
+        <select data-x-group>${GROUP_DIMENSIONS.map(([v, l]) => `<option value="${escapeHtml(v)}">${escapeHtml(l)}</option>`).join('')}</select>
+      </label>
+      <button type="button" class="btn btn-secondary" data-x-reset>Återställ</button>
     </div>
-    ${allProducts.length ? `<div class="card"><h3>Produkter</h3>${chipRow(allProducts, 50)}</div>` : ''}
-    <div class="card">
-      <h3>Avtal (${contracts.length})</h3>
-      <table class="contracts-table">
-        <thead><tr><th>Kommun</th><th>Datum</th><th>Fil</th><th>Produkter</th><th>Värde</th><th>Avtalstid</th></tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
-    </div>`;
+    <div class="explorer-summary" data-x-summary>${escapeHtml(explorerSummaryLine(facts))}</div>
+    <table class="explorer-table">
+      <thead><tr>
+        <th>Leverantör</th><th>Kommun</th><th>Län</th><th>Produkter</th>
+        <th style="text-align:right">Årlig kostnad</th><th>Prismodell</th>
+        <th style="text-align:right">Längd</th><th>Nästa förnyelse</th><th>Källa</th>
+      </tr></thead>
+      <tbody data-x-body>${facts.map((f) => explorerRow(f, todayIso)).join('')}</tbody>
+    </table>
+  </section>`;
 }
 
-export function renderVendors({ vendors = [], selected = null, selectedSlug = null, heartbeat = null, partial = false, escalationCount = 0 } = {}) {
-  const body = `
-    <div class="page-head"><h1>Leverantörer</h1><span class="muted">${vendors.length} st</span></div>
-    <div class="master-detail">
-      <aside class="md-list">${renderVendorListPane(vendors, selectedSlug)}</aside>
-      <div class="md-detail">${renderVendorDetailPane(selected)}</div>
+// ---- Surface 1: market overview (/leverantorer) ----
+
+const VENDOR_COLUMN_DEFAULT_ORDER = {
+  vendor_name: 'asc',
+  kommun_count: 'desc',
+  contract_count: 'desc',
+  total_annual_sek: 'desc',
+  dominant_pricing_model: 'asc',
+  next_renewal_date: 'asc',
+};
+
+function vendorSortHeader({ key, label, currentSort, currentOrder, align = 'left' }) {
+  const isActive = currentSort === key;
+  const nextOrder = isActive
+    ? (currentOrder === 'desc' ? 'asc' : 'desc')
+    : (VENDOR_COLUMN_DEFAULT_ORDER[key] ?? 'asc');
+  const indicator = isActive ? (currentOrder === 'desc' ? ' ▼' : ' ▲') : '';
+  const style = align === 'right' ? ' style="text-align:right"' : '';
+  return `<th${style}><a href="?sort=${key}&order=${nextOrder}" data-pane-link class="th-sort${isActive ? ' th-sort-active' : ''}">${escapeHtml(label)}${indicator}</a></th>`;
+}
+
+function marketRollupRow(r, todayIso) {
+  const total = r.total_annual_sek == null
+    ? '<span class="muted">okänt</span>'
+    : `${escapeHtml(fmtSekFull(r.total_annual_sek))}/år`;
+  const share = r.value_known_count < r.contract_count
+    ? ` <span class="muted">(${r.value_known_count} av ${r.contract_count} kända)</span>`
+    : '';
+  const mixTitle = Object.entries(r.pricing_model_mix)
+    .map(([m, n]) => `${PRICING_MODEL_LABELS[m] ?? m}: ${n}`).join(', ');
+  const renewal = r.next_renewal_date
+    ? renewalCell({ next_review_date: r.next_renewal_date }, todayIso)
+    : '<span class="muted">okänt</span>';
+  return `<tr>
+    <td><a class="kommun-link" href="/leverantor/${escapeHtml(r.vendor_slug)}" data-pane-link>${escapeHtml(r.vendor_name)}</a></td>
+    <td class="num">${r.kommun_count}</td>
+    <td class="num">${r.contract_count}</td>
+    <td class="num">${total}${share}</td>
+    <td><span title="${escapeHtml(mixTitle)}">${pricingModelBadge(r.dominant_pricing_model)}</span></td>
+    <td>${chipRow(r.products, 4)}</td>
+    <td>${renewal}</td>
+  </tr>`;
+}
+
+export function renderVendorMarket({ summary, rollups = [], facts = [], sort = null, order = null, todayIso, heartbeat = null, partial = false, escalationCount = 0 }) {
+  const totalCard = summary.total_annual_sek == null
+    ? '<div class="value">okänt</div>'
+    : `<div class="value good">${escapeHtml(fmtSekCompact(summary.total_annual_sek))}/år</div>`;
+  const stats = `
+    <div class="stats stats-band">
+      <div class="stat-card"><div class="label">Leverantörer</div><div class="value">${summary.vendor_count}</div></div>
+      <div class="stat-card"><div class="label">Kommuner med avtal</div><div class="value">${summary.kommun_count}</div></div>
+      <div class="stat-card"><div class="label">Avtal</div><div class="value">${summary.contract_count}</div></div>
+      <div class="stat-card"><div class="label">Känd årskostnad</div>${totalCard}
+        <div class="stat-sub">${completenessLine(summary.value_completeness.known, summary.value_completeness.total)}</div></div>
+      <div class="stat-card"><div class="label">Förnyelser inom 12 mån</div><div class="value${summary.renewals_within_12mo > 0 ? ' warn' : ''}">${summary.renewals_within_12mo}</div></div>
     </div>`;
+
+  const headerArgs = { currentSort: sort, currentOrder: order };
+  const table = rollups.length === 0
+    ? '<div class="empty-state">Inga leverantörer ännu — avtal analyseras när kommuner levererar.</div>'
+    : `<table>
+        <thead><tr>
+          ${vendorSortHeader({ ...headerArgs, key: 'vendor_name', label: 'Leverantör' })}
+          ${vendorSortHeader({ ...headerArgs, key: 'kommun_count', label: 'Kommuner', align: 'right' })}
+          ${vendorSortHeader({ ...headerArgs, key: 'contract_count', label: 'Avtal', align: 'right' })}
+          ${vendorSortHeader({ ...headerArgs, key: 'total_annual_sek', label: 'Känd årskostnad', align: 'right' })}
+          ${vendorSortHeader({ ...headerArgs, key: 'dominant_pricing_model', label: 'Prismodell' })}
+          <th>Produkter</th>
+          ${vendorSortHeader({ ...headerArgs, key: 'next_renewal_date', label: 'Nästa förnyelse' })}
+        </tr></thead>
+        <tbody>${rollups.map((r) => marketRollupRow(r, todayIso)).join('')}</tbody>
+      </table>`;
+
+  const body = `
+    <div class="page-head"><h1>Leverantörer</h1><span class="muted">marknadsöversikt · ${facts.length} avtal</span></div>
+    ${stats}
+    <p class="muted honesty-note">Summor bygger enbart på avtal med känd årskostnad — okända värden visas som ”okänt” och hittas i utforskaren nedan.</p>
+    <section class="board-section">
+      <h2>Marknadsöversikt <span class="count">${rollups.length}</span></h2>
+      ${table}
+    </section>
+    ${renderExplorer(facts, todayIso)}
+  `;
   return layout({ title: 'Leverantörer', body, currentPath: '/leverantorer', heartbeat, partial, escalationCount });
+}
+
+// ---- Surface 2: vendor dossier (/leverantor/:slug) ----
+
+function dossierLifecycleCell(f) {
+  const bits = [];
+  if (f.auto_renews) {
+    bits.push('<span class="pill pill-default" title="Förlängs automatiskt om det inte sägs upp">förlängs automatiskt</span>');
+  }
+  if (f.period_end) bits.push(activeBadge(f.period_end));
+  return bits.length ? bits.join(' ') : '<span class="muted">okänt</span>';
+}
+
+function dossierContractRow(f, todayIso) {
+  const period = f.period_start || f.period_end
+    ? `${escapeHtml(f.period_start ?? '?')} – ${escapeHtml(f.period_end ?? '?')}${f.contract_length_months != null ? ` <span class="muted">(${f.contract_length_months} mån)</span>` : ''}`
+    : '<span class="muted">okänd</span>';
+  return `<tr>
+    <td><a href="/kommun/${escapeHtml(f.kommun_kod)}" data-pane-link>${escapeHtml(f.kommun_namn)}</a>
+      <span class="muted">${escapeHtml(f.lan ?? '')}</span></td>
+    <td>${(f.products ?? []).length ? chipRow(f.products, 4) : '<span class="muted">—</span>'}</td>
+    <td class="num">${annualValueCell(f)}</td>
+    <td>${pricingModelBadge(f.pricing_model)}</td>
+    <td>${period}</td>
+    <td>${dossierLifecycleCell(f)}</td>
+    <td>${renewalCell(f, todayIso)}</td>
+    <td>${f.attachment_id ? `<a href="/attachments/${f.attachment_id}" target="_blank" rel="noopener" title="${escapeHtml(f.filename ?? '')}">📎 ${escapeHtml(f.filename ?? 'PDF')}</a>` : ''}</td>
+  </tr>`;
+}
+
+function renewalCalendar(facts, todayIso) {
+  const upcoming = facts
+    .filter((f) => f.next_review_date && f.next_review_date >= todayIso)
+    .sort((a, b) => a.next_review_date.localeCompare(b.next_review_date));
+  const unknownOrPast = facts.length - upcoming.length;
+  if (upcoming.length === 0) {
+    return `<p class="muted">Inga kommande förnyelsedatum kända${facts.length ? ` (${facts.length} avtal utan känt eller framtida datum)` : ''}.</p>`;
+  }
+  const items = upcoming.map((f) => `
+    <li class="renewal-item">
+      <span class="renewal-date">${escapeHtml(f.next_review_date)}</span>
+      <a href="/kommun/${escapeHtml(f.kommun_kod)}" data-pane-link>${escapeHtml(f.kommun_namn)}</a>
+      ${f.auto_renews ? '<span class="pill pill-default">förlängs automatiskt</span>' : ''}
+      <span class="tag">${escapeHtml(renewalWindow(f, todayIso))}</span>
+    </li>`).join('');
+  const note = unknownOrPast > 0
+    ? `<p class="muted">${unknownOrPast} avtal utan känt eller framtida förnyelsedatum.</p>` : '';
+  return `<ul class="renewal-list">${items}</ul>${note}`;
+}
+
+export function renderVendorDossier({ vendor, rollup = null, facts = [], todayIso, heartbeat = null, partial = false, escalationCount = 0 }) {
+  const r = rollup ?? {
+    contract_count: 0, kommun_count: 0, total_annual_sek: null, value_known_count: 0,
+    median_length_months: null, length_known_count: 0,
+    price_per_student_min: null, price_per_student_max: null,
+    dominant_pricing_model: null, pricing_model_mix: {}, products: [], next_renewal_date: null,
+  };
+  const arrCard = r.total_annual_sek == null
+    ? '<div class="value">okänt</div>'
+    : `<div class="value good">${escapeHtml(fmtSekCompact(r.total_annual_sek))}/år</div>`;
+  const lengthVal = r.median_length_months == null ? 'okänt' : `${r.median_length_months} mån`;
+  const elevVal = r.price_per_student_min == null
+    ? 'okänt'
+    : (r.price_per_student_min === r.price_per_student_max
+        ? `${fmtSekFull(r.price_per_student_min)}`
+        : `${fmtSekFull(r.price_per_student_min)} – ${fmtSekFull(r.price_per_student_max)}`);
+  const stats = `
+    <div class="stats stats-band">
+      <div class="stat-card"><div class="label">Kommuner</div><div class="value">${r.kommun_count}</div></div>
+      <div class="stat-card"><div class="label">Avtal</div><div class="value">${r.contract_count}</div></div>
+      <div class="stat-card"><div class="label">Känd årskostnad</div>${arrCard}
+        <div class="stat-sub">${completenessLine(r.value_known_count, r.contract_count)}</div></div>
+      <div class="stat-card"><div class="label">Median avtalslängd</div><div class="value">${escapeHtml(lengthVal)}</div>
+        <div class="stat-sub">${completenessLine(r.length_known_count, r.contract_count, 'avtalstid')}</div></div>
+      <div class="stat-card"><div class="label">Pris per elev</div><div class="value">${escapeHtml(elevVal)}</div></div>
+      <div class="stat-card"><div class="label">Nästa förnyelse</div><div class="value">${escapeHtml(r.next_renewal_date ?? 'okänt')}</div></div>
+    </div>`;
+
+  const table = facts.length === 0
+    ? '<div class="empty-state">Inga lagrade avtal för denna leverantör ännu.</div>'
+    : `<table class="contracts-table">
+        <thead><tr>
+          <th>Kommun</th><th>Produkter</th><th style="text-align:right">Årlig kostnad</th>
+          <th>Prismodell</th><th>Avtalstid</th><th>Livscykel</th><th>Nästa förnyelse</th><th>Källa</th>
+        </tr></thead>
+        <tbody>${facts.map((f) => dossierContractRow(f, todayIso)).join('')}</tbody>
+      </table>`;
+
+  const body = `
+    <div class="page-head">
+      <h1>${escapeHtml(vendor.name)}</h1>
+      <a href="/leverantorer" data-pane-link class="muted">← alla leverantörer</a>
+    </div>
+    ${stats}
+    ${r.products.length ? `<div class="card"><h3>Produkter (${r.products.length})</h3>${chipRow(r.products, 50)}</div>` : ''}
+    <div class="card">
+      <h3>Förnyelsekalender</h3>
+      ${renewalCalendar(facts, todayIso)}
+    </div>
+    <section class="board-section">
+      <h2>Avtal per kommun <span class="count">${facts.length}</span></h2>
+      ${table}
+    </section>
+  `;
+  return layout({ title: vendor.name, body, currentPath: '/leverantorer', heartbeat, partial, escalationCount });
 }
