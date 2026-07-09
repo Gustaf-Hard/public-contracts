@@ -19,9 +19,11 @@ import {
   renderKommunDetail,
   renderActivity,
   renderCompose,
-  renderVendors,
+  renderVendorMarket,
+  renderVendorDossier,
   mergeContacts,
 } from './dashboard-views.js';
+import { buildContractFacts, buildVendorRollups, buildMarketSummary } from './vendor-analytics.js';
 
 const ROLE_PRIORITY = ['central', 'utbildning', 'gymnasie', 'vuxenutbildning', 'other'];
 
@@ -479,6 +481,36 @@ function loadCaseDetail(db, convId) {
   return { conv, messages, attachmentsByMsg, signatures, escalations, threads, follow_up: effectiveFollowUp(conv) };
 }
 
+// Sort vendor rollups for the market table. Default (no sort param) keeps
+// the analytics layer's order: total known annual SEK desc. Nulls (unknown
+// totals / no renewal date) always sort last regardless of direction — an
+// unknown must never masquerade as the biggest or the most urgent.
+export function sortVendorRollups(rollups, { sort, order } = {}) {
+  if (!sort) return rollups;
+  const dir = order === 'asc' ? 1 : -1;
+  const cmpText = (a, b) => String(a ?? '').localeCompare(String(b ?? ''), 'sv');
+  const keyed = {
+    vendor_name: (a, b) => dir * cmpText(a.vendor_name, b.vendor_name),
+    kommun_count: (a, b) => dir * (a.kommun_count - b.kommun_count),
+    contract_count: (a, b) => dir * (a.contract_count - b.contract_count),
+    total_annual_sek: (a, b) => {
+      if (a.total_annual_sek == null && b.total_annual_sek == null) return 0;
+      if (a.total_annual_sek == null) return 1;
+      if (b.total_annual_sek == null) return -1;
+      return dir * (a.total_annual_sek - b.total_annual_sek);
+    },
+    dominant_pricing_model: (a, b) => dir * cmpText(a.dominant_pricing_model, b.dominant_pricing_model),
+    next_renewal_date: (a, b) => {
+      if (a.next_renewal_date == null && b.next_renewal_date == null) return 0;
+      if (a.next_renewal_date == null) return 1;
+      if (b.next_renewal_date == null) return -1;
+      return dir * cmpText(a.next_renewal_date, b.next_renewal_date);
+    },
+  };
+  const cmp = keyed[sort];
+  return cmp ? [...rollups].sort(cmp) : rollups;
+}
+
 // Exported for tests + the Ärenden routes.
 export { buildOverviewRows, applyFilter };
 
@@ -794,22 +826,49 @@ export function createDashboardApp({
     }));
   });
 
+  // Vendor data center (2026-07-09-vendor-data-center-design.md Part 3).
+  // All heavy computation happens in the pure analytics layer; the routes
+  // just assemble facts → rollups → summary and pick a sort.
+  const vendorData = (now) => {
+    const municipalities = municipalitiesLoader();
+    const lanByKommunKod = new Map(municipalities.map((m) => [m.kommun_kod, m.lan ?? null]));
+    const facts = db ? buildContractFacts(db.listContractFacts(), { lanByKommunKod, now }) : [];
+    return {
+      facts,
+      rollups: buildVendorRollups(facts, { now }),
+      summary: buildMarketSummary(facts, { now }),
+      todayIso: now.toISOString().slice(0, 10),
+    };
+  };
+
   app.get('/leverantorer', (req, res) => {
-    const vendors = db ? db.listVendorsOverview() : [];
+    const { facts, rollups, summary, todayIso } = vendorData(new Date());
+    const sort = typeof req.query.sort === 'string' ? req.query.sort : null;
+    const order = typeof req.query.order === 'string' ? req.query.order : null;
     res.set('Content-Type', 'text/html; charset=utf-8');
-    res.send(renderVendors({ vendors, selected: null, heartbeat: hb(), partial: isPartial(req), escalationCount: escCount() }));
+    res.send(renderVendorMarket({
+      summary, rollups: sortVendorRollups(rollups, { sort, order }), facts, sort, order, todayIso,
+      heartbeat: hb(), partial: isPartial(req), escalationCount: escCount(),
+    }));
   });
 
   app.get('/leverantor/:slug', (req, res) => {
-    const vendors = db ? db.listVendorsOverview() : [];
     const vendor = db ? db.getVendorBySlug(req.params.slug) : null;
     res.set('Content-Type', 'text/html; charset=utf-8');
     if (!vendor) {
-      return res.status(404).send(renderVendors({ vendors, selected: null, heartbeat: hb(), partial: isPartial(req), escalationCount: escCount() }));
+      // Unknown vendor → 404 with the market overview as a useful landing.
+      const { facts, rollups, summary, todayIso } = vendorData(new Date());
+      return res.status(404).send(renderVendorMarket({
+        summary, rollups, facts, todayIso,
+        heartbeat: hb(), partial: isPartial(req), escalationCount: escCount(),
+      }));
     }
-    const contracts = db.listContractsForVendor(vendor.id);
-    res.send(renderVendors({
-      vendors, selected: { vendor, contracts }, selectedSlug: req.params.slug,
+    const { facts, rollups, todayIso } = vendorData(new Date());
+    res.send(renderVendorDossier({
+      vendor,
+      rollup: rollups.find((r) => r.vendor_id === vendor.id) ?? null,
+      facts: facts.filter((f) => f.vendor_id === vendor.id),
+      todayIso,
       heartbeat: hb(), partial: isPartial(req), escalationCount: escCount(),
     }));
   });
