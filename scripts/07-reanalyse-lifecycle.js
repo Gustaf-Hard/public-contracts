@@ -3,10 +3,15 @@
 // last_cancellation_date, extension_option_until) over already-stored contract
 // PDFs by re-running the Opus analyser (2026-07-09 design Part A §2.3).
 //
-// This re-analyses EVERY PDF attachment (recordContract replaces the row in
-// place, preserving contract ids where the attachment is unchanged) so the new
-// fields are populated from the current prompt/schema. It is the analyser's
-// existing `force` path with a clearer name and a dry-run guard.
+// This re-analyses EVERY PDF attachment so the new fields are populated from
+// the current prompt/schema. It is the analyser's existing `force` path with a
+// clearer name and a dry-run guard.
+//
+// NON-DESTRUCTIVE (finding 6): storeContractAnalysis MERGES each re-run against
+// the existing row — a degraded second pass can never flip a good is_contract=1
+// to false or null out a set period/vendor/lifecycle field. Only NULL fields
+// are filled; genuine improvements overwrite. Every preserved/overwritten field
+// is logged per contract (REANALYSE …) so the operator can audit the diff.
 //
 // HARD CONSTRAINT: not run automatically. See
 // docs/superpowers/runbooks/2026-07-09-refresh-activation.md — the owner runs

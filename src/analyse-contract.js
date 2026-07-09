@@ -144,36 +144,107 @@ function warnOnLikelyDuplicate(db, contractId, attachmentId, vendorId, analysis,
   }
 }
 
+// Non-destructive merge for re-analysis (finding 6): a re-run must never
+// silently REGRESS a previously-good contract row. LLM output is not
+// deterministic — a second pass can return is_contract=false for a document it
+// once read correctly, or null out a period it once extracted. Re-analysis is
+// meant to FILL new/NULL lifecycle fields, not to destroy known-good ones.
+//
+// Rules, given a previously-stored `existing` row for this attachment:
+//   - is_contract: never flip a good 1 → 0. If it was a contract, it stays one
+//     unless the new pass ALSO says contract (upgrades 0 → 1 are fine).
+//   - vendor / period_start / period_end / avtalsvarde / valuta / renewal_term /
+//     last_cancellation_date / extension_option_until: keep the existing
+//     non-null value when the new pass returns null (fill-only). A new non-null
+//     value overwrites (the point of re-analysis is to improve, not stagnate).
+//   - auto_renews: keep existing when the new pass would clear a known true.
+// Returns { merged, changes: [field, from, to] } for a per-contract summary.
+export function mergePreserving(existing, fresh) {
+  if (!existing) return { merged: fresh, changes: null };
+  const changes = [];
+  const merged = { ...fresh };
+
+  // is_contract: protect a good positive.
+  const oldIsContract = existing.is_contract === 1 || existing.is_contract === true;
+  const newIsContract = fresh.is_contract === true;
+  if (oldIsContract && !newIsContract) {
+    merged.is_contract = true;
+    changes.push(['is_contract', 'preserved 1 (new pass said 0)', 1]);
+  }
+
+  // Fill-only string/date fields.
+  const fillOnly = ['vendor_name', 'period_start', 'period_end', 'avtalsvarde', 'valuta',
+    'renewal_term', 'last_cancellation_date', 'extension_option_until'];
+  for (const f of fillOnly) {
+    const oldV = existing[f] ?? null;
+    const newV = fresh[f] ?? null;
+    if (oldV != null && newV == null) {
+      merged[f] = oldV;
+      changes.push([f, `preserved ${JSON.stringify(oldV)} (new pass null)`, oldV]);
+    } else if (oldV != null && newV != null && oldV !== newV) {
+      changes.push([f, JSON.stringify(oldV), JSON.stringify(newV)]); // record the overwrite
+    }
+  }
+
+  // auto_renews: don't clear a known true.
+  const oldAuto = existing.auto_renews === 1 || existing.auto_renews === true;
+  const newAuto = fresh.auto_renews === true;
+  if (oldAuto && !newAuto) {
+    merged.auto_renews = true;
+    changes.push(['auto_renews', 'preserved true (new pass false)', true]);
+  }
+
+  return { merged, changes };
+}
+
 // Persist one analysis: vendor (case-insensitive upsert) + products + contract row.
-// Re-running for the same attachment replaces (recordContract handles that).
+// Re-running for the same attachment replaces (recordContract handles that), but
+// the replacement is MERGED against the existing row so a degraded re-analysis
+// can never regress a good one (finding 6).
 export function storeContractAnalysis(db, attachmentId, analysis, { model, log = null } = {}) {
+  // Read the existing row (with vendor name) so the merge can preserve it.
+  const existing = db.raw.prepare(`
+    SELECT c.is_contract, c.period_start, c.period_end, c.avtalsvarde, c.valuta,
+           c.auto_renews, c.renewal_term, c.last_cancellation_date, c.extension_option_until,
+           v.name AS vendor_name
+    FROM contracts c
+    LEFT JOIN vendors v ON v.id = c.vendor_id
+    WHERE c.attachment_id = ?
+  `).get(attachmentId) ?? null;
+
+  const { merged, changes } = mergePreserving(existing, analysis);
+  if (existing && changes && changes.length) {
+    log?.(`REANALYSE ${merged.vendor_name ?? 'okänd'} (att ${attachmentId}): ` +
+      changes.map(([f, from, to]) => `${f}: ${from} → ${JSON.stringify(to)}`).join('; '));
+  }
+
   let vendorId = null;
-  if (analysis.is_contract && analysis.vendor_name) {
-    vendorId = db.upsertVendor(analysis.vendor_name).id;
+  if (merged.is_contract && merged.vendor_name) {
+    vendorId = db.upsertVendor(merged.vendor_name).id;
   }
   const contractId = db.recordContract({
     attachment_id: attachmentId,
     vendor_id: vendorId,
-    avtalsvarde: analysis.avtalsvarde,
-    valuta: analysis.valuta,
-    period_start: analysis.period_start,
-    period_end: analysis.period_end,
-    auto_renews: analysis.auto_renews,
-    renewal_term: analysis.renewal_term,
-    last_cancellation_date: analysis.last_cancellation_date,
-    extension_option_until: analysis.extension_option_until,
-    is_contract: analysis.is_contract ? 1 : 0,
-    summary: analysis.summary,
-    confidence: analysis.confidence,
-    analysis_json: analysis,
+    avtalsvarde: merged.avtalsvarde,
+    valuta: merged.valuta,
+    period_start: merged.period_start,
+    period_end: merged.period_end,
+    auto_renews: merged.auto_renews,
+    renewal_term: merged.renewal_term,
+    last_cancellation_date: merged.last_cancellation_date,
+    extension_option_until: merged.extension_option_until,
+    is_contract: merged.is_contract ? 1 : 0,
+    summary: merged.summary,
+    confidence: merged.confidence,
+    analysis_json: merged,
     model,
   });
   if (vendorId) {
-    for (const name of analysis.products ?? []) {
+    for (const name of merged.products ?? []) {
       db.linkContractProduct(contractId, db.upsertProduct(vendorId, name));
     }
   }
-  warnOnLikelyDuplicate(db, contractId, attachmentId, vendorId, analysis, log);
+  warnOnLikelyDuplicate(db, contractId, attachmentId, vendorId, merged, log);
   return contractId;
 }
 
