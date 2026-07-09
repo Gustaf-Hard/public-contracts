@@ -38,6 +38,15 @@ export function isClockSkewAllowed(overrides) {
   return rehearsalKods.has(active[0]);
 }
 
+// Perpetual-refresh pilot gating (2026-07-09 design §3.4). The refresh
+// mechanism is general; only this allowlist limits which kommuner arm/trigger.
+// Expanding later is a config edit to refresh_pilot_kommun_kods in
+// data/pilot-overrides.json.
+export function isRefreshAllowed(overrides, kommunKod) {
+  const allow = overrides?.refresh_pilot_kommun_kods ?? [];
+  return allow.includes(kommunKod);
+}
+
 export function getEffectiveNow({ env = process.env, overrides, baseNow = new Date() } = {}) {
   if (!isClockSkewAllowed(overrides)) return baseNow;
   const days = parseInt(env.PILOT_CLOCK_OFFSET_DAYS ?? '0', 10);

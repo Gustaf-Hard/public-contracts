@@ -3,6 +3,7 @@ import {
   resolveActiveKommuner,
   isClockSkewAllowed,
   getEffectiveNow,
+  isRefreshAllowed,
 } from '../src/pilot-config.js';
 
 const overrides = {
@@ -91,5 +92,23 @@ describe('getEffectiveNow', () => {
     const flipped = { ...overrides, active_pilot_kommun_kods: ['2418'] };
     const now = getEffectiveNow({ env: { PILOT_CLOCK_OFFSET_DAYS: '7' }, overrides: flipped, baseNow: base });
     expect(now.getTime()).toBe(base.getTime());
+  });
+});
+
+describe('isRefreshAllowed (perpetual-refresh pilot gating)', () => {
+  it('allows kommuner in refresh_pilot_kommun_kods', () => {
+    const o = { refresh_pilot_kommun_kods: ['1489', '1980'] };
+    expect(isRefreshAllowed(o, '1489')).toBe(true);
+    expect(isRefreshAllowed(o, '1980')).toBe(true);
+  });
+  it('rejects kommuner not on the allowlist', () => {
+    const o = { refresh_pilot_kommun_kods: ['1489'] };
+    expect(isRefreshAllowed(o, '1980')).toBe(false);
+    expect(isRefreshAllowed(o, '0000')).toBe(false);
+  });
+  it('rejects everything when the allowlist is missing or empty', () => {
+    expect(isRefreshAllowed({}, '1489')).toBe(false);
+    expect(isRefreshAllowed({ refresh_pilot_kommun_kods: [] }, '1489')).toBe(false);
+    expect(isRefreshAllowed(null, '1489')).toBe(false);
   });
 });
