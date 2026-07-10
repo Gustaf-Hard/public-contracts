@@ -1035,6 +1035,44 @@ export function createDashboardApp({
     res.redirect(`/kommun/${kommun.kommun_kod}`);
   });
 
+  // One-click kickoff from the overview "ej kontaktad" cell. Sends T-INITIAL to
+  // the kommun's FIRST listed contact (the one usually on top) with the standard
+  // template — no compose page, no confirm, so the operator can start several
+  // streams rapidly. Deliberately unconfirmed per operator request; the button
+  // only renders for kommuner with no conversation yet.
+  app.post('/kommun/:kod/quick-init', async (req, res) => {
+    if (!db) return res.status(503).send('No DB');
+    if (!gmailClient) return res.status(503).send('Gmail not configured — run pilot-auth first.');
+
+    const municipalities = municipalitiesLoader();
+    const kommun = municipalities.find((m) => m.kommun_kod === req.params.kod);
+    if (!kommun) return res.status(404).send('Kommun not found');
+
+    const contact = (kommun.contacts ?? [])[0];
+    if (!contact || !contact.email) return res.status(400).send('Kommunen saknar kontaktadress');
+
+    const { subject, body } = renderInitialDraft({ kommun_namn: kommun.kommun_namn, role: contact.role, env });
+    try {
+      await sendInitial({
+        db, gmail: gmailClient, env,
+        kommun_kod: kommun.kommun_kod,
+        kommun_namn: kommun.kommun_namn,
+        role: contact.role,
+        contact_email: contact.email,
+        subject,
+        body,
+      });
+    } catch (e) {
+      // Lost claim (a tick sent first) or an already-existing conversation are
+      // both benign no-ops — nothing double-sent; go back to the list either way.
+      if (e.code === 'INITIAL_CLAIM_LOST' || /already exists/i.test(e.message)) {
+        return res.redirect('/');
+      }
+      return res.status(500).send(`Send failed: ${escapeForError(e.message)}`);
+    }
+    res.redirect('/');
+  });
+
   return app;
 }
 

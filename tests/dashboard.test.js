@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { openDb } from '../src/storage.js';
 import { createDashboardApp, buildActionQueue, buildWaiting, applyFilter, buildOverviewRows, contentDisposition } from '../src/dashboard.js';
-import { layout, renderEscalationForm } from '../src/dashboard-views.js';
+import { layout, renderEscalationForm, renderOverview } from '../src/dashboard-views.js';
 
 let tmp, db, dbPath, muniPath;
 
@@ -67,7 +67,7 @@ async function getNoRedirect(app, path) {
 }
 
 describe('dashboard / overview', () => {
-  it('shows all kommuner with "ej kontaktad" under ?filter=all', async () => {
+  it('shows all kommuner with a one-click send for not-contacted ones under ?filter=all', async () => {
     const app = appWithFakes();
     // Home now defaults to active kommuner; the full 290-list is behind ?filter=all
     const res = await get(app, '/?filter=all');
@@ -75,7 +75,10 @@ describe('dashboard / overview', () => {
     expect(res.text).toContain('Malå');
     expect(res.text).toContain('Boxholm');
     expect(res.text).toContain('Testkommun');
-    expect(res.text).toContain('ej kontaktad');
+    // Not-contacted kommuner now render a one-click quick-init send form
+    // (replacing the old "ej kontaktad" link) plus an edit-first compose link.
+    expect(res.text).toContain('/quick-init');
+    expect(res.text).toContain('📨 Skicka');
   });
 
   it('default home hides never-contacted kommuner and shows the queue heading', async () => {
@@ -726,5 +729,26 @@ describe('thread status toggle', () => {
     expect([302, 303]).toContain(res.status);
     expect(db.getThreadById(t.id).status).toBe('muted');
     expect(db.getThreadById(t.id).status_source).toBe('manual');
+  });
+});
+
+describe('overview one-click send (quick-init)', () => {
+  const baseArgs = (states) => ({
+    summary: { in_pilot: 0, delivering: 0, done: 0, dead_end: 0, contracts: 0, avg_reply_days: null },
+    rows: [{ kommun_kod: '1489', kommun_namn: 'Alingsås', lan: 'Västra Götaland', folkmangd: 42861, states, contracts: 0, open_escalations: 0, follow_up_at: null, last_activity_at: null }],
+    totalKommuner: 1, filter: 'all',
+  });
+
+  it('renders a one-click send form for a not-contacted kommun', () => {
+    const html = renderOverview(baseArgs([]));
+    expect(html).toMatch(/<form[^>]*action="\/kommun\/1489\/quick-init"[^>]*method="post"|<form[^>]*method="post"[^>]*action="\/kommun\/1489\/quick-init"/);
+    expect(html).toContain('📨 Skicka');
+    // keeps an edit-first escape hatch to the compose page
+    expect(html).toContain('/kommun/1489/compose');
+  });
+
+  it('shows the state pills (no send form) once a kommun is contacted', () => {
+    const html = renderOverview(baseArgs([{ role: 'central', state: 'SENT', tooltip: '' }]));
+    expect(html).not.toContain('/kommun/1489/quick-init');
   });
 });
