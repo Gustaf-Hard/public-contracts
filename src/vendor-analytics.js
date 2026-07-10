@@ -11,6 +11,76 @@
 
 import { computeNextReviewDate } from './contract-lifecycle.js';
 
+// ---- Grade-level coverage schema (2026-07-10-product-intelligence design) ----
+
+// Canonical, fixed 9-level grade schema. Order matters: every consumer
+// (matrix columns, mapper output) uses this order.
+export const GRADE_LEVELS = Object.freeze([
+  'Förskola', 'Förskoleklass', '1-3', '4-6', '7-9',
+  'Gymnasiet', 'Komvux', 'Introduktionsprogrammet', 'Högskola',
+]);
+
+// The levels a kommun actually operates — everything except Högskola.
+// whole-municipality coverage expands to these, never to Högskola.
+export const MUNICIPAL_GRADE_LEVELS = Object.freeze(GRADE_LEVELS.slice(0, 8));
+
+const COMPULSORY_BANDS = ['1-3', '4-6', '7-9'];
+
+// Map an "F-3"/"åk 4-6"/"F-Gy" range onto the bands it intersects.
+// lo/hi live on the scale F=0, 1..9, Gy=10.
+function rangeToLevels(lo, hi) {
+  const out = [];
+  if (lo === 0) out.push('Förskoleklass');
+  for (const [band, s, e] of [['1-3', 1, 3], ['4-6', 4, 6], ['7-9', 7, 9]]) {
+    if (Math.max(lo, 1) <= e && Math.min(hi, 9) >= s && hi >= 1 && lo <= 9) out.push(band);
+  }
+  if (hi === 10) out.push('Gymnasiet');
+  return out;
+}
+
+// Pure Swedish-unit-description → canonical-band mapper (spec Feature 2).
+// Honest by design: unrecognized text maps to NOTHING — never a guess.
+// Anpassad skola / särskola is folded into the matching age bands (its
+// students count toward 1-3/4-6/7-9/Gymnasiet): a qualified phrase
+// ("anpassad grundskola", "gymnasiesärskola") folds into its own bands via
+// the ordinary keyword rules; a bare "anpassad skola"/"särskola" with no
+// age context folds into all four.
+export function mapUnitToGradeLevels(unitText) {
+  if (typeof unitText !== 'string' || !unitText.trim()) return [];
+  const t = unitText.toLowerCase();
+  const out = new Set();
+
+  // Whole-municipality phrases → every municipal level.
+  if (/hela kommunen|samtliga skolformer|alla skolformer|kommunövergripande/.test(t)) {
+    for (const g of MUNICIPAL_GRADE_LEVELS) out.add(g);
+  }
+
+  // "F-3" / "åk 4-6" / "F-Gy" style ranges (hyphen or dash).
+  for (const m of t.matchAll(/(?:åk\s*)?\b(f|[1-9])\s*[-–—]\s*(gy\w*|[1-9])\b/gi)) {
+    const lo = m[1] === 'f' ? 0 : Number(m[1]);
+    const hi = /^gy/.test(m[2]) ? 10 : Number(m[2]);
+    for (const g of rangeToLevels(lo, hi)) out.add(g);
+  }
+
+  if (/förskoleklass/.test(t)) out.add('Förskoleklass');
+  if (/förskol(a|an|or|orna)/.test(t)) out.add('Förskola');
+  if (/grundskol/.test(t)) for (const g of COMPULSORY_BANDS) out.add(g);
+  if (/gymnasi/.test(t)) out.add('Gymnasiet');
+  if (/introduktionsprogram|\bim-program/.test(t)) out.add('Introduktionsprogrammet');
+  if (/vuxenutbildning|komvux|\bsfi\b|svenska för invandrare/.test(t)) out.add('Komvux');
+  if (/högskol|universitet/.test(t)) out.add('Högskola');
+
+  // Anpassad skola / särskola folding. Qualified forms are already handled
+  // above (grundsärskola matches nothing yet → handled here; anpassad
+  // grundskola matched /grundskol/; gymnasiesärskola matched /gymnasi/).
+  if (/grundsärskol/.test(t)) for (const g of COMPULSORY_BANDS) out.add(g);
+  if (/anpassad|särskol/.test(t) && !/grundskol|grundsärskol|gymnasi/.test(t)) {
+    for (const g of [...COMPULSORY_BANDS, 'Gymnasiet']) out.add(g);
+  }
+
+  return GRADE_LEVELS.filter((g) => out.has(g));
+}
+
 // ---- SEK/year normalization -------------------------------------------------
 
 // Parse a Swedish-formatted amount ("612 500,00", "4 955 221") to a number.
