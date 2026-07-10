@@ -13,6 +13,7 @@ import {
   PRICING_MODEL_LABELS,
   UNKNOWN,
 } from '../public/explorer-core.js';
+import { GRADE_LEVELS } from './vendor-analytics.js';
 
 function escapeHtml(s) {
   if (s === null || s === undefined) return '';
@@ -337,6 +338,22 @@ const baseCss = `
   .heartbeat-off   { background: #ef44441a; color: var(--bad);  border-color: #ef444466; }
   .pill-list { display: flex; flex-wrap: wrap; gap: 4px; }
   .muted { color: var(--fg-muted); }
+  /* Product intelligence: coverage matrix (2026-07-10 design) */
+  .cov-table th.cov-head { text-align: center; }
+  .cov-table td.cov-cell { text-align: center; font-size: 13px; }
+  .cov-cell.cov-full    { background: #22c55e1a; color: var(--good); }
+  .cov-cell.cov-partial { background: #f59e0b1a; color: var(--warn); }
+  .cov-cell.cov-none    { background: #ef44441a; color: var(--bad); }
+  .cov-cell.cov-na      { color: var(--fg-muted); }
+  .cov-detail { background: transparent; border-radius: 0; padding: 0; margin: 0; display: inline-block; position: relative; }
+  .cov-detail summary { cursor: pointer; list-style: none; color: inherit; font-size: 13px; }
+  .cov-detail summary::-webkit-details-marker { display: none; }
+  .cov-pop {
+    position: absolute; z-index: 20; left: 50%; transform: translateX(-50%);
+    background: var(--bg-elev); border: 1px solid var(--border); border-radius: 6px;
+    padding: 8px 10px; box-shadow: var(--shadow); text-align: left;
+    color: var(--fg); font-size: 12px; white-space: nowrap;
+  }
   .danger { color: var(--bad); font-weight: 500; }
   .warn { color: var(--warn); font-weight: 500; }
   .good { color: var(--good); font-weight: 500; }
@@ -1798,6 +1815,95 @@ export function renderVendorMarket({ summary, rollups = [], facts = [], sort = n
 
 // ---- Surface 2: vendor dossier (/leverantor/:slug) ----
 
+// ---- Product intelligence (2026-07-10 design): product table + matrix ----
+
+const GRADE_SHORT_LABELS = { Förskoleklass: 'F-klass', Introduktionsprogrammet: 'IM' };
+
+// Pris cell: per-product summed line items — a per-kommun value or a range.
+// A product only ever seen inside a lump sum is honestly "ingår,
+// ospecificerat pris"; partial knowledge gets a completeness note.
+function productPriceCell(p) {
+  if (!p.priceRange) return '<span class="muted">ingår, ospecificerat pris</span>';
+  const known = p.priceByKommun.filter((k) => k.amount_sek != null).length;
+  const value = p.priceRange.min === p.priceRange.max
+    ? fmtSekFull(p.priceRange.min)
+    : `${fmtSekFull(p.priceRange.min)} – ${fmtSekFull(p.priceRange.max)}`;
+  const per = p.kommunCount > 1 ? ' per kommun' : '';
+  const note = known < p.kommunCount
+    ? ` <span class="muted">(känd för ${known} av ${p.kommunCount} kommuner)</span>` : '';
+  const title = p.priceByKommun
+    .map((k) => `${k.kommun_namn}: ${k.amount_sek != null ? fmtSekFull(k.amount_sek) : 'ospecificerat'}`)
+    .join(' · ');
+  return `<span title="${escapeHtml(title)}">${escapeHtml(value + per)}</span>${note}`;
+}
+
+function productTable(productRollups) {
+  const rows = productRollups.map((p) => `<tr>
+    <td>${escapeHtml(p.name)}</td>
+    <td class="num"><span title="${escapeHtml(p.kommuns.join(', '))}">${p.kommunCount}</span></td>
+    <td class="num">${productPriceCell(p)}</td>
+    <td>${pricingModelBadge(p.dominantPricingModel)}</td>
+  </tr>`).join('');
+  return `
+    <section class="board-section">
+      <h2>Produkter <span class="count">${productRollups.length}</span></h2>
+      <table class="product-table">
+        <thead><tr>
+          <th>Produkt</th><th style="text-align:right">Kommuner</th>
+          <th style="text-align:right">Pris</th><th>Prismodell</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <p class="muted honesty-note">Pris = summan av avtalets egna prisspecifikationsrader per produkt — aldrig en påhittad fördelning av en klumpsumma.</p>
+    </section>`;
+}
+
+// One coverage-matrix cell. Green/yellow cells expand (server-rendered
+// <details>, no JS needed) to the per-kommun detail; red/neutral cells carry
+// their meaning in a tooltip.
+function coverageCell(p, grade) {
+  const colour = p.coverageByGrade[grade];
+  if (colour === 'na') {
+    return `<td class="cov-cell cov-na" title="${escapeHtml(`${grade}: förekommer inte i leverantörens avtal`)}">–</td>`;
+  }
+  if (colour === 'red') {
+    return `<td class="cov-cell cov-none" title="${escapeHtml(`${grade}: leverantören säljs på nivån i andra sammanhang, men ${p.name} når ingen kommun här`)}">✕</td>`;
+  }
+  const covered = p.coverageDetail[grade] ?? [];
+  const coveredNames = new Set(covered.map((d) => d.kommun_namn));
+  const lines = [
+    ...covered.map((d) => `${d.kommun_namn}: ${d.status === 'full' ? 'full täckning' : 'delvis'}${d.student_count != null ? ` (${fmtInt(d.student_count)} elever/barn)` : ''}`),
+    ...p.kommuns.filter((n) => !coveredNames.has(n)).map((n) => `${n}: ingen täckning extraherad`),
+  ];
+  const mark = colour === 'green' ? '●' : '◐';
+  const klass = colour === 'green' ? 'cov-full' : 'cov-partial';
+  return `<td class="cov-cell ${klass}"><details class="cov-detail"><summary title="${escapeHtml(grade)}">${mark}</summary><div class="cov-pop">${lines.map((l) => `<div>${escapeHtml(l)}</div>`).join('')}</div></details></td>`;
+}
+
+function coverageMatrix(productRollups) {
+  if (!productRollups.some((p) => p.coverageKnown)) {
+    return `
+    <section class="board-section">
+      <h2>Täckning per skolnivå</h2>
+      <p class="muted">Ingen täckningsdata extraherad ännu — avtalens enhetslistor fylls på vid (om)analys.</p>
+    </section>`;
+  }
+  const head = GRADE_LEVELS
+    .map((g) => `<th class="cov-head" title="${escapeHtml(g)}">${escapeHtml(GRADE_SHORT_LABELS[g] ?? g)}</th>`)
+    .join('');
+  const rows = productRollups.map((p) =>
+    `<tr><td>${escapeHtml(p.name)}</td>${GRADE_LEVELS.map((g) => coverageCell(p, g)).join('')}</tr>`).join('');
+  return `
+    <section class="board-section">
+      <h2>Täckning per skolnivå</h2>
+      <table class="cov-table">
+        <thead><tr><th>Produkt</th>${head}</tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <p class="muted honesty-note">● full i alla köpande kommuner · ◐ delvis eller blandat · ✕ nivån säljs av leverantören men inte här · – nivån förekommer inte i leverantörens avtal. Klicka på en cell för detalj per kommun.</p>
+    </section>`;
+}
+
 function dossierLifecycleCell(f) {
   const bits = [];
   if (f.auto_renews) {
@@ -1844,12 +1950,13 @@ function renewalCalendar(facts, todayIso) {
   return `<ul class="renewal-list">${items}</ul>${note}`;
 }
 
-export function renderVendorDossier({ vendor, rollup = null, facts = [], todayIso, heartbeat = null, partial = false, escalationCount = 0 }) {
+export function renderVendorDossier({ vendor, rollup = null, facts = [], productRollups = [], todayIso, heartbeat = null, partial = false, escalationCount = 0 }) {
   const r = rollup ?? {
     contract_count: 0, kommun_count: 0, total_annual_sek: null, value_known_count: 0,
     median_length_months: null, length_known_count: 0,
     price_per_student_min: null, price_per_student_max: null,
     dominant_pricing_model: null, pricing_model_mix: {}, products: [], next_renewal_date: null,
+    avg_annual_per_kommun: null,
   };
   const arrCard = r.total_annual_sek == null
     ? '<div class="value">okänt</div>'
@@ -1866,6 +1973,11 @@ export function renderVendorDossier({ vendor, rollup = null, facts = [], todayIs
       <div class="stat-card"><div class="label">Avtal</div><div class="value">${r.contract_count}</div></div>
       <div class="stat-card"><div class="label">Känd årskostnad</div>${arrCard}
         <div class="stat-sub">${completenessLine(r.value_known_count, r.contract_count)}</div></div>
+      <div class="stat-card"><div class="label">Snitt per kommun</div>${
+        r.avg_annual_per_kommun == null
+          ? '<div class="value">okänt</div>'
+          : `<div class="value">${escapeHtml(fmtSekCompact(r.avg_annual_per_kommun))}/år</div>`}
+        <div class="stat-sub">${completenessLine(r.value_known_count, r.contract_count)} · ${r.kommun_count} kommuner</div></div>
       <div class="stat-card"><div class="label">Median avtalslängd</div><div class="value">${escapeHtml(lengthVal)}</div>
         <div class="stat-sub">${completenessLine(r.length_known_count, r.contract_count, 'avtalstid')}</div></div>
       <div class="stat-card"><div class="label">Pris per elev</div><div class="value">${escapeHtml(elevVal)}</div></div>
@@ -1888,7 +2000,9 @@ export function renderVendorDossier({ vendor, rollup = null, facts = [], todayIs
       <a href="/leverantorer" data-pane-link class="muted">← alla leverantörer</a>
     </div>
     ${stats}
-    ${r.products.length ? `<div class="card"><h3>Produkter (${r.products.length})</h3>${chipRow(r.products, 50)}</div>` : ''}
+    ${productRollups.length
+      ? productTable(productRollups) + coverageMatrix(productRollups)
+      : (r.products.length ? `<div class="card"><h3>Produkter (${r.products.length})</h3>${chipRow(r.products, 50)}</div>` : '')}
     <div class="card">
       <h3>Förnyelsekalender</h3>
       ${renewalCalendar(facts, todayIso)}
