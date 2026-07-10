@@ -64,6 +64,38 @@ describe('mergePreserving (pure) — guards a good row against a degraded re-run
     expect(merged.period_end).toBe('2027-06-30');
     expect(changes.some(([f]) => f === 'period_end')).toBe(true);
   });
+
+  // Product intelligence (2026-07-10 design): line_items / coverage arrays are
+  // fill-only too — an empty array from a degraded re-run is "no signal".
+  it('preserves existing line_items / coverage rows when the new pass returns empty arrays', () => {
+    const withRows = {
+      ...good,
+      line_items: [{ product_name: 'Begreppa', amount_sek: 166585 }],
+      coverage: [{ product_name: 'Begreppa', grade_level: '1-3', status: 'full', student_count: null }],
+    };
+    const degraded = { is_contract: true, vendor_name: 'Skolon', line_items: [], coverage: [] };
+    const { merged, changes } = mergePreserving(withRows, degraded);
+    expect(merged.line_items).toEqual(withRows.line_items);
+    expect(merged.coverage).toEqual(withRows.coverage);
+    expect(changes.some(([f]) => f === 'line_items')).toBe(true);
+    expect(changes.some(([f]) => f === 'coverage')).toBe(true);
+  });
+
+  it('non-empty new line_items / coverage DO replace the old rows', () => {
+    const withRows = {
+      ...good,
+      line_items: [{ product_name: 'Begreppa', amount_sek: 166585 }],
+      coverage: [{ product_name: 'Begreppa', grade_level: '1-3', status: 'full', student_count: null }],
+    };
+    const better = {
+      is_contract: true, vendor_name: 'Skolon',
+      line_items: [{ product_name: 'Polyglutt', amount_sek: 168300 }],
+      coverage: [{ product_name: 'Polyglutt', grade_level: 'Förskola', status: 'full', student_count: 1683 }],
+    };
+    const { merged } = mergePreserving(withRows, better);
+    expect(merged.line_items).toEqual(better.line_items);
+    expect(merged.coverage).toEqual(better.coverage);
+  });
 });
 
 describe('storeContractAnalysis — a degraded re-run preserves the good stored row', () => {

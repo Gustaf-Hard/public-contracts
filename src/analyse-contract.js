@@ -9,6 +9,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { GRADE_LEVELS, MUNICIPAL_GRADE_LEVELS, mapUnitToGradeLevels } from './vendor-analytics.js';
 
 const DEFAULT_MODEL = 'claude-opus-4-8';
 
@@ -33,6 +34,9 @@ Regler:
 - pricing_model: hur priset är konstruerat — "per_student" (per elev/barn), "per_user" (per användare/licens), "fixed" (fast års-/månadsbelopp), "tiered" (olika belopp per år eller volymtrappa), "usage" (rörligt efter förbrukning, t.ex. per dag/timme), "one_time" (endast engångsköp), "free" (uttryckligen kostnadsfritt), "unknown" när det inte framgår.
 - unit_price_sek / unit / quantity: vid enhetspris — priset per enhet som tal, enheten på svenska i singular ("elev", "användare"), och antalet enheter som avtalet anger. Använd innevarande nivå vid trappa. null där de inte framgår.
 - value_incl_moms: true om angivna belopp är inklusive moms, false om exklusive. null om det inte framgår.
+- line_items: avtalets EGEN prisspecifikation — raderna där totalpriset bryts ner per produkt/tjänst (t.ex. under "Totalt pris … beräknas enligt nedan"). En rad per specificerad post: { product: produktnamnet som det står, description: radens beskrivning (t.ex. "65,40 kr/elev, 7 månader"), unit_price_sek, unit ("elev", "barn" …), quantity, period_months, amount_sek }. amount_sek är radens bidrag till avtalets totala pris. Ange det AVTALADE beloppet — referensbelopp som "ordinarie pris" ska ALDRIG tas med. Samma produkt kan ha flera rader (olika pris under olika delperioder). Tom array när avtalet bara anger en klumpsumma utan specifikation — hitta ALDRIG på en fördelning.
+- coverage: vilka enheter/skolformer varje produkt omfattar enligt avtalet (t.ex. avsnitt "för följande enheter"). En post per produkt och enhetsbeskrivning: { product, unit_text: beskrivningen ordagrant (t.ex. "Alla kommunala grundskolor (3 810)"), grade_levels: de skolnivåer beskrivningen motsvarar, som lista ur exakt dessa värden: "Förskola", "Förskoleklass", "1-3", "4-6", "7-9", "Gymnasiet", "Komvux", "Introduktionsprogrammet", "Högskola" (grundskola → "1-3" + "4-6" + "7-9"; F-3 → "Förskoleklass" + "1-3"; vuxenutbildning/SFI → "Komvux"; anpassad skola/särskola räknas in i motsvarande åldersband), status: "full" när ALLA enheter i skolformen omfattas ("alla kommunala grundskolor"), "partial" när endast namngivna/utvalda enheter omfattas, student_count: antal elever/barn om det anges, annars null }. Tom array när avtalet inte beskriver täckning.
+- whole_municipality: true ENDAST när avtalet uttryckligen gäller kommunens HELA verksamhet/alla skolformer kommunövergripande (då gäller full täckning på alla nivåer). Annars false.
 - summary: 1-2 meningar på svenska om vad dokumentet gäller.
 - mentioned_agreements: lista de avtal/leverantörer som dokumentet NÄMNER, med { vendor, product, doc_attached }. doc_attached = true endast om själva avtalshandlingen finns i DETTA dokument; false när dokumentet bara refererar till eller sammanställer avtalet utan att innehålla det. Tom array om inga nämns.
 - confidence: 0.9+ = mycket säker, 0.7-0.9 = ganska säker, <0.7 = osäker.
@@ -41,7 +45,7 @@ Regler:
 const CONTRACT_SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['is_contract', 'document_type', 'vendor_name', 'products', 'avtalsvarde', 'valuta', 'period_start', 'period_end', 'auto_renews', 'renewal_term', 'last_cancellation_date', 'extension_option_until', 'annual_value_sek', 'one_time_value_sek', 'pricing_model', 'unit_price_sek', 'unit', 'quantity', 'value_incl_moms', 'summary', 'confidence', 'mentioned_agreements'],
+  required: ['is_contract', 'document_type', 'vendor_name', 'products', 'avtalsvarde', 'valuta', 'period_start', 'period_end', 'auto_renews', 'renewal_term', 'last_cancellation_date', 'extension_option_until', 'annual_value_sek', 'one_time_value_sek', 'pricing_model', 'unit_price_sek', 'unit', 'quantity', 'value_incl_moms', 'line_items', 'coverage', 'whole_municipality', 'summary', 'confidence', 'mentioned_agreements'],
   properties: {
     is_contract: { type: 'boolean' },
     document_type: { type: 'string', enum: ['avtal', 'följebrev_sammanställning', 'prislista', 'sekretessbeslut', 'övrigt'] },
@@ -62,6 +66,39 @@ const CONTRACT_SCHEMA = {
     unit: { anyOf: [{ type: 'string' }, { type: 'null' }] },
     quantity: { anyOf: [{ type: 'number' }, { type: 'null' }] },
     value_incl_moms: { anyOf: [{ type: 'boolean' }, { type: 'null' }] },
+    line_items: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['product', 'description', 'unit_price_sek', 'unit', 'quantity', 'period_months', 'amount_sek'],
+        properties: {
+          product: { type: 'string' },
+          description: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+          unit_price_sek: { anyOf: [{ type: 'number' }, { type: 'null' }] },
+          unit: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+          quantity: { anyOf: [{ type: 'number' }, { type: 'null' }] },
+          period_months: { anyOf: [{ type: 'number' }, { type: 'null' }] },
+          amount_sek: { anyOf: [{ type: 'number' }, { type: 'null' }] },
+        },
+      },
+    },
+    coverage: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['product', 'unit_text', 'grade_levels', 'status', 'student_count'],
+        properties: {
+          product: { type: 'string' },
+          unit_text: { type: 'string' },
+          grade_levels: { type: 'array', items: { type: 'string', enum: [...GRADE_LEVELS] } },
+          status: { type: 'string', enum: ['full', 'partial'] },
+          student_count: { anyOf: [{ type: 'number' }, { type: 'null' }] },
+        },
+      },
+    },
+    whole_municipality: { type: 'boolean' },
     summary: { type: 'string' },
     confidence: { type: 'number' },
     mentioned_agreements: {
@@ -156,6 +193,72 @@ function warnOnLikelyDuplicate(db, contractId, attachmentId, vendorId, analysis,
   }
 }
 
+// ---- Product intelligence (2026-07-10 design): line items + coverage ----
+
+function numOrNull(v) {
+  return typeof v === 'number' && Number.isFinite(v) ? v : null;
+}
+
+// Analysis-shape line items ({ product, … }) → DB-row shape
+// ({ product_name, … }). Entries without a usable product name are dropped.
+function normalizeLineItems(items) {
+  if (!Array.isArray(items)) return [];
+  return items
+    .filter((it) => it && typeof (it.product ?? it.product_name) === 'string' && (it.product ?? it.product_name).trim())
+    .map((it) => ({
+      product_name: (it.product ?? it.product_name).trim(),
+      description: it.description ?? null,
+      unit_price_sek: numOrNull(it.unit_price_sek),
+      unit: it.unit ?? null,
+      quantity: numOrNull(it.quantity),
+      period_months: numOrNull(it.period_months),
+      amount_sek: numOrNull(it.amount_sek),
+    }));
+}
+
+// Expand an analysis' coverage[] (+ whole_municipality flag) into DB rows:
+// one row per (product, grade_level). Pure and exported for direct testing.
+//   - grade_levels from the model are trusted but filtered to the canonical
+//     enum; when the model gives none, mapUnitToGradeLevels(unit_text) fills.
+//   - whole_municipality=true → every product of the contract gets 'full'
+//     on all municipal levels (never Högskola).
+//   - duplicates dedupe with 'full' beating 'partial'; student_count fills
+//     when the kept row has none.
+export function expandCoverageRows(analysis) {
+  const entries = Array.isArray(analysis?.coverage) ? analysis.coverage : [];
+  const rows = new Map(); // "product\0grade" → row
+  const upsert = (product_name, grade_level, status, student_count) => {
+    const key = `${product_name}\u0000${grade_level}`;
+    const prev = rows.get(key);
+    if (!prev) {
+      rows.set(key, { product_name, grade_level, status, student_count });
+      return;
+    }
+    if (status === 'full') prev.status = 'full';
+    if (prev.student_count == null && student_count != null) prev.student_count = student_count;
+  };
+
+  for (const e of entries) {
+    const name = typeof e?.product === 'string' && e.product.trim() ? e.product.trim() : null;
+    if (!name) continue;
+    let levels = (Array.isArray(e.grade_levels) ? e.grade_levels : []).filter((g) => GRADE_LEVELS.includes(g));
+    if (levels.length === 0) levels = mapUnitToGradeLevels(e.unit_text);
+    const status = e.status === 'full' ? 'full' : 'partial';
+    for (const g of levels) upsert(name, g, status, numOrNull(e.student_count));
+  }
+
+  if (analysis?.whole_municipality === true) {
+    for (const p of analysis.products ?? []) {
+      if (typeof p !== 'string' || !p.trim()) continue;
+      for (const g of MUNICIPAL_GRADE_LEVELS) upsert(p.trim(), g, 'full', null);
+    }
+  }
+
+  return [...rows.values()].sort((a, b) =>
+    a.product_name.localeCompare(b.product_name, 'sv')
+    || GRADE_LEVELS.indexOf(a.grade_level) - GRADE_LEVELS.indexOf(b.grade_level));
+}
+
 // Non-destructive merge for re-analysis (finding 6): a re-run must never
 // silently REGRESS a previously-good contract row. LLM output is not
 // deterministic — a second pass can return is_contract=false for a document it
@@ -210,6 +313,20 @@ export function mergePreserving(existing, fresh) {
     changes.push(['auto_renews', 'preserved true (new pass false)', true]);
   }
 
+  // Product-intelligence arrays (2026-07-10 design): line_items / coverage are
+  // fill-only at the ARRAY level. An empty array from a degraded re-run is
+  // "no signal" — it must never wipe previously-extracted rows. A non-empty
+  // fresh array replaces (idempotent re-analysis). Handled outside the scalar
+  // fillOnly loop so we log a row count, never a giant JSON diff.
+  for (const f of ['line_items', 'coverage']) {
+    const oldArr = Array.isArray(existing[f]) ? existing[f] : [];
+    const newArr = Array.isArray(fresh[f]) ? fresh[f] : [];
+    if (oldArr.length > 0 && newArr.length === 0) {
+      merged[f] = oldArr;
+      changes.push([f, `preserved ${oldArr.length} rows (new pass empty)`, oldArr.length]);
+    }
+  }
+
   return { merged, changes };
 }
 
@@ -220,7 +337,8 @@ export function mergePreserving(existing, fresh) {
 export function storeContractAnalysis(db, attachmentId, analysis, { model, log = null } = {}) {
   // Read the existing row (with vendor name) so the merge can preserve it.
   const existing = db.raw.prepare(`
-    SELECT c.is_contract, c.period_start, c.period_end, c.avtalsvarde, c.valuta,
+    SELECT c.id AS contract_id,
+           c.is_contract, c.period_start, c.period_end, c.avtalsvarde, c.valuta,
            c.auto_renews, c.renewal_term, c.last_cancellation_date, c.extension_option_until,
            c.annual_value_sek, c.one_time_value_sek, c.pricing_model, c.unit_price_sek,
            c.unit, c.quantity, c.value_incl_moms,
@@ -230,7 +348,21 @@ export function storeContractAnalysis(db, attachmentId, analysis, { model, log =
     WHERE c.attachment_id = ?
   `).get(attachmentId) ?? null;
 
-  const { merged, changes } = mergePreserving(existing, analysis);
+  // Normalize the fresh product-intelligence arrays to DB-row shape BEFORE the
+  // merge (whole_municipality expands into coverage here, so its signal
+  // participates in the empty-means-no-signal rule), and read the previously
+  // stored rows so a degraded re-run can preserve them (fill-only).
+  if (existing) {
+    existing.line_items = db.listLineItemsForContract(existing.contract_id);
+    existing.coverage = db.listCoverageForContract(existing.contract_id);
+  }
+  const normalized = {
+    ...analysis,
+    line_items: normalizeLineItems(analysis.line_items),
+    coverage: expandCoverageRows(analysis),
+  };
+
+  const { merged, changes } = mergePreserving(existing, normalized);
   if (existing && changes && changes.length) {
     log?.(`REANALYSE ${merged.vendor_name ?? 'okänd'} (att ${attachmentId}): ` +
       changes.map(([f, from, to]) => `${f}: ${from} → ${JSON.stringify(to)}`).join('; '));
@@ -269,6 +401,21 @@ export function storeContractAnalysis(db, attachmentId, analysis, { model, log =
       db.linkContractProduct(contractId, db.upsertProduct(vendorId, name));
     }
   }
+
+  // Line items + coverage (2026-07-10 design). recordContract cleared the old
+  // contract's rows; merged.* carries either the fresh extraction or the
+  // preserved previous rows. product_id is matched by name against the
+  // vendor's products when possible — never invented.
+  const withProductId = (rows) => rows.map((r) => ({
+    ...r,
+    product_id: r.product_id ?? (vendorId
+      ? db.raw.prepare('SELECT id FROM products WHERE vendor_id = ? AND name = ? COLLATE NOCASE')
+          .get(vendorId, r.product_name)?.id ?? null
+      : null),
+  }));
+  db.replaceContractLineItems(contractId, withProductId(merged.line_items ?? []));
+  db.replaceContractCoverage(contractId, withProductId(merged.coverage ?? []));
+
   warnOnLikelyDuplicate(db, contractId, attachmentId, vendorId, merged, log);
   return contractId;
 }
