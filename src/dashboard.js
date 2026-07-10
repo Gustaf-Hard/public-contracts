@@ -23,7 +23,7 @@ import {
   renderVendorDossier,
   mergeContacts,
 } from './dashboard-views.js';
-import { buildContractFacts, buildVendorRollups, buildMarketSummary } from './vendor-analytics.js';
+import { buildContractFacts, buildVendorRollups, buildMarketSummary, buildProductRollups } from './vendor-analytics.js';
 
 const ROLE_PRIORITY = ['central', 'utbildning', 'gymnasie', 'vuxenutbildning', 'other'];
 
@@ -864,10 +864,15 @@ export function createDashboardApp({
       }));
     }
     const { facts, rollups, todayIso } = vendorData(new Date());
+    const vendorFacts = facts.filter((f) => f.vendor_id === vendor.id);
     res.send(renderVendorDossier({
       vendor,
       rollup: rollups.find((r) => r.vendor_id === vendor.id) ?? null,
-      facts: facts.filter((f) => f.vendor_id === vendor.id),
+      facts: vendorFacts,
+      // Product intelligence (2026-07-10 design): line items + coverage rows
+      // for the whole DB — buildProductRollups joins them onto this vendor's
+      // facts by contract_id, so other vendors' rows fall away.
+      productRollups: buildProductRollups(vendorFacts, db.listLineItems(), db.listCoverage()),
       todayIso,
       heartbeat: hb(), partial: isPartial(req), escalationCount: escCount(),
     }));

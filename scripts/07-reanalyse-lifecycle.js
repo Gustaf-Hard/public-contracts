@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 // Backfill the perpetual-refresh lifecycle fields (auto_renews, renewal_term,
-// last_cancellation_date, extension_option_until) AND the vendor-data-center
+// last_cancellation_date, extension_option_until), the vendor-data-center
 // pricing fields (annual_value_sek, one_time_value_sek, pricing_model,
-// unit_price_sek, unit, quantity, value_incl_moms) over already-stored
-// contract PDFs by re-running the Opus analyser (2026-07-09 refresh design
-// Part A §2.3 + 2026-07-09 vendor-data-center design §1).
+// unit_price_sek, unit, quantity, value_incl_moms) AND the product-
+// intelligence tables (contract_line_items, contract_coverage — 2026-07-10
+// design) over already-stored contract PDFs by re-running the Opus analyser.
 //
 // This re-analyses EVERY PDF attachment so the new fields are populated from
 // the current prompt/schema. It is the analyser's existing `force` path with a
@@ -12,13 +12,19 @@
 //
 // NON-DESTRUCTIVE (finding 6): storeContractAnalysis MERGES each re-run against
 // the existing row — a degraded second pass can never flip a good is_contract=1
-// to false or null out a set period/vendor/lifecycle field. Only NULL fields
-// are filled; genuine improvements overwrite. Every preserved/overwritten field
-// is logged per contract (REANALYSE …) so the operator can audit the diff.
+// to false, null out a set period/vendor/lifecycle field, or wipe previously-
+// extracted line items/coverage (an empty array is "no signal", fill-only).
+// Only NULL fields are filled; genuine improvements overwrite. Every
+// preserved/overwritten field is logged per contract (REANALYSE …) so the
+// operator can audit the diff.
+//
+// --counts prints the product-intelligence row counts WITHOUT re-analysing —
+// run it before and after the backfill and check nothing regressed.
 //
 // HARD CONSTRAINT: not run automatically. See
-// docs/superpowers/runbooks/2026-07-09-refresh-activation.md — the owner runs
-// this under supervision after backing up data/pilot.db.
+// docs/superpowers/runbooks/2026-07-09-refresh-activation.md and
+// docs/superpowers/runbooks/2026-07-10-product-intelligence-activation.md —
+// the owner runs this under supervision after backing up data/pilot.db.
 
 import 'dotenv/config';
 import { openDb } from '../src/storage.js';
@@ -33,27 +39,45 @@ export function parseArgs(argv) {
     dryRun: argv.includes('--dry-run'),
     dbPath,
     onlyId: Number.isFinite(only) ? only : null,
+    counts: argv.includes('--counts'),
   };
+}
+
+// Pure formatter for db.countProductIntelligence() — the before/after
+// verification line of the product-intelligence backfill.
+export function formatIntelligenceCounts(c) {
+  return `product intelligence: ${c.line_items} line items across ${c.contracts_with_line_items} contracts, `
+    + `${c.coverage} coverage rows across ${c.contracts_with_coverage} contracts`;
 }
 
 // Only run the IO when invoked as a script (not when imported by tests).
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const { dryRun, dbPath, onlyId } = parseArgs(process.argv.slice(2));
+  const { dryRun, dbPath, onlyId, counts } = parseArgs(process.argv.slice(2));
   const path = dbPath ?? process.env.PILOT_DB_PATH ?? 'data/pilot.db';
 
   if (dryRun) {
-    console.log(`[dry-run] would re-analyse all contract PDFs in ${path} to backfill lifecycle fields. No changes made.`);
+    console.log(`[dry-run] would re-analyse all contract PDFs in ${path} to backfill lifecycle/pricing fields + line items + coverage. No changes made.`);
+    process.exit(0);
+  }
+
+  if (counts) {
+    // Read-only verification: no migration, no re-analysis, no API calls.
+    const db = openDb(path);
+    console.log(formatIntelligenceCounts(db.countProductIntelligence()));
+    db.close();
     process.exit(0);
   }
 
   const db = openDb(path);
   db.migrate();
+  console.log(`before: ${formatIntelligenceCounts(db.countProductIntelligence())}`);
   const n = await analysePendingContracts({
     db,
     force: true, // re-analyse every PDF, not only those without a contracts row
     onlyId,
     log: (msg) => console.log(msg),
   });
-  console.log(`Done. ${n} attachment(s) re-analysed for lifecycle fields.`);
+  console.log(`after:  ${formatIntelligenceCounts(db.countProductIntelligence())}`);
+  console.log(`Done. ${n} attachment(s) re-analysed for lifecycle/pricing/product-intelligence fields.`);
   db.close();
 }

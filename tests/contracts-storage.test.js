@@ -292,6 +292,139 @@ describe('listContractFacts', () => {
   });
 });
 
+describe('product intelligence tables (2026-07-10 design)', () => {
+  it('migrate is idempotent — line-item/coverage tables + indexes exist once after two runs', () => {
+    expect(() => { db.migrate(); db.migrate(); }).not.toThrow();
+    const tables = db.raw.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map((r) => r.name);
+    expect(tables.filter((n) => n === 'contract_line_items')).toHaveLength(1);
+    expect(tables.filter((n) => n === 'contract_coverage')).toHaveLength(1);
+    const indexes = db.raw.prepare("SELECT name FROM sqlite_master WHERE type='index'").all().map((r) => r.name);
+    expect(indexes.filter((n) => n === 'idx_line_items_contract')).toHaveLength(1);
+    expect(indexes.filter((n) => n === 'idx_coverage_contract')).toHaveLength(1);
+  });
+
+  it('migrate adds the tables to a pre-existing DB created without them', () => {
+    const path2 = join(tmp, 'old-pi.db');
+    const Database = db.raw.constructor;
+    const old = new Database(path2);
+    old.exec(`
+      CREATE TABLE contracts (
+        id INTEGER PRIMARY KEY,
+        attachment_id INTEGER NOT NULL UNIQUE,
+        vendor_id INTEGER,
+        avtalsvarde TEXT, valuta TEXT, period_start TEXT, period_end TEXT,
+        is_contract INTEGER NOT NULL DEFAULT 1,
+        summary TEXT, confidence REAL, analysis_json TEXT, model TEXT,
+        analyzed_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      INSERT INTO contracts (attachment_id, avtalsvarde) VALUES (1, '129 tkr/år');
+    `);
+    old.close();
+    const db2 = openDb(path2);
+    // Pre-migration --counts check must not crash: absent tables read as zeros.
+    expect(db2.countProductIntelligence()).toEqual({
+      line_items: 0, coverage: 0, contracts_with_line_items: 0, contracts_with_coverage: 0,
+    });
+    expect(() => { db2.migrate(); db2.migrate(); }).not.toThrow();
+    const tables = db2.raw.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map((r) => r.name);
+    expect(tables).toContain('contract_line_items');
+    expect(tables).toContain('contract_coverage');
+    expect(db2.raw.prepare('SELECT avtalsvarde FROM contracts WHERE attachment_id = 1').get().avtalsvarde).toBe('129 tkr/år');
+    db2.close();
+  });
+
+  it('replaceContractLineItems + listLineItemsForContract round-trip (Ale ILT shape)', () => {
+    const { attId } = seedAttachment();
+    const v = db.upsertVendor('ILT Education');
+    const cId = db.recordContract({ attachment_id: attId, vendor_id: v.id, is_contract: 1 });
+    const pid = db.upsertProduct(v.id, 'Begreppa');
+    db.replaceContractLineItems(cId, [
+      { product_id: pid, product_name: 'Begreppa', description: null, unit_price_sek: null, unit: null, quantity: null, period_months: null, amount_sek: 116244 },
+      { product_id: pid, product_name: 'Begreppa', description: '3,5 mån tidigare pris', unit_price_sek: null, unit: null, quantity: null, period_months: 3.5, amount_sek: 50341 },
+      { product_id: null, product_name: 'Polyglutt', description: '100 kr/barn', unit_price_sek: 100, unit: 'barn', quantity: 1683, period_months: null, amount_sek: 168300 },
+    ]);
+    const rows = db.listLineItemsForContract(cId);
+    expect(rows).toHaveLength(3);
+    expect(rows[0]).toMatchObject({ contract_id: cId, product_id: pid, product_name: 'Begreppa', amount_sek: 116244 });
+    expect(rows[1]).toMatchObject({ description: '3,5 mån tidigare pris', period_months: 3.5, amount_sek: 50341 });
+    expect(rows[2]).toMatchObject({ product_id: null, product_name: 'Polyglutt', unit_price_sek: 100, unit: 'barn', quantity: 1683, amount_sek: 168300 });
+    // Replace is idempotent, not additive.
+    db.replaceContractLineItems(cId, [
+      { product_name: 'Polyglutt', amount_sek: 168300 },
+    ]);
+    expect(db.listLineItemsForContract(cId)).toHaveLength(1);
+  });
+
+  it('replaceContractCoverage + listCoverageForContract round-trip (one row per product × grade)', () => {
+    const { attId } = seedAttachment();
+    const v = db.upsertVendor('ILT Education');
+    const cId = db.recordContract({ attachment_id: attId, vendor_id: v.id, is_contract: 1 });
+    db.replaceContractCoverage(cId, [
+      { product_id: null, product_name: 'Polyglutt', grade_level: 'Förskola', status: 'full', student_count: 1683 },
+      { product_id: null, product_name: 'Begreppa', grade_level: '1-3', status: 'full', student_count: null },
+      { product_id: null, product_name: 'Begreppa', grade_level: 'Gymnasiet', status: 'partial', student_count: 120 },
+    ]);
+    const rows = db.listCoverageForContract(cId);
+    expect(rows).toHaveLength(3);
+    expect(rows.find((r) => r.grade_level === 'Förskola')).toMatchObject({ product_name: 'Polyglutt', status: 'full', student_count: 1683 });
+    expect(rows.find((r) => r.grade_level === 'Gymnasiet')).toMatchObject({ product_name: 'Begreppa', status: 'partial' });
+    db.replaceContractCoverage(cId, []);
+    expect(db.listCoverageForContract(cId)).toHaveLength(0);
+  });
+
+  it('recordContract re-analysis replacement clears the old contract line items + coverage (no FK error)', () => {
+    const { attId } = seedAttachment();
+    const v = db.upsertVendor('ILT Education');
+    const c1 = db.recordContract({ attachment_id: attId, vendor_id: v.id, is_contract: 1 });
+    db.replaceContractLineItems(c1, [{ product_name: 'Begreppa', amount_sek: 166585 }]);
+    db.replaceContractCoverage(c1, [{ product_name: 'Begreppa', grade_level: '1-3', status: 'full', student_count: null }]);
+    // Re-analysis re-records for the same attachment — must not throw on FK
+    // (foreign_keys=ON would block deleting a contracts row with children).
+    // Note SQLite may reuse the freed rowid, so assert on emptiness, not ids.
+    let c2;
+    expect(() => { c2 = db.recordContract({ attachment_id: attId, vendor_id: v.id, is_contract: 1 }); }).not.toThrow();
+    expect(db.listLineItemsForContract(c1)).toHaveLength(0);
+    expect(db.listLineItemsForContract(c2)).toHaveLength(0); // caller re-writes explicitly
+    expect(db.listCoverageForContract(c1)).toHaveLength(0);
+    expect(db.listCoverageForContract(c2)).toHaveLength(0);
+  });
+
+  it('listLineItems / listCoverage return all rows for stored contracts (is_contract=1 only)', () => {
+    const a = seedAttachment({ filename: 'ILT.pdf' });
+    const b = seedAttachment({ filename: 'Brev.pdf', kommun_kod: '0180' });
+    const v = db.upsertVendor('ILT Education');
+    const c1 = db.recordContract({ attachment_id: a.attId, vendor_id: v.id, is_contract: 1 });
+    const c2 = db.recordContract({ attachment_id: b.attId, vendor_id: null, is_contract: 0 });
+    db.replaceContractLineItems(c1, [{ product_name: 'Begreppa', amount_sek: 166585 }]);
+    db.replaceContractLineItems(c2, [{ product_name: 'Spök', amount_sek: 1 }]);
+    db.replaceContractCoverage(c1, [{ product_name: 'Begreppa', grade_level: '1-3', status: 'full', student_count: null }]);
+    db.replaceContractCoverage(c2, [{ product_name: 'Spök', grade_level: '1-3', status: 'full', student_count: null }]);
+    const items = db.listLineItems();
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({ contract_id: c1, product_name: 'Begreppa', amount_sek: 166585 });
+    const cov = db.listCoverage();
+    expect(cov).toHaveLength(1);
+    expect(cov[0]).toMatchObject({ contract_id: c1, product_name: 'Begreppa', grade_level: '1-3', status: 'full' });
+  });
+
+  it('countProductIntelligence reports row + contract counts for the backfill verify step', () => {
+    const a = seedAttachment({ filename: 'ILT.pdf' });
+    const v = db.upsertVendor('ILT Education');
+    const c1 = db.recordContract({ attachment_id: a.attId, vendor_id: v.id, is_contract: 1 });
+    expect(db.countProductIntelligence()).toEqual({
+      line_items: 0, coverage: 0, contracts_with_line_items: 0, contracts_with_coverage: 0,
+    });
+    db.replaceContractLineItems(c1, [
+      { product_name: 'Begreppa', amount_sek: 116244 },
+      { product_name: 'Begreppa', amount_sek: 50341 },
+    ]);
+    db.replaceContractCoverage(c1, [{ product_name: 'Begreppa', grade_level: '1-3', status: 'full', student_count: null }]);
+    expect(db.countProductIntelligence()).toEqual({
+      line_items: 2, coverage: 1, contracts_with_line_items: 1, contracts_with_coverage: 1,
+    });
+  });
+});
+
 describe('listVendorsOverview', () => {
   it('aggregates contract count, kommun count, products', () => {
     const { attId } = seedAttachment();

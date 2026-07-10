@@ -11,6 +11,76 @@
 
 import { computeNextReviewDate } from './contract-lifecycle.js';
 
+// ---- Grade-level coverage schema (2026-07-10-product-intelligence design) ----
+
+// Canonical, fixed 9-level grade schema. Order matters: every consumer
+// (matrix columns, mapper output) uses this order.
+export const GRADE_LEVELS = Object.freeze([
+  'Förskola', 'Förskoleklass', '1-3', '4-6', '7-9',
+  'Gymnasiet', 'Komvux', 'Introduktionsprogrammet', 'Högskola',
+]);
+
+// The levels a kommun actually operates — everything except Högskola.
+// whole-municipality coverage expands to these, never to Högskola.
+export const MUNICIPAL_GRADE_LEVELS = Object.freeze(GRADE_LEVELS.slice(0, 8));
+
+const COMPULSORY_BANDS = ['1-3', '4-6', '7-9'];
+
+// Map an "F-3"/"åk 4-6"/"F-Gy" range onto the bands it intersects.
+// lo/hi live on the scale F=0, 1..9, Gy=10.
+function rangeToLevels(lo, hi) {
+  const out = [];
+  if (lo === 0) out.push('Förskoleklass');
+  for (const [band, s, e] of [['1-3', 1, 3], ['4-6', 4, 6], ['7-9', 7, 9]]) {
+    if (Math.max(lo, 1) <= e && Math.min(hi, 9) >= s && hi >= 1 && lo <= 9) out.push(band);
+  }
+  if (hi === 10) out.push('Gymnasiet');
+  return out;
+}
+
+// Pure Swedish-unit-description → canonical-band mapper (spec Feature 2).
+// Honest by design: unrecognized text maps to NOTHING — never a guess.
+// Anpassad skola / särskola is folded into the matching age bands (its
+// students count toward 1-3/4-6/7-9/Gymnasiet): a qualified phrase
+// ("anpassad grundskola", "gymnasiesärskola") folds into its own bands via
+// the ordinary keyword rules; a bare "anpassad skola"/"särskola" with no
+// age context folds into all four.
+export function mapUnitToGradeLevels(unitText) {
+  if (typeof unitText !== 'string' || !unitText.trim()) return [];
+  const t = unitText.toLowerCase();
+  const out = new Set();
+
+  // Whole-municipality phrases → every municipal level.
+  if (/hela kommunen|samtliga skolformer|alla skolformer|kommunövergripande/.test(t)) {
+    for (const g of MUNICIPAL_GRADE_LEVELS) out.add(g);
+  }
+
+  // "F-3" / "åk 4-6" / "F-Gy" style ranges (hyphen or dash).
+  for (const m of t.matchAll(/(?:åk\s*)?\b(f|[1-9])\s*[-–—]\s*(gy\w*|[1-9])\b/gi)) {
+    const lo = m[1] === 'f' ? 0 : Number(m[1]);
+    const hi = /^gy/.test(m[2]) ? 10 : Number(m[2]);
+    for (const g of rangeToLevels(lo, hi)) out.add(g);
+  }
+
+  if (/förskoleklass/.test(t)) out.add('Förskoleklass');
+  if (/förskol(a|an|or|orna)/.test(t)) out.add('Förskola');
+  if (/grundskol/.test(t)) for (const g of COMPULSORY_BANDS) out.add(g);
+  if (/gymnasi/.test(t)) out.add('Gymnasiet');
+  if (/introduktionsprogram|\bim-program/.test(t)) out.add('Introduktionsprogrammet');
+  if (/vuxenutbildning|komvux|\bsfi\b|svenska för invandrare/.test(t)) out.add('Komvux');
+  if (/högskol|universitet/.test(t)) out.add('Högskola');
+
+  // Anpassad skola / särskola folding. Qualified forms are already handled
+  // above (grundsärskola matches nothing yet → handled here; anpassad
+  // grundskola matched /grundskol/; gymnasiesärskola matched /gymnasi/).
+  if (/grundsärskol/.test(t)) for (const g of COMPULSORY_BANDS) out.add(g);
+  if (/anpassad|särskol/.test(t) && !/grundskol|grundsärskol|gymnasi/.test(t)) {
+    for (const g of [...COMPULSORY_BANDS, 'Gymnasiet']) out.add(g);
+  }
+
+  return GRADE_LEVELS.filter((g) => out.has(g));
+}
+
 // ---- SEK/year normalization -------------------------------------------------
 
 // Parse a Swedish-formatted amount ("612 500,00", "4 955 221") to a number.
@@ -253,6 +323,12 @@ export function buildVendorRollups(facts, { now }) {
       length_known_count: lengths.length,
       price_per_student_min: studentPrices.length ? Math.min(...studentPrices) : null,
       price_per_student_max: studentPrices.length ? Math.max(...studentPrices) : null,
+      // "Snitt per kommun" KPI (2026-07-10 design): total KNOWN annual ÷
+      // distinct kommuner. Null (never 0) when no value is known; the view
+      // pairs it with the value-completeness line.
+      avg_annual_per_kommun: known.length
+        ? Math.round(known.reduce((s, f) => s + f.annual_value_sek, 0) / new Set(group.map((f) => f.kommun_kod)).size)
+        : null,
       products: [...new Set(group.flatMap((f) => f.products))].sort((a, b) => a.localeCompare(b, 'sv')),
       next_renewal_date: nextFutureDate(group, now),
     });
@@ -262,6 +338,134 @@ export function buildVendorRollups(facts, { now }) {
     (b.total_annual_sek ?? -1) - (a.total_annual_sek ?? -1)
     || b.kommun_count - a.kommun_count
     || String(a.vendor_name).localeCompare(String(b.vendor_name), 'sv'));
+}
+
+// ---- Per-product rollups: line-item pricing + coverage matrix --------------
+// (2026-07-10-product-intelligence design.) `facts` is one vendor's contract
+// facts (the dossier's slice); `lineItems`/`coverage` are DB rows from
+// db.listLineItems()/db.listCoverage() — rows for other vendors' contracts
+// are ignored via the contract_id join, so passing the full tables is safe.
+
+// Aggregated colour for one (product, grade) over the kommuner with known
+// coverage for the product:
+//   green  — full in ALL of them
+//   yellow — partial somewhere, or mixed full/absent across kommuner
+//   red    — no kommun covers the level (but the vendor references it
+//            elsewhere, so red always means "sold elsewhere, not here")
+//   na     — the level is never referenced by any contract of this vendor,
+//            or the product has no extracted coverage at all (unknown ≠ red).
+export function buildProductRollups(facts, lineItems = [], coverage = []) {
+  const factById = new Map(facts.map((f) => [f.contract_id, f]));
+  const li = lineItems.filter((r) => factById.has(r.contract_id));
+  const cov = coverage.filter((r) => factById.has(r.contract_id));
+
+  // Product universe: named on contracts, in line items, or in coverage.
+  const names = new Set();
+  for (const f of facts) for (const p of f.products ?? []) names.add(p);
+  for (const r of li) names.add(r.product_name);
+  for (const r of cov) names.add(r.product_name);
+
+  // Vendor-level applicability: a grade the vendor never references is "–"
+  // for every product (not-applicable), so red keeps its meaning.
+  const applicable = new Set(cov.map((r) => r.grade_level));
+
+  const rollups = [];
+  for (const name of names) {
+    // Selling kommuner: any contract naming the product (or carrying its
+    // line items / coverage rows).
+    const kommunNames = new Map(); // kod → namn
+    for (const f of facts) {
+      if ((f.products ?? []).includes(name)) kommunNames.set(f.kommun_kod, f.kommun_namn);
+    }
+    for (const r of [...li, ...cov]) {
+      if (r.product_name !== name) continue;
+      const f = factById.get(r.contract_id);
+      kommunNames.set(f.kommun_kod, f.kommun_namn);
+    }
+    const kommunKods = [...kommunNames.keys()].sort((a, b) =>
+      kommunNames.get(a).localeCompare(kommunNames.get(b), 'sv'));
+
+    // Per-kommun price = Σ amount_sek of the product's line items in that
+    // kommun's contracts. No line items → null ("ingår, ospecificerat pris").
+    const priceByKommun = kommunKods.map((kod) => {
+      const amounts = li.filter((r) => r.product_name === name
+        && factById.get(r.contract_id).kommun_kod === kod
+        && r.amount_sek != null);
+      return {
+        kommun_kod: kod,
+        kommun_namn: kommunNames.get(kod),
+        amount_sek: amounts.length ? Math.round(amounts.reduce((s, r) => s + r.amount_sek, 0)) : null,
+      };
+    });
+    const knownPrices = priceByKommun.map((p) => p.amount_sek).filter((v) => v != null);
+    const priceRange = knownPrices.length
+      ? { min: Math.min(...knownPrices), max: Math.max(...knownPrices) }
+      : null;
+
+    // Dominant pricing model over the contracts that name the product.
+    const mix = {};
+    for (const f of facts) {
+      if ((f.products ?? []).includes(name) && f.pricing_model) {
+        mix[f.pricing_model] = (mix[f.pricing_model] ?? 0) + 1;
+      }
+    }
+    const dominantPricingModel = Object.entries(mix)
+      .filter(([m]) => m !== 'unknown')
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0] ?? null;
+
+    // Coverage per kommun: kod → Map(grade → { status, student_count }),
+    // full beating partial when a kommun has several contracts.
+    const covByKommun = new Map();
+    for (const r of cov) {
+      if (r.product_name !== name) continue;
+      const f = factById.get(r.contract_id);
+      if (!covByKommun.has(f.kommun_kod)) covByKommun.set(f.kommun_kod, new Map());
+      const grades = covByKommun.get(f.kommun_kod);
+      const prev = grades.get(r.grade_level);
+      if (!prev || (prev.status !== 'full' && r.status === 'full')) {
+        grades.set(r.grade_level, { status: r.status, student_count: r.student_count ?? null });
+      }
+    }
+    const coverageKnown = covByKommun.size > 0;
+
+    const coverageByGrade = {};
+    const coverageDetail = {};
+    for (const g of GRADE_LEVELS) {
+      const detail = kommunKods
+        .filter((kod) => covByKommun.get(kod)?.has(g))
+        .map((kod) => ({
+          kommun_kod: kod,
+          kommun_namn: kommunNames.get(kod),
+          status: covByKommun.get(kod).get(g).status,
+          student_count: covByKommun.get(kod).get(g).student_count,
+        }));
+      coverageDetail[g] = detail;
+      if (!coverageKnown || !applicable.has(g)) {
+        coverageByGrade[g] = 'na';
+      } else if (detail.length === 0) {
+        coverageByGrade[g] = 'red';
+      } else if (detail.length === covByKommun.size && detail.every((d) => d.status === 'full')) {
+        coverageByGrade[g] = 'green';
+      } else {
+        coverageByGrade[g] = 'yellow';
+      }
+    }
+
+    rollups.push({
+      name,
+      kommunCount: kommunKods.length,
+      kommuns: kommunKods.map((kod) => kommunNames.get(kod)),
+      priceByKommun,
+      priceRange,
+      dominantPricingModel,
+      coverageKnown,
+      coverageByGrade,
+      coverageDetail,
+    });
+  }
+
+  return rollups.sort((a, b) =>
+    b.kommunCount - a.kommunCount || a.name.localeCompare(b.name, 'sv'));
 }
 
 // Non-null count for any fact key — drives every "känd för X av Y avtal" line.

@@ -169,6 +169,31 @@ CREATE TABLE IF NOT EXISTS contract_products (
   product_id INTEGER NOT NULL REFERENCES products(id),
   PRIMARY KEY (contract_id, product_id)
 );
+
+CREATE TABLE IF NOT EXISTS contract_line_items (
+  id INTEGER PRIMARY KEY,
+  contract_id INTEGER NOT NULL REFERENCES contracts(id),
+  product_id INTEGER REFERENCES products(id),
+  product_name TEXT NOT NULL,
+  description TEXT,
+  unit_price_sek REAL,
+  unit TEXT,
+  quantity REAL,
+  period_months REAL,
+  amount_sek REAL
+);
+CREATE INDEX IF NOT EXISTS idx_line_items_contract ON contract_line_items(contract_id);
+
+CREATE TABLE IF NOT EXISTS contract_coverage (
+  id INTEGER PRIMARY KEY,
+  contract_id INTEGER NOT NULL REFERENCES contracts(id),
+  product_id INTEGER REFERENCES products(id),
+  product_name TEXT NOT NULL,
+  grade_level TEXT NOT NULL,
+  status TEXT NOT NULL,
+  student_count REAL
+);
+CREATE INDEX IF NOT EXISTS idx_coverage_contract ON contract_coverage(contract_id);
 `;
 
 export function openDb(path) {
@@ -595,10 +620,15 @@ export function openDb(path) {
   }
 
   function recordContract(c) {
-    // Re-analysis replaces: clear old row + product links for this attachment.
+    // Re-analysis replaces: clear old row + product links + line items +
+    // coverage for this attachment. Line items/coverage are re-written by
+    // storeContractAnalysis after the merge (non-destructive: it reads the
+    // old rows first and preserves them when the new pass has no signal).
     const old = db.prepare('SELECT id FROM contracts WHERE attachment_id = ?').get(c.attachment_id);
     if (old) {
       db.prepare('DELETE FROM contract_products WHERE contract_id = ?').run(old.id);
+      db.prepare('DELETE FROM contract_line_items WHERE contract_id = ?').run(old.id);
+      db.prepare('DELETE FROM contract_coverage WHERE contract_id = ?').run(old.id);
       db.prepare('DELETE FROM contracts WHERE id = ?').run(old.id);
     }
     const r = db.prepare(`
@@ -625,6 +655,82 @@ export function openDb(path) {
 
   function linkContractProduct(contractId, productId) {
     db.prepare('INSERT OR IGNORE INTO contract_products (contract_id, product_id) VALUES (?, ?)').run(contractId, productId);
+  }
+
+  // ---- Product intelligence (2026-07-10 design): line items + coverage ----
+
+  // Replace ALL line items for one contract (idempotent re-analysis write).
+  function replaceContractLineItems(contractId, items) {
+    db.prepare('DELETE FROM contract_line_items WHERE contract_id = ?').run(contractId);
+    const ins = db.prepare(`
+      INSERT INTO contract_line_items
+        (contract_id, product_id, product_name, description, unit_price_sek, unit, quantity, period_months, amount_sek)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    for (const it of items) {
+      ins.run(contractId, it.product_id ?? null, it.product_name,
+        it.description ?? null, it.unit_price_sek ?? null, it.unit ?? null,
+        it.quantity ?? null, it.period_months ?? null, it.amount_sek ?? null);
+    }
+  }
+
+  function listLineItemsForContract(contractId) {
+    return db.prepare('SELECT * FROM contract_line_items WHERE contract_id = ? ORDER BY id').all(contractId);
+  }
+
+  // Replace ALL coverage rows for one contract. One row per (product, grade).
+  function replaceContractCoverage(contractId, rows) {
+    db.prepare('DELETE FROM contract_coverage WHERE contract_id = ?').run(contractId);
+    const ins = db.prepare(`
+      INSERT INTO contract_coverage
+        (contract_id, product_id, product_name, grade_level, status, student_count)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `);
+    for (const r of rows) {
+      ins.run(contractId, r.product_id ?? null, r.product_name, r.grade_level, r.status, r.student_count ?? null);
+    }
+  }
+
+  function listCoverageForContract(contractId) {
+    return db.prepare('SELECT * FROM contract_coverage WHERE contract_id = ? ORDER BY id').all(contractId);
+  }
+
+  // All line items / coverage rows for STORED contracts (is_contract=1) —
+  // the raw input for buildProductRollups. Rows carry contract_id; the
+  // analytics layer joins them to contract facts (which carry the kommun).
+  function listLineItems() {
+    return db.prepare(`
+      SELECT li.* FROM contract_line_items li
+      JOIN contracts c ON c.id = li.contract_id
+      WHERE c.is_contract = 1
+      ORDER BY li.contract_id, li.id
+    `).all();
+  }
+
+  function listCoverage() {
+    return db.prepare(`
+      SELECT cc.* FROM contract_coverage cc
+      JOIN contracts c ON c.id = cc.contract_id
+      WHERE c.is_contract = 1
+      ORDER BY cc.contract_id, cc.id
+    `).all();
+  }
+
+  // Backfill verification: totals must never regress across a re-analysis
+  // run (runbook "verify counts don't regress" step). Tolerates a
+  // pre-migration DB (tables absent → zeros) so the read-only --counts
+  // check can run BEFORE the migration without touching the schema.
+  function countProductIntelligence() {
+    const hasTable = (t) => !!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name = ?").get(t);
+    if (!hasTable('contract_line_items') || !hasTable('contract_coverage')) {
+      return { line_items: 0, coverage: 0, contracts_with_line_items: 0, contracts_with_coverage: 0 };
+    }
+    return {
+      line_items: db.prepare('SELECT COUNT(*) AS n FROM contract_line_items').get().n,
+      coverage: db.prepare('SELECT COUNT(*) AS n FROM contract_coverage').get().n,
+      contracts_with_line_items: db.prepare('SELECT COUNT(DISTINCT contract_id) AS n FROM contract_line_items').get().n,
+      contracts_with_coverage: db.prepare('SELECT COUNT(DISTINCT contract_id) AS n FROM contract_coverage').get().n,
+    };
   }
 
   function listPendingContractAttachments() {
@@ -834,6 +940,13 @@ export function openDb(path) {
     upsertProduct,
     recordContract,
     linkContractProduct,
+    replaceContractLineItems,
+    listLineItemsForContract,
+    replaceContractCoverage,
+    listCoverageForContract,
+    listLineItems,
+    listCoverage,
+    countProductIntelligence,
     listPendingContractAttachments,
     listContractInfoForMessage,
     listContractsForVendor,
