@@ -8,6 +8,9 @@ import {
   GRADE_LEVELS,
   MUNICIPAL_GRADE_LEVELS,
   mapUnitToGradeLevels,
+  buildContractFacts,
+  buildProductRollups,
+  buildVendorRollups,
 } from '../src/vendor-analytics.js';
 
 describe('grade schema constants', () => {
@@ -117,5 +120,171 @@ describe('mapUnitToGradeLevels — table tests over real unit phrases', () => {
   it('result is deduped and in canonical order regardless of phrase order', () => {
     expect(m('gymnasieskolor och grundskolor')).toEqual(['1-3', '4-6', '7-9', 'Gymnasiet']);
     expect(m('vuxenutbildning samt förskola')).toEqual(['Förskola', 'Komvux']);
+  });
+});
+
+// ---- buildProductRollups: ILT-shaped fixture with the REAL Ale breakdown ----
+
+const NOW = new Date('2026-07-10T12:00:00Z');
+const LAN = new Map([['1440', 'Västra Götalands län'], ['1489', 'Västra Götalands län']]);
+
+// Contract 1 = the real Ale / ILT Education contract (live row 101): total
+// 585 649 SEK år 1, itemized per product, per-product enhets-lists.
+// Contract 2 = a second kommun (Alingsås) buying only Begreppa, with partial
+// coverage and NO line items (lump sum) — drives the yellow/"ospecificerat"
+// paths.
+function iltFacts() {
+  return buildContractFacts([
+    {
+      contract_id: 1, vendor_id: 7, vendor_name: 'ILT Education', vendor_slug: 'ilt-education',
+      kommun_kod: '1440', kommun_namn: 'Ale',
+      avtalsvarde: '585 649 SEK år 1, 615 767 SEK år 2, 624 182 SEK år 3', valuta: 'SEK',
+      period_start: '2025-01-31', period_end: '2028-01-30',
+      auto_renews: null, renewal_term: null, last_cancellation_date: null, extension_option_until: null,
+      annual_value_sek: 585649, one_time_value_sek: null, pricing_model: 'tiered',
+      unit_price_sek: null, unit: null, quantity: null, value_incl_moms: null,
+      confidence: 0.95, summary: 'ILT-avtal', attachment_id: 101, filename: 'ILT-Ale.pdf',
+      received_at: '2026-06-01T10:00:00Z',
+      products: ['Begreppa', 'Inlästa läromedel', 'Polyglutt'],
+    },
+    {
+      contract_id: 2, vendor_id: 7, vendor_name: 'ILT Education', vendor_slug: 'ilt-education',
+      kommun_kod: '1489', kommun_namn: 'Alingsås',
+      avtalsvarde: null, valuta: 'SEK',
+      period_start: '2025-08-01', period_end: '2026-07-31',
+      auto_renews: null, renewal_term: null, last_cancellation_date: null, extension_option_until: null,
+      annual_value_sek: 100000, one_time_value_sek: null, pricing_model: 'fixed',
+      unit_price_sek: null, unit: null, quantity: null, value_incl_moms: null,
+      confidence: 0.9, summary: 'Begreppa-avtal', attachment_id: 102, filename: 'ILT-Alingsas.pdf',
+      received_at: '2026-06-02T10:00:00Z',
+      products: ['Begreppa'],
+    },
+  ], { lanByKommunKod: LAN, now: NOW });
+}
+
+// DB-row-shaped line items (as db.listLineItems() returns them).
+const ILT_LINE_ITEMS = [
+  { id: 1, contract_id: 1, product_id: null, product_name: 'Inlästa läromedel', description: '65,40 kr/elev, 7 månader', unit_price_sek: 65.4, unit: 'elev', quantity: null, period_months: 7, amount_sek: 161909 },
+  { id: 2, contract_id: 1, product_id: null, product_name: 'Inlästa läromedel', description: '55 kr/elev, 5 månader', unit_price_sek: 55, unit: 'elev', quantity: null, period_months: 5, amount_sek: 88855 },
+  { id: 3, contract_id: 1, product_id: null, product_name: 'Begreppa', description: null, unit_price_sek: null, unit: null, quantity: null, period_months: null, amount_sek: 116244 },
+  { id: 4, contract_id: 1, product_id: null, product_name: 'Begreppa', description: '3,5 mån tidigare pris', unit_price_sek: null, unit: null, quantity: null, period_months: 3.5, amount_sek: 50341 },
+  { id: 5, contract_id: 1, product_id: null, product_name: 'Polyglutt', description: '100 kr/barn', unit_price_sek: 100, unit: 'barn', quantity: 1683, period_months: null, amount_sek: 168300 },
+];
+
+const FULL_ALE_GRADES = ['1-3', '4-6', '7-9', 'Gymnasiet', 'Komvux'];
+
+// DB-row-shaped coverage (as db.listCoverage() returns it).
+const ILT_COVERAGE = [
+  ...FULL_ALE_GRADES.map((g, i) => ({ id: 10 + i, contract_id: 1, product_id: null, product_name: 'Inlästa läromedel', grade_level: g, status: 'full', student_count: 4244 })),
+  ...FULL_ALE_GRADES.map((g, i) => ({ id: 20 + i, contract_id: 1, product_id: null, product_name: 'Begreppa', grade_level: g, status: 'full', student_count: 4244 })),
+  { id: 30, contract_id: 1, product_id: null, product_name: 'Polyglutt', grade_level: 'Förskola', status: 'full', student_count: 1683 },
+  // Alingsås: Begreppa only in SOME grundskolor, only lower/middle years.
+  { id: 40, contract_id: 2, product_id: null, product_name: 'Begreppa', grade_level: '1-3', status: 'partial', student_count: 800 },
+  { id: 41, contract_id: 2, product_id: null, product_name: 'Begreppa', grade_level: '4-6', status: 'partial', student_count: null },
+];
+
+describe('buildProductRollups — line-item pricing (Ale figures)', () => {
+  const rollups = buildProductRollups(iltFacts(), ILT_LINE_ITEMS, ILT_COVERAGE);
+  const byName = (n) => rollups.find((r) => r.name === n);
+
+  it('one rollup per product, most-sold first', () => {
+    expect(rollups.map((r) => r.name)).toEqual(['Begreppa', 'Inlästa läromedel', 'Polyglutt']);
+  });
+
+  it('per-product price = Σ its line-item amounts: Begreppa 166 585, Polyglutt 168 300', () => {
+    expect(byName('Begreppa').priceByKommun.find((p) => p.kommun_namn === 'Ale').amount_sek).toBe(166585);
+    expect(byName('Polyglutt').priceByKommun.find((p) => p.kommun_namn === 'Ale').amount_sek).toBe(168300);
+    expect(byName('Inlästa läromedel').priceByKommun.find((p) => p.kommun_namn === 'Ale').amount_sek).toBe(250764);
+  });
+
+  it('a kommun without line items for the product prices as null (ingår, ospecificerat)', () => {
+    expect(byName('Begreppa').priceByKommun.find((p) => p.kommun_namn === 'Alingsås').amount_sek).toBeNull();
+  });
+
+  it('priceRange spans only the KNOWN per-kommun sums; null when nothing is known', () => {
+    expect(byName('Begreppa').priceRange).toEqual({ min: 166585, max: 166585 });
+    const noItems = buildProductRollups(iltFacts(), [], ILT_COVERAGE);
+    expect(noItems.find((r) => r.name === 'Begreppa').priceRange).toBeNull();
+  });
+
+  it('counts and names the selling kommuner', () => {
+    expect(byName('Begreppa').kommunCount).toBe(2);
+    expect(byName('Begreppa').kommuns).toEqual(['Ale', 'Alingsås']);
+    expect(byName('Polyglutt').kommunCount).toBe(1);
+  });
+
+  it('dominant pricing model across the product-selling contracts', () => {
+    expect(byName('Polyglutt').dominantPricingModel).toBe('tiered');
+    expect(['fixed', 'tiered']).toContain(byName('Begreppa').dominantPricingModel);
+  });
+});
+
+describe('buildProductRollups — coverage matrix aggregation (green/yellow/red/na)', () => {
+  const rollups = buildProductRollups(iltFacts(), ILT_LINE_ITEMS, ILT_COVERAGE);
+  const byName = (n) => rollups.find((r) => r.name === n);
+
+  it('green only when FULL in all selling kommuner (Inlästa läromedel, single kommun)', () => {
+    const g = byName('Inlästa läromedel').coverageByGrade;
+    for (const grade of FULL_ALE_GRADES) expect(g[grade]).toBe('green');
+  });
+
+  it('yellow on partial or mixed across kommuner (Begreppa: Ale full, Alingsås partial/absent)', () => {
+    const g = byName('Begreppa').coverageByGrade;
+    expect(g['1-3']).toBe('yellow');   // full + partial
+    expect(g['4-6']).toBe('yellow');
+    expect(g['7-9']).toBe('yellow');   // full in Ale, no row in Alingsås → mixed
+    expect(g['Gymnasiet']).toBe('yellow');
+    expect(g['Komvux']).toBe('yellow');
+  });
+
+  it('red when the vendor sells the level elsewhere but this product reaches no kommun there', () => {
+    expect(byName('Begreppa').coverageByGrade['Förskola']).toBe('red');   // Polyglutt owns Förskola
+    expect(byName('Polyglutt').coverageByGrade['1-3']).toBe('red');
+    expect(byName('Polyglutt').coverageByGrade['Komvux']).toBe('red');
+  });
+
+  it('na when NO contract for this vendor ever references the level', () => {
+    for (const r of rollups) {
+      expect(r.coverageByGrade['Förskoleklass']).toBe('na');
+      expect(r.coverageByGrade['Introduktionsprogrammet']).toBe('na');
+      expect(r.coverageByGrade['Högskola']).toBe('na');
+    }
+  });
+
+  it('per-kommun detail behind each cell (who is full vs partial)', () => {
+    const detail = byName('Begreppa').coverageDetail['1-3'];
+    expect(detail).toEqual([
+      { kommun_kod: '1440', kommun_namn: 'Ale', status: 'full', student_count: 4244 },
+      { kommun_kod: '1489', kommun_namn: 'Alingsås', status: 'partial', student_count: 800 },
+    ]);
+  });
+
+  it('a product with no coverage anywhere is honestly all-na, flagged coverageKnown=false', () => {
+    const noCov = buildProductRollups(iltFacts(), ILT_LINE_ITEMS,
+      ILT_COVERAGE.filter((r) => r.product_name !== 'Polyglutt'));
+    const poly = noCov.find((r) => r.name === 'Polyglutt');
+    expect(poly.coverageKnown).toBe(false);
+    for (const g of GRADE_LEVELS) expect(poly.coverageByGrade[g]).toBe('na');
+    expect(noCov.find((r) => r.name === 'Begreppa').coverageKnown).toBe(true);
+  });
+
+  it('empty inputs → empty rollups', () => {
+    expect(buildProductRollups([], [], [])).toEqual([]);
+  });
+});
+
+describe('avg annual per kommun (vendor rollup KPI)', () => {
+  it('total known annual ÷ distinct kommuner, rounded', () => {
+    const rollups = buildVendorRollups(iltFacts(), { now: NOW });
+    const ilt = rollups.find((r) => r.vendor_name === 'ILT Education');
+    expect(ilt.total_annual_sek).toBe(685649);
+    expect(ilt.kommun_count).toBe(2);
+    expect(ilt.avg_annual_per_kommun).toBe(342825); // round(685649 / 2)
+  });
+
+  it('null (never 0) when no contract value is known', () => {
+    const facts = iltFacts().map((f) => ({ ...f, annual_value_sek: null, avtalsvarde: null }));
+    const rollups = buildVendorRollups(facts, { now: NOW });
+    expect(rollups[0].avg_annual_per_kommun).toBeNull();
   });
 });

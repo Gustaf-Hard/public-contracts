@@ -323,6 +323,12 @@ export function buildVendorRollups(facts, { now }) {
       length_known_count: lengths.length,
       price_per_student_min: studentPrices.length ? Math.min(...studentPrices) : null,
       price_per_student_max: studentPrices.length ? Math.max(...studentPrices) : null,
+      // "Snitt per kommun" KPI (2026-07-10 design): total KNOWN annual ÷
+      // distinct kommuner. Null (never 0) when no value is known; the view
+      // pairs it with the value-completeness line.
+      avg_annual_per_kommun: known.length
+        ? Math.round(known.reduce((s, f) => s + f.annual_value_sek, 0) / new Set(group.map((f) => f.kommun_kod)).size)
+        : null,
       products: [...new Set(group.flatMap((f) => f.products))].sort((a, b) => a.localeCompare(b, 'sv')),
       next_renewal_date: nextFutureDate(group, now),
     });
@@ -332,6 +338,134 @@ export function buildVendorRollups(facts, { now }) {
     (b.total_annual_sek ?? -1) - (a.total_annual_sek ?? -1)
     || b.kommun_count - a.kommun_count
     || String(a.vendor_name).localeCompare(String(b.vendor_name), 'sv'));
+}
+
+// ---- Per-product rollups: line-item pricing + coverage matrix --------------
+// (2026-07-10-product-intelligence design.) `facts` is one vendor's contract
+// facts (the dossier's slice); `lineItems`/`coverage` are DB rows from
+// db.listLineItems()/db.listCoverage() — rows for other vendors' contracts
+// are ignored via the contract_id join, so passing the full tables is safe.
+
+// Aggregated colour for one (product, grade) over the kommuner with known
+// coverage for the product:
+//   green  — full in ALL of them
+//   yellow — partial somewhere, or mixed full/absent across kommuner
+//   red    — no kommun covers the level (but the vendor references it
+//            elsewhere, so red always means "sold elsewhere, not here")
+//   na     — the level is never referenced by any contract of this vendor,
+//            or the product has no extracted coverage at all (unknown ≠ red).
+export function buildProductRollups(facts, lineItems = [], coverage = []) {
+  const factById = new Map(facts.map((f) => [f.contract_id, f]));
+  const li = lineItems.filter((r) => factById.has(r.contract_id));
+  const cov = coverage.filter((r) => factById.has(r.contract_id));
+
+  // Product universe: named on contracts, in line items, or in coverage.
+  const names = new Set();
+  for (const f of facts) for (const p of f.products ?? []) names.add(p);
+  for (const r of li) names.add(r.product_name);
+  for (const r of cov) names.add(r.product_name);
+
+  // Vendor-level applicability: a grade the vendor never references is "–"
+  // for every product (not-applicable), so red keeps its meaning.
+  const applicable = new Set(cov.map((r) => r.grade_level));
+
+  const rollups = [];
+  for (const name of names) {
+    // Selling kommuner: any contract naming the product (or carrying its
+    // line items / coverage rows).
+    const kommunNames = new Map(); // kod → namn
+    for (const f of facts) {
+      if ((f.products ?? []).includes(name)) kommunNames.set(f.kommun_kod, f.kommun_namn);
+    }
+    for (const r of [...li, ...cov]) {
+      if (r.product_name !== name) continue;
+      const f = factById.get(r.contract_id);
+      kommunNames.set(f.kommun_kod, f.kommun_namn);
+    }
+    const kommunKods = [...kommunNames.keys()].sort((a, b) =>
+      kommunNames.get(a).localeCompare(kommunNames.get(b), 'sv'));
+
+    // Per-kommun price = Σ amount_sek of the product's line items in that
+    // kommun's contracts. No line items → null ("ingår, ospecificerat pris").
+    const priceByKommun = kommunKods.map((kod) => {
+      const amounts = li.filter((r) => r.product_name === name
+        && factById.get(r.contract_id).kommun_kod === kod
+        && r.amount_sek != null);
+      return {
+        kommun_kod: kod,
+        kommun_namn: kommunNames.get(kod),
+        amount_sek: amounts.length ? Math.round(amounts.reduce((s, r) => s + r.amount_sek, 0)) : null,
+      };
+    });
+    const knownPrices = priceByKommun.map((p) => p.amount_sek).filter((v) => v != null);
+    const priceRange = knownPrices.length
+      ? { min: Math.min(...knownPrices), max: Math.max(...knownPrices) }
+      : null;
+
+    // Dominant pricing model over the contracts that name the product.
+    const mix = {};
+    for (const f of facts) {
+      if ((f.products ?? []).includes(name) && f.pricing_model) {
+        mix[f.pricing_model] = (mix[f.pricing_model] ?? 0) + 1;
+      }
+    }
+    const dominantPricingModel = Object.entries(mix)
+      .filter(([m]) => m !== 'unknown')
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0] ?? null;
+
+    // Coverage per kommun: kod → Map(grade → { status, student_count }),
+    // full beating partial when a kommun has several contracts.
+    const covByKommun = new Map();
+    for (const r of cov) {
+      if (r.product_name !== name) continue;
+      const f = factById.get(r.contract_id);
+      if (!covByKommun.has(f.kommun_kod)) covByKommun.set(f.kommun_kod, new Map());
+      const grades = covByKommun.get(f.kommun_kod);
+      const prev = grades.get(r.grade_level);
+      if (!prev || (prev.status !== 'full' && r.status === 'full')) {
+        grades.set(r.grade_level, { status: r.status, student_count: r.student_count ?? null });
+      }
+    }
+    const coverageKnown = covByKommun.size > 0;
+
+    const coverageByGrade = {};
+    const coverageDetail = {};
+    for (const g of GRADE_LEVELS) {
+      const detail = kommunKods
+        .filter((kod) => covByKommun.get(kod)?.has(g))
+        .map((kod) => ({
+          kommun_kod: kod,
+          kommun_namn: kommunNames.get(kod),
+          status: covByKommun.get(kod).get(g).status,
+          student_count: covByKommun.get(kod).get(g).student_count,
+        }));
+      coverageDetail[g] = detail;
+      if (!coverageKnown || !applicable.has(g)) {
+        coverageByGrade[g] = 'na';
+      } else if (detail.length === 0) {
+        coverageByGrade[g] = 'red';
+      } else if (detail.length === covByKommun.size && detail.every((d) => d.status === 'full')) {
+        coverageByGrade[g] = 'green';
+      } else {
+        coverageByGrade[g] = 'yellow';
+      }
+    }
+
+    rollups.push({
+      name,
+      kommunCount: kommunKods.length,
+      kommuns: kommunKods.map((kod) => kommunNames.get(kod)),
+      priceByKommun,
+      priceRange,
+      dominantPricingModel,
+      coverageKnown,
+      coverageByGrade,
+      coverageDetail,
+    });
+  }
+
+  return rollups.sort((a, b) =>
+    b.kommunCount - a.kommunCount || a.name.localeCompare(b.name, 'sv'));
 }
 
 // Non-null count for any fact key — drives every "känd för X av Y avtal" line.
