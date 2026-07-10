@@ -717,8 +717,14 @@ export function openDb(path) {
   }
 
   // Backfill verification: totals must never regress across a re-analysis
-  // run (runbook "verify counts don't regress" step).
+  // run (runbook "verify counts don't regress" step). Tolerates a
+  // pre-migration DB (tables absent → zeros) so the read-only --counts
+  // check can run BEFORE the migration without touching the schema.
   function countProductIntelligence() {
+    const hasTable = (t) => !!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name = ?").get(t);
+    if (!hasTable('contract_line_items') || !hasTable('contract_coverage')) {
+      return { line_items: 0, coverage: 0, contracts_with_line_items: 0, contracts_with_coverage: 0 };
+    }
     return {
       line_items: db.prepare('SELECT COUNT(*) AS n FROM contract_line_items').get().n,
       coverage: db.prepare('SELECT COUNT(*) AS n FROM contract_coverage').get().n,

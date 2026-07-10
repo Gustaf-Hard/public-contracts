@@ -321,6 +321,10 @@ describe('product intelligence tables (2026-07-10 design)', () => {
     `);
     old.close();
     const db2 = openDb(path2);
+    // Pre-migration --counts check must not crash: absent tables read as zeros.
+    expect(db2.countProductIntelligence()).toEqual({
+      line_items: 0, coverage: 0, contracts_with_line_items: 0, contracts_with_coverage: 0,
+    });
     expect(() => { db2.migrate(); db2.migrate(); }).not.toThrow();
     const tables = db2.raw.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map((r) => r.name);
     expect(tables).toContain('contract_line_items');
