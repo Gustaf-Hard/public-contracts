@@ -520,6 +520,7 @@ const baseCss = `
   .vendor-item .vi-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 6px; font-size: 12px; }
   .vendor-item .vi-name { font-weight: 600; font-size: 14px; }
   .chip-row { display: flex; flex-wrap: wrap; gap: 4px; }
+  .quick-init { display: inline; } .quick-init-edit { margin-left: 6px; text-decoration: none; }
   .tag-more { background: transparent; border-style: dashed; }
   /* Gmail-style inbox rows (Ärenden list) */
   .mail-row { display: grid; grid-template-columns: 10px minmax(110px, 150px) 1fr auto; align-items: center; gap: 10px;
@@ -819,7 +820,10 @@ export function renderOverview({ summary, rows, filter, sort, order, totalKommun
     : rows
         .map((r) => {
           const stateCell = r.states.length === 0
-            ? `<a class="compose-link" href="/kommun/${escapeHtml(r.kommun_kod)}/compose">— ej kontaktad —</a>`
+            ? `<form method="post" action="/kommun/${escapeHtml(r.kommun_kod)}/quick-init" class="quick-init">
+                 <button type="submit" class="compose-link" title="Skicka T-INITIAL till första kontakten">📨 Skicka</button>
+               </form>
+               <a class="muted quick-init-edit" href="/kommun/${escapeHtml(r.kommun_kod)}/compose" title="Redigera innan du skickar">✎</a>`
             : `<div class="pill-list">${r.states.map((s) => {
                 // Title attribute supports newlines on macOS/most modern browsers;
                 // we lead with "Roll: X" then the "Senast / Nästa" narrative.
