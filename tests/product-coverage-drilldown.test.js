@@ -11,7 +11,8 @@ import {
   buildProductCoverageByKommun,
   slugifyProductName,
 } from '../src/vendor-analytics.js';
-import { renderProductCoverage } from '../src/dashboard-views.js';
+import { renderProductCoverage, renderVendorDossier } from '../src/dashboard-views.js';
+import { buildProductRollups, buildVendorRollups } from '../src/vendor-analytics.js';
 
 const NOW = new Date('2026-07-11T12:00:00Z');
 const LAN = new Map([
@@ -210,5 +211,27 @@ describe('renderProductCoverage — kommun×grade matrix view', () => {
   it('legend adapts red to "har avtal med oss men inte denna produkt/nivå"', () => {
     expect(html).toContain('har avtal med oss men inte denna produkt/nivå');
     expect(html).toContain('nivån förekommer inte i leverantörens avtal');
+  });
+});
+
+// ---- Dossier: product names in the coverage matrix link to the drill-down ---
+
+describe('dossier coverage matrix links each product to its drill-down', () => {
+  const facts = iltFacts();
+  const html = renderVendorDossier({
+    vendor: VENDOR,
+    rollup: buildVendorRollups(facts, { now: NOW })[0],
+    facts,
+    productRollups: buildProductRollups(facts, [], COVERAGE),
+    todayIso: '2026-07-11',
+  });
+
+  it('PRODUKT-column cells are links to /leverantor/<slug>/produkt/<productSlug>', () => {
+    expect(html).toContain('href="/leverantor/ilt-education/produkt/begreppa"');
+    expect(html).toContain('href="/leverantor/ilt-education/produkt/polyglutt"');
+  });
+
+  it('the link wraps the product name in the coverage matrix row', () => {
+    expect(html).toMatch(/<a href="\/leverantor\/ilt-education\/produkt\/begreppa"[^>]*>Begreppa<\/a>/);
   });
 });
