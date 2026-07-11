@@ -292,6 +292,43 @@ describe('listContractFacts', () => {
   });
 });
 
+describe('listKommunerWithContracts', () => {
+  it('one row per distinct kommun with >=1 stored contract, sorted by name — the drill-down row universe', () => {
+    const a = seedAttachment({ filename: 'Skolon-V.pdf' });                    // Västerås
+    // A second Västerås contract (same conversation) must not duplicate the row.
+    const msg2 = db.recordMessage({
+      conversation_id: a.convId, gmail_message_id: `gm-${Math.random()}`,
+      direction: 'inbound', from_email: 'reg@example.se', to_email: 'me@example.com',
+      subject: 'Avtal 2', body_text: '', classification: null,
+      classification_confidence: null, received_at: '2026-04-14T10:00:00Z', attachment_count: 1,
+    });
+    const att2 = db.recordAttachment({
+      message_id: msg2, filename: 'Skolon-V2.pdf',
+      saved_path: 'data/contracts/1980/Skolon-V2.pdf',
+      mime_type: 'application/pdf', size_bytes: 1000,
+    });
+    const b = { attId: att2 };
+    const c = seedAttachment({ filename: 'ILT.pdf', kommun_kod: '1440', kommun_namn: 'Ale' });
+    const d = seedAttachment({ filename: 'Brev.pdf', kommun_kod: '1489', kommun_namn: 'Alingsås' });
+    const v = db.upsertVendor('Skolon');
+    db.recordContract({ attachment_id: a.attId, vendor_id: v.id, is_contract: 1 });
+    db.recordContract({ attachment_id: b.attId, vendor_id: v.id, is_contract: 1 });
+    // A vendor-less contract still makes its kommun a data-kommun.
+    db.recordContract({ attachment_id: c.attId, vendor_id: null, is_contract: 1 });
+    // Non-contract (följebrev) does NOT make Alingsås a data-kommun.
+    db.recordContract({ attachment_id: d.attId, vendor_id: null, is_contract: 0 });
+
+    expect(db.listKommunerWithContracts()).toEqual([
+      { kommun_kod: '1440', kommun_namn: 'Ale' },
+      { kommun_kod: '1980', kommun_namn: 'Västerås' },
+    ]);
+  });
+
+  it('empty when nothing is stored', () => {
+    expect(db.listKommunerWithContracts()).toEqual([]);
+  });
+});
+
 describe('product intelligence tables (2026-07-10 design)', () => {
   it('migrate is idempotent — line-item/coverage tables + indexes exist once after two runs', () => {
     expect(() => { db.migrate(); db.migrate(); }).not.toThrow();
