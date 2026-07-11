@@ -100,6 +100,34 @@ export function T_FOLLOWUP_CLOSE(ctx) {
   };
 }
 
+const SV_MONTH_NAMES = ['januari', 'februari', 'mars', 'april', 'maj', 'juni', 'juli', 'augusti', 'september', 'oktober', 'november', 'december'];
+
+// '2026-07-20' → '20 juli 2026'. Non-ISO input (an LLM slip like "20 juli")
+// is returned verbatim — a readable date in the draft always beats a crash.
+export function formatDateSv(iso) {
+  const m = typeof iso === 'string' ? iso.match(/^(\d{4})-(\d{2})-(\d{2})$/) : null;
+  if (!m) return iso ?? '';
+  const month = SV_MONTH_NAMES[Number(m[2]) - 1];
+  if (!month) return iso;
+  return `${Number(m[3])} ${month} ${m[1]}`;
+}
+
+// Graceful "we'll wait" ack for a delay promise / out-of-office autoreply that
+// states a return date. Names the date so the counterpart (and the approving
+// operator) sees exactly what we committed to waiting for.
+export function T_DELAY_ACK(ctx) {
+  return {
+    subject: `Re: ${ctx.thread_subject}`,
+    body: [
+      'Hej,',
+      '',
+      `Tack för ditt svar! Då avvaktar vi till ${formatDateSv(ctx.delay_date)} och hör av oss igen om vi inte fått något då.`,
+      '',
+      signature(ctx),
+    ].join('\n'),
+  };
+}
+
 // Join a list the Swedish way: "A", "A och B", "A, B och C".
 function listSv(items) {
   if (items.length <= 1) return items[0] ?? '';
