@@ -870,19 +870,27 @@ export function openDb(path) {
   }
 
   // Every kommun we hold ANY stored contract for (is_contract=1, any vendor)
-  // — the honest row universe for the product-coverage drill-down: a kommun
-  // listed here with no coverage of a product means "not sold to them, as far
-  // as our collected data shows", never "unknown".
+  // — the row universe for the product-coverage drill-down. `collection_done`
+  // says whether we may draw confident negative conclusions ("not sold to
+  // them"): true only when the kommun has >=1 conversation and ALL of them
+  // are DONE. Any still-active conversation (SENT/ACK_RECEIVED/DELIVERING/…)
+  // — or a DEAD_END, which is ambiguous about coverage — means the picture
+  // is incomplete, and the matrices must render "unknown" instead of red.
+  // Derived from conversations.state; no schema change.
   function listKommunerWithContracts() {
     return db.prepare(`
-      SELECT DISTINCT conv.kommun_kod, conv.kommun_namn
+      SELECT DISTINCT conv.kommun_kod, conv.kommun_namn,
+        NOT EXISTS (
+          SELECT 1 FROM conversations c2
+          WHERE c2.kommun_kod = conv.kommun_kod AND c2.state != 'DONE'
+        ) AS collection_done
       FROM contracts c
       JOIN attachments a ON a.id = c.attachment_id
       JOIN messages m ON m.id = a.message_id
       JOIN conversations conv ON conv.id = m.conversation_id
       WHERE c.is_contract = 1
       ORDER BY conv.kommun_namn COLLATE NOCASE, conv.kommun_kod
-    `).all();
+    `).all().map((r) => ({ ...r, collection_done: !!r.collection_done }));
   }
 
   // DONE conversations armed with a next_review_at at or before `todayIso`.
