@@ -4,7 +4,12 @@
 // contract data for — so an all-red row honestly means "has given us
 // contracts, but none for this product", never "unknown". Pure analytics
 // here; views and the route are tested further down.
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { openDb } from '../src/storage.js';
+import { createDashboardApp } from '../src/dashboard.js';
 import {
   GRADE_LEVELS,
   buildContractFacts,
@@ -233,5 +238,116 @@ describe('dossier coverage matrix links each product to its drill-down', () => {
 
   it('the link wraps the product name in the coverage matrix row', () => {
     expect(html).toMatch(/<a href="\/leverantor\/ilt-education\/produkt\/begreppa"[^>]*>Begreppa<\/a>/);
+  });
+});
+
+// ---- Route: GET /leverantor/:slug/produkt/:productSlug -----------------------
+
+describe('route: GET /leverantor/:slug/produkt/:productSlug', () => {
+  let tmp, db;
+
+  const MUNICIPALITIES = [
+    { kommun_kod: '1440', kommun_namn: 'Ale', lan: 'Västra Götalands län', folkmangd: 33000, contacts: [] },
+    { kommun_kod: '1489', kommun_namn: 'Alingsås', lan: 'Västra Götalands län', folkmangd: 42186, contacts: [] },
+    { kommun_kod: '1470', kommun_namn: 'Vara', lan: 'Västra Götalands län', folkmangd: 16000, contacts: [] },
+  ];
+
+  beforeEach(() => {
+    tmp = mkdtempSync(join(tmpdir(), 'pcov-route-'));
+    db = openDb(join(tmp, 'pilot.db'));
+    db.migrate();
+  });
+
+  afterEach(() => {
+    db.close();
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  function seedAttachment(kod, namn, filename) {
+    const convId = db.createConversation({
+      kommun_kod: kod, kommun_namn: namn, role: 'central',
+      contact_email: `reg@${kod}.se`, scheduled_send_at: '2026-04-01T08:00:00Z',
+    });
+    const msgId = db.recordMessage({
+      conversation_id: convId, gmail_message_id: `gm-${Math.random()}`, direction: 'inbound',
+      from_email: `reg@${kod}.se`, to_email: 'me@x.com', subject: 'Avtal', body_text: '',
+      classification: null, classification_confidence: null,
+      received_at: '2026-06-01T10:00:00Z', attachment_count: 1,
+    });
+    return db.recordAttachment({
+      message_id: msgId, filename, saved_path: join(tmp, kod, filename),
+      mime_type: 'application/pdf', size_bytes: 1000,
+    });
+  }
+
+  function seedIltWorld() {
+    const ilt = db.upsertVendor('ILT Education');
+    // Ale: Begreppa, full coverage 1-3.
+    const cAle = db.recordContract({
+      attachment_id: seedAttachment('1440', 'Ale', 'ILT-Ale.pdf'),
+      vendor_id: ilt.id, is_contract: 1, annual_value_sek: 585649, pricing_model: 'tiered',
+    });
+    db.linkContractProduct(cAle, db.upsertProduct(ilt.id, 'Begreppa'));
+    db.replaceContractCoverage(cAle, [
+      { product_name: 'Begreppa', grade_level: '1-3', status: 'full', student_count: 4244 },
+    ]);
+    // Alingsås: Begreppa, partial coverage 1-3.
+    const cAli = db.recordContract({
+      attachment_id: seedAttachment('1489', 'Alingsås', 'ILT-Alingsas.pdf'),
+      vendor_id: ilt.id, is_contract: 1, annual_value_sek: 100000, pricing_model: 'fixed',
+    });
+    db.linkContractProduct(cAli, db.upsertProduct(ilt.id, 'Begreppa'));
+    db.replaceContractCoverage(cAli, [
+      { product_name: 'Begreppa', grade_level: '1-3', status: 'partial', student_count: 800 },
+    ]);
+    // Vara: has stored contract data — but from ANOTHER vendor entirely.
+    const skolon = db.upsertVendor('Skolon');
+    db.recordContract({
+      attachment_id: seedAttachment('1470', 'Vara', 'Skolon-Vara.pdf'),
+      vendor_id: skolon.id, is_contract: 1,
+    });
+    return db;
+  }
+
+  async function get(app, path) {
+    return new Promise((resolve, reject) => {
+      const server = app.listen(0, () => {
+        const port = server.address().port;
+        fetch(`http://127.0.0.1:${port}${path}`).then(async (r) => {
+          const text = await r.text();
+          server.close(() => resolve({ status: r.status, text }));
+        }).catch((e) => server.close(() => reject(e)));
+      });
+    });
+  }
+
+  it('200 for a real product: kommun rows from ALL data-kommuner, incl. the all-red one', async () => {
+    seedIltWorld();
+    const app = createDashboardApp({ db, municipalitiesLoader: () => MUNICIPALITIES });
+    const res = await get(app, '/leverantor/ilt-education/produkt/begreppa');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Begreppa — ILT Education · täckning per kommun');
+    expect(res.text).toContain('2 av 3 kommuner (med data) har produkten');
+    // Ale full, Alingsås partial — Vara (other vendor's kommun) appears all-red.
+    expect(res.text).toContain('cov-cell cov-full');
+    expect(res.text).toContain('cov-cell cov-partial');
+    expect(res.text).toContain('href="/kommun/1470"');
+    const vara = res.text.match(/<tr>\s*<td><a href="\/kommun\/1470"[\s\S]*?<\/tr>/)[0];
+    expect(vara).toContain('cov-cell cov-none');
+    expect(vara).not.toContain('cov-full');
+    // Back link to the dossier.
+    expect(res.text).toContain('href="/leverantor/ilt-education"');
+  });
+
+  it('404 for an unknown product within a real vendor', async () => {
+    seedIltWorld();
+    const app = createDashboardApp({ db, municipalitiesLoader: () => MUNICIPALITIES });
+    expect((await get(app, '/leverantor/ilt-education/produkt/okand-produkt')).status).toBe(404);
+  });
+
+  it('404 for an unknown vendor', async () => {
+    seedIltWorld();
+    const app = createDashboardApp({ db, municipalitiesLoader: () => MUNICIPALITIES });
+    expect((await get(app, '/leverantor/nope/produkt/begreppa')).status).toBe(404);
   });
 });

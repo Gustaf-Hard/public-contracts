@@ -21,9 +21,13 @@ import {
   renderCompose,
   renderVendorMarket,
   renderVendorDossier,
+  renderProductCoverage,
   mergeContacts,
 } from './dashboard-views.js';
-import { buildContractFacts, buildVendorRollups, buildMarketSummary, buildProductRollups } from './vendor-analytics.js';
+import {
+  buildContractFacts, buildVendorRollups, buildMarketSummary, buildProductRollups,
+  buildProductCoverageByKommun, slugifyProductName,
+} from './vendor-analytics.js';
 
 const ROLE_PRIORITY = ['central', 'utbildning', 'gymnasie', 'vuxenutbildning', 'other'];
 
@@ -874,6 +878,51 @@ export function createDashboardApp({
       // facts by contract_id, so other vendors' rows fall away.
       productRollups: buildProductRollups(vendorFacts, db.listLineItems(), db.listCoverage()),
       todayIso,
+      heartbeat: hb(), partial: isPartial(req), escalationCount: escCount(),
+    }));
+  });
+
+  // Product-coverage drill-down: the dossier matrix pivoted for one product
+  // (rows = every kommun with ANY stored contract, columns = grade levels).
+  // Read-only — safe while the pilot is live.
+  app.get('/leverantor/:slug/produkt/:productSlug', (req, res) => {
+    const vendor = db ? db.getVendorBySlug(req.params.slug) : null;
+    res.set('Content-Type', 'text/html; charset=utf-8');
+    if (!vendor) {
+      // Unknown vendor → 404 with the market overview as a useful landing.
+      const { facts, rollups, summary, todayIso } = vendorData(new Date());
+      return res.status(404).send(renderVendorMarket({
+        summary, rollups, facts, todayIso,
+        heartbeat: hb(), partial: isPartial(req), escalationCount: escCount(),
+      }));
+    }
+    const { facts, rollups, todayIso } = vendorData(new Date());
+    const vendorFacts = facts.filter((f) => f.vendor_id === vendor.id);
+    const lineItems = db.listLineItems();
+    const coverage = db.listCoverage();
+    // Resolve the product by slug within THIS vendor (same slug rule as
+    // vendors); the rollups carry the full product universe.
+    const productRollups = buildProductRollups(vendorFacts, lineItems, coverage);
+    const product = productRollups.find((p) => slugifyProductName(p.name) === req.params.productSlug);
+    if (!product) {
+      // Unknown product → 404 with the vendor dossier as a useful landing.
+      return res.status(404).send(renderVendorDossier({
+        vendor,
+        rollup: rollups.find((r) => r.vendor_id === vendor.id) ?? null,
+        facts: vendorFacts, productRollups, todayIso,
+        heartbeat: hb(), partial: isPartial(req), escalationCount: escCount(),
+      }));
+    }
+    const drilldown = buildProductCoverageByKommun({
+      vendorName: vendor.name,
+      productName: product.name,
+      facts: vendorFacts,
+      lineItems,
+      coverage,
+      dataKommuner: db.listKommunerWithContracts(),
+    });
+    res.send(renderProductCoverage({
+      vendor, drilldown,
       heartbeat: hb(), partial: isPartial(req), escalationCount: escCount(),
     }));
   });
