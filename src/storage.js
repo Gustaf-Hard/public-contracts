@@ -350,6 +350,29 @@ export function openDb(path) {
     return db.prepare('SELECT * FROM decisions ORDER BY id').all();
   }
 
+  // Read-only view for the on-demand edit-review report
+  // (scripts/08-review-edits.js): every operator edit joined to its
+  // conversation, newest first.
+  function listEditDecisions() {
+    return db.prepare(`
+      SELECT
+        d.id AS decision_id,
+        d.decided_at,
+        conv.kommun_kod,
+        conv.kommun_namn,
+        conv.role,
+        d.classifier_class,
+        d.conversation_state,
+        d.draft_template,
+        d.draft_body,
+        d.final_body
+      FROM decisions d
+      JOIN conversations conv ON conv.id = d.conversation_id
+      WHERE d.decision = 'edit'
+      ORDER BY d.decided_at DESC, d.id DESC
+    `).all();
+  }
+
   function listOpenEscalations() {
     return db.prepare("SELECT * FROM escalations WHERE status = 'open' ORDER BY id").all();
   }
@@ -680,6 +703,7 @@ export function openDb(path) {
     transaction,
     recordDecision,
     listDecisions,
+    listEditDecisions,
     recordHeartbeat,
     getHeartbeat,
     getTickHealth,
