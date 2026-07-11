@@ -834,6 +834,22 @@ export function openDb(path) {
     return rows.map((r) => ({ ...r, products: prodMap.get(r.contract_id) ?? [] }));
   }
 
+  // Every kommun we hold ANY stored contract for (is_contract=1, any vendor)
+  // — the honest row universe for the product-coverage drill-down: a kommun
+  // listed here with no coverage of a product means "not sold to them, as far
+  // as our collected data shows", never "unknown".
+  function listKommunerWithContracts() {
+    return db.prepare(`
+      SELECT DISTINCT conv.kommun_kod, conv.kommun_namn
+      FROM contracts c
+      JOIN attachments a ON a.id = c.attachment_id
+      JOIN messages m ON m.id = a.message_id
+      JOIN conversations conv ON conv.id = m.conversation_id
+      WHERE c.is_contract = 1
+      ORDER BY conv.kommun_namn COLLATE NOCASE, conv.kommun_kod
+    `).all();
+  }
+
   // DONE conversations armed with a next_review_at at or before `todayIso`.
   // Drives the daily refresh scan.
   function listConversationsDueForRefresh(todayIso) {
@@ -952,6 +968,7 @@ export function openDb(path) {
     listContractsForVendor,
     listContractsForKommun,
     listContractFacts,
+    listKommunerWithContracts,
     listConversationsDueForRefresh,
     listVendorsOverview,
     getVendorBySlug,

@@ -468,6 +468,64 @@ export function buildProductRollups(facts, lineItems = [], coverage = []) {
     b.kommunCount - a.kommunCount || a.name.localeCompare(b.name, 'sv'));
 }
 
+// ---- Product-coverage drill-down: kommun × grade for ONE product ------------
+
+// Product-name slug — the SAME rule as vendor slugs in storage.js
+// (upsertVendor), so /leverantor/:slug/produkt/:productSlug reads uniformly.
+export function slugifyProductName(name) {
+  return String(name ?? '').toLowerCase()
+    .replace(/[åä]/g, 'a').replace(/ö/g, 'o')
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
+
+// The dossier's product×grade matrix pivoted for one product: rows are
+// kommuner, columns the 9 grade levels. `dataKommuner` is EVERY kommun we
+// hold any stored contract for (db.listKommunerWithContracts()) — so a row of
+// "none" honestly means "gave us contracts, but none for this product", never
+// "unknown". Per-cell states:
+//   full/partial — this kommun's contract covers the level (fully / partly)
+//   none         — kommun has collected data, no coverage of this product here
+//   na           — exactly where buildProductRollups says 'na' (the vendor
+//                  never references the level, or no coverage extracted at all)
+// `facts` is the vendor's contract-fact slice; the grade aggregation is
+// buildProductRollups itself — shared, not forked. Product match is
+// case-insensitive; returns null when the vendor has no such product.
+export function buildProductCoverageByKommun({ vendorName, productName, facts = [], lineItems = [], coverage = [], dataKommuner = [] }) {
+  const wanted = String(productName ?? '').toLowerCase();
+  const rollup = buildProductRollups(facts, lineItems, coverage)
+    .find((p) => p.name.toLowerCase() === wanted);
+  if (!rollup) return null;
+
+  // Selling kommuner: any contract naming the product (kods via priceByKommun,
+  // which buildProductRollups derives from the same kommun universe).
+  const sellingKods = new Set(rollup.priceByKommun.map((p) => p.kommun_kod));
+
+  const kommuner = [...dataKommuner]
+    .sort((a, b) => a.kommun_namn.localeCompare(b.kommun_namn, 'sv'))
+    .map(({ kommun_kod, kommun_namn }) => {
+      const coverageByGrade = {};
+      for (const g of GRADE_LEVELS) {
+        if (rollup.coverageByGrade[g] === 'na') {
+          coverageByGrade[g] = 'na';
+          continue;
+        }
+        const d = rollup.coverageDetail[g].find((x) => x.kommun_kod === kommun_kod);
+        coverageByGrade[g] = d ? (d.status === 'full' ? 'full' : 'partial') : 'none';
+      }
+      return { kommun_kod, kommun_namn, coverageByGrade };
+    });
+
+  return {
+    vendorName,
+    productName: rollup.name,
+    kommuner,
+    summary: {
+      kommun_total: dataKommuner.length,
+      kommun_with_product: dataKommuner.filter((k) => sellingKods.has(k.kommun_kod)).length,
+    },
+  };
+}
+
 // Non-null count for any fact key — drives every "känd för X av Y avtal" line.
 export function completeness(facts, key) {
   return {

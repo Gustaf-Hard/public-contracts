@@ -13,7 +13,7 @@ import {
   PRICING_MODEL_LABELS,
   UNKNOWN,
 } from '../public/explorer-core.js';
-import { GRADE_LEVELS } from './vendor-analytics.js';
+import { GRADE_LEVELS, slugifyProductName } from './vendor-analytics.js';
 
 function escapeHtml(s) {
   if (s === null || s === undefined) return '';
@@ -1884,7 +1884,7 @@ function coverageCell(p, grade) {
   return `<td class="cov-cell ${klass}"><details class="cov-detail"><summary title="${escapeHtml(grade)}">${mark}</summary><div class="cov-pop">${lines.map((l) => `<div>${escapeHtml(l)}</div>`).join('')}</div></details></td>`;
 }
 
-function coverageMatrix(productRollups) {
+function coverageMatrix(productRollups, vendorSlug) {
   if (!productRollups.some((p) => p.coverageKnown)) {
     return `
     <section class="board-section">
@@ -1895,8 +1895,12 @@ function coverageMatrix(productRollups) {
   const head = GRADE_LEVELS
     .map((g) => `<th class="cov-head" title="${escapeHtml(g)}">${escapeHtml(GRADE_SHORT_LABELS[g] ?? g)}</th>`)
     .join('');
+  // Product name → the per-kommun drill-down (same matrix, rows = kommuner).
+  const productCell = (p) => (vendorSlug
+    ? `<a href="/leverantor/${escapeHtml(vendorSlug)}/produkt/${escapeHtml(slugifyProductName(p.name))}" data-pane-link title="${escapeHtml(`${p.name}: täckning per kommun`)}">${escapeHtml(p.name)}</a>`
+    : escapeHtml(p.name));
   const rows = productRollups.map((p) =>
-    `<tr><td>${escapeHtml(p.name)}</td>${GRADE_LEVELS.map((g) => coverageCell(p, g)).join('')}</tr>`).join('');
+    `<tr><td>${productCell(p)}</td>${GRADE_LEVELS.map((g) => coverageCell(p, g)).join('')}</tr>`).join('');
   return `
     <section class="board-section">
       <h2>Täckning per skolnivå</h2>
@@ -1904,7 +1908,7 @@ function coverageMatrix(productRollups) {
         <thead><tr><th>Produkt</th>${head}</tr></thead>
         <tbody>${rows}</tbody>
       </table>
-      <p class="muted honesty-note">● full i alla köpande kommuner · ◐ delvis eller blandat · ✕ nivån säljs av leverantören men inte här · – nivån förekommer inte i leverantörens avtal. Klicka på en cell för detalj per kommun.</p>
+      <p class="muted honesty-note">● full i alla köpande kommuner · ◐ delvis eller blandat · ✕ nivån säljs av leverantören men inte här · – nivån förekommer inte i leverantörens avtal. Klicka på en cell för detalj per kommun, eller på produktnamnet för täckning per kommun.</p>
     </section>`;
 }
 
@@ -2005,7 +2009,7 @@ export function renderVendorDossier({ vendor, rollup = null, facts = [], product
     </div>
     ${stats}
     ${productRollups.length
-      ? productTable(productRollups) + coverageMatrix(productRollups)
+      ? productTable(productRollups) + coverageMatrix(productRollups, vendor.slug)
       : (r.products.length ? `<div class="card"><h3>Produkter (${r.products.length})</h3>${chipRow(r.products, 50)}</div>` : '')}
     <div class="card">
       <h3>Förnyelsekalender</h3>
@@ -2017,4 +2021,58 @@ export function renderVendorDossier({ vendor, rollup = null, facts = [], product
     </section>
   `;
   return layout({ title: vendor.name, body, currentPath: '/leverantorer', heartbeat, partial, escalationCount });
+}
+
+// One cell of the per-product kommun×grade drill-down. Same colour language
+// as the dossier's product×grade matrix (cov-full/-partial/-none/-na), but
+// red here means "this kommun gave us contracts — none for this product at
+// this level", because the row universe is data-kommuner only.
+function kommunCoverageCell(state, grade, productName) {
+  if (state === 'na') {
+    return `<td class="cov-cell cov-na" title="${escapeHtml(`${grade}: förekommer inte i leverantörens avtal`)}">–</td>`;
+  }
+  if (state === 'none') {
+    return `<td class="cov-cell cov-none" title="${escapeHtml(`${grade}: kommunen har lämnat avtal till oss, men inget för ${productName} på nivån`)}">✕</td>`;
+  }
+  const mark = state === 'full' ? '●' : '◐';
+  const klass = state === 'full' ? 'cov-full' : 'cov-partial';
+  const label = state === 'full' ? 'full täckning' : 'delvis täckning';
+  return `<td class="cov-cell ${klass}" title="${escapeHtml(`${grade}: ${label}`)}">${mark}</td>`;
+}
+
+// Product-coverage drill-down (/leverantor/:slug/produkt/:productSlug): the
+// dossier matrix pivoted for ONE product — rows are every kommun we hold
+// collected contract data for, columns the 9 grade levels. `drilldown` is
+// buildProductCoverageByKommun output.
+export function renderProductCoverage({ vendor, drilldown, heartbeat = null, partial = false, escalationCount = 0 }) {
+  const head = GRADE_LEVELS
+    .map((g) => `<th class="cov-head" title="${escapeHtml(g)}">${escapeHtml(GRADE_SHORT_LABELS[g] ?? g)}</th>`)
+    .join('');
+  const rows = drilldown.kommuner.map((k) => `<tr>
+    <td><a href="/kommun/${escapeHtml(k.kommun_kod)}" data-pane-link>${escapeHtml(k.kommun_namn)}</a></td>
+    ${GRADE_LEVELS.map((g) => kommunCoverageCell(k.coverageByGrade[g], g, drilldown.productName)).join('')}
+  </tr>`).join('');
+  const matrix = drilldown.kommuner.length === 0
+    ? '<div class="empty-state">Inga kommuner med insamlade avtal ännu.</div>'
+    : `<table class="cov-table">
+        <thead><tr><th>Kommun</th>${head}</tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <p class="muted honesty-note">● full täckning · ◐ delvis · ✕ har avtal med oss men inte denna produkt/nivå · – nivån förekommer inte i leverantörens avtal.</p>`;
+
+  const body = `
+    <div class="page-head">
+      <h1>${escapeHtml(drilldown.productName)} — ${escapeHtml(vendor.name)} · täckning per kommun</h1>
+      <a href="/leverantor/${escapeHtml(vendor.slug)}" data-pane-link class="muted">← ${escapeHtml(vendor.name)}</a>
+    </div>
+    <p class="muted">${drilldown.summary.kommun_with_product} av ${drilldown.summary.kommun_total} kommuner (med data) har produkten — endast kommuner vi hämtat avtal från visas.</p>
+    <section class="board-section">
+      <h2>Täckning per skolnivå och kommun</h2>
+      ${matrix}
+    </section>
+  `;
+  return layout({
+    title: `${drilldown.productName} — ${vendor.name}`,
+    body, currentPath: '/leverantorer', heartbeat, partial, escalationCount,
+  });
 }
