@@ -1,3 +1,5 @@
+import { WATCHLIST } from './watchlist.js';
+
 function scopeText(role) {
   return role === 'central' ? 'kommunen' : 'utbildningsförvaltningen';
 }
@@ -233,8 +235,13 @@ export function T_REQUEST_MISSING(ctx) {
   } else {
     ask = 'Tack för ert svar. Jag ser dock inte de faktiska avtalshandlingarna bifogade — kan ni skicka de fullständiga avtalen?';
   }
+  // Net-new / watchlist probe. edit-review showed T_REQUEST_MISSING was the one
+  // template the operator consistently rewrote — every time to append a question
+  // about OTHER digital school services, naming the watchlisted vendors. Bake it
+  // in from the watchlist (single source of truth) so it no longer needs editing.
+  const probe = `Har ni därutöver avtal för andra digitala tjänster inom skolan, till exempel ${listSv(WATCHLIST.map((w) => w.canonical))} eller liknande?`;
   return {
     subject: `Re: ${ctx.thread_subject}`,
-    body: ['Hej,', '', ask, '', signature(ctx)].join('\n'),
+    body: ['Hej,', '', ask, '', probe, '', signature(ctx)].join('\n'),
   };
 }

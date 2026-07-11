@@ -191,6 +191,13 @@ describe('T_REQUEST_MISSING', () => {
     const m = T_REQUEST_MISSING({ ...base, received: [], missing: [] });
     expect(m.body).toMatch(/faktiska avtalshandlingarna/);
   });
+  it('always appends the net-new / watchlist probe naming watchlisted vendors', () => {
+    // edit-review finding: the operator adds this to every T_REQUEST_MISSING draft.
+    const m = T_REQUEST_MISSING({ ...base, received: ['Skolon'], missing: ['Quiculum'] });
+    expect(m.body).toMatch(/andra digitala tjänster inom skolan/);
+    expect(m.body).toMatch(/Binogi/);            // a watchlisted vendor is named
+    expect(m.body).toMatch(/eller liknande\?/);
+  });
 });
 
 describe('T_UPDATE (perpetual refresh re-contact)', () => {
