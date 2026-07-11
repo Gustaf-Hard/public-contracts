@@ -429,6 +429,29 @@ describe('route: GET /leverantor/:slug/produkt/:productSlug', () => {
     expect(res.text).toContain('href="/leverantor/ilt-education"');
   });
 
+  it('an in-progress kommun renders cov-unknown, never cov-none (Arjeplog DELIVERING regression)', async () => {
+    seedIltWorld();
+    // Arjeplog delivered ONE contract (another vendor's) but its conversation
+    // is still DELIVERING — its missing Begreppa is unknown, not "not sold".
+    const skolon = db.getVendorBySlug('skolon') ?? db.upsertVendor('Skolon');
+    db.recordContract({
+      attachment_id: seedAttachment('2506', 'Arjeplog', 'Skolon-Arjeplog.pdf', { state: 'DELIVERING' }),
+      vendor_id: skolon.id, is_contract: 1,
+    });
+    const app = createDashboardApp({ db, municipalitiesLoader: () => MUNICIPALITIES });
+    const res = await get(app, '/leverantor/ilt-education/produkt/begreppa');
+    expect(res.status).toBe(200);
+    const arjeplog = res.text.match(/<tr>\s*<td><a href="\/kommun\/2506"[\s\S]*?<\/tr>/)[0];
+    expect(arjeplog).toContain('cov-cell cov-unknown');
+    expect(arjeplog).toContain('insamling pågår');
+    expect(arjeplog).not.toContain('cov-none');
+    // Vara's collection IS done — its red stays red.
+    const vara = res.text.match(/<tr>\s*<td><a href="\/kommun\/1470"[\s\S]*?<\/tr>/)[0];
+    expect(vara).toContain('cov-cell cov-none');
+    // The legend explains the new state.
+    expect(res.text).toContain('? · insamling pågår (vet inte än)');
+  });
+
   it('404 for an unknown product within a real vendor', async () => {
     seedIltWorld();
     const app = createDashboardApp({ db, municipalitiesLoader: () => MUNICIPALITIES });

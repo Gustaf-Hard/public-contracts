@@ -845,6 +845,13 @@ export function createDashboardApp({
     };
   };
 
+  // Kommuner whose collection is complete (>=1 conversation, all DONE) —
+  // the only ones the coverage matrices may paint confidently red.
+  const doneKommunKods = () => new Set(
+    (db ? db.listKommunerWithContracts() : [])
+      .filter((k) => k.collection_done)
+      .map((k) => k.kommun_kod));
+
   app.get('/leverantorer', (req, res) => {
     const { facts, rollups, summary, todayIso } = vendorData(new Date());
     const sort = typeof req.query.sort === 'string' ? req.query.sort : null;
@@ -875,8 +882,11 @@ export function createDashboardApp({
       facts: vendorFacts,
       // Product intelligence (2026-07-10 design): line items + coverage rows
       // for the whole DB — buildProductRollups joins them onto this vendor's
-      // facts by contract_id, so other vendors' rows fall away.
-      productRollups: buildProductRollups(vendorFacts, db.listLineItems(), db.listCoverage()),
+      // facts by contract_id, so other vendors' rows fall away. doneKods
+      // (kommuner with every conversation DONE) gates the confident-red
+      // aggregate: in-progress kommuner render as unknown, never red.
+      productRollups: buildProductRollups(vendorFacts, db.listLineItems(), db.listCoverage(),
+        { doneKods: doneKommunKods() }),
       todayIso,
       heartbeat: hb(), partial: isPartial(req), escalationCount: escCount(),
     }));
@@ -900,9 +910,14 @@ export function createDashboardApp({
     const vendorFacts = facts.filter((f) => f.vendor_id === vendor.id);
     const lineItems = db.listLineItems();
     const coverage = db.listCoverage();
+    // Data-kommuner carry collection_done; the drill-down uses it to render
+    // unknown (insamling pågår) instead of a confident red for kommuner
+    // whose conversations aren't all DONE yet.
+    const dataKommuner = db.listKommunerWithContracts();
+    const doneKods = new Set(dataKommuner.filter((k) => k.collection_done).map((k) => k.kommun_kod));
     // Resolve the product by slug within THIS vendor (same slug rule as
     // vendors); the rollups carry the full product universe.
-    const productRollups = buildProductRollups(vendorFacts, lineItems, coverage);
+    const productRollups = buildProductRollups(vendorFacts, lineItems, coverage, { doneKods });
     const product = productRollups.find((p) => slugifyProductName(p.name) === req.params.productSlug);
     if (!product) {
       // Unknown product → 404 with the vendor dossier as a useful landing.
@@ -919,7 +934,7 @@ export function createDashboardApp({
       facts: vendorFacts,
       lineItems,
       coverage,
-      dataKommuner: db.listKommunerWithContracts(),
+      dataKommuner,
     });
     res.send(renderProductCoverage({
       vendor, drilldown,
