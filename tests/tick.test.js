@@ -565,6 +565,130 @@ describe('runTick — zip attachments are expanded into inner PDFs', () => {
   });
 });
 
+// Case 20 (Boden) regression: the procurement office delivered the requested
+// info with attachment_count=1, but the attachment was an Excel sammanställning
+// — and the old `if (!isPdf && !isZip) continue` silently discarded it. Every
+// inbound attachment must now be stored; only contract ANALYSIS stays PDF-only.
+describe('runTick — non-PDF attachments are stored, never silently dropped', () => {
+  function convInState(kod = '2582', namn = 'Boden') {
+    const id = db.createConversation({
+      kommun_kod: kod, kommun_namn: namn, role: 'central',
+      contact_email: `kommun@${namn.toLowerCase()}.se`, scheduled_send_at: '2026-06-10T09:00:00Z',
+    });
+    db.updateConversationState(id, 'SENT', { gmail_thread_id: 'thr-att', last_outbound_at: '2026-06-10T10:00:00Z' });
+    return id;
+  }
+
+  function deliveryMsg(parts) {
+    return {
+      id: 'att-msg-1', threadId: 'thr-att',
+      payload: {
+        headers: [
+          { name: 'From', value: 'Upphandling <upphandling@boden.se>' },
+          { name: 'To', value: 'gustaf@mediagraf.se' },
+          { name: 'Subject', value: 'Svar på begäran' },
+          { name: 'Date', value: 'Fri, 12 Jun 2026 10:30:00 +0200' },
+        ],
+        mimeType: 'multipart/mixed',
+        parts: [
+          { mimeType: 'text/plain', body: { data: b64('Bifogat finner du sammanställningen.') } },
+          ...parts,
+        ],
+      },
+    };
+  }
+
+  function gmailWith(msg, buffers) {
+    const gmail = fakeGmail({ listResult: [{ id: msg.id }], getResult: { [msg.id]: msg } });
+    gmail.fetchAttachment = vi.fn(async (g, msgId, attId) => buffers[attId]);
+    return gmail;
+  }
+
+  it('stores an .xlsx attachment as a row + file on disk, but never queues it for contract analysis', async () => {
+    const id = convInState();
+    const xlsxMime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    const msg = deliveryMsg([
+      { mimeType: xlsxMime, filename: 'Sammanställning avtal.xlsx', body: { attachmentId: 'a-xlsx', size: 34_000 } },
+    ]);
+    const gmail = gmailWith(msg, { 'a-xlsx': Buffer.from('PK-xlsx-bytes') });
+
+    await runTick(makeDeps({ gmail }));
+
+    const rows = db.raw.prepare('SELECT a.* FROM attachments a JOIN messages m ON m.id=a.message_id WHERE m.conversation_id=?').all(id);
+    expect(rows.map((a) => a.filename)).toEqual(['Sammanställning avtal.xlsx']);
+    expect(rows[0].mime_type).toBe(xlsxMime);
+    const { existsSync, readFileSync } = await import('node:fs');
+    expect(existsSync(rows[0].saved_path)).toBe(true);
+    expect(readFileSync(rows[0].saved_path).toString()).toBe('PK-xlsx-bytes');
+    // Stored — but the Opus contract analyser must never see it.
+    expect(db.listPendingContractAttachments()).toEqual([]);
+  });
+
+  it('stores a .docx alongside a .pdf; only the PDF is queued for analysis', async () => {
+    const id = convInState('0180', 'Stockholm');
+    const docxMime = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    const msg = deliveryMsg([
+      { mimeType: 'application/pdf', filename: 'Avtal.pdf', body: { attachmentId: 'a-pdf', size: 90_000 } },
+      { mimeType: docxMime, filename: 'Följebrev.docx', body: { attachmentId: 'a-docx', size: 18_000 } },
+    ]);
+    const gmail = gmailWith(msg, { 'a-pdf': Buffer.from('%PDF-1.4 avtal'), 'a-docx': Buffer.from('PK-docx') });
+
+    await runTick(makeDeps({ gmail }));
+
+    const rows = db.raw.prepare('SELECT a.* FROM attachments a JOIN messages m ON m.id=a.message_id WHERE m.conversation_id=? ORDER BY a.filename').all(id);
+    expect(rows.map((a) => a.filename)).toEqual(['Avtal.pdf', 'Följebrev.docx']);
+    expect(db.listPendingContractAttachments().map((a) => a.filename)).toEqual(['Avtal.pdf']);
+  });
+
+  it('skips a tiny inline signature image without even fetching it, but keeps attachment_count honest', async () => {
+    const id = convInState('1480', 'Göteborg');
+    const msg = deliveryMsg([
+      { mimeType: 'image/png', filename: 'image001.png', body: { attachmentId: 'a-logo', size: 4_096 } },
+      { mimeType: 'application/pdf', filename: 'Avtal.pdf', body: { attachmentId: 'a-pdf', size: 90_000 } },
+    ]);
+    const gmail = gmailWith(msg, { 'a-pdf': Buffer.from('%PDF-1.4'), 'a-logo': Buffer.from('png') });
+
+    await runTick(makeDeps({ gmail }));
+
+    const rows = db.raw.prepare('SELECT a.* FROM attachments a JOIN messages m ON m.id=a.message_id WHERE m.conversation_id=?').all(id);
+    expect(rows.map((a) => a.filename)).toEqual(['Avtal.pdf']);
+    const fetchedIds = gmail.fetchAttachment.mock.calls.map((c) => c[2]);
+    expect(fetchedIds).toEqual(['a-pdf']); // the logo was never fetched
+    // attachment_count still records what the mail carried, so the gap is visible.
+    const m = db.raw.prepare('SELECT * FROM messages WHERE conversation_id=?').get(id);
+    expect(m.attachment_count).toBe(2);
+  });
+
+  it('stores an image large enough to be a scanned document', async () => {
+    const id = convInState('2584', 'Kiruna');
+    const msg = deliveryMsg([
+      { mimeType: 'image/jpeg', filename: 'avtal-scan.jpg', body: { attachmentId: 'a-scan', size: 800_000 } },
+    ]);
+    const gmail = gmailWith(msg, { 'a-scan': Buffer.from('jpeg-bytes') });
+
+    await runTick(makeDeps({ gmail }));
+
+    const rows = db.raw.prepare('SELECT a.* FROM attachments a JOIN messages m ON m.id=a.message_id WHERE m.conversation_id=?').all(id);
+    expect(rows.map((a) => a.filename)).toEqual(['avtal-scan.jpg']);
+    expect(db.listPendingContractAttachments()).toEqual([]); // not a PDF → not analysed
+  });
+
+  it('stores the zip itself when it expands to no inner PDFs (nothing is ever dropped)', async () => {
+    const id = convInState('2506', 'Arjeplog');
+    const zipBytes = Buffer.from(zipSync({ 'sammanställning.xlsx': strToU8('PK-inner-xlsx') }));
+    const msg = deliveryMsg([
+      { mimeType: 'application/zip', filename: 'Handlingar.zip', body: { attachmentId: 'a-zip', size: zipBytes.length } },
+    ]);
+    const gmail = gmailWith(msg, { 'a-zip': zipBytes });
+
+    await runTick(makeDeps({ gmail }));
+
+    const rows = db.raw.prepare('SELECT a.* FROM attachments a JOIN messages m ON m.id=a.message_id WHERE m.conversation_id=?').all(id);
+    expect(rows.map((a) => a.filename)).toEqual(['Handlingar.zip']);
+    expect(db.listPendingContractAttachments()).toEqual([]);
+  });
+});
+
 describe('runTick — muted thread suppresses escalation', () => {
   it('suppresses escalation for a muted thread but not for an equivalent non-muted one', async () => {
     const spy = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue(null);
