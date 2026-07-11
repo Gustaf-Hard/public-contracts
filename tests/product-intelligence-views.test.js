@@ -68,7 +68,7 @@ const COVERAGE = [
   { id: 40, contract_id: 2, product_id: null, product_name: 'Begreppa', grade_level: '1-3', status: 'partial', student_count: 800 },
 ];
 
-function renderedDossier({ lineItems = LINE_ITEMS, coverage = COVERAGE } = {}) {
+function renderedDossier({ lineItems = LINE_ITEMS, coverage = COVERAGE, doneKods = null } = {}) {
   const lan = new Map(MUNICIPALITIES.map((m) => [m.kommun_kod, m.lan]));
   const facts = buildContractFacts(FACT_ROWS, { lanByKommunKod: lan, now: NOW });
   const rollups = buildVendorRollups(facts, { now: NOW });
@@ -76,7 +76,7 @@ function renderedDossier({ lineItems = LINE_ITEMS, coverage = COVERAGE } = {}) {
     vendor: { id: 7, name: 'ILT Education', slug: 'ilt-education' },
     rollup: rollups[0],
     facts,
-    productRollups: buildProductRollups(facts, lineItems, coverage),
+    productRollups: buildProductRollups(facts, lineItems, coverage, { doneKods }),
     todayIso: TODAY,
   });
 }
@@ -133,6 +133,27 @@ describe('dossier coverage matrix', () => {
     const html = renderedDossier({ coverage: [] });
     expect(html).toContain('Ingen täckningsdata');
     expect(html).not.toContain('cov-cell cov-full');
+  });
+
+  // Data honesty (2026-07-11): the aggregate goes red only when a
+  // collection-COMPLETE kommun lacks the level; while only in-progress
+  // kommuner lack it, the cell must say "?" (unknown), not "✕".
+  it('unknown aggregate → cov-unknown "?" when only in-progress kommuner lack the level', () => {
+    const html = renderedDossier({ doneKods: new Set() }); // nobody's collection is done
+    expect(html).toContain('cov-cell cov-unknown');
+    expect(html).toContain('insamling pågår');
+    expect(html).not.toContain('cov-cell cov-none'); // no confident red anywhere
+  });
+
+  it('a collection-complete kommun keeps the confident red aggregate', () => {
+    const html = renderedDossier({ doneKods: new Set(['1440', '1489']) });
+    expect(html).toContain('cov-cell cov-none'); // Polyglutt outside Förskola
+    expect(html).not.toContain('cov-cell cov-unknown');
+  });
+
+  it('legend explains the ? state', () => {
+    const html = renderedDossier();
+    expect(html).toContain('? · insamling pågår (vet inte än)');
   });
 });
 

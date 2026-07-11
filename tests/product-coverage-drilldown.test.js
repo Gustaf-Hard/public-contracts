@@ -165,22 +165,22 @@ describe('buildProductCoverageByKommun — kommun×grade pivot for one product',
 // is still in progress (any conversation not DONE) must NOT be painted red
 // ("not sold here") for products it lacks — we simply don't know yet. Fixture
 // mirrors the live Begreppa case: Ale is DONE, Arjeplog is still DELIVERING.
+// Arjeplog holds a contract (so it IS a data-kommun) but its conversation is
+// still DELIVERING — more contracts may arrive.
+const IN_PROGRESS_KOMMUNER = [
+  { kommun_kod: '1440', kommun_namn: 'Ale', collection_done: true },
+  { kommun_kod: '1489', kommun_namn: 'Alingsås', collection_done: false },
+  { kommun_kod: '2506', kommun_namn: 'Arjeplog', collection_done: false },
+];
+
+function begreppaInProgress() {
+  return buildProductCoverageByKommun({
+    vendorName: 'ILT Education', productName: 'Begreppa',
+    facts: iltFacts(), coverage: COVERAGE, dataKommuner: IN_PROGRESS_KOMMUNER,
+  });
+}
+
 describe('buildProductCoverageByKommun — collection_done gates none vs unknown', () => {
-  // Arjeplog holds a contract (so it IS a data-kommun) but its conversation
-  // is still DELIVERING — more contracts may arrive.
-  const IN_PROGRESS_KOMMUNER = [
-    { kommun_kod: '1440', kommun_namn: 'Ale', collection_done: true },
-    { kommun_kod: '1489', kommun_namn: 'Alingsås', collection_done: false },
-    { kommun_kod: '2506', kommun_namn: 'Arjeplog', collection_done: false },
-  ];
-
-  function begreppaInProgress() {
-    return buildProductCoverageByKommun({
-      vendorName: 'ILT Education', productName: 'Begreppa',
-      facts: iltFacts(), coverage: COVERAGE, dataKommuner: IN_PROGRESS_KOMMUNER,
-    });
-  }
-
   it('a DONE kommun lacking the product/level → none (confident red)', () => {
     const ale = begreppaInProgress().kommuner.find((k) => k.kommun_namn === 'Ale');
     expect(ale.coverageByGrade['Förskola']).toBe('none'); // Polyglutt-only level, Ale is DONE
@@ -275,6 +275,34 @@ describe('renderProductCoverage — kommun×grade matrix view', () => {
   it('legend adapts red to "har avtal med oss men inte denna produkt/nivå"', () => {
     expect(html).toContain('har avtal med oss men inte denna produkt/nivå');
     expect(html).toContain('nivån förekommer inte i leverantörens avtal');
+  });
+});
+
+describe('renderProductCoverage — unknown cells while collection is in progress', () => {
+  const html = renderProductCoverage({ vendor: VENDOR, drilldown: begreppaInProgress() });
+
+  it('an in-progress kommun lacking the product renders cov-unknown "?" — never cov-none (Arjeplog)', () => {
+    const arjeplog = rowFor(html, '2506');
+    expect((arjeplog.match(/cov-cell cov-unknown/g) ?? [])).toHaveLength(6);
+    expect((arjeplog.match(/cov-cell cov-na/g) ?? [])).toHaveLength(3);
+    expect(arjeplog).not.toContain('cov-none');
+    expect(arjeplog).toContain('>?</td>');
+    expect(arjeplog).toContain('insamling pågår');
+  });
+
+  it('a DONE kommun keeps confident red cells (Ale at Förskola)', () => {
+    expect(rowFor(html, '1440')).toContain('cov-cell cov-none');
+  });
+
+  it('positives survive an unfinished collection (Alingsås partial cells)', () => {
+    const alingsas = rowFor(html, '1489');
+    expect((alingsas.match(/cov-cell cov-partial/g) ?? [])).toHaveLength(2);
+    expect(alingsas).toContain('cov-cell cov-unknown');
+    expect(alingsas).not.toContain('cov-none');
+  });
+
+  it('legend explains the ? state', () => {
+    expect(html).toContain('? · insamling pågår (vet inte än)');
   });
 });
 
