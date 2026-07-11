@@ -139,6 +139,54 @@ describe('dashboard / kommun detail', () => {
     expect(res.text).not.toContain('auto_ack');
   });
 
+  it('marks a stored non-PDF attachment as "sparad, ej avtalsanalyserad" and surfaces a skipped-count note', async () => {
+    const cid = db.createConversation({
+      kommun_kod: '2418', kommun_namn: 'Malå', role: 'central',
+      contact_email: 'kommun@mala.se', scheduled_send_at: '2026-05-24T10:00:00Z',
+    });
+    db.updateConversationState(cid, 'DELIVERING', { gmail_thread_id: 't-att', last_outbound_at: '2026-05-24T10:00:00Z' });
+    // Inbound carried 2 attachments: an .xlsx (stored) + a tiny logo (skipped).
+    const mid = db.recordMessage({
+      conversation_id: cid, gmail_message_id: 'm-att', direction: 'inbound',
+      from_email: 'upphandling@mala.se', to_email: 'gustaf@mediagraf.se',
+      subject: 'Svar', body_text: 'Bifogar sammanställningen.',
+      classification: 'delivery', classification_confidence: 0.9,
+      received_at: '2026-05-24T11:00:00Z', attachment_count: 2,
+    });
+    db.recordAttachment({
+      message_id: mid, filename: 'Sammanställning avtal.xlsx',
+      saved_path: join(tmp, 'x.xlsx'), size_bytes: 34000,
+      mime_type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    const res = await get(appWithFakes(), '/kommun/2418');
+    expect(res.text).toContain('Sammanställning avtal.xlsx');
+    expect(res.text).toContain('sparad, ej avtalsanalyserad (ej PDF)');
+    expect(res.text).toContain('1 bilaga hoppades över (liten bild)');
+  });
+
+  it('does not annotate PDF attachments and shows no skipped note when all attachments are stored', async () => {
+    const cid = db.createConversation({
+      kommun_kod: '2418', kommun_namn: 'Malå', role: 'utbildning',
+      contact_email: 'bun@mala.se', scheduled_send_at: '2026-05-24T10:00:00Z',
+    });
+    db.updateConversationState(cid, 'DELIVERING', { gmail_thread_id: 't-pdf', last_outbound_at: '2026-05-24T10:00:00Z' });
+    const mid = db.recordMessage({
+      conversation_id: cid, gmail_message_id: 'm-pdf', direction: 'inbound',
+      from_email: 'bun@mala.se', to_email: 'gustaf@mediagraf.se',
+      subject: 'Avtal', body_text: 'Bifogar avtalet.',
+      classification: 'delivery', classification_confidence: 0.9,
+      received_at: '2026-05-24T11:00:00Z', attachment_count: 1,
+    });
+    db.recordAttachment({
+      message_id: mid, filename: 'Avtal.pdf',
+      saved_path: join(tmp, 'a.pdf'), size_bytes: 90000, mime_type: 'application/pdf',
+    });
+    const res = await get(appWithFakes(), '/kommun/2418');
+    expect(res.text).toContain('Avtal.pdf');
+    expect(res.text).not.toContain('ej avtalsanalyserad');
+    expect(res.text).not.toContain('hoppades över');
+  });
+
   it('404-style fallback for unknown kommun_kod', async () => {
     const app = appWithFakes();
     const res = await get(app, '/kommun/0001');

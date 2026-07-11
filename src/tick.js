@@ -6,7 +6,7 @@ import { inferThreadStatus } from './threads.js';
 import { nextActionForClassification, staleAction } from './conversation.js';
 import { parseInboundMessage, sameEmailDomain } from './gmail.js';
 import { buildEscalationBlocks } from './slack.js';
-import { saveAttachment, extractPdfsFromZip, dedupeFilenames } from './attachments.js';
+import { saveAttachment, extractPdfsFromZip, dedupeFilenames, isTrivialImage } from './attachments.js';
 import { extractSignature } from './extract-signature.js';
 import { analyseMessage, analysisToLegacyClassification } from './analyse-message.js';
 import { analysePendingContracts } from './analyse-contract.js';
@@ -328,20 +328,29 @@ async function ingestMessage({ conv, item, deps }) {
 
   const sig = extractSignature(parsed.body);
 
-  // Fetch and expand attachments BEFORE any DB write. Kommuner deliver
-  // contracts either as a PDF directly or zipped — expand zips into their
-  // inner PDFs so each is saved and analysed like any other attachment.
+  // Fetch and expand attachments BEFORE any DB write. EVERY attachment is
+  // stored regardless of MIME type — Boden delivered a sammanställning as
+  // .xlsx and the old PDF/zip-only filter silently discarded it. Only
+  // contract ANALYSIS stays PDF-gated (listPendingContractAttachments).
+  // Zips still expand into their inner PDFs; a zip with no inner PDFs is
+  // stored as-is so its contents are never lost. The single allowed skip is
+  // an image known to be tiny (signature logos — see isTrivialImage); the
+  // gap stays visible because attachment_count records what the mail carried.
   const entries = [];
   for (const att of parsed.attachments) {
     const fn = att.filename?.toLowerCase() ?? '';
-    const isPdf = att.mime_type === 'application/pdf' || fn.endsWith('.pdf');
     const isZip = att.mime_type === 'application/zip'
       || att.mime_type === 'application/x-zip-compressed' || fn.endsWith('.zip');
-    if (!isPdf && !isZip) continue;
+    if (isTrivialImage(att)) continue;
     const buf = await gmailOps.fetchAttachment(gmailClient.gmail, item.id, att.attachment_id);
     if (isZip) {
-      for (const e of extractPdfsFromZip(buf)) {
-        entries.push({ filename: e.filename, data: e.data, mime_type: 'application/pdf' });
+      const inner = extractPdfsFromZip(buf);
+      if (inner.length > 0) {
+        for (const e of inner) {
+          entries.push({ filename: e.filename, data: e.data, mime_type: 'application/pdf' });
+        }
+      } else {
+        entries.push({ filename: att.filename, data: buf, mime_type: att.mime_type });
       }
     } else {
       entries.push({ filename: att.filename, data: buf, mime_type: att.mime_type });

@@ -3,7 +3,34 @@ import { mkdtempSync, rmSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { zipSync, strToU8 } from 'fflate';
-import { saveAttachment, safeFilename, extractPdfsFromZip } from '../src/attachments.js';
+import { saveAttachment, safeFilename, extractPdfsFromZip, isTrivialImage, TINY_IMAGE_SKIP_BYTES } from '../src/attachments.js';
+
+describe('isTrivialImage', () => {
+  it('flags a small inline-signature-sized image', () => {
+    expect(isTrivialImage({ filename: 'image001.png', mime_type: 'image/png', size_bytes: 4_096 })).toBe(true);
+    expect(isTrivialImage({ filename: 'logo.jpg', mime_type: 'image/jpeg', size_bytes: TINY_IMAGE_SKIP_BYTES - 1 })).toBe(true);
+  });
+
+  it('keeps images at or above the threshold — could be a scanned document', () => {
+    expect(isTrivialImage({ filename: 'scan.png', mime_type: 'image/png', size_bytes: TINY_IMAGE_SKIP_BYTES })).toBe(false);
+    expect(isTrivialImage({ filename: 'avtal-scan.jpg', mime_type: 'image/jpeg', size_bytes: 900_000 })).toBe(false);
+  });
+
+  it('detects images by filename extension when the mime type is generic', () => {
+    expect(isTrivialImage({ filename: 'image001.gif', mime_type: 'application/octet-stream', size_bytes: 1_000 })).toBe(true);
+  });
+
+  it('never flags non-image documents, however small', () => {
+    expect(isTrivialImage({ filename: 'sammanställning.xlsx', mime_type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', size_bytes: 900 })).toBe(false);
+    expect(isTrivialImage({ filename: 'svar.docx', mime_type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', size_bytes: 500 })).toBe(false);
+    expect(isTrivialImage({ filename: 'avtal.pdf', mime_type: 'application/pdf', size_bytes: 100 })).toBe(false);
+  });
+
+  it('keeps an image whose size is unknown (0/undefined counts as unknown → keep)', () => {
+    expect(isTrivialImage({ filename: 'bild.png', mime_type: 'image/png', size_bytes: 0 })).toBe(false);
+    expect(isTrivialImage({ filename: 'bild.png', mime_type: 'image/png' })).toBe(false);
+  });
+});
 
 describe('extractPdfsFromZip', () => {
   it('returns only PDF entries, basenamed, with their bytes', () => {
