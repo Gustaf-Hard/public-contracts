@@ -1023,6 +1023,7 @@ function aggregateContracts(conversations, messagesByConv, attachmentsByMsg) {
         out.push({
           id: att.id,
           filename: att.filename,
+          mime_type: att.mime_type,
           size_bytes: att.size_bytes,
           received_at: m.received_at,
           role: conv.role,
@@ -1146,7 +1147,7 @@ export function renderKommunDetail({ kommun, conversations, messagesByConv, atta
               <td>${escapeHtml(c.received_at?.slice(0, 10) ?? '')}</td>
               <td><a href="#case-${c.conv_id}">#${c.conv_id}</a></td>
               <td>${escapeHtml(c.role)}</td>
-              <td><a href="/attachments/${c.id}" target="_blank" rel="noopener">📎 ${escapeHtml(c.filename)}</a></td>
+              <td><a href="/attachments/${c.id}" target="_blank" rel="noopener">📎 ${escapeHtml(c.filename)}</a>${isPdfAttachment(c) ? '' : ' <span class="muted">— sparad, ej avtalsanalyserad (ej PDF)</span>'}</td>
               <td>${escapeHtml(fmtBytes(c.size_bytes))}</td>
             </tr>`).join('')}</tbody>
         </table>
@@ -1305,8 +1306,22 @@ function threadMessage(m, attachments, sig, expanded) {
     : (from.email ? `<${from.email}>` : '');
   const snippet = (m.body_text ?? '').replace(/\s+/g, ' ').trim().slice(0, 100);
   const atts = (attachments ?? [])
-    .map((a) => `<a class="msg-att" href="/attachments/${a.id}" target="_blank" rel="noopener">📎 ${escapeHtml(a.filename)}</a>`)
+    .map((a) => {
+      const link = `<a class="msg-att" href="/attachments/${a.id}" target="_blank" rel="noopener">📎 ${escapeHtml(a.filename)}</a>`;
+      // Stored non-PDFs (.xlsx/.docx/scans…) never reach the contract
+      // analyser — say so, so a delivered document is never invisibly "just
+      // a file" the operator assumes was analysed.
+      return isPdfAttachment(a) ? link : `${link} <span class="muted">— sparad, ej avtalsanalyserad (ej PDF)</span>`;
+    })
     .join('');
+  // The mail carried more attachments than we stored → the ingest skipped
+  // tiny images (signature logos). Surface the gap instead of hiding it.
+  const skipped = m.direction === 'inbound'
+    ? (m.attachment_count ?? 0) - (attachments?.length ?? 0)
+    : 0;
+  const skippedNote = skipped > 0
+    ? `<div class="muted" style="font-size:11px;margin-top:4px">${skipped} ${skipped === 1 ? 'bilaga' : 'bilagor'} hoppades över (liten bild)</div>`
+    : '';
   return `<div class="msg msg-${m.direction}">
     <div class="msg-head" data-collapse aria-expanded="${expanded ? 'true' : 'false'}">
       <span class="avatar avatar-${m.direction}">${escapeHtml(initial)}</span>
@@ -1319,8 +1334,15 @@ function threadMessage(m, attachments, sig, expanded) {
     <div class="msg-body" data-collapse-target${expanded ? '' : ' hidden'}>
       <div class="msg-text">${escapeHtml(m.body_text ?? '')}</div>
       ${atts ? `<div class="msg-atts">${atts}</div>` : ''}
+      ${skippedNote}
     </div>
   </div>`;
+}
+
+// PDFs (and zip-expanded inner PDFs, saved as PDFs) are the only attachments
+// the contract analyser consumes — mirrors listPendingContractAttachments.
+function isPdfAttachment(a) {
+  return a.mime_type === 'application/pdf' || (a.filename ?? '').toLowerCase().endsWith('.pdf');
 }
 
 // A status chip + manual toggle for one thread.
