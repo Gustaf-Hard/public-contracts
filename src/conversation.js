@@ -30,6 +30,19 @@ export function nextActionForClassification(state, classification, opts = {}) {
     return { nextState: state, action: 'none' };
   }
 
+  // A delay promise (incl. an out-of-office autoreply with a return date) is
+  // an acknowledgement plus a graceful "we'll wait" ack draft. follow_up_at
+  // (return/promised date + grace) is patched by the ingest from the analysis.
+  if (classification === 'delay_promise') {
+    if (state === 'SENT' || state === 'ACK_RECEIVED' || state === 'AWAITING_PRECISION') {
+      return { nextState: 'ACK_RECEIVED', action: 'send_delay_ack' };
+    }
+    if (state === 'DELIVERING') {
+      return { nextState: 'DELIVERING', action: 'send_delay_ack' };
+    }
+    return { nextState: state, action: 'none' };
+  }
+
   if (classification === 'delivery') {
     const action = opts.receipt_sent ? 'none' : 'send_receipt';
     return { nextState: 'DELIVERING', action };

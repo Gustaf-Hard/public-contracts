@@ -51,6 +51,26 @@ describe('nextActionForClassification', () => {
     expect(r.nextState).toBe('NEEDS_HUMAN');
     expect(r.action).toBe('escalate');
   });
+
+  it('SENT/ACK_RECEIVED/AWAITING_PRECISION + delay_promise → ACK_RECEIVED, send_delay_ack', () => {
+    for (const state of ['SENT', 'ACK_RECEIVED', 'AWAITING_PRECISION']) {
+      const r = nextActionForClassification(state, 'delay_promise');
+      expect(r.nextState).toBe('ACK_RECEIVED');
+      expect(r.action).toBe('send_delay_ack');
+    }
+  });
+
+  it('DELIVERING + delay_promise stays DELIVERING but still acks', () => {
+    const r = nextActionForClassification('DELIVERING', 'delay_promise');
+    expect(r.nextState).toBe('DELIVERING');
+    expect(r.action).toBe('send_delay_ack');
+  });
+
+  it('delay_promise in other states is a no-op', () => {
+    const r = nextActionForClassification('INITIAL', 'delay_promise');
+    expect(r.nextState).toBe('INITIAL');
+    expect(r.action).toBe('none');
+  });
 });
 
 describe('staleAction', () => {

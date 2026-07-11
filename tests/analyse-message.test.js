@@ -199,9 +199,9 @@ describe('buildSystemPrompt — OOO guidance', () => {
 });
 
 describe('analysisToLegacyClassification', () => {
-  it('maps auto_ack and delay_promise both to auto_ack legacy class', () => {
+  it('maps auto_ack to auto_ack and delay_promise to its own class (drives T_DELAY_ACK)', () => {
     expect(analysisToLegacyClassification({ intent: 'auto_ack', confidence: 0.9 }).class).toBe('auto_ack');
-    expect(analysisToLegacyClassification({ intent: 'delay_promise', confidence: 0.9 }).class).toBe('auto_ack');
+    expect(analysisToLegacyClassification({ intent: 'delay_promise', confidence: 0.9 }).class).toBe('delay_promise');
   });
 
   it('maps handoff and fee_demand to unknown (escalate)', () => {

@@ -308,7 +308,7 @@ export function analysisToLegacyClassification(analysis) {
     auto_ack: 'auto_ack',
     clarification: 'clarification',
     delivery: 'delivery',
-    delay_promise: 'auto_ack',  // legacy FSM treats both as "registrator acknowledged, no outbound"
+    delay_promise: 'delay_promise', // FSM drafts a T_DELAY_ACK naming the promised date
     handoff: 'unknown',          // escalate to human; preserved on analysis.intent
     dead_end: 'dead_end',
     fee_demand: 'unknown',       // escalate to human
