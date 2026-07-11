@@ -2018,3 +2018,57 @@ export function renderVendorDossier({ vendor, rollup = null, facts = [], product
   `;
   return layout({ title: vendor.name, body, currentPath: '/leverantorer', heartbeat, partial, escalationCount });
 }
+
+// One cell of the per-product kommun×grade drill-down. Same colour language
+// as the dossier's product×grade matrix (cov-full/-partial/-none/-na), but
+// red here means "this kommun gave us contracts — none for this product at
+// this level", because the row universe is data-kommuner only.
+function kommunCoverageCell(state, grade, productName) {
+  if (state === 'na') {
+    return `<td class="cov-cell cov-na" title="${escapeHtml(`${grade}: förekommer inte i leverantörens avtal`)}">–</td>`;
+  }
+  if (state === 'none') {
+    return `<td class="cov-cell cov-none" title="${escapeHtml(`${grade}: kommunen har lämnat avtal till oss, men inget för ${productName} på nivån`)}">✕</td>`;
+  }
+  const mark = state === 'full' ? '●' : '◐';
+  const klass = state === 'full' ? 'cov-full' : 'cov-partial';
+  const label = state === 'full' ? 'full täckning' : 'delvis täckning';
+  return `<td class="cov-cell ${klass}" title="${escapeHtml(`${grade}: ${label}`)}">${mark}</td>`;
+}
+
+// Product-coverage drill-down (/leverantor/:slug/produkt/:productSlug): the
+// dossier matrix pivoted for ONE product — rows are every kommun we hold
+// collected contract data for, columns the 9 grade levels. `drilldown` is
+// buildProductCoverageByKommun output.
+export function renderProductCoverage({ vendor, drilldown, heartbeat = null, partial = false, escalationCount = 0 }) {
+  const head = GRADE_LEVELS
+    .map((g) => `<th class="cov-head" title="${escapeHtml(g)}">${escapeHtml(GRADE_SHORT_LABELS[g] ?? g)}</th>`)
+    .join('');
+  const rows = drilldown.kommuner.map((k) => `<tr>
+    <td><a href="/kommun/${escapeHtml(k.kommun_kod)}" data-pane-link>${escapeHtml(k.kommun_namn)}</a></td>
+    ${GRADE_LEVELS.map((g) => kommunCoverageCell(k.coverageByGrade[g], g, drilldown.productName)).join('')}
+  </tr>`).join('');
+  const matrix = drilldown.kommuner.length === 0
+    ? '<div class="empty-state">Inga kommuner med insamlade avtal ännu.</div>'
+    : `<table class="cov-table">
+        <thead><tr><th>Kommun</th>${head}</tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <p class="muted honesty-note">● full täckning · ◐ delvis · ✕ har avtal med oss men inte denna produkt/nivå · – nivån förekommer inte i leverantörens avtal.</p>`;
+
+  const body = `
+    <div class="page-head">
+      <h1>${escapeHtml(drilldown.productName)} — ${escapeHtml(vendor.name)} · täckning per kommun</h1>
+      <a href="/leverantor/${escapeHtml(vendor.slug)}" data-pane-link class="muted">← ${escapeHtml(vendor.name)}</a>
+    </div>
+    <p class="muted">${drilldown.summary.kommun_with_product} av ${drilldown.summary.kommun_total} kommuner (med data) har produkten — endast kommuner vi hämtat avtal från visas.</p>
+    <section class="board-section">
+      <h2>Täckning per skolnivå och kommun</h2>
+      ${matrix}
+    </section>
+  `;
+  return layout({
+    title: `${drilldown.productName} — ${vendor.name}`,
+    body, currentPath: '/leverantorer', heartbeat, partial, escalationCount,
+  });
+}

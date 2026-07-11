@@ -11,6 +11,7 @@ import {
   buildProductCoverageByKommun,
   slugifyProductName,
 } from '../src/vendor-analytics.js';
+import { renderProductCoverage } from '../src/dashboard-views.js';
 
 const NOW = new Date('2026-07-11T12:00:00Z');
 const LAN = new Map([
@@ -157,5 +158,57 @@ describe('slugifyProductName — same rule as vendor slugs', () => {
     expect(slugifyProductName('Inlästa läromedel')).toBe('inlasta-laromedel');
     expect(slugifyProductName('Begreppa')).toBe('begreppa');
     expect(slugifyProductName('Skolon Plattform 2.0')).toBe('skolon-plattform-2-0');
+  });
+});
+
+// ---- View: renderProductCoverage --------------------------------------------
+
+const VENDOR = { id: 7, name: 'ILT Education', slug: 'ilt-education' };
+
+// The <tr> for one kommun (matrix rows carry a /kommun/:kod link first).
+function rowFor(html, kod) {
+  const m = html.match(new RegExp(`<tr>\\s*<td><a href="/kommun/${kod}"[\\s\\S]*?</tr>`));
+  return m ? m[0] : null;
+}
+
+describe('renderProductCoverage — kommun×grade matrix view', () => {
+  const html = renderProductCoverage({ vendor: VENDOR, drilldown: begreppa() });
+
+  it('header names product + vendor, and links back to the dossier', () => {
+    expect(html).toContain('Begreppa — ILT Education · täckning per kommun');
+    expect(html).toContain('href="/leverantor/ilt-education"');
+  });
+
+  it('summary line is honest about the row universe', () => {
+    expect(html).toContain('2 av 3 kommuner (med data) har produkten');
+    expect(html).toContain('endast kommuner vi hämtat avtal från');
+  });
+
+  it('renders all nine grade columns and one row per data-kommun', () => {
+    for (const label of ['Förskola', 'F-klass', '1-3', '4-6', '7-9', 'Gymnasiet', 'Komvux', 'IM', 'Högskola']) {
+      expect(html).toContain(`>${label}</th>`);
+    }
+    for (const kod of ['1440', '1489', '1470']) expect(rowFor(html, kod)).not.toBeNull();
+  });
+
+  it('full/partial cells carry cov-full/cov-partial (Ale full, Alingsås partial)', () => {
+    const ale = rowFor(html, '1440');
+    expect((ale.match(/cov-cell cov-full/g) ?? [])).toHaveLength(5); // 1-3..Komvux
+    const alingsas = rowFor(html, '1489');
+    expect((alingsas.match(/cov-cell cov-partial/g) ?? [])).toHaveLength(2); // 1-3, 4-6
+    expect(alingsas).toContain('cov-cell cov-none');
+  });
+
+  it('the "not sold" kommun renders an all-red row (none everywhere applicable, na elsewhere)', () => {
+    const vara = rowFor(html, '1470');
+    expect((vara.match(/cov-cell cov-none/g) ?? [])).toHaveLength(6);
+    expect((vara.match(/cov-cell cov-na/g) ?? [])).toHaveLength(3);
+    expect(vara).not.toContain('cov-full');
+    expect(vara).not.toContain('cov-partial');
+  });
+
+  it('legend adapts red to "har avtal med oss men inte denna produkt/nivå"', () => {
+    expect(html).toContain('har avtal med oss men inte denna produkt/nivå');
+    expect(html).toContain('nivån förekommer inte i leverantörens avtal');
   });
 });
