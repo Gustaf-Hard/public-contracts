@@ -70,11 +70,13 @@ const COVERAGE = [
 ];
 
 // Every kommun with ANY stored contract — Vara has contracts from some other
-// vendor, so it belongs here even though ILT never appears there.
+// vendor, so it belongs here even though ILT never appears there. All three
+// are collection-complete (every conversation DONE), so a missing product
+// honestly renders as 'none'.
 const DATA_KOMMUNER = [
-  { kommun_kod: '1470', kommun_namn: 'Vara' },
-  { kommun_kod: '1440', kommun_namn: 'Ale' },
-  { kommun_kod: '1489', kommun_namn: 'Alingsås' },
+  { kommun_kod: '1470', kommun_namn: 'Vara', collection_done: true },
+  { kommun_kod: '1440', kommun_namn: 'Ale', collection_done: true },
+  { kommun_kod: '1489', kommun_namn: 'Alingsås', collection_done: true },
 ];
 
 // Levels no ILT contract ever references → "–" for every kommun.
@@ -156,6 +158,63 @@ describe('buildProductCoverageByKommun — kommun×grade pivot for one product',
     for (const k of r.kommuner) {
       for (const g of GRADE_LEVELS) expect(k.coverageByGrade[g]).toBe('na');
     }
+  });
+});
+
+// Regression for the data-honesty bug (2026-07-11): a kommun whose collection
+// is still in progress (any conversation not DONE) must NOT be painted red
+// ("not sold here") for products it lacks — we simply don't know yet. Fixture
+// mirrors the live Begreppa case: Ale is DONE, Arjeplog is still DELIVERING.
+describe('buildProductCoverageByKommun — collection_done gates none vs unknown', () => {
+  // Arjeplog holds a contract (so it IS a data-kommun) but its conversation
+  // is still DELIVERING — more contracts may arrive.
+  const IN_PROGRESS_KOMMUNER = [
+    { kommun_kod: '1440', kommun_namn: 'Ale', collection_done: true },
+    { kommun_kod: '1489', kommun_namn: 'Alingsås', collection_done: false },
+    { kommun_kod: '2506', kommun_namn: 'Arjeplog', collection_done: false },
+  ];
+
+  function begreppaInProgress() {
+    return buildProductCoverageByKommun({
+      vendorName: 'ILT Education', productName: 'Begreppa',
+      facts: iltFacts(), coverage: COVERAGE, dataKommuner: IN_PROGRESS_KOMMUNER,
+    });
+  }
+
+  it('a DONE kommun lacking the product/level → none (confident red)', () => {
+    const ale = begreppaInProgress().kommuner.find((k) => k.kommun_namn === 'Ale');
+    expect(ale.coverageByGrade['Förskola']).toBe('none'); // Polyglutt-only level, Ale is DONE
+  });
+
+  it('an in-progress kommun lacking the product entirely → unknown everywhere applicable (Arjeplog, DELIVERING)', () => {
+    const arjeplog = begreppaInProgress().kommuner.find((k) => k.kommun_namn === 'Arjeplog');
+    for (const g of GRADE_LEVELS) {
+      expect(arjeplog.coverageByGrade[g]).toBe(NA_GRADES.includes(g) ? 'na' : 'unknown');
+    }
+  });
+
+  it('a kommun that HAS the product keeps full/partial even while not DONE (Alingsås)', () => {
+    const alingsas = begreppaInProgress().kommuner.find((k) => k.kommun_namn === 'Alingsås');
+    expect(alingsas.coverageByGrade['1-3']).toBe('partial');
+    expect(alingsas.coverageByGrade['4-6']).toBe('partial');
+    // …but its UNcovered applicable levels are unknown, not none.
+    expect(alingsas.coverageByGrade['7-9']).toBe('unknown');
+    expect(alingsas.coverageByGrade['Gymnasiet']).toBe('unknown');
+  });
+
+  it('na is still na regardless of completion state', () => {
+    for (const k of begreppaInProgress().kommuner) {
+      for (const g of NA_GRADES) expect(k.coverageByGrade[g]).toBe('na');
+    }
+  });
+
+  it('a data-kommun without a collection_done flag is treated as complete (legacy callers)', () => {
+    const r = buildProductCoverageByKommun({
+      vendorName: 'ILT Education', productName: 'Begreppa',
+      facts: iltFacts(), coverage: COVERAGE,
+      dataKommuner: [{ kommun_kod: '1470', kommun_namn: 'Vara' }],
+    });
+    expect(r.kommuner[0].coverageByGrade['1-3']).toBe('none');
   });
 });
 
@@ -263,11 +322,14 @@ describe('route: GET /leverantor/:slug/produkt/:productSlug', () => {
     rmSync(tmp, { recursive: true, force: true });
   });
 
-  function seedAttachment(kod, namn, filename) {
+  function seedAttachment(kod, namn, filename, { state = 'DONE' } = {}) {
     const convId = db.createConversation({
       kommun_kod: kod, kommun_namn: namn, role: 'central',
       contact_email: `reg@${kod}.se`, scheduled_send_at: '2026-04-01T08:00:00Z',
     });
+    // Collection state matters now: DONE kommuner may be painted red for
+    // missing products; anything else must render as unknown.
+    db.updateConversationState(convId, state);
     const msgId = db.recordMessage({
       conversation_id: convId, gmail_message_id: `gm-${Math.random()}`, direction: 'inbound',
       from_email: `reg@${kod}.se`, to_email: 'me@x.com', subject: 'Avtal', body_text: '',

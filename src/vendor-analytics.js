@@ -348,13 +348,19 @@ export function buildVendorRollups(facts, { now }) {
 
 // Aggregated colour for one (product, grade) over the kommuner with known
 // coverage for the product:
-//   green  — full in ALL of them
-//   yellow — partial somewhere, or mixed full/absent across kommuner
-//   red    — no kommun covers the level (but the vendor references it
-//            elsewhere, so red always means "sold elsewhere, not here")
-//   na     — the level is never referenced by any contract of this vendor,
-//            or the product has no extracted coverage at all (unknown ≠ red).
-export function buildProductRollups(facts, lineItems = [], coverage = []) {
+//   green   — full in ALL of them
+//   yellow  — partial somewhere, or mixed full/absent across kommuner
+//   red     — no kommun covers the level AND at least one of the lacking
+//             kommuner is collection-complete, so "sold elsewhere, not here"
+//             is a confident claim
+//   unknown — no kommun covers the level, but every lacking kommun's
+//             collection is still in progress — we can't claim red yet
+//   na      — the level is never referenced by any contract of this vendor,
+//             or the product has no extracted coverage at all (unknown ≠ red).
+// `doneKods` is the Set of kommun_kods whose collection is complete (>=1
+// conversation, all DONE — see storage.listKommunerWithContracts). Omitted
+// (null) → legacy behavior: every kommun treated as complete, red stays red.
+export function buildProductRollups(facts, lineItems = [], coverage = [], { doneKods = null } = {}) {
   const factById = new Map(facts.map((f) => [f.contract_id, f]));
   const li = lineItems.filter((r) => factById.has(r.contract_id));
   const cov = coverage.filter((r) => factById.has(r.contract_id));
@@ -443,7 +449,11 @@ export function buildProductRollups(facts, lineItems = [], coverage = []) {
       if (!coverageKnown || !applicable.has(g)) {
         coverageByGrade[g] = 'na';
       } else if (detail.length === 0) {
-        coverageByGrade[g] = 'red';
+        // Red is a confident negative — it needs at least one lacking kommun
+        // whose collection is finished. All-in-progress → unknown, not red.
+        const confident = doneKods == null
+          || [...covByKommun.keys()].some((kod) => doneKods.has(kod));
+        coverageByGrade[g] = confident ? 'red' : 'unknown';
       } else if (detail.length === covByKommun.size && detail.every((d) => d.status === 'full')) {
         coverageByGrade[g] = 'green';
       } else {
@@ -480,19 +490,27 @@ export function slugifyProductName(name) {
 
 // The dossier's product×grade matrix pivoted for one product: rows are
 // kommuner, columns the 9 grade levels. `dataKommuner` is EVERY kommun we
-// hold any stored contract for (db.listKommunerWithContracts()) — so a row of
-// "none" honestly means "gave us contracts, but none for this product", never
-// "unknown". Per-cell states:
-//   full/partial — this kommun's contract covers the level (fully / partly)
-//   none         — kommun has collected data, no coverage of this product here
+// hold any stored contract for (db.listKommunerWithContracts()), each row
+// carrying `collection_done` (>=1 conversation, all DONE). Per-cell states:
+//   full/partial — this kommun's contract covers the level (fully / partly);
+//                  a positive stands regardless of collection state
+//   none         — collection-complete kommun, no coverage of this product
+//                  here → a CONFIDENT "not sold to them"
+//   unknown      — kommun lacks the product/level but its collection is
+//                  still in progress (or DEAD_END) — "vet inte än", not red
 //   na           — exactly where buildProductRollups says 'na' (the vendor
 //                  never references the level, or no coverage extracted at all)
+// A dataKommuner row without a collection_done flag is treated as complete
+// (legacy callers keep the old confident-red behavior).
 // `facts` is the vendor's contract-fact slice; the grade aggregation is
 // buildProductRollups itself — shared, not forked. Product match is
 // case-insensitive; returns null when the vendor has no such product.
 export function buildProductCoverageByKommun({ vendorName, productName, facts = [], lineItems = [], coverage = [], dataKommuner = [] }) {
   const wanted = String(productName ?? '').toLowerCase();
-  const rollup = buildProductRollups(facts, lineItems, coverage)
+  const doneKods = new Set(dataKommuner
+    .filter((k) => k.collection_done !== false)
+    .map((k) => k.kommun_kod));
+  const rollup = buildProductRollups(facts, lineItems, coverage, { doneKods })
     .find((p) => p.name.toLowerCase() === wanted);
   if (!rollup) return null;
 
@@ -510,7 +528,9 @@ export function buildProductCoverageByKommun({ vendorName, productName, facts = 
           continue;
         }
         const d = rollup.coverageDetail[g].find((x) => x.kommun_kod === kommun_kod);
-        coverageByGrade[g] = d ? (d.status === 'full' ? 'full' : 'partial') : 'none';
+        coverageByGrade[g] = d
+          ? (d.status === 'full' ? 'full' : 'partial')
+          : (doneKods.has(kommun_kod) ? 'none' : 'unknown');
       }
       return { kommun_kod, kommun_namn, coverageByGrade };
     });
