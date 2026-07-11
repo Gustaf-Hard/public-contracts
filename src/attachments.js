@@ -24,6 +24,26 @@ export function extractPdfsFromZip(buffer) {
   return out;
 }
 
+// Images smaller than this are almost certainly e-mail signature logos /
+// footer icons (typically 1–15 kB), not delivered documents. Anything at or
+// above the threshold — a scanned contract photographed as a JPEG easily
+// clears it — is kept. Noise control only; when in doubt we store.
+export const TINY_IMAGE_SKIP_BYTES = 20 * 1024;
+
+const IMAGE_EXT_RE = /\.(png|jpe?g|gif|bmp|webp|svg|ico)$/i;
+
+// True only for an image KNOWN to be below TINY_IMAGE_SKIP_BYTES. Non-images
+// are never trivial regardless of size (a 900-byte .xlsx is still a delivered
+// document), and an image with unknown size (0/undefined) is kept — the
+// default is to store anything that could be a document.
+export function isTrivialImage({ filename, mime_type, size_bytes } = {}) {
+  const isImage = (mime_type ?? '').toLowerCase().startsWith('image/')
+    || IMAGE_EXT_RE.test(filename ?? '');
+  if (!isImage) return false;
+  const size = size_bytes ?? 0;
+  return size > 0 && size < TINY_IMAGE_SKIP_BYTES;
+}
+
 // De-duplicate filenames within one message. Two same-named PDFs (e.g. zip
 // subfolders a/avtal.pdf and b/avtal.pdf that both flatten to avtal.pdf)
 // would otherwise overwrite the same saved path, leaving two DB rows pointing
