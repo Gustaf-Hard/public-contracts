@@ -244,6 +244,57 @@ describe('decisions', () => {
     expect(list[0].decision).toBe('approve_unmodified');
     expect(list[0].classifier_class).toBe('clarification');
   });
+
+  describe('listEditDecisions', () => {
+    function seedDecision({ kommun_kod, kommun_namn, role, decision, decided_at, draft = 'draft text', final = 'final text' }) {
+      const cid = db.createConversation({
+        kommun_kod, kommun_namn, role,
+        contact_email: `${kommun_kod}@x.se`, scheduled_send_at: '2026-05-19T10:00:00Z',
+      });
+      const eid = db.recordEscalation({
+        conversation_id: cid, reason: 'reply_needs_review',
+        draft_template: 'T_PRECISION', draft_subject: 'Re: x', draft_body: draft,
+        classifier_class: 'clarification',
+      });
+      const did = db.recordDecision({
+        escalation_id: eid, conversation_id: cid,
+        conversation_state: 'ACK_RECEIVED', classifier_class: 'clarification',
+        classifier_confidence: 0.85, draft_template: 'T_PRECISION',
+        draft_body: draft, decision, final_body: final,
+      });
+      if (decided_at) db.raw.prepare('UPDATE decisions SET decided_at = ? WHERE id = ?').run(decided_at, did);
+      return did;
+    }
+
+    it('returns only edit decisions, joined to conversation fields, newest first', () => {
+      seedDecision({ kommun_kod: '0180', kommun_namn: 'Stockholm', role: 'central', decision: 'approve_unmodified', decided_at: '2026-07-01 08:00:00' });
+      const oldEdit = seedDecision({ kommun_kod: '2506', kommun_namn: 'Arjeplog', role: 'central', decision: 'edit', decided_at: '2026-07-02 08:00:00', draft: 'bot draft A', final: 'sent A' });
+      seedDecision({ kommun_kod: '1980', kommun_namn: 'Västerås', role: 'utbildning', decision: 'skip', decided_at: '2026-07-03 08:00:00' });
+      const newEdit = seedDecision({ kommun_kod: '1480', kommun_namn: 'Göteborg', role: 'utbildning', decision: 'edit', decided_at: '2026-07-04 08:00:00', draft: 'bot draft B', final: 'sent B' });
+
+      const rows = db.listEditDecisions();
+      expect(rows).toHaveLength(2);
+      // Newest first
+      expect(rows.map((r) => r.decision_id)).toEqual([newEdit, oldEdit]);
+      const r = rows[0];
+      expect(r).toMatchObject({
+        decision_id: newEdit,
+        decided_at: '2026-07-04 08:00:00',
+        kommun_kod: '1480',
+        kommun_namn: 'Göteborg',
+        role: 'utbildning',
+        classifier_class: 'clarification',
+        conversation_state: 'ACK_RECEIVED',
+        draft_template: 'T_PRECISION',
+        draft_body: 'bot draft B',
+        final_body: 'sent B',
+      });
+    });
+
+    it('returns an empty array when there are no edit decisions', () => {
+      expect(db.listEditDecisions()).toEqual([]);
+    });
+  });
 });
 
 describe('threads', () => {
