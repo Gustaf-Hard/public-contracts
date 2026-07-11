@@ -225,7 +225,7 @@ describe('runTick — inbound processing', () => {
     expect(escs[0].previous_state).toBe('SENT');
   });
 
-  it('LLM analysis path: delay_promise sets follow_up_at and records analysis_json (no outbound)', async () => {
+  it('LLM analysis path: delay_promise sets follow_up_at, records analysis_json, and drafts ONE human-approved T_DELAY_ACK (no outbound)', async () => {
     const id = db.createConversation({
       kommun_kod: '9999', kommun_namn: 'Testkommun', role: 'utbildning',
       contact_email: 'gustaf.hard@gmail.com', scheduled_send_at: '2026-05-19T09:00:00Z',
@@ -266,8 +266,17 @@ describe('runTick — inbound processing', () => {
     });
 
     expect(spy).toHaveBeenCalledOnce();
-    expect(gmail.sendCalls).toHaveLength(0);
-    expect(slack.posts).toHaveLength(0); // delay_promise → auto_ack legacy → no escalation
+    expect(gmail.sendCalls).toHaveLength(0); // draft only — the operator approves like any outbound
+
+    // Exactly one T_DELAY_ACK draft, deterministic template naming the date
+    // (the PDF-blind LLM draft must not win here).
+    expect(slack.posts).toHaveLength(1);
+    const escs = db.listOpenEscalations();
+    expect(escs).toHaveLength(1);
+    expect(escs[0].draft_template).toBe('T_DELAY_ACK');
+    expect(escs[0].draft_body).toMatch(/Då avvaktar vi till 8 juni 2026/);
+    expect(escs[0].reason).toContain('until=2026-06-08');
+    expect(escs[0].classifier_class).toBe('delay_promise');
 
     const conv = db.getConversation(id);
     expect(conv.state).toBe('ACK_RECEIVED');
@@ -279,6 +288,57 @@ describe('runTick — inbound processing', () => {
     const recorded = JSON.parse(messages[0].analysis_json);
     expect(recorded.intent).toBe('delay_promise');
     expect(recorded.extracted.promised_response_days).toBe(10);
+
+    spy.mockRestore();
+  });
+
+  it('OOO autoreply (delay_promise): drafts the ack once; a re-fired identical OOO does NOT mint a second draft (loop guard)', async () => {
+    const id = db.createConversation({
+      kommun_kod: '1260', kommun_namn: 'Bjuv', role: 'central',
+      contact_email: 'info@bjuv.se', scheduled_send_at: '2026-06-19T09:00:00Z',
+    });
+    db.updateConversationState(id, 'SENT', { gmail_thread_id: 'thr-OOO', last_outbound_at: '2026-07-01T10:00:00Z' });
+
+    const oooAnalysis = {
+      intent: 'delay_promise', confidence: 0.9,
+      summary: 'Frånvaroautosvar: åter 20 juli; kollega för akuta ärenden.',
+      extracted: { arendenummer: null, promised_response_days: null, promised_response_date: '2026-07-20', handoff_to_email: null, handoff_to_forvaltning: null, questions: null, mentioned_vendors: null },
+      suggested_action: 'acknowledge', is_final_delivery: false,
+      draft_reply: 'Hej,\n\nTack för ditt svar! Då avvaktar vi till 20 juli.\n\nMvh\nGustaf',
+      follow_up_at: '2026-07-23',
+    };
+    const spy = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue(oooAnalysis);
+    const oooBody = 'Jag har semester och är åter på kontoret måndag 20 juli. Vid akuta ärende kan ni kontakta min kollega Mirella Beck.';
+
+    const slack = fakeSlack();
+    const tick = (msgId) => runTick({
+      db, gmailClient: { gmail: {} }, slackClient: {}, slackOps: slack, env, contractsDir,
+      now: new Date('2026-07-05T11:00:00Z'),
+      gmailOps: fakeGmail({
+        listResult: [{ id: msgId }],
+        getResult: { [msgId]: mkMsg(msgId, 'thr-OOO', 'Registrator <info@bjuv.se>', oooBody, 'Autosvar: semester') },
+      }),
+    });
+
+    // First OOO: classified as a wait (NOT a NEEDS_HUMAN handoff), timer armed,
+    // one approvable T_DELAY_ACK draft.
+    await tick('ooo-1');
+    expect(db.getConversation(id).state).toBe('ACK_RECEIVED'); // not NEEDS_HUMAN
+    expect(db.getConversation(id).follow_up_at).toBe('2026-07-23');
+    expect(slack.posts).toHaveLength(1);
+    let escs = db.listOpenEscalations();
+    expect(escs).toHaveLength(1);
+    expect(escs[0].draft_template).toBe('T_DELAY_ACK');
+    expect(escs[0].draft_body).toMatch(/Då avvaktar vi till 20 juli 2026/);
+
+    // The autoresponder fires again for the same return date (e.g. our ack
+    // triggered it): no second ack draft, and the first is NOT superseded.
+    await tick('ooo-2');
+    escs = db.raw.prepare("SELECT * FROM escalations WHERE conversation_id = ? AND draft_template = 'T_DELAY_ACK'").all(id);
+    expect(escs).toHaveLength(1);
+    expect(escs[0].status).toBe('open');
+    expect(slack.posts).toHaveLength(1);
+    expect(db.hasGmailMessageId('ooo-2')).toBe(true); // message still ingested
 
     spy.mockRestore();
   });
