@@ -28,18 +28,18 @@ Ditt jobb är att kategorisera registratorns svar och förbereda ett kort, artig
 - "auto_ack": Automatiskt mottagningskvitto från diariesystem (innehåller ofta "Ärendenummer", "Tack för att du hörde av dig", "flexiteBPMS", "Vi har tagit emot"). Ingen mänsklig registrator har behandlat svaret än. Inget svar krävs.
 - "clarification": Registratorn ber om förtydliganden (tidsperiod, specifika system, sammanställning vs fullständiga avtal etc.). Boten bör skicka en preciseringstext.
 - "delivery": Avtal levererade som bifogade filer ELLER bekräftelse att alla avtal nu skickats. Skicka kort "tack"-bekräftelse.
-- "delay_promise": Registratorn bekräftar att de hanterar ärendet och utlovar svar inom X dagar / före visst datum. Inget svar krävs, men sätt follow_up_at till deras utlovade datum + 3 dagars grace.
-- "handoff": Registratorn hänvisar oss till en annan förvaltning, e-postadress eller registrator. Boten kan inte själv följa upp dit — eskalera till människa.
+- "delay_promise": Registratorn bekräftar att de hanterar ärendet och utlovar svar inom X dagar / före visst datum. Hit hör OCKSÅ frånvaro-/semesterautosvar som anger ett återkomstdatum ("Jag har semester och är åter 20 juli", "tillbaka 3 augusti", "åter på kontoret måndag 20 juli") — ÄVEN om en kollega/vikarie nämns för akuta ärenden. En semester är en tillfällig väntan, inte en permanent hänvisning: välj delay_promise, INTE handoff. Extrahera återkomst-/utlovsdatumet som promised_response_date (ISO) och sätt follow_up_at = datumet + 3 dagars grace. Boten föreslår en kort bekräftelse ("då avvaktar vi till <datum>").
+- "handoff": Registratorn hänvisar oss PERMANENT till en annan förvaltning, e-postadress eller registrator. Boten kan inte själv följa upp dit — eskalera till människa. Ett semesterautosvar med återkomstdatum är INTE handoff (se delay_promise), även om en kollega anges för akuta ärenden.
 - "dead_end": Kommunen har inga sådana avtal, eller vägrar lämna ut handlingarna. Terminalt.
 - "fee_demand": Kommunen kräver avgift för utlämnandet. Eskalera till människa för beslut.
 - "unknown": Inget av ovanstående matchar tydligt. Eskalera till människa.
 
 # Föreslagen åtgärd (suggested_action)
 
-- "acknowledge" — bot skickar kort "Tack"-svar (delivery + slutleverans, eller delay_promise om vi vill bekräfta mottagning)
+- "acknowledge" — bot skickar kort "Tack"-svar (delivery + slutleverans, eller delay_promise: "då avvaktar vi till <datum>")
 - "send_precision" — bot skickar preciseringen som svar på clarification
 - "send_receipt" — bot skickar kvitto efter mottagna avtal (delivery, ej slutleverans)
-- "wait" — inget svar krävs, vi väntar (auto_ack, delay_promise)
+- "wait" — inget svar krävs, vi väntar (auto_ack)
 - "escalate" — vi vet inte vad vi ska göra, människan tar över (handoff, fee_demand, unknown)
 
 # draft_reply
@@ -54,7 +54,7 @@ true ENDAST när registratorn i sitt EGET svar (inte i citerad text) bekräftar 
 
 ISO-datum (YYYY-MM-DD) när boten ska kolla tillbaka om inget hörs av kommunen.
 
-- För "delay_promise": använd kommunens utlovade datum + 3 dagars grace (om de säger 10 dagar, sätt follow_up_at = idag + 13 dagar).
+- För "delay_promise": använd kommunens utlovade datum + 3 dagars grace (om de säger 10 dagar, sätt follow_up_at = idag + 13 dagar). För semesterautosvar: återkomstdatumet + 3 dagar.
 - För "auto_ack": null (vi väntar utan timer; om inget hörs på 7 dagar tar standard-staleness över).
 - För "clarification" / "delivery" / "delay_promise": konversationen rör sig vidare, sätt rimlig grace (5-7 dagar).
 - För terminalstaten "dead_end" / "fee_demand" / "handoff" / "unknown": null.
@@ -77,7 +77,13 @@ Inkommande:
 > Hej, vi behöver cirka 10 arbetsdagar för att ta fram materialet. Återkommer senast 2026-06-08.
 
 Output:
-{"intent":"delay_promise","confidence":0.95,"summary":"Kommunen utlovar svar inom 10 arbetsdagar, senast 2026-06-08.","extracted":{"arendenummer":null,"promised_response_days":10,"promised_response_date":"2026-06-08","handoff_to_email":null,"handoff_to_forvaltning":null,"questions":null,"mentioned_vendors":null},"suggested_action":"wait","is_final_delivery":false,"draft_reply":"Hej,\\n\\nTack för uppdateringen. Jag inväntar handlingarna senast 8 juni.\\n\\nMed vänliga hälsningar,\\n${from_name}\\n${from_email}","follow_up_at":"2026-06-11"}
+{"intent":"delay_promise","confidence":0.95,"summary":"Kommunen utlovar svar inom 10 arbetsdagar, senast 2026-06-08.","extracted":{"arendenummer":null,"promised_response_days":10,"promised_response_date":"2026-06-08","handoff_to_email":null,"handoff_to_forvaltning":null,"questions":null,"mentioned_vendors":null},"suggested_action":"acknowledge","is_final_delivery":false,"draft_reply":"Hej,\\n\\nTack för uppdateringen. Jag inväntar handlingarna senast 8 juni.\\n\\nMed vänliga hälsningar,\\n${from_name}\\n${from_email}","follow_up_at":"2026-06-11"}
+
+Inkommande:
+> Hej! Jag har semester och är åter på kontoret måndag 20 juli. Vid akuta ärenden kan ni kontakta min kollega Mirella Beck, mirella.beck@kommunen.se.
+
+Output:
+{"intent":"delay_promise","confidence":0.9,"summary":"Frånvaroautosvar: registratorn är åter 20 juli; kollega anges endast för akuta ärenden.","extracted":{"arendenummer":null,"promised_response_days":null,"promised_response_date":"2026-07-20","handoff_to_email":null,"handoff_to_forvaltning":null,"questions":null,"mentioned_vendors":null},"suggested_action":"acknowledge","is_final_delivery":false,"draft_reply":"Hej,\\n\\nTack för ditt svar! Då avvaktar vi till 20 juli och hör av oss igen om vi inte fått något då.\\n\\nMed vänliga hälsningar,\\n${from_name}\\n${from_email}","follow_up_at":"2026-07-23"}
 
 Inkommande:
 > Hej, dessa avtal hanteras av stadsledningskontoret. Vänligen kontakta dem på registrator@stadsledningen.kommun.se.
@@ -134,6 +140,85 @@ const ANALYSIS_SCHEMA = {
     follow_up_at: { anyOf: [{ type: 'string' }, { type: 'null' }] },
   },
 };
+
+// ---------------------------------------------------------------------------
+// Pure date helpers — used to normalise delay_promise analyses so a stated
+// return date ALWAYS re-arms the follow-up timer, even when the model forgot
+// to compute follow_up_at or emitted the date in Swedish prose.
+
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+// '2026-07-20' + 3 → '2026-07-23'. Returns null on non-ISO input.
+export function addDaysIso(iso, days) {
+  if (typeof iso !== 'string' || !ISO_DATE_RE.test(iso)) return null;
+  const t = new Date(`${iso}T00:00:00Z`);
+  if (Number.isNaN(t.getTime())) return null;
+  t.setUTCDate(t.getUTCDate() + days);
+  return t.toISOString().slice(0, 10);
+}
+
+const SV_MONTHS = {
+  januari: 1, februari: 2, mars: 3, april: 4, maj: 5, juni: 6,
+  juli: 7, augusti: 8, september: 9, oktober: 10, november: 11, december: 12,
+};
+
+// Extract a date from Swedish prose ('måndag 20 juli', '3 augusti 2026') or
+// ISO ('2026-07-20', possibly embedded). Yearless dates resolve to the NEXT
+// occurrence relative to todayIso (a return date is always in the future).
+// Returns YYYY-MM-DD or null.
+export function parseSwedishDateToIso(text, { todayIso } = {}) {
+  if (!text || typeof text !== 'string') return null;
+  const s = text.trim().toLowerCase();
+
+  const iso = s.match(/(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) {
+    const candidate = `${iso[1]}-${iso[2]}-${iso[3]}`;
+    return isRealDate(Number(iso[1]), Number(iso[2]), Number(iso[3])) ? candidate : null;
+  }
+
+  const m = s.match(/(\d{1,2})\s+(januari|februari|mars|april|maj|juni|juli|augusti|september|oktober|november|december)(?:\s+(\d{4}))?/);
+  if (!m) return null;
+  const day = Number(m[1]);
+  const month = SV_MONTHS[m[2]];
+  let year = m[3] ? Number(m[3]) : null;
+  if (year == null) {
+    const todayYear = todayIso && ISO_DATE_RE.test(todayIso) ? Number(todayIso.slice(0, 4)) : new Date().getUTCFullYear();
+    year = todayYear;
+    const candidate = `${year}-${pad2(month)}-${pad2(day)}`;
+    if (todayIso && candidate < todayIso) year += 1; // already passed → next year
+  }
+  if (!isRealDate(year, month, day)) return null;
+  return `${year}-${pad2(month)}-${pad2(day)}`;
+}
+
+function pad2(n) { return String(n).padStart(2, '0'); }
+
+function isRealDate(year, month, day) {
+  const d = new Date(Date.UTC(year, month - 1, day));
+  return d.getUTCFullYear() === year && d.getUTCMonth() === month - 1 && d.getUTCDate() === day;
+}
+
+// Deterministic safety net over the model output (pure, exported for tests):
+// for delay_promise, coerce a prose promised_response_date to ISO and, when
+// follow_up_at is missing, derive it — return/promised date + 3 days grace,
+// or today + promised_response_days + 3. Without this, an OOO reply the model
+// classified correctly could still leave nothing re-armed (case 19, Bjuv).
+export function normaliseDelayAnalysis(analysis, todayIso) {
+  if (!analysis || analysis.intent !== 'delay_promise') return analysis;
+  const ex = analysis.extracted ?? {};
+  if (ex.promised_response_date && !ISO_DATE_RE.test(ex.promised_response_date)) {
+    const coerced = parseSwedishDateToIso(ex.promised_response_date, { todayIso });
+    if (coerced) ex.promised_response_date = coerced;
+  }
+  if (!analysis.follow_up_at) {
+    if (ex.promised_response_date && ISO_DATE_RE.test(ex.promised_response_date)) {
+      analysis.follow_up_at = addDaysIso(ex.promised_response_date, 3);
+    } else if (Number.isInteger(ex.promised_response_days) && todayIso && ISO_DATE_RE.test(todayIso)) {
+      analysis.follow_up_at = addDaysIso(todayIso, ex.promised_response_days + 3);
+    }
+  }
+  return analysis;
+}
 
 let cachedClient = null;
 function getClient(apiKey) {
@@ -201,7 +286,7 @@ export async function analyseMessage(body, ctx, { env = process.env, client = nu
     if (!textBlock || !textBlock.text) return null;
     try {
       const parsed = JSON.parse(textBlock.text);
-      return parsed;
+      return normaliseDelayAnalysis(parsed, ctx.today_iso);
     } catch (e) {
       return null;
     }
