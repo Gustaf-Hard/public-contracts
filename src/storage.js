@@ -554,6 +554,18 @@ export function openDb(path) {
     ).get(conversationId, ...ACTIVE_ESCALATION_STATUSES) != null;
   }
 
+  // Autoreply-loop guard for T_DELAY_ACK (no schema change): a delay-ack
+  // escalation carries `until=<ISO date>` in its reason, so "have we already
+  // acked this exact return date?" is answerable across EVERY status —
+  // including resolved/sent — because replying again to the same
+  // out-of-office autoresponder is the reply→autoreply→reply loop we must
+  // never enter, regardless of what happened to the earlier draft.
+  function hasDelayAckForDate(conversationId, isoDate) {
+    return db.prepare(
+      "SELECT 1 FROM escalations WHERE conversation_id = ? AND draft_template = 'T_DELAY_ACK' AND reason LIKE ? LIMIT 1"
+    ).get(conversationId, `%until=${isoDate}%`) != null;
+  }
+
   // Atomically claim a due INITIAL conversation for its T-INITIAL send.
   // Two-phase outbound: the row moves INITIAL → SENDING *before* the Gmail
   // call, so a crash between Gmail accepting and the SENT finalize leaves a
@@ -963,6 +975,7 @@ export function openDb(path) {
     listOpenEscalationsForConversation,
     listActiveEscalationsForConversation,
     hasActiveEscalation,
+    hasDelayAckForDate,
     getEscalationBySlackTs,
     resolveEscalation,
     resolveEscalationIfOpen,

@@ -1,4 +1,4 @@
-import { T_INITIAL, T_PRECISION, T_RECEIPT, T_FOLLOWUP_NUDGE, T_FOLLOWUP_CLOSE, T_REQUEST_MISSING, T_UPDATE, computeReceivedMissing, chooseDeliveryReply } from './templates.js';
+import { T_INITIAL, T_PRECISION, T_RECEIPT, T_FOLLOWUP_NUDGE, T_FOLLOWUP_CLOSE, T_REQUEST_MISSING, T_UPDATE, T_DELAY_ACK, computeReceivedMissing, chooseDeliveryReply } from './templates.js';
 import { computeKommunReview } from './contract-lifecycle.js';
 import { matchWatchlist } from './watchlist.js';
 import { classify, isCloserText } from './classifier.js';
@@ -8,10 +8,10 @@ import { parseInboundMessage, sameEmailDomain } from './gmail.js';
 import { buildEscalationBlocks } from './slack.js';
 import { saveAttachment, extractPdfsFromZip, dedupeFilenames, isTrivialImage } from './attachments.js';
 import { extractSignature } from './extract-signature.js';
-import { analyseMessage, analysisToLegacyClassification } from './analyse-message.js';
+import { analyseMessage, analysisToLegacyClassification, addDaysIso } from './analyse-message.js';
 import { analysePendingContracts } from './analyse-contract.js';
 
-const TEMPLATES = { T_INITIAL, T_PRECISION, T_RECEIPT, T_FOLLOWUP_NUDGE, T_FOLLOWUP_CLOSE, T_REQUEST_MISSING, T_UPDATE };
+const TEMPLATES = { T_INITIAL, T_PRECISION, T_RECEIPT, T_FOLLOWUP_NUDGE, T_FOLLOWUP_CLOSE, T_REQUEST_MISSING, T_UPDATE, T_DELAY_ACK };
 
 function fromHeader(env) {
   return `${env.GMAIL_FROM_NAME} <${env.GMAIL_USER_EMAIL}>`;
@@ -30,6 +30,8 @@ function tplCtx(conv, env, extra = {}) {
     // Perpetual-refresh (T_UPDATE) context, forwarded when present.
     arendenummer: extra.arendenummer ?? conv.arendenummer ?? null,
     review_contracts: extra.review_contracts ?? [],
+    // Delay/OOO acknowledgement (T_DELAY_ACK) context.
+    delay_date: extra.delay_date ?? null,
   };
 }
 
@@ -439,19 +441,43 @@ async function dispatchEscalationForIngest(pending, deps) {
   // If the LLM produced a draft_reply, prefer it over the canned template.
   let draftTemplate = null;
   let llmDraft = null;
+  let templateCtx = {};
+  let watchlistVendors = [];
+  let reasonPrefix = null;
   if (transition.action === 'send_precision') draftTemplate = 'T_PRECISION';
   else if (transition.action === 'send_receipt' && !updated.receipt_sent) draftTemplate = 'T_RECEIPT';
   else if (transition.action === 'escalate') draftTemplate = 'free_form';
+  else if (transition.action === 'send_delay_ack') {
+    // Graceful "we'll wait" for a delay promise / OOO autoreply. The named
+    // date is the kommun's return/promised date — follow_up_at already holds
+    // date + 3 days grace (patched during ingest), so derive back if needed.
+    const delayDate = analysis?.extracted?.promised_response_date
+      ?? (analysis?.follow_up_at ? addDaysIso(analysis.follow_up_at, -3) : null);
+    if (!delayDate) {
+      // No date to name — nothing to ack; the follow-up timer (if any) and
+      // staleness rules carry the case.
+      deps.log?.(`SKIP delay ack for ${updated.kommun_namn}/${updated.role}: no return date extracted`);
+    } else if (db.hasDelayAckForDate(updated.id, delayDate)) {
+      // Autoreply-loop guard: the same OOO re-firing (possibly triggered by
+      // our own ack) must not mint another identical draft.
+      deps.log?.(`SKIP delay ack for ${updated.kommun_namn}/${updated.role}: ack for ${delayDate} already exists (autoreply loop guard)`);
+    } else {
+      draftTemplate = 'T_DELAY_ACK';
+      templateCtx = { delay_date: delayDate };
+      // `until=<date>` in the reason is what hasDelayAckForDate dedupes on.
+      reasonPrefix = `delay ack until=${delayDate}`;
+    }
+  }
 
-  if (draftTemplate && analysis?.draft_reply) {
+  // T_DELAY_ACK is deterministic on purpose: it must name the exact date the
+  // loop guard deduped on, so the LLM draft never substitutes for it.
+  if (draftTemplate && draftTemplate !== 'T_DELAY_ACK' && analysis?.draft_reply) {
     llmDraft = { body: analysis.draft_reply };
   }
 
   // Contract-aware delivery: a "delivery" reply must reflect what the
   // attachments actually contain. A watchlisted vendor supersedes the
   // contract-aware draft and holds the reply for conscious authoring.
-  let templateCtx = {};
-  let watchlistVendors = [];
   if (draftTemplate === 'T_RECEIPT') {
     const analyseContracts = deps.analyseContracts ?? analysePendingContracts;
     try {
@@ -496,6 +522,9 @@ async function dispatchEscalationForIngest(pending, deps) {
     let reason = analysis
       ? `llm intent=${analysis.intent} action=${analysis.suggested_action} confidence=${(analysis.confidence ?? 0).toFixed(2)}`
       : `classifier=${classification.class} confidence=${classification.confidence.toFixed(2)}`;
+    if (reasonPrefix) {
+      reason = `${reasonPrefix} | ${reason}`;
+    }
     if (watchlistVendors.length > 0) {
       reason = `⚠️ BEVAKAD LEVERANTÖR: ${watchlistVendors.join(', ')} | ${reason}`;
     }

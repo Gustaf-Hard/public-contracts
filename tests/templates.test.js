@@ -6,7 +6,7 @@ import {
   T_FOLLOWUP_NUDGE,
   T_FOLLOWUP_CLOSE,
 } from '../src/templates.js';
-import { T_REQUEST_MISSING, computeReceivedMissing, chooseDeliveryReply, T_UPDATE } from '../src/templates.js';
+import { T_REQUEST_MISSING, T_UPDATE, T_DELAY_ACK, formatDateSv, computeReceivedMissing, chooseDeliveryReply } from '../src/templates.js';
 
 const ctx = {
   kommun_namn: 'Malå',
@@ -95,6 +95,36 @@ describe('T_FOLLOWUP_CLOSE', () => {
     const m = T_FOLLOWUP_CLOSE(ctx);
     expect(m.body).toMatch(/ytterligare avtal/);
     expect(m.body).toMatch(/slutförd/);
+  });
+});
+
+describe('formatDateSv', () => {
+  it('renders an ISO date with Swedish month names', () => {
+    expect(formatDateSv('2026-07-20')).toBe('20 juli 2026');
+    expect(formatDateSv('2027-01-03')).toBe('3 januari 2027');
+  });
+
+  it('passes non-ISO input through unchanged (never crashes the draft)', () => {
+    expect(formatDateSv('20 juli')).toBe('20 juli');
+    expect(formatDateSv('')).toBe('');
+  });
+});
+
+describe('T_DELAY_ACK', () => {
+  it('is a short, warm ack that NAMES the promised return date', () => {
+    const m = T_DELAY_ACK({ ...ctx, delay_date: '2026-07-20' });
+    expect(m.subject).toMatch(/^Re: /);
+    expect(m.body).toMatch(/^Hej,\n/);
+    expect(m.body).toMatch(/Tack för ditt svar!/);
+    expect(m.body).toMatch(/Då avvaktar vi till 20 juli 2026/);
+    expect(m.body).toMatch(/hör av oss igen om vi inte fått något då/);
+    expect(m.body).toMatch(/Gustaf Hård af Segerstad/);
+    expect(m.body).toMatch(/gustaf@mediagraf.se/);
+  });
+
+  it('names a non-ISO date verbatim rather than dropping it', () => {
+    const m = T_DELAY_ACK({ ...ctx, delay_date: '20 juli' });
+    expect(m.body).toMatch(/Då avvaktar vi till 20 juli/);
   });
 });
 

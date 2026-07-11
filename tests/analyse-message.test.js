@@ -3,6 +3,9 @@ import {
   analyseMessage,
   analysisToLegacyClassification,
   isLlmAnalysisEnabled,
+  buildSystemPrompt,
+  addDaysIso,
+  parseSwedishDateToIso,
 } from '../src/analyse-message.js';
 
 function fakeClientReturning(analysisObject) {
@@ -94,10 +97,111 @@ describe('analyseMessage', () => {
   });
 });
 
+describe('date helpers (pure)', () => {
+  it('addDaysIso adds calendar days across month/year boundaries', () => {
+    expect(addDaysIso('2026-07-20', 3)).toBe('2026-07-23');
+    expect(addDaysIso('2026-05-24', 13)).toBe('2026-06-06');
+    expect(addDaysIso('2026-12-30', 3)).toBe('2027-01-02');
+    expect(addDaysIso('2026-07-23', -3)).toBe('2026-07-20');
+    expect(addDaysIso('not-a-date', 3)).toBeNull();
+  });
+
+  it('parseSwedishDateToIso handles ISO passthrough', () => {
+    expect(parseSwedishDateToIso('2026-07-20')).toBe('2026-07-20');
+    expect(parseSwedishDateToIso('senast 2026-07-20', {})).toBe('2026-07-20');
+  });
+
+  it('parseSwedishDateToIso parses Swedish month names, inferring the next occurrence', () => {
+    expect(parseSwedishDateToIso('20 juli', { todayIso: '2026-07-05' })).toBe('2026-07-20');
+    expect(parseSwedishDateToIso('måndag 20 juli', { todayIso: '2026-07-05' })).toBe('2026-07-20');
+    expect(parseSwedishDateToIso('åter på kontoret måndag 20 juli.', { todayIso: '2026-07-05' })).toBe('2026-07-20');
+    expect(parseSwedishDateToIso('3 augusti 2026', { todayIso: '2026-07-05' })).toBe('2026-08-03');
+    // A month-day already past this year means next year
+    expect(parseSwedishDateToIso('3 januari', { todayIso: '2026-12-20' })).toBe('2027-01-03');
+  });
+
+  it('parseSwedishDateToIso rejects garbage and impossible dates', () => {
+    expect(parseSwedishDateToIso('hej hej', { todayIso: '2026-07-05' })).toBeNull();
+    expect(parseSwedishDateToIso('31 februari', { todayIso: '2026-07-05' })).toBeNull();
+    expect(parseSwedishDateToIso(null, { todayIso: '2026-07-05' })).toBeNull();
+  });
+});
+
+describe('analyseMessage — delay_promise normalisation', () => {
+  const oooBody = 'Hej! Jag har semester och är åter på kontoret måndag 20 juli. Vid akuta ärende kan ni kontakta min kollega Mirella Beck.';
+
+  it('OOO with a non-ISO return date: coerces the date and fills follow_up_at = return date + 3', async () => {
+    const client = fakeClientReturning({
+      intent: 'delay_promise', confidence: 0.9,
+      summary: 'Frånvaroautosvar: åter 20 juli.',
+      extracted: { arendenummer: null, promised_response_days: null, promised_response_date: '20 juli', handoff_to_email: null, handoff_to_forvaltning: null, questions: null, mentioned_vendors: null },
+      suggested_action: 'acknowledge',
+      is_final_delivery: false,
+      draft_reply: 'Hej, ...',
+      follow_up_at: null,
+    });
+    const r = await analyseMessage(oooBody, { ...baseCtx, today_iso: '2026-07-05' }, { env: { ANTHROPIC_API_KEY: 'k' }, client });
+    expect(r.intent).toBe('delay_promise'); // a vacation is a wait, not a handoff
+    expect(r.extracted.promised_response_date).toBe('2026-07-20');
+    expect(r.follow_up_at).toBe('2026-07-23');
+  });
+
+  it('genuine "utlovar svar inom 10 dagar" with no date: follow_up_at = today + 10 + 3 grace', async () => {
+    const client = fakeClientReturning({
+      intent: 'delay_promise', confidence: 0.95,
+      summary: 'Utlovar svar inom 10 dagar.',
+      extracted: { arendenummer: null, promised_response_days: 10, promised_response_date: null, handoff_to_email: null, handoff_to_forvaltning: null, questions: null, mentioned_vendors: null },
+      suggested_action: 'acknowledge',
+      is_final_delivery: false,
+      draft_reply: 'Hej, ...',
+      follow_up_at: null,
+    });
+    const r = await analyseMessage('Vi utlovar svar inom 10 dagar.', { ...baseCtx, today_iso: '2026-05-24' }, { env: { ANTHROPIC_API_KEY: 'k' }, client });
+    expect(r.intent).toBe('delay_promise');
+    expect(r.follow_up_at).toBe('2026-06-06'); // today + 13
+  });
+
+  it('never overwrites an LLM-provided follow_up_at', async () => {
+    const client = fakeClientReturning({
+      intent: 'delay_promise', confidence: 0.95,
+      summary: 'Åter 2026-06-08.',
+      extracted: { arendenummer: null, promised_response_days: 10, promised_response_date: '2026-06-08', handoff_to_email: null, handoff_to_forvaltning: null, questions: null, mentioned_vendors: null },
+      suggested_action: 'acknowledge',
+      is_final_delivery: false,
+      draft_reply: 'Hej, ...',
+      follow_up_at: '2026-06-11',
+    });
+    const r = await analyseMessage('Vi behöver 10 dagar.', baseCtx, { env: { ANTHROPIC_API_KEY: 'k' }, client });
+    expect(r.follow_up_at).toBe('2026-06-11');
+  });
+});
+
+describe('buildSystemPrompt — OOO guidance', () => {
+  const prompt = buildSystemPrompt({ from_name: 'Gustaf', from_email: 'gustaf@mediagraf.se' });
+
+  it('instructs that a vacation autoreply with a return date is delay_promise, not handoff — even with a stand-in colleague', () => {
+    expect(prompt).toMatch(/semester/i);
+    expect(prompt).toMatch(/åter/i);
+    expect(prompt).toMatch(/INTE handoff/);
+    expect(prompt).toMatch(/kollega/i);
+  });
+
+  it('keeps the genuine delay-promise rule (promised date + 3 dagars grace)', () => {
+    expect(prompt).toMatch(/utlovade datum \+ 3 dagars grace/);
+    expect(prompt).toMatch(/follow_up_at = idag \+ 13 dagar/);
+  });
+
+  it('contains an OOO few-shot example that extracts the return date', () => {
+    expect(prompt).toMatch(/åter på kontoret måndag 20 juli/);
+    expect(prompt).toMatch(/"promised_response_date":"2026-07-20"/);
+    expect(prompt).toMatch(/"follow_up_at":"2026-07-23"/);
+  });
+});
+
 describe('analysisToLegacyClassification', () => {
-  it('maps auto_ack and delay_promise both to auto_ack legacy class', () => {
+  it('maps auto_ack to auto_ack and delay_promise to its own class (drives T_DELAY_ACK)', () => {
     expect(analysisToLegacyClassification({ intent: 'auto_ack', confidence: 0.9 }).class).toBe('auto_ack');
-    expect(analysisToLegacyClassification({ intent: 'delay_promise', confidence: 0.9 }).class).toBe('auto_ack');
+    expect(analysisToLegacyClassification({ intent: 'delay_promise', confidence: 0.9 }).class).toBe('delay_promise');
   });
 
   it('maps handoff and fee_demand to unknown (escalate)', () => {
