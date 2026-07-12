@@ -373,6 +373,47 @@ describe('renderProductCoverage — unknown cells while collection is in progres
   });
 });
 
+describe('renderProductCoverage — reseller badge + softened cells', () => {
+  const html = renderProductCoverage({ vendor: VENDOR, drilldown: begreppaWithResellers() });
+
+  it('a reseller-procuring kommun carries the 🛒 via ramavtal badge with its channels', () => {
+    const alingsas = rowFor(html, '1489');
+    expect(alingsas).toContain('pill-reseller');
+    expect(alingsas).toContain('🛒 via ramavtal: Atea');
+  });
+
+  it('non-reseller kommuner carry no badge', () => {
+    expect(rowFor(html, '1440')).not.toContain('pill-reseller');
+    expect(rowFor(html, '1470')).not.toContain('pill-reseller');
+    expect(rowFor(html, '1470')).not.toContain('via ramavtal');
+  });
+
+  it('the complete reseller kommun renders ? with a ramavtal tooltip — never ✕ (key regression)', () => {
+    const alingsas = rowFor(html, '1489');
+    expect(alingsas).toContain('cov-cell cov-unknown');
+    expect(alingsas).toContain('kan finnas via ramavtal (Atea)');
+    expect(alingsas).not.toContain('cov-none');
+    // …while its positives stand.
+    expect((alingsas.match(/cov-cell cov-partial/g) ?? [])).toHaveLength(2);
+  });
+
+  it('a plain complete kommun keeps its confident red row (Vara)', () => {
+    const vara = rowFor(html, '1470');
+    expect(vara).toContain('cov-cell cov-none');
+    expect(vara).not.toContain('cov-unknown');
+  });
+
+  it('legend explains that a ? on a reseller kommun means "kan finnas via ramavtal"', () => {
+    expect(html).toContain('🛒 via ramavtal');
+    expect(html).toContain('kan finnas via ramavtal');
+  });
+
+  it('no reseller kommuner → no ramavtal legend noise', () => {
+    const plain = renderProductCoverage({ vendor: VENDOR, drilldown: begreppa() });
+    expect(plain).not.toContain('via ramavtal');
+  });
+});
+
 // ---- Dossier: product names in the coverage matrix link to the drill-down ---
 
 describe('dossier coverage matrix links each product to its drill-down', () => {

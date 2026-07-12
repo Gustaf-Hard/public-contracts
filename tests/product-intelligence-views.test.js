@@ -68,7 +68,7 @@ const COVERAGE = [
   { id: 40, contract_id: 2, product_id: null, product_name: 'Begreppa', grade_level: '1-3', status: 'partial', student_count: 800 },
 ];
 
-function renderedDossier({ lineItems = LINE_ITEMS, coverage = COVERAGE, doneKods = null } = {}) {
+function renderedDossier({ lineItems = LINE_ITEMS, coverage = COVERAGE, doneKods = null, resellerKods = null, resellerChannelsByKommun = new Map() } = {}) {
   const lan = new Map(MUNICIPALITIES.map((m) => [m.kommun_kod, m.lan]));
   const facts = buildContractFacts(FACT_ROWS, { lanByKommunKod: lan, now: NOW });
   const rollups = buildVendorRollups(facts, { now: NOW });
@@ -76,8 +76,9 @@ function renderedDossier({ lineItems = LINE_ITEMS, coverage = COVERAGE, doneKods
     vendor: { id: 7, name: 'ILT Education', slug: 'ilt-education' },
     rollup: rollups[0],
     facts,
-    productRollups: buildProductRollups(facts, lineItems, coverage, { doneKods }),
+    productRollups: buildProductRollups(facts, lineItems, coverage, { doneKods, resellerKods }),
     todayIso: TODAY,
+    resellerChannelsByKommun,
   });
 }
 
@@ -154,6 +155,57 @@ describe('dossier coverage matrix', () => {
   it('legend explains the ? state', () => {
     const html = renderedDossier();
     expect(html).toContain('? · insamling pågår (vet inte än)');
+  });
+});
+
+// Framework/reseller awareness: kommuner buying via Adda/Atea/Skolon/
+// Läromedia can hold a product without a direct contract. The dossier badges
+// them where kommuner are listed, and its aggregate only stays red when a
+// complete NON-reseller kommun lacks the level.
+describe('dossier reseller awareness (badge + softened aggregate)', () => {
+  const bothDone = new Set(['1440', '1489']);
+
+  it('the kommun list badges reseller-procuring kommuner — and only them', () => {
+    const html = renderedDossier({
+      doneKods: bothDone,
+      resellerChannelsByKommun: new Map([['1489', ['Atea']], ['1440', []]]),
+    });
+    expect(html).toContain('🛒 via ramavtal: Atea');
+    expect((html.match(/pill-reseller/g) ?? []).length).toBeGreaterThan(0);
+    // Ale (no channels) never gets a badge: every badge sits next to Alingsås.
+    const aleRow = html.match(/<tr>\s*<td><a href="\/kommun\/1440"[\s\S]*?<\/tr>/)[0];
+    expect(aleRow).not.toContain('pill-reseller');
+  });
+
+  it('aggregate softens to cov-unknown when every lacking kommun procures via a channel', () => {
+    const html = renderedDossier({
+      doneKods: bothDone,
+      resellerKods: bothDone,
+      resellerChannelsByKommun: new Map([['1440', ['Skolon']], ['1489', ['Atea']]]),
+    });
+    expect(html).toContain('cov-cell cov-unknown');
+    expect(html).not.toContain('cov-cell cov-none');
+  });
+
+  it('a complete non-reseller kommun keeps the confident red aggregate', () => {
+    const html = renderedDossier({
+      doneKods: bothDone,
+      resellerKods: new Set(['1489']),
+      resellerChannelsByKommun: new Map([['1489', ['Atea']]]),
+    });
+    expect(html).toContain('cov-cell cov-none'); // Begreppa Förskola anchored by Ale
+  });
+
+  it('legend gains the ramavtal line when reseller kommuner are present', () => {
+    const html = renderedDossier({
+      doneKods: bothDone,
+      resellerChannelsByKommun: new Map([['1489', ['Atea']]]),
+    });
+    expect(html).toContain('kan finnas via ramavtal');
+  });
+
+  it('no reseller kommuner → no ramavtal legend noise', () => {
+    expect(renderedDossier({ doneKods: bothDone })).not.toContain('via ramavtal');
   });
 });
 
