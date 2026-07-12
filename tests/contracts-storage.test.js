@@ -319,13 +319,57 @@ describe('listKommunerWithContracts', () => {
     db.recordContract({ attachment_id: d.attId, vendor_id: null, is_contract: 0 });
 
     expect(db.listKommunerWithContracts()).toEqual([
-      { kommun_kod: '1440', kommun_namn: 'Ale' },
-      { kommun_kod: '1980', kommun_namn: 'Västerås' },
+      { kommun_kod: '1440', kommun_namn: 'Ale', collection_done: false },
+      { kommun_kod: '1980', kommun_namn: 'Västerås', collection_done: false },
     ]);
   });
 
   it('empty when nothing is stored', () => {
     expect(db.listKommunerWithContracts()).toEqual([]);
+  });
+
+  // "Collection complete" = the kommun has >=1 conversation and ALL of them
+  // are DONE. Anything still active (SENT/ACK_RECEIVED/DELIVERING/…) — or a
+  // DEAD_END, which is ambiguous about coverage — means NOT complete, so the
+  // coverage matrices must say "unknown", never a confident red.
+  describe('collection_done', () => {
+    function seedContract(kod, namn, filename) {
+      const a = seedAttachment({ kommun_kod: kod, kommun_namn: namn, filename });
+      db.recordContract({ attachment_id: a.attId, vendor_id: null, is_contract: 1 });
+      return a;
+    }
+
+    it('true when every conversation of the kommun is DONE', () => {
+      const a = seedContract('1440', 'Ale', 'Ale.pdf');
+      db.updateConversationState(a.convId, 'DONE');
+      expect(db.listKommunerWithContracts()).toEqual([
+        { kommun_kod: '1440', kommun_namn: 'Ale', collection_done: true },
+      ]);
+    });
+
+    it('false while a conversation is still active (DELIVERING) — the exact Arjeplog case', () => {
+      const a = seedContract('2506', 'Arjeplog', 'Arjeplog.pdf');
+      db.updateConversationState(a.convId, 'DELIVERING');
+      expect(db.listKommunerWithContracts()[0].collection_done).toBe(false);
+    });
+
+    it('false when ANY conversation of the kommun is not DONE, even if another is', () => {
+      const a = seedContract('1440', 'Ale', 'Ale.pdf');
+      db.updateConversationState(a.convId, 'DONE');
+      // A second conversation for the same kommun (different role), still active.
+      const conv2 = db.createConversation({
+        kommun_kod: '1440', kommun_namn: 'Ale', role: 'utbildning',
+        contact_email: 'utb@example.se', scheduled_send_at: '2026-04-01T08:00:00Z',
+      });
+      db.updateConversationState(conv2, 'ACK_RECEIVED');
+      expect(db.listKommunerWithContracts()[0].collection_done).toBe(false);
+    });
+
+    it('false for DEAD_END (terminal, but says nothing certain about coverage)', () => {
+      const a = seedContract('1440', 'Ale', 'Ale.pdf');
+      db.updateConversationState(a.convId, 'DEAD_END');
+      expect(db.listKommunerWithContracts()[0].collection_done).toBe(false);
+    });
   });
 });
 

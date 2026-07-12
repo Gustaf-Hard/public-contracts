@@ -344,6 +344,9 @@ const baseCss = `
   .cov-cell.cov-full    { background: #22c55e1a; color: var(--good); }
   .cov-cell.cov-partial { background: #f59e0b1a; color: var(--warn); }
   .cov-cell.cov-none    { background: #ef44441a; color: var(--bad); }
+  /* unknown = insamling pågår: translucent grey works in both colour schemes,
+     --fg-muted flips with prefers-color-scheme. Distinct from cov-na (no bg). */
+  .cov-cell.cov-unknown { background: #6b72801a; color: var(--fg-muted); }
   .cov-cell.cov-na      { color: var(--fg-muted); }
   .cov-detail { background: transparent; border-radius: 0; padding: 0; margin: 0; display: inline-block; position: relative; }
   .cov-detail summary { cursor: pointer; list-style: none; color: inherit; font-size: 13px; }
@@ -1885,12 +1888,17 @@ function productTable(productRollups) {
 }
 
 // One coverage-matrix cell. Green/yellow cells expand (server-rendered
-// <details>, no JS needed) to the per-kommun detail; red/neutral cells carry
-// their meaning in a tooltip.
+// <details>, no JS needed) to the per-kommun detail; red/grey/neutral cells
+// carry their meaning in a tooltip. Red is a CONFIDENT negative (some
+// collection-complete kommun lacks the level); "?" means the only kommuner
+// lacking it are still mid-collection — we don't know yet.
 function coverageCell(p, grade) {
   const colour = p.coverageByGrade[grade];
   if (colour === 'na') {
     return `<td class="cov-cell cov-na" title="${escapeHtml(`${grade}: förekommer inte i leverantörens avtal`)}">–</td>`;
+  }
+  if (colour === 'unknown') {
+    return `<td class="cov-cell cov-unknown" title="${escapeHtml(`${grade}: insamling pågår i kommunerna utan ${p.name} här — vet inte än`)}">?</td>`;
   }
   if (colour === 'red') {
     return `<td class="cov-cell cov-none" title="${escapeHtml(`${grade}: leverantören säljs på nivån i andra sammanhang, men ${p.name} når ingen kommun här`)}">✕</td>`;
@@ -1930,7 +1938,7 @@ function coverageMatrix(productRollups, vendorSlug) {
         <thead><tr><th>Produkt</th>${head}</tr></thead>
         <tbody>${rows}</tbody>
       </table>
-      <p class="muted honesty-note">● full i alla köpande kommuner · ◐ delvis eller blandat · ✕ nivån säljs av leverantören men inte här · – nivån förekommer inte i leverantörens avtal. Klicka på en cell för detalj per kommun, eller på produktnamnet för täckning per kommun.</p>
+      <p class="muted honesty-note">● full i alla köpande kommuner · ◐ delvis eller blandat · ✕ nivån säljs av leverantören men inte här · ? · insamling pågår (vet inte än) · – nivån förekommer inte i leverantörens avtal. Klicka på en cell för detalj per kommun, eller på produktnamnet för täckning per kommun.</p>
     </section>`;
 }
 
@@ -2046,12 +2054,17 @@ export function renderVendorDossier({ vendor, rollup = null, facts = [], product
 }
 
 // One cell of the per-product kommun×grade drill-down. Same colour language
-// as the dossier's product×grade matrix (cov-full/-partial/-none/-na), but
-// red here means "this kommun gave us contracts — none for this product at
-// this level", because the row universe is data-kommuner only.
+// as the dossier's product×grade matrix (cov-full/-partial/-none/-unknown/-na),
+// but red here means "this kommun's collection is COMPLETE and it gave us no
+// contract for this product at this level" — a confident negative. While the
+// kommun's collection is still in progress (any conversation not DONE), an
+// uncovered level is "?" — insamling pågår, vet inte än — never red.
 function kommunCoverageCell(state, grade, productName) {
   if (state === 'na') {
     return `<td class="cov-cell cov-na" title="${escapeHtml(`${grade}: förekommer inte i leverantörens avtal`)}">–</td>`;
+  }
+  if (state === 'unknown') {
+    return `<td class="cov-cell cov-unknown" title="${escapeHtml(`${grade}: insamling pågår hos kommunen — vet inte än om ${productName} finns på nivån`)}">?</td>`;
   }
   if (state === 'none') {
     return `<td class="cov-cell cov-none" title="${escapeHtml(`${grade}: kommunen har lämnat avtal till oss, men inget för ${productName} på nivån`)}">✕</td>`;
@@ -2080,7 +2093,7 @@ export function renderProductCoverage({ vendor, drilldown, heartbeat = null, par
         <thead><tr><th>Kommun</th>${head}</tr></thead>
         <tbody>${rows}</tbody>
       </table>
-      <p class="muted honesty-note">● full täckning · ◐ delvis · ✕ har avtal med oss men inte denna produkt/nivå · – nivån förekommer inte i leverantörens avtal.</p>`;
+      <p class="muted honesty-note">● full täckning · ◐ delvis · ✕ har avtal med oss men inte denna produkt/nivå (insamling klar) · ? · insamling pågår (vet inte än) · – nivån förekommer inte i leverantörens avtal.</p>`;
 
   const body = `
     <div class="page-head">

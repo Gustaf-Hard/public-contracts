@@ -68,7 +68,7 @@ const COVERAGE = [
   { id: 40, contract_id: 2, product_id: null, product_name: 'Begreppa', grade_level: '1-3', status: 'partial', student_count: 800 },
 ];
 
-function renderedDossier({ lineItems = LINE_ITEMS, coverage = COVERAGE } = {}) {
+function renderedDossier({ lineItems = LINE_ITEMS, coverage = COVERAGE, doneKods = null } = {}) {
   const lan = new Map(MUNICIPALITIES.map((m) => [m.kommun_kod, m.lan]));
   const facts = buildContractFacts(FACT_ROWS, { lanByKommunKod: lan, now: NOW });
   const rollups = buildVendorRollups(facts, { now: NOW });
@@ -76,7 +76,7 @@ function renderedDossier({ lineItems = LINE_ITEMS, coverage = COVERAGE } = {}) {
     vendor: { id: 7, name: 'ILT Education', slug: 'ilt-education' },
     rollup: rollups[0],
     facts,
-    productRollups: buildProductRollups(facts, lineItems, coverage),
+    productRollups: buildProductRollups(facts, lineItems, coverage, { doneKods }),
     todayIso: TODAY,
   });
 }
@@ -134,6 +134,27 @@ describe('dossier coverage matrix', () => {
     expect(html).toContain('Ingen täckningsdata');
     expect(html).not.toContain('cov-cell cov-full');
   });
+
+  // Data honesty (2026-07-11): the aggregate goes red only when a
+  // collection-COMPLETE kommun lacks the level; while only in-progress
+  // kommuner lack it, the cell must say "?" (unknown), not "✕".
+  it('unknown aggregate → cov-unknown "?" when only in-progress kommuner lack the level', () => {
+    const html = renderedDossier({ doneKods: new Set() }); // nobody's collection is done
+    expect(html).toContain('cov-cell cov-unknown');
+    expect(html).toContain('insamling pågår');
+    expect(html).not.toContain('cov-cell cov-none'); // no confident red anywhere
+  });
+
+  it('a collection-complete kommun keeps the confident red aggregate', () => {
+    const html = renderedDossier({ doneKods: new Set(['1440', '1489']) });
+    expect(html).toContain('cov-cell cov-none'); // Polyglutt outside Förskola
+    expect(html).not.toContain('cov-cell cov-unknown');
+  });
+
+  it('legend explains the ? state', () => {
+    const html = renderedDossier();
+    expect(html).toContain('? · insamling pågår (vet inte än)');
+  });
 });
 
 describe('dossier "Snitt per kommun" KPI', () => {
@@ -175,11 +196,14 @@ describe('route: GET /leverantor/:slug serves the product intelligence from the 
     rmSync(tmp, { recursive: true, force: true });
   });
 
-  function seedAttachment(kod, namn, filename) {
+  // Collection state matters for the matrix: DONE kommuner may be painted
+  // confidently red for missing products; anything else renders unknown.
+  function seedAttachment(kod, namn, filename, { state = 'DONE' } = {}) {
     const convId = db.createConversation({
       kommun_kod: kod, kommun_namn: namn, role: 'central',
       contact_email: `reg@${kod}.se`, scheduled_send_at: '2026-04-01T08:00:00Z',
     });
+    db.updateConversationState(convId, state);
     const msgId = db.recordMessage({
       conversation_id: convId, gmail_message_id: `gm-${Math.random()}`, direction: 'inbound',
       from_email: `reg@${kod}.se`, to_email: 'me@x.com', subject: 'Avtal', body_text: '',
@@ -233,6 +257,24 @@ describe('route: GET /leverantor/:slug serves the product intelligence from the 
     expect(res.text).toContain('Snitt per kommun');
     expect(res.text).toContain('cov-cell cov-full');
     expect(res.text).toContain('cov-cell cov-none'); // Begreppa at Förskola
+  });
+
+  it('an in-progress kommun (DELIVERING) yields cov-unknown, never cov-none, in the dossier matrix', async () => {
+    const v = db.upsertVendor('ILT Education');
+    // Ale is still DELIVERING — more contracts may arrive, so Begreppa's
+    // absence at Förskola is not a confident red.
+    const attId = seedAttachment('1440', 'Ale', 'ILT.pdf', { state: 'DELIVERING' });
+    const cId = db.recordContract({ attachment_id: attId, vendor_id: v.id, is_contract: 1 });
+    for (const p of ['Begreppa', 'Polyglutt']) db.linkContractProduct(cId, db.upsertProduct(v.id, p));
+    db.replaceContractCoverage(cId, [
+      { product_name: 'Begreppa', grade_level: '1-3', status: 'full', student_count: null },
+      { product_name: 'Polyglutt', grade_level: 'Förskola', status: 'full', student_count: 1683 },
+    ]);
+    const app = createDashboardApp({ db, municipalitiesLoader: () => MUNICIPALITIES });
+    const res = await get(app, '/leverantor/ilt-education');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('cov-cell cov-unknown'); // Begreppa at Förskola: vet inte än
+    expect(res.text).not.toContain('cov-cell cov-none');
   });
 
   it('a vendor without line items or coverage still renders (all honest fallbacks)', async () => {

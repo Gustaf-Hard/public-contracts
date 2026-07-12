@@ -273,6 +273,51 @@ describe('buildProductRollups — coverage matrix aggregation (green/yellow/red/
   });
 });
 
+// Red must mean a CONFIDENT "sold elsewhere, not at this level" — which
+// requires at least one collection-complete kommun to lack the level. When
+// only in-progress kommuner lack it, the honest aggregate is 'unknown'.
+// `doneKods` = kommun_kods whose collection is complete (all convs DONE);
+// omitted → legacy behavior (every kommun treated as complete).
+describe('buildProductRollups — red requires a collection-complete kommun (doneKods)', () => {
+  const withDone = (doneKods) =>
+    buildProductRollups(iltFacts(), ILT_LINE_ITEMS, ILT_COVERAGE, { doneKods });
+  const byName = (rollups, n) => rollups.find((r) => r.name === n);
+
+  it('stays red when a DONE kommun lacks the level (both kommuner done)', () => {
+    const r = withDone(new Set(['1440', '1489']));
+    expect(byName(r, 'Begreppa').coverageByGrade['Förskola']).toBe('red');
+    expect(byName(r, 'Polyglutt').coverageByGrade['1-3']).toBe('red');
+  });
+
+  it('unknown, not red, when ONLY in-progress kommuner lack the level', () => {
+    const r = withDone(new Set()); // nobody's collection is finished
+    expect(byName(r, 'Begreppa').coverageByGrade['Förskola']).toBe('unknown');
+    expect(byName(r, 'Polyglutt').coverageByGrade['1-3']).toBe('unknown');
+    expect(byName(r, 'Polyglutt').coverageByGrade['Komvux']).toBe('unknown');
+  });
+
+  it('one DONE kommun among the lacking ones is enough for red', () => {
+    // Only Alingsås is done; it sells Begreppa but lacks Förskola → red.
+    const r = withDone(new Set(['1489']));
+    expect(byName(r, 'Begreppa').coverageByGrade['Förskola']).toBe('red');
+    // Polyglutt is sold only in Ale (not done) → its uncovered levels are unknown.
+    expect(byName(r, 'Polyglutt').coverageByGrade['1-3']).toBe('unknown');
+  });
+
+  it('green/yellow/na are untouched by completion state', () => {
+    const r = withDone(new Set()); // nothing done — positives still stand
+    const inlasta = byName(r, 'Inlästa läromedel');
+    for (const grade of FULL_ALE_GRADES) expect(inlasta.coverageByGrade[grade]).toBe('green');
+    expect(byName(r, 'Begreppa').coverageByGrade['1-3']).toBe('yellow');
+    expect(byName(r, 'Begreppa').coverageByGrade['Förskoleklass']).toBe('na');
+  });
+
+  it('omitting doneKods keeps the legacy confident-red behavior', () => {
+    const r = buildProductRollups(iltFacts(), ILT_LINE_ITEMS, ILT_COVERAGE);
+    expect(byName(r, 'Begreppa').coverageByGrade['Förskola']).toBe('red');
+  });
+});
+
 describe('avg annual per kommun (vendor rollup KPI)', () => {
   it('total known annual ÷ distinct kommuner, rounded', () => {
     const rollups = buildVendorRollups(iltFacts(), { now: NOW });
