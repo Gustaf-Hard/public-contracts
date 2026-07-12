@@ -563,6 +563,49 @@ describe('route: GET /leverantor/:slug/produkt/:productSlug', () => {
     expect(res.text).toContain('? · insamling pågår (vet inte än)');
   });
 
+  it('a reseller-procuring kommun renders the badge and ? instead of red (Alingsås-via-Atea style)', async () => {
+    seedIltWorld();
+    // Boden's collection is DONE, but its only contract is with Atea — a
+    // reseller channel. Its missing Begreppa must render "?" (kan finnas via
+    // ramavtal), never a confident red, and the row carries the badge.
+    const atea = db.upsertVendor('Atea Sverige AB');
+    db.recordContract({
+      attachment_id: seedAttachment('2582', 'Boden', 'Atea-Boden.pdf'),
+      vendor_id: atea.id, is_contract: 1,
+    });
+    const app = createDashboardApp({ db, municipalitiesLoader: () => MUNICIPALITIES });
+    const res = await get(app, '/leverantor/ilt-education/produkt/begreppa');
+    expect(res.status).toBe(200);
+    const boden = res.text.match(/<tr>\s*<td><a href="\/kommun\/2582"[\s\S]*?<\/tr>/)[0];
+    expect(boden).toContain('🛒 via ramavtal: Atea');
+    expect(boden).toContain('pill-reseller');
+    expect(boden).toContain('cov-cell cov-unknown');
+    expect(boden).toContain('kan finnas via ramavtal (Atea)');
+    expect(boden).not.toContain('cov-none');
+    // Vara buys direct and is complete — its red is untouched.
+    const vara = res.text.match(/<tr>\s*<td><a href="\/kommun\/1470"[\s\S]*?<\/tr>/)[0];
+    expect(vara).toContain('cov-cell cov-none');
+    expect(vara).not.toContain('pill-reseller');
+    // Legend explains the reseller ?.
+    expect(res.text).toContain('kan finnas via ramavtal utan direktavtal');
+  });
+
+  it('the vendor dossier badges reseller-procuring kommuner in its kommun list', async () => {
+    seedIltWorld();
+    const atea = db.upsertVendor('Atea Sverige AB');
+    db.recordContract({
+      attachment_id: seedAttachment('2582', 'Boden', 'Atea-Boden.pdf'),
+      vendor_id: atea.id, is_contract: 1,
+    });
+    const app = createDashboardApp({ db, municipalitiesLoader: () => MUNICIPALITIES });
+    const res = await get(app, '/leverantor/atea-sverige-ab');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('🛒 via ramavtal: Atea'); // Boden's row badge
+    // The ILT dossier lists only direct-buying kommuner → no badge there.
+    const ilt = await get(app, '/leverantor/ilt-education');
+    expect(ilt.text).not.toContain('🛒 via ramavtal');
+  });
+
   it('404 for an unknown product within a real vendor', async () => {
     seedIltWorld();
     const app = createDashboardApp({ db, municipalitiesLoader: () => MUNICIPALITIES });

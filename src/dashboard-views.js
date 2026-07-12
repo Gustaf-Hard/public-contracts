@@ -2014,7 +2014,10 @@ function renewalCalendar(facts, todayIso) {
 // storage.listKommunerWithContracts().reseller_channels) badges kommuner that
 // procure via framework/reseller channels and widens the ?-legend.
 export function renderVendorDossier({ vendor, rollup = null, facts = [], productRollups = [], todayIso, resellerChannelsByKommun = new Map(), heartbeat = null, partial = false, escalationCount = 0 }) {
-  const anyReseller = [...resellerChannelsByKommun.values()].some((c) => (c ?? []).length > 0);
+  // Only THIS vendor's kommuner matter for the badge/legend: a reseller
+  // kommun elsewhere in the DB can't soften this dossier's aggregates.
+  const anyReseller = facts.some((f) =>
+    (resellerChannelsByKommun.get(f.kommun_kod) ?? []).length > 0);
   const r = rollup ?? {
     contract_count: 0, kommun_count: 0, total_annual_sek: null, value_known_count: 0,
     median_length_months: null, length_known_count: 0,
