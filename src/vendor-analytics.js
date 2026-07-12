@@ -360,7 +360,12 @@ export function buildVendorRollups(facts, { now }) {
 // `doneKods` is the Set of kommun_kods whose collection is complete (>=1
 // conversation, all DONE — see storage.listKommunerWithContracts). Omitted
 // (null) → legacy behavior: every kommun treated as complete, red stays red.
-export function buildProductRollups(facts, lineItems = [], coverage = [], { doneKods = null } = {}) {
+// `resellerKods` is the Set of kommun_kods that procure via a framework/
+// reseller channel (non-empty reseller_channels): such a kommun can HAVE a
+// product without a direct contract, so it can never anchor a confident red —
+// red needs >=1 complete AND non-reseller kommun lacking the level; when the
+// only lacking kommuner are in-progress or reseller-procuring → unknown.
+export function buildProductRollups(facts, lineItems = [], coverage = [], { doneKods = null, resellerKods = null } = {}) {
   const factById = new Map(facts.map((f) => [f.contract_id, f]));
   const li = lineItems.filter((r) => factById.has(r.contract_id));
   const cov = coverage.filter((r) => factById.has(r.contract_id));
@@ -450,9 +455,12 @@ export function buildProductRollups(facts, lineItems = [], coverage = [], { done
         coverageByGrade[g] = 'na';
       } else if (detail.length === 0) {
         // Red is a confident negative — it needs at least one lacking kommun
-        // whose collection is finished. All-in-progress → unknown, not red.
-        const confident = doneKods == null
-          || [...covByKommun.keys()].some((kod) => doneKods.has(kod));
+        // whose collection is finished AND that does not procure via a
+        // framework/reseller channel (the product could reach it that way).
+        // All-in-progress or all-via-reseller → unknown, not red.
+        const confident = [...covByKommun.keys()].some((kod) =>
+          (doneKods == null || doneKods.has(kod))
+          && !(resellerKods != null && resellerKods.has(kod)));
         coverageByGrade[g] = confident ? 'red' : 'unknown';
       } else if (detail.length === covByKommun.size && detail.every((d) => d.status === 'full')) {
         coverageByGrade[g] = 'green';
@@ -494,14 +502,20 @@ export function slugifyProductName(name) {
 // carrying `collection_done` (>=1 conversation, all DONE). Per-cell states:
 //   full/partial — this kommun's contract covers the level (fully / partly);
 //                  a positive stands regardless of collection state
-//   none         — collection-complete kommun, no coverage of this product
-//                  here → a CONFIDENT "not sold to them"
-//   unknown      — kommun lacks the product/level but its collection is
-//                  still in progress (or DEAD_END) — "vet inte än", not red
+//   none         — collection-complete, NON-reseller kommun, no coverage of
+//                  this product here → a CONFIDENT "not sold to them"
+//   unknown      — kommun lacks the product/level but either its collection
+//                  is still in progress (or DEAD_END) — "vet inte än" — or it
+//                  procures via a framework/reseller channel (non-empty
+//                  reseller_channels), so the product may reach it via the
+//                  channel without a direct contract ("kan finnas via
+//                  ramavtal"). Never red in either case.
 //   na           — exactly where buildProductRollups says 'na' (the vendor
 //                  never references the level, or no coverage extracted at all)
 // A dataKommuner row without a collection_done flag is treated as complete
-// (legacy callers keep the old confident-red behavior).
+// (legacy callers keep the old confident-red behavior). Rows are passed
+// through with reseller_channels + collection_done so views can badge the
+// kommun and word the unknown tooltip by reason.
 // `facts` is the vendor's contract-fact slice; the grade aggregation is
 // buildProductRollups itself — shared, not forked. Product match is
 // case-insensitive; returns null when the vendor has no such product.
@@ -510,7 +524,10 @@ export function buildProductCoverageByKommun({ vendorName, productName, facts = 
   const doneKods = new Set(dataKommuner
     .filter((k) => k.collection_done !== false)
     .map((k) => k.kommun_kod));
-  const rollup = buildProductRollups(facts, lineItems, coverage, { doneKods })
+  const resellerKods = new Set(dataKommuner
+    .filter((k) => (k.reseller_channels ?? []).length > 0)
+    .map((k) => k.kommun_kod));
+  const rollup = buildProductRollups(facts, lineItems, coverage, { doneKods, resellerKods })
     .find((p) => p.name.toLowerCase() === wanted);
   if (!rollup) return null;
 
@@ -520,7 +537,7 @@ export function buildProductCoverageByKommun({ vendorName, productName, facts = 
 
   const kommuner = [...dataKommuner]
     .sort((a, b) => a.kommun_namn.localeCompare(b.kommun_namn, 'sv'))
-    .map(({ kommun_kod, kommun_namn }) => {
+    .map(({ kommun_kod, kommun_namn, collection_done, reseller_channels }) => {
       const coverageByGrade = {};
       for (const g of GRADE_LEVELS) {
         if (rollup.coverageByGrade[g] === 'na') {
@@ -530,9 +547,15 @@ export function buildProductCoverageByKommun({ vendorName, productName, facts = 
         const d = rollup.coverageDetail[g].find((x) => x.kommun_kod === kommun_kod);
         coverageByGrade[g] = d
           ? (d.status === 'full' ? 'full' : 'partial')
-          : (doneKods.has(kommun_kod) ? 'none' : 'unknown');
+          : (doneKods.has(kommun_kod) && !resellerKods.has(kommun_kod) ? 'none' : 'unknown');
       }
-      return { kommun_kod, kommun_namn, coverageByGrade };
+      return {
+        kommun_kod,
+        kommun_namn,
+        collection_done: collection_done !== false,
+        reseller_channels: reseller_channels ?? [],
+        coverageByGrade,
+      };
     });
 
   return {

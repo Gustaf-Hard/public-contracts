@@ -318,6 +318,52 @@ describe('buildProductRollups — red requires a collection-complete kommun (don
   });
 });
 
+// Framework/reseller awareness: a kommun that procures via a channel
+// (Adda/Atea/Skolon/Läromedia — src/resellers.js) can HAVE a product without
+// a direct contract, so it can never anchor a confident red. Red now needs
+// >=1 collection-complete AND non-reseller kommun lacking the level; when the
+// only lacking kommuner procure via a channel, the honest aggregate is
+// 'unknown' (kan finnas via ramavtal).
+describe('buildProductRollups — reseller-procuring kommuner cannot anchor red (resellerKods)', () => {
+  const allDone = new Set(['1440', '1489']);
+  const roll = (resellerKods) =>
+    buildProductRollups(iltFacts(), ILT_LINE_ITEMS, ILT_COVERAGE, { doneKods: allDone, resellerKods });
+  const byName = (rollups, n) => rollups.find((r) => r.name === n);
+
+  it('unknown, not red, when every lacking kommun procures via a reseller', () => {
+    const r = roll(new Set(['1440', '1489']));
+    expect(byName(r, 'Begreppa').coverageByGrade['Förskola']).toBe('unknown');
+    expect(byName(r, 'Polyglutt').coverageByGrade['1-3']).toBe('unknown');
+  });
+
+  it('stays red while at least one complete NON-reseller kommun lacks the level', () => {
+    // Ale procures via a channel, Alingsås does not → Alingsås anchors red
+    // for Begreppa (sold in both); Polyglutt is Ale-only → unknown.
+    const r = roll(new Set(['1440']));
+    expect(byName(r, 'Begreppa').coverageByGrade['Förskola']).toBe('red');
+    expect(byName(r, 'Polyglutt').coverageByGrade['1-3']).toBe('unknown');
+  });
+
+  it('an in-progress reseller kommun is doubly unable to anchor red', () => {
+    const r = buildProductRollups(iltFacts(), ILT_LINE_ITEMS, ILT_COVERAGE,
+      { doneKods: new Set(['1489']), resellerKods: new Set(['1489']) });
+    expect(byName(r, 'Begreppa').coverageByGrade['Förskola']).toBe('unknown');
+  });
+
+  it('green/yellow/na are untouched by reseller state', () => {
+    const r = roll(new Set(['1440', '1489']));
+    const inlasta = byName(r, 'Inlästa läromedel');
+    for (const grade of FULL_ALE_GRADES) expect(inlasta.coverageByGrade[grade]).toBe('green');
+    expect(byName(r, 'Begreppa').coverageByGrade['1-3']).toBe('yellow');
+    expect(byName(r, 'Begreppa').coverageByGrade['Förskoleklass']).toBe('na');
+  });
+
+  it('omitting resellerKods keeps the previous behavior', () => {
+    const r = buildProductRollups(iltFacts(), ILT_LINE_ITEMS, ILT_COVERAGE, { doneKods: allDone });
+    expect(byName(r, 'Begreppa').coverageByGrade['Förskola']).toBe('red');
+  });
+});
+
 describe('avg annual per kommun (vendor rollup KPI)', () => {
   it('total known annual ÷ distinct kommuner, rounded', () => {
     const rollups = buildVendorRollups(iltFacts(), { now: NOW });

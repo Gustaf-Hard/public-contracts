@@ -218,6 +218,73 @@ describe('buildProductCoverageByKommun — collection_done gates none vs unknown
   });
 });
 
+// Framework/reseller awareness (Alingsås-via-Atea style): a kommun with a
+// non-empty reseller_channels procures via a framework/reseller channel, so
+// it can HAVE a product without us seeing a direct contract. Even when its
+// collection is COMPLETE, its missing cells must say 'unknown' (kan finnas
+// via ramavtal) — never a confident 'none'.
+const RESELLER_KOMMUNER = [
+  { kommun_kod: '1440', kommun_namn: 'Ale', collection_done: true, reseller_channels: [] },
+  { kommun_kod: '1489', kommun_namn: 'Alingsås', collection_done: true, reseller_channels: ['Atea'] },
+  { kommun_kod: '1470', kommun_namn: 'Vara', collection_done: true, reseller_channels: [] },
+];
+
+function begreppaWithResellers() {
+  return buildProductCoverageByKommun({
+    vendorName: 'ILT Education', productName: 'Begreppa',
+    facts: iltFacts(), coverage: COVERAGE, dataKommuner: RESELLER_KOMMUNER,
+  });
+}
+
+describe('buildProductCoverageByKommun — reseller channels soften none to unknown', () => {
+  it('a collection-COMPLETE kommun procuring via a reseller: lacking cells → unknown, NOT none (the key regression)', () => {
+    const alingsas = begreppaWithResellers().kommuner.find((k) => k.kommun_namn === 'Alingsås');
+    expect(alingsas.coverageByGrade['7-9']).toBe('unknown');
+    expect(alingsas.coverageByGrade['Gymnasiet']).toBe('unknown');
+    expect(alingsas.coverageByGrade['Komvux']).toBe('unknown');
+    expect(alingsas.coverageByGrade['Förskola']).toBe('unknown'); // Polyglutt-owned level
+  });
+
+  it('positives stand regardless: the reseller kommun keeps its full/partial cells', () => {
+    const alingsas = begreppaWithResellers().kommuner.find((k) => k.kommun_namn === 'Alingsås');
+    expect(alingsas.coverageByGrade['1-3']).toBe('partial');
+    expect(alingsas.coverageByGrade['4-6']).toBe('partial');
+  });
+
+  it('a complete NON-reseller kommun lacking the product is still confidently none (Vara)', () => {
+    const vara = begreppaWithResellers().kommuner.find((k) => k.kommun_namn === 'Vara');
+    for (const g of GRADE_LEVELS) {
+      expect(vara.coverageByGrade[g]).toBe(NA_GRADES.includes(g) ? 'na' : 'none');
+    }
+  });
+
+  it('a kommun that HAS the product stays full (Ale)', () => {
+    const ale = begreppaWithResellers().kommuner.find((k) => k.kommun_namn === 'Ale');
+    for (const g of ALE_GRADES) expect(ale.coverageByGrade[g]).toBe('full');
+  });
+
+  it('na stays na for reseller kommuner too', () => {
+    const alingsas = begreppaWithResellers().kommuner.find((k) => k.kommun_namn === 'Alingsås');
+    for (const g of NA_GRADES) expect(alingsas.coverageByGrade[g]).toBe('na');
+  });
+
+  it('rows carry reseller_channels + collection_done so the view can badge and word tooltips', () => {
+    const r = begreppaWithResellers();
+    expect(r.kommuner.find((k) => k.kommun_namn === 'Alingsås').reseller_channels).toEqual(['Atea']);
+    expect(r.kommuner.find((k) => k.kommun_namn === 'Alingsås').collection_done).toBe(true);
+    expect(r.kommuner.find((k) => k.kommun_namn === 'Vara').reseller_channels).toEqual([]);
+  });
+
+  it('an in-progress reseller kommun is unknown as well (both reasons point the same way)', () => {
+    const r = buildProductCoverageByKommun({
+      vendorName: 'ILT Education', productName: 'Begreppa',
+      facts: iltFacts(), coverage: COVERAGE,
+      dataKommuner: [{ kommun_kod: '2506', kommun_namn: 'Arjeplog', collection_done: false, reseller_channels: ['Skolon'] }],
+    });
+    expect(r.kommuner[0].coverageByGrade['1-3']).toBe('unknown');
+  });
+});
+
 describe('slugifyProductName — same rule as vendor slugs', () => {
   it('folds å/ä/ö and kebab-cases', () => {
     expect(slugifyProductName('Inlästa läromedel')).toBe('inlasta-laromedel');
@@ -391,10 +458,12 @@ describe('route: GET /leverantor/:slug/produkt/:productSlug', () => {
       { product_name: 'Begreppa', grade_level: '1-3', status: 'partial', student_count: 800 },
     ]);
     // Vara: has stored contract data — but from ANOTHER vendor entirely.
-    const skolon = db.upsertVendor('Skolon');
+    // Deliberately a NON-reseller vendor: a Skolon/Atea contract would make
+    // Vara reseller-procuring and honestly soften its red to unknown.
+    const gleerups = db.upsertVendor('Gleerups');
     db.recordContract({
-      attachment_id: seedAttachment('1470', 'Vara', 'Skolon-Vara.pdf'),
-      vendor_id: skolon.id, is_contract: 1,
+      attachment_id: seedAttachment('1470', 'Vara', 'Gleerups-Vara.pdf'),
+      vendor_id: gleerups.id, is_contract: 1,
     });
     return db;
   }
@@ -431,12 +500,13 @@ describe('route: GET /leverantor/:slug/produkt/:productSlug', () => {
 
   it('an in-progress kommun renders cov-unknown, never cov-none (Arjeplog DELIVERING regression)', async () => {
     seedIltWorld();
-    // Arjeplog delivered ONE contract (another vendor's) but its conversation
-    // is still DELIVERING — its missing Begreppa is unknown, not "not sold".
-    const skolon = db.getVendorBySlug('skolon') ?? db.upsertVendor('Skolon');
+    // Arjeplog delivered ONE contract (another non-reseller vendor's) but its
+    // conversation is still DELIVERING — its missing Begreppa is unknown
+    // because collection is in progress, not because of any reseller channel.
+    const gleerups = db.getVendorBySlug('gleerups') ?? db.upsertVendor('Gleerups');
     db.recordContract({
-      attachment_id: seedAttachment('2506', 'Arjeplog', 'Skolon-Arjeplog.pdf', { state: 'DELIVERING' }),
-      vendor_id: skolon.id, is_contract: 1,
+      attachment_id: seedAttachment('2506', 'Arjeplog', 'Gleerups-Arjeplog.pdf', { state: 'DELIVERING' }),
+      vendor_id: gleerups.id, is_contract: 1,
     });
     const app = createDashboardApp({ db, municipalitiesLoader: () => MUNICIPALITIES });
     const res = await get(app, '/leverantor/ilt-education/produkt/begreppa');
