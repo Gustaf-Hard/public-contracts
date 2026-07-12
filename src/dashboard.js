@@ -845,12 +845,24 @@ export function createDashboardApp({
     };
   };
 
-  // Kommuner whose collection is complete (>=1 conversation, all DONE) —
-  // the only ones the coverage matrices may paint confidently red.
-  const doneKommunKods = () => new Set(
-    (db ? db.listKommunerWithContracts() : [])
-      .filter((k) => k.collection_done)
-      .map((k) => k.kommun_kod));
+  // The data-kommun universe (kommuner with >=1 stored contract) split three
+  // ways for the coverage matrices: doneKods (collection complete — the only
+  // ones that may anchor a confident red), resellerKods (procure via a
+  // framework/reseller channel — can HAVE a product without a direct
+  // contract, so they can never anchor red), and the per-kommun channel list
+  // for the 🛒 via ramavtal badges. One read, no schema change.
+  const kommunCoverageContext = () => {
+    const dataKommuner = db ? db.listKommunerWithContracts() : [];
+    return {
+      dataKommuner,
+      doneKods: new Set(dataKommuner.filter((k) => k.collection_done).map((k) => k.kommun_kod)),
+      resellerKods: new Set(dataKommuner
+        .filter((k) => (k.reseller_channels ?? []).length > 0)
+        .map((k) => k.kommun_kod)),
+      resellerChannelsByKommun: new Map(dataKommuner
+        .map((k) => [k.kommun_kod, k.reseller_channels ?? []])),
+    };
+  };
 
   app.get('/leverantorer', (req, res) => {
     const { facts, rollups, summary, todayIso } = vendorData(new Date());
@@ -876,6 +888,7 @@ export function createDashboardApp({
     }
     const { facts, rollups, todayIso } = vendorData(new Date());
     const vendorFacts = facts.filter((f) => f.vendor_id === vendor.id);
+    const { doneKods, resellerKods, resellerChannelsByKommun } = kommunCoverageContext();
     res.send(renderVendorDossier({
       vendor,
       rollup: rollups.find((r) => r.vendor_id === vendor.id) ?? null,
@@ -884,10 +897,13 @@ export function createDashboardApp({
       // for the whole DB — buildProductRollups joins them onto this vendor's
       // facts by contract_id, so other vendors' rows fall away. doneKods
       // (kommuner with every conversation DONE) gates the confident-red
-      // aggregate: in-progress kommuner render as unknown, never red.
+      // aggregate: in-progress kommuner render as unknown, never red — and
+      // resellerKods kommuner (procure via ramavtal/reseller) never anchor
+      // red either, since the product may reach them via the channel.
       productRollups: buildProductRollups(vendorFacts, db.listLineItems(), db.listCoverage(),
-        { doneKods: doneKommunKods() }),
+        { doneKods, resellerKods }),
       todayIso,
+      resellerChannelsByKommun,
       heartbeat: hb(), partial: isPartial(req), escalationCount: escCount(),
     }));
   });
@@ -910,21 +926,21 @@ export function createDashboardApp({
     const vendorFacts = facts.filter((f) => f.vendor_id === vendor.id);
     const lineItems = db.listLineItems();
     const coverage = db.listCoverage();
-    // Data-kommuner carry collection_done; the drill-down uses it to render
-    // unknown (insamling pågår) instead of a confident red for kommuner
-    // whose conversations aren't all DONE yet.
-    const dataKommuner = db.listKommunerWithContracts();
-    const doneKods = new Set(dataKommuner.filter((k) => k.collection_done).map((k) => k.kommun_kod));
+    // Data-kommuner carry collection_done + reseller_channels; the drill-down
+    // uses them to render unknown (insamling pågår / kan finnas via ramavtal)
+    // instead of a confident red for kommuner whose conversations aren't all
+    // DONE yet or that procure via a framework/reseller channel.
+    const { dataKommuner, doneKods, resellerKods, resellerChannelsByKommun } = kommunCoverageContext();
     // Resolve the product by slug within THIS vendor (same slug rule as
     // vendors); the rollups carry the full product universe.
-    const productRollups = buildProductRollups(vendorFacts, lineItems, coverage, { doneKods });
+    const productRollups = buildProductRollups(vendorFacts, lineItems, coverage, { doneKods, resellerKods });
     const product = productRollups.find((p) => slugifyProductName(p.name) === req.params.productSlug);
     if (!product) {
       // Unknown product → 404 with the vendor dossier as a useful landing.
       return res.status(404).send(renderVendorDossier({
         vendor,
         rollup: rollups.find((r) => r.vendor_id === vendor.id) ?? null,
-        facts: vendorFacts, productRollups, todayIso,
+        facts: vendorFacts, productRollups, todayIso, resellerChannelsByKommun,
         heartbeat: hb(), partial: isPartial(req), escalationCount: escCount(),
       }));
     }

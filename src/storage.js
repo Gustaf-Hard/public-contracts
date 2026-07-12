@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3';
+import { matchResellers } from './resellers.js';
 
 // Active (non-terminal) escalation statuses — the single source of truth for
 // "this conversation already has pending or unresolved outbound work":
@@ -877,7 +878,25 @@ export function openDb(path) {
   // — or a DEAD_END, which is ambiguous about coverage — means the picture
   // is incomplete, and the matrices must render "unknown" instead of red.
   // Derived from conversations.state; no schema change.
+  // `reseller_channels` (also read-time derived, no schema change) lists the
+  // framework/reseller channels (src/resellers.js) the kommun has >=1 stored
+  // contract with. Non-empty means the kommun procures via a channel, so it
+  // can HAVE a product without a direct vendor contract — the coverage
+  // matrices must soften its confident red to unknown.
   function listKommunerWithContracts() {
+    const vendorNamesByKommun = new Map();
+    for (const r of db.prepare(`
+      SELECT DISTINCT conv.kommun_kod AS kommun_kod, v.name AS vendor_name
+      FROM contracts c
+      JOIN attachments a ON a.id = c.attachment_id
+      JOIN messages m ON m.id = a.message_id
+      JOIN conversations conv ON conv.id = m.conversation_id
+      JOIN vendors v ON v.id = c.vendor_id
+      WHERE c.is_contract = 1
+    `).all()) {
+      if (!vendorNamesByKommun.has(r.kommun_kod)) vendorNamesByKommun.set(r.kommun_kod, []);
+      vendorNamesByKommun.get(r.kommun_kod).push(r.vendor_name);
+    }
     return db.prepare(`
       SELECT DISTINCT conv.kommun_kod, conv.kommun_namn,
         NOT EXISTS (
@@ -890,7 +909,11 @@ export function openDb(path) {
       JOIN conversations conv ON conv.id = m.conversation_id
       WHERE c.is_contract = 1
       ORDER BY conv.kommun_namn COLLATE NOCASE, conv.kommun_kod
-    `).all().map((r) => ({ ...r, collection_done: !!r.collection_done }));
+    `).all().map((r) => ({
+      ...r,
+      collection_done: !!r.collection_done,
+      reseller_channels: matchResellers(vendorNamesByKommun.get(r.kommun_kod) ?? []),
+    }));
   }
 
   // DONE conversations armed with a next_review_at at or before `todayIso`.

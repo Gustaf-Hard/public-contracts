@@ -319,8 +319,9 @@ describe('listKommunerWithContracts', () => {
     db.recordContract({ attachment_id: d.attId, vendor_id: null, is_contract: 0 });
 
     expect(db.listKommunerWithContracts()).toEqual([
-      { kommun_kod: '1440', kommun_namn: 'Ale', collection_done: false },
-      { kommun_kod: '1980', kommun_namn: 'Västerås', collection_done: false },
+      { kommun_kod: '1440', kommun_namn: 'Ale', collection_done: false, reseller_channels: [] },
+      // Skolon is a reseller/marketplace channel — Västerås carries it.
+      { kommun_kod: '1980', kommun_namn: 'Västerås', collection_done: false, reseller_channels: ['Skolon'] },
     ]);
   });
 
@@ -343,7 +344,7 @@ describe('listKommunerWithContracts', () => {
       const a = seedContract('1440', 'Ale', 'Ale.pdf');
       db.updateConversationState(a.convId, 'DONE');
       expect(db.listKommunerWithContracts()).toEqual([
-        { kommun_kod: '1440', kommun_namn: 'Ale', collection_done: true },
+        { kommun_kod: '1440', kommun_namn: 'Ale', collection_done: true, reseller_channels: [] },
       ]);
     });
 
@@ -369,6 +370,65 @@ describe('listKommunerWithContracts', () => {
       const a = seedContract('1440', 'Ale', 'Ale.pdf');
       db.updateConversationState(a.convId, 'DEAD_END');
       expect(db.listKommunerWithContracts()[0].collection_done).toBe(false);
+    });
+  });
+
+  // reseller_channels: which framework/reseller channels (src/resellers.js)
+  // the kommun has >=1 stored contract with. Derived at read time from
+  // contracts+vendors — no schema change. A non-empty list means the kommun
+  // procures via a channel, so the coverage matrices must not paint its
+  // missing products confidently red.
+  describe('reseller_channels', () => {
+    const convByKod = new Map(); // one conversation per kommun; extra contracts reuse it
+    beforeEach(() => convByKod.clear());
+
+    function seedVendorContract(kod, namn, vendorName, { is_contract = 1 } = {}) {
+      if (!convByKod.has(kod)) {
+        convByKod.set(kod, db.createConversation({
+          kommun_kod: kod, kommun_namn: namn, role: 'central',
+          contact_email: 'reg@example.se', scheduled_send_at: '2026-04-01T08:00:00Z',
+        }));
+      }
+      const msgId = db.recordMessage({
+        conversation_id: convByKod.get(kod), gmail_message_id: `gm-${Math.random()}`,
+        direction: 'inbound', from_email: 'reg@example.se', to_email: 'me@example.com',
+        subject: 'Avtal', body_text: '', classification: null,
+        classification_confidence: null, received_at: '2026-04-13T10:00:00Z', attachment_count: 1,
+      });
+      const attId = db.recordAttachment({
+        message_id: msgId, filename: `${vendorName}-${kod}.pdf`,
+        saved_path: `data/contracts/${kod}/${vendorName}.pdf`,
+        mime_type: 'application/pdf', size_bytes: 1000,
+      });
+      const v = db.upsertVendor(vendorName);
+      db.recordContract({ attachment_id: attId, vendor_id: v.id, is_contract });
+    }
+
+    it('a kommun with an Atea contract carries ["Atea"] (Alingsås licenspartner case)', () => {
+      seedVendorContract('1489', 'Alingsås', 'Atea Sverige AB');
+      expect(db.listKommunerWithContracts()[0].reseller_channels).toEqual(['Atea']);
+    });
+
+    it('SKL Kommentus resolves to the Adda canonical', () => {
+      seedVendorContract('2582', 'Boden', 'SKL Kommentus Inköpscentral AB');
+      expect(db.listKommunerWithContracts()[0].reseller_channels).toEqual(['Adda']);
+    });
+
+    it('several channels dedupe into RESELLERS order', () => {
+      seedVendorContract('1489', 'Alingsås', 'Atea Sverige AB');
+      seedVendorContract('1489', 'Alingsås', 'Skolon AB');
+      expect(db.listKommunerWithContracts()[0].reseller_channels).toEqual(['Skolon', 'Atea']);
+    });
+
+    it('empty for a kommun with only non-reseller vendors', () => {
+      seedVendorContract('1440', 'Ale', 'ILT Education');
+      expect(db.listKommunerWithContracts()[0].reseller_channels).toEqual([]);
+    });
+
+    it('a non-contract attachment (följebrev) from a reseller does not count', () => {
+      seedVendorContract('1440', 'Ale', 'ILT Education');
+      seedVendorContract('1440', 'Ale', 'Atea Sverige AB', { is_contract: 0 });
+      expect(db.listKommunerWithContracts()[0].reseller_channels).toEqual([]);
     });
   });
 });

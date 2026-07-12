@@ -332,6 +332,10 @@ const baseCss = `
   .pill-promise  { background: #22c55e1a; color: var(--good); border-color: #22c55e66; }
   .pill-default  { background: #ef44441a; color: var(--bad);  border-color: #ef444466; }
   .pill-overdue  { background: #f59e0b1a; color: var(--warn); border-color: #f59e0b66; }
+  /* Reseller/framework-channel badge: deliberately muted (an information
+     marker, not an alarm) — the elevation/border vars keep it legible in
+     both colour schemes. */
+  .pill-reseller { background: var(--bg-elev-2); color: var(--fg-muted); border-color: var(--border); }
   .heartbeat { font-size: 11px; padding: 3px 9px; border-radius: 999px; border: 1px solid; font-weight: 500; }
   .heartbeat-live  { background: #22c55e1a; color: var(--good); border-color: #22c55e66; }
   .heartbeat-stale { background: #f59e0b1a; color: var(--warn); border-color: #f59e0b66; }
@@ -1887,18 +1891,33 @@ function productTable(productRollups) {
     </section>`;
 }
 
+// 🛒 badge for a kommun that procures via framework agreements / resellers
+// (src/resellers.js). A muted pill, never an alarm: it explains why the
+// kommun's missing products render "?" (kan finnas via ramavtal) instead of
+// a confident red. Empty channels → no badge at all.
+function resellerBadge(channels) {
+  if (!channels || channels.length === 0) return '';
+  const list = channels.join(', ');
+  return ` <span class="pill pill-reseller" title="${escapeHtml(`Kommunen köper via ramavtal/återförsäljare (${list}) — produkter kan finnas den vägen utan direktavtal med leverantören`)}">🛒 via ramavtal: ${escapeHtml(list)}</span>`;
+}
+
 // One coverage-matrix cell. Green/yellow cells expand (server-rendered
 // <details>, no JS needed) to the per-kommun detail; red/grey/neutral cells
 // carry their meaning in a tooltip. Red is a CONFIDENT negative (some
-// collection-complete kommun lacks the level); "?" means the only kommuner
-// lacking it are still mid-collection — we don't know yet.
-function coverageCell(p, grade) {
+// collection-complete, non-reseller kommun lacks the level); "?" means the
+// only kommuner lacking it are still mid-collection — or procure via a
+// framework/reseller channel (`anyReseller` widens the tooltip) — we don't
+// know yet.
+function coverageCell(p, grade, anyReseller = false) {
   const colour = p.coverageByGrade[grade];
   if (colour === 'na') {
     return `<td class="cov-cell cov-na" title="${escapeHtml(`${grade}: förekommer inte i leverantörens avtal`)}">–</td>`;
   }
   if (colour === 'unknown') {
-    return `<td class="cov-cell cov-unknown" title="${escapeHtml(`${grade}: insamling pågår i kommunerna utan ${p.name} här — vet inte än`)}">?</td>`;
+    const why = anyReseller
+      ? `insamling pågår eller köp via ramavtal i kommunerna utan ${p.name} här — vet inte än`
+      : `insamling pågår i kommunerna utan ${p.name} här — vet inte än`;
+    return `<td class="cov-cell cov-unknown" title="${escapeHtml(`${grade}: ${why}`)}">?</td>`;
   }
   if (colour === 'red') {
     return `<td class="cov-cell cov-none" title="${escapeHtml(`${grade}: leverantören säljs på nivån i andra sammanhang, men ${p.name} når ingen kommun här`)}">✕</td>`;
@@ -1914,7 +1933,7 @@ function coverageCell(p, grade) {
   return `<td class="cov-cell ${klass}"><details class="cov-detail"><summary title="${escapeHtml(grade)}">${mark}</summary><div class="cov-pop">${lines.map((l) => `<div>${escapeHtml(l)}</div>`).join('')}</div></details></td>`;
 }
 
-function coverageMatrix(productRollups, vendorSlug) {
+function coverageMatrix(productRollups, vendorSlug, anyReseller = false) {
   if (!productRollups.some((p) => p.coverageKnown)) {
     return `
     <section class="board-section">
@@ -1930,7 +1949,10 @@ function coverageMatrix(productRollups, vendorSlug) {
     ? `<a href="/leverantor/${escapeHtml(vendorSlug)}/produkt/${escapeHtml(slugifyProductName(p.name))}" data-pane-link title="${escapeHtml(`${p.name}: täckning per kommun`)}">${escapeHtml(p.name)}</a>`
     : escapeHtml(p.name));
   const rows = productRollups.map((p) =>
-    `<tr><td>${productCell(p)}</td>${GRADE_LEVELS.map((g) => coverageCell(p, g)).join('')}</tr>`).join('');
+    `<tr><td>${productCell(p)}</td>${GRADE_LEVELS.map((g) => coverageCell(p, g, anyReseller)).join('')}</tr>`).join('');
+  const resellerLegend = anyReseller
+    ? ' · 🛒 via ramavtal — kommunen köper via ramavtal/återförsäljare, så produkten kan finnas via ramavtal utan direktavtal (ett ? i stället för ✕).'
+    : '';
   return `
     <section class="board-section">
       <h2>Täckning per skolnivå</h2>
@@ -1938,7 +1960,7 @@ function coverageMatrix(productRollups, vendorSlug) {
         <thead><tr><th>Produkt</th>${head}</tr></thead>
         <tbody>${rows}</tbody>
       </table>
-      <p class="muted honesty-note">● full i alla köpande kommuner · ◐ delvis eller blandat · ✕ nivån säljs av leverantören men inte här · ? · insamling pågår (vet inte än) · – nivån förekommer inte i leverantörens avtal. Klicka på en cell för detalj per kommun, eller på produktnamnet för täckning per kommun.</p>
+      <p class="muted honesty-note">● full i alla köpande kommuner · ◐ delvis eller blandat · ✕ nivån säljs av leverantören men inte här · ? · insamling pågår (vet inte än) · – nivån förekommer inte i leverantörens avtal${resellerLegend}. Klicka på en cell för detalj per kommun, eller på produktnamnet för täckning per kommun.</p>
     </section>`;
 }
 
@@ -1951,12 +1973,12 @@ function dossierLifecycleCell(f) {
   return bits.length ? bits.join(' ') : '<span class="muted">okänt</span>';
 }
 
-function dossierContractRow(f, todayIso) {
+function dossierContractRow(f, todayIso, resellerChannelsByKommun = new Map()) {
   const period = f.period_start || f.period_end
     ? `${escapeHtml(f.period_start ?? '?')} – ${escapeHtml(f.period_end ?? '?')}${f.contract_length_months != null ? ` <span class="muted">(${f.contract_length_months} mån)</span>` : ''}`
     : '<span class="muted">okänd</span>';
   return `<tr>
-    <td><a href="/kommun/${escapeHtml(f.kommun_kod)}" data-pane-link>${escapeHtml(f.kommun_namn)}</a>
+    <td><a href="/kommun/${escapeHtml(f.kommun_kod)}" data-pane-link>${escapeHtml(f.kommun_namn)}</a>${resellerBadge(resellerChannelsByKommun.get(f.kommun_kod))}
       <span class="muted">${escapeHtml(f.lan ?? '')}</span></td>
     <td>${(f.products ?? []).length ? chipRow(f.products, 4) : '<span class="muted">—</span>'}</td>
     <td class="num">${annualValueCell(f)}</td>
@@ -1988,7 +2010,14 @@ function renewalCalendar(facts, todayIso) {
   return `<ul class="renewal-list">${items}</ul>${note}`;
 }
 
-export function renderVendorDossier({ vendor, rollup = null, facts = [], productRollups = [], todayIso, heartbeat = null, partial = false, escalationCount = 0 }) {
+// `resellerChannelsByKommun` (kommun_kod → reseller canonicals, from
+// storage.listKommunerWithContracts().reseller_channels) badges kommuner that
+// procure via framework/reseller channels and widens the ?-legend.
+export function renderVendorDossier({ vendor, rollup = null, facts = [], productRollups = [], todayIso, resellerChannelsByKommun = new Map(), heartbeat = null, partial = false, escalationCount = 0 }) {
+  // Only THIS vendor's kommuner matter for the badge/legend: a reseller
+  // kommun elsewhere in the DB can't soften this dossier's aggregates.
+  const anyReseller = facts.some((f) =>
+    (resellerChannelsByKommun.get(f.kommun_kod) ?? []).length > 0);
   const r = rollup ?? {
     contract_count: 0, kommun_count: 0, total_annual_sek: null, value_known_count: 0,
     median_length_months: null, length_known_count: 0,
@@ -2029,7 +2058,7 @@ export function renderVendorDossier({ vendor, rollup = null, facts = [], product
           <th>Kommun</th><th>Produkter</th><th style="text-align:right">Årlig kostnad</th>
           <th>Prismodell</th><th>Avtalstid</th><th>Livscykel</th><th>Nästa förnyelse</th><th>Källa</th>
         </tr></thead>
-        <tbody>${facts.map((f) => dossierContractRow(f, todayIso)).join('')}</tbody>
+        <tbody>${facts.map((f) => dossierContractRow(f, todayIso, resellerChannelsByKommun)).join('')}</tbody>
       </table>`;
 
   const body = `
@@ -2039,7 +2068,7 @@ export function renderVendorDossier({ vendor, rollup = null, facts = [], product
     </div>
     ${stats}
     ${productRollups.length
-      ? productTable(productRollups) + coverageMatrix(productRollups, vendor.slug)
+      ? productTable(productRollups) + coverageMatrix(productRollups, vendor.slug, anyReseller)
       : (r.products.length ? `<div class="card"><h3>Produkter (${r.products.length})</h3>${chipRow(r.products, 50)}</div>` : '')}
     <div class="card">
       <h3>Förnyelsekalender</h3>
@@ -2055,16 +2084,23 @@ export function renderVendorDossier({ vendor, rollup = null, facts = [], product
 
 // One cell of the per-product kommun×grade drill-down. Same colour language
 // as the dossier's product×grade matrix (cov-full/-partial/-none/-unknown/-na),
-// but red here means "this kommun's collection is COMPLETE and it gave us no
-// contract for this product at this level" — a confident negative. While the
-// kommun's collection is still in progress (any conversation not DONE), an
-// uncovered level is "?" — insamling pågår, vet inte än — never red.
-function kommunCoverageCell(state, grade, productName) {
+// but red here means "this kommun's collection is COMPLETE, it buys direct,
+// and it gave us no contract for this product at this level" — a confident
+// negative. An uncovered level is "?" instead when the kommun's collection is
+// still in progress (insamling pågår, vet inte än) OR when it procures via a
+// framework/reseller channel (kan finnas via ramavtal) — never red then.
+// `k` is one buildProductCoverageByKommun row (carries reseller_channels +
+// collection_done so the tooltip can name the actual reason).
+function kommunCoverageCell(k, grade, productName) {
+  const state = k.coverageByGrade[grade];
   if (state === 'na') {
     return `<td class="cov-cell cov-na" title="${escapeHtml(`${grade}: förekommer inte i leverantörens avtal`)}">–</td>`;
   }
   if (state === 'unknown') {
-    return `<td class="cov-cell cov-unknown" title="${escapeHtml(`${grade}: insamling pågår hos kommunen — vet inte än om ${productName} finns på nivån`)}">?</td>`;
+    const why = (k.reseller_channels ?? []).length > 0 && k.collection_done !== false
+      ? `kan finnas via ramavtal (${k.reseller_channels.join(', ')}) — inget direktavtal för ${productName} sett`
+      : `insamling pågår hos kommunen — vet inte än om ${productName} finns på nivån`;
+    return `<td class="cov-cell cov-unknown" title="${escapeHtml(`${grade}: ${why}`)}">?</td>`;
   }
   if (state === 'none') {
     return `<td class="cov-cell cov-none" title="${escapeHtml(`${grade}: kommunen har lämnat avtal till oss, men inget för ${productName} på nivån`)}">✕</td>`;
@@ -2084,16 +2120,20 @@ export function renderProductCoverage({ vendor, drilldown, heartbeat = null, par
     .map((g) => `<th class="cov-head" title="${escapeHtml(g)}">${escapeHtml(GRADE_SHORT_LABELS[g] ?? g)}</th>`)
     .join('');
   const rows = drilldown.kommuner.map((k) => `<tr>
-    <td><a href="/kommun/${escapeHtml(k.kommun_kod)}" data-pane-link>${escapeHtml(k.kommun_namn)}</a></td>
-    ${GRADE_LEVELS.map((g) => kommunCoverageCell(k.coverageByGrade[g], g, drilldown.productName)).join('')}
+    <td><a href="/kommun/${escapeHtml(k.kommun_kod)}" data-pane-link>${escapeHtml(k.kommun_namn)}</a>${resellerBadge(k.reseller_channels)}</td>
+    ${GRADE_LEVELS.map((g) => kommunCoverageCell(k, g, drilldown.productName)).join('')}
   </tr>`).join('');
+  const anyReseller = drilldown.kommuner.some((k) => (k.reseller_channels ?? []).length > 0);
+  const resellerLegend = anyReseller
+    ? ' · 🛒 via ramavtal — kommunen köper via ramavtal/återförsäljare, så ett ? betyder att produkten kan finnas via ramavtal utan direktavtal'
+    : '';
   const matrix = drilldown.kommuner.length === 0
     ? '<div class="empty-state">Inga kommuner med insamlade avtal ännu.</div>'
     : `<table class="cov-table">
         <thead><tr><th>Kommun</th>${head}</tr></thead>
         <tbody>${rows}</tbody>
       </table>
-      <p class="muted honesty-note">● full täckning · ◐ delvis · ✕ har avtal med oss men inte denna produkt/nivå (insamling klar) · ? · insamling pågår (vet inte än) · – nivån förekommer inte i leverantörens avtal.</p>`;
+      <p class="muted honesty-note">● full täckning · ◐ delvis · ✕ har avtal med oss men inte denna produkt/nivå (insamling klar) · ? · insamling pågår (vet inte än) · – nivån förekommer inte i leverantörens avtal${resellerLegend}.</p>`;
 
   const body = `
     <div class="page-head">

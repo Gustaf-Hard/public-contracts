@@ -27,13 +27,15 @@ function escapeRegExp(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-// Canonical names of watchlist entries matched by any of `names`, deduped,
-// in WATCHLIST order. An alias matches only as a whole word on the normalized
-// string, so short aliases (ne, ilt) never fire inside unrelated tokens.
-export function matchWatchlist(names = []) {
+// Generic canonical-name matcher over `{ canonical, aliases }` entries —
+// shared by the watchlist and the reseller/framework list (src/resellers.js).
+// Returns the canonicals matched by any of `names`, deduped, in entry order.
+// An alias matches only as a whole word on the normalized string, so short
+// aliases (ne, ilt) never fire inside unrelated tokens.
+export function matchVendorEntries(entries, names = []) {
   const normed = names.map(normalize).filter(Boolean);
   const matched = [];
-  for (const entry of WATCHLIST) {
+  for (const entry of entries) {
     const hit = entry.aliases.some((alias) => {
       const a = normalize(alias);
       if (!a) return false;
@@ -43,4 +45,9 @@ export function matchWatchlist(names = []) {
     if (hit) matched.push(entry.canonical);
   }
   return matched;
+}
+
+// Canonical names of watchlist entries matched by any of `names`.
+export function matchWatchlist(names = []) {
+  return matchVendorEntries(WATCHLIST, names);
 }
