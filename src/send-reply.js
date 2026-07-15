@@ -3,7 +3,7 @@
 // effects so the FSM stays consistent regardless of where the human clicked
 // "Send".
 
-import { sendMessage as gmailSend } from './gmail.js';
+import { sendMessage as gmailSend, archiveThread } from './gmail.js';
 import { T_INITIAL } from './templates.js';
 import { resolveReplyRecipient } from './threads.js';
 import { updateEscalationResolved } from './slack.js';
@@ -40,6 +40,21 @@ async function stripSlackButtons({ slackClient, env, esc, kommun_namn, status, d
   }
 }
 
+// Best-effort: archive the thread we just replied into so the operator's inbox
+// stays clean. A reply lives in the SAME Gmail thread as the inbound it answers
+// — which is sitting in the inbox — so dropping the thread's INBOX label
+// archives that conversation. Runs only after the send is confirmed and never
+// lets an archive failure surface: the send already succeeded, archiving is
+// cosmetic, and the thread re-enters the inbox on the kommun's next reply.
+async function archiveThreadBestEffort({ archiveThreadImpl, gmail, threadId, log }) {
+  if (!threadId) return;
+  try {
+    await archiveThreadImpl(gmail, threadId);
+  } catch (e) {
+    log?.(`gmail archive failed for thread ${threadId}: ${e.message}`);
+  }
+}
+
 // Send an approved reply to an open escalation. The caller passes the
 // possibly-edited body; we send via Gmail, record outbound, advance side
 // effects (followup_count, receipt_sent), resolve the escalation, and log
@@ -55,7 +70,7 @@ async function stripSlackButtons({ slackClient, env, esc, kommun_namn, status, d
 //  - If Gmail throws after the claim, the escalation is parked as
 //    'send_failed' (never back to 'open') so nothing auto-retries an
 //    ambiguous send; the operator verifies in Gmail Sent first.
-export async function sendApprovedReply({ db, gmail, env, conv, esc, finalBody, finalSubject, finalTo, decision, gmailSendImpl = gmailSend, slackClient = null, log = null }) {
+export async function sendApprovedReply({ db, gmail, env, conv, esc, finalBody, finalSubject, finalTo, decision, gmailSendImpl = gmailSend, archiveThreadImpl = archiveThread, slackClient = null, log = null }) {
   const subject = finalSubject ?? esc.draft_subject ?? 'Re: Begäran om allmänna handlingar';
   const triggeringMessage = esc.message_id ? db.getMessageById(esc.message_id) : null;
 
@@ -182,6 +197,10 @@ export async function sendApprovedReply({ db, gmail, env, conv, esc, finalBody, 
     resolved_text: finalBody,
   });
   await stripSlackButtons({ slackClient, env, esc, kommun_namn: conv.kommun_namn, status: resolvedStatus, log });
+  // Keep the inbox clean: archive the thread we replied into. The refresh path
+  // opens a brand-new thread (no inbound, nothing in the inbox), so archiving it
+  // is a harmless no-op there; every other reply archives the inbound thread.
+  await archiveThreadBestEffort({ archiveThreadImpl, gmail, threadId: sent.threadId ?? threadId, log });
   db.recordDecision({
     escalation_id: esc.id,
     conversation_id: conv.id,

@@ -45,3 +45,27 @@ describe('sendApprovedReply recipient routing', () => {
     expect(send.mock.calls[0][1]).toMatchObject({ to: 'someone.else@arboga.se' });
   });
 });
+
+describe('sendApprovedReply archives the replied-into thread', () => {
+  it('archives the thread it sent into, keeping the inbox clean', async () => {
+    const { db, conv, esc } = seedArboga();
+    const send = vi.fn(async () => ({ id: 'out-1', threadId: 'thr-anneli' }));
+    const archive = vi.fn(async () => {});
+    await sendApprovedReply({ db, gmail: {}, env, conv, esc, finalBody: 'tack', decision: 'approve_unmodified', gmailSendImpl: send, archiveThreadImpl: archive });
+    expect(archive).toHaveBeenCalledOnce();
+    expect(archive.mock.calls[0][1]).toBe('thr-anneli'); // the thread Gmail returned
+  });
+
+  it('an archive failure never breaks the (already-confirmed) send', async () => {
+    const { db, conv, esc } = seedArboga();
+    const send = vi.fn(async () => ({ id: 'out-1', threadId: 'thr-anneli' }));
+    const archive = vi.fn(async () => { throw new Error('gmail 500'); });
+    // Must resolve, not reject — the send succeeded, archiving is cosmetic.
+    await expect(
+      sendApprovedReply({ db, gmail: {}, env, conv, esc, finalBody: 'tack', decision: 'approve_unmodified', gmailSendImpl: send, archiveThreadImpl: archive })
+    ).resolves.toMatchObject({ id: 'out-1' });
+    // The outbound + escalation resolution still committed.
+    expect(db.raw.prepare("SELECT * FROM messages WHERE gmail_message_id = 'out-1'").get()).toBeTruthy();
+    expect(db.raw.prepare('SELECT status FROM escalations WHERE id = ?').get(esc.id).status).toBe('resolved_send');
+  });
+});

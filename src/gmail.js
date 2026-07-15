@@ -261,3 +261,13 @@ export async function ensureLabel(gmail, name) {
 export async function addLabel(gmail, messageId, labelId) {
   await gmail.users.messages.modify({ userId: 'me', id: messageId, requestBody: { addLabelIds: [labelId] } });
 }
+
+// Archive a whole thread — drop the INBOX label from every message in it,
+// exactly like the Gmail "Archive" button. The thread stays fully intact (in
+// All Mail, searchable, and re-surfaces in the inbox if the kommun replies
+// again); it just leaves the operator's inbox.
+export async function archiveThread(gmail, threadId) {
+  await gmail.users.threads.modify({
+    userId: 'me', id: threadId, requestBody: { removeLabelIds: ['INBOX'] },
+  });
+}
