@@ -122,6 +122,25 @@ describe('lifecycle + refresh columns (2026-07-09 perpetual-refresh design)', ()
     expect(row.extension_option_until).toBeNull();
   });
 
+  it('migrate adds a document_type column to contracts (idempotent)', () => {
+    expect(() => { db.migrate(); db.migrate(); }).not.toThrow();
+    const cCols = db.raw.prepare("PRAGMA table_info(contracts)").all().map((r) => r.name);
+    expect(cCols.filter((n) => n === 'document_type')).toHaveLength(1);
+  });
+
+  it('recordContract round-trips document_type; undefined stays NULL (legacy)', () => {
+    const { attId } = seedAttachment();
+    const v = db.upsertVendor('Skolon');
+    db.recordContract({ attachment_id: attId, vendor_id: v.id, is_contract: 1, document_type: 'avtal' });
+    const withType = db.raw.prepare('SELECT document_type FROM contracts WHERE attachment_id = ?').get(attId);
+    expect(withType.document_type).toBe('avtal');
+
+    const { attId: att2 } = seedAttachment({ kommun_kod: '1981', kommun_namn: 'Sala', filename: 'Legacy.pdf' });
+    db.recordContract({ attachment_id: att2, vendor_id: null, is_contract: 0 });
+    const legacy = db.raw.prepare('SELECT document_type FROM contracts WHERE attachment_id = ?').get(att2);
+    expect(legacy.document_type).toBeNull();
+  });
+
   it('recordContract with auto_renews undefined stores NULL (not 0)', () => {
     const { attId } = seedAttachment();
     const v = db.upsertVendor('Okänd');

@@ -276,6 +276,11 @@ export function openDb(path) {
     if (!contractCols.includes('value_incl_moms')) {
       db.exec('ALTER TABLE contracts ADD COLUMN value_incl_moms INTEGER');
     }
+    // Document taxonomy (2026-07-15 contract-validation design). NULL = legacy /
+    // not yet re-analysed. is_contract=1 only for document_type='avtal'.
+    if (!contractCols.includes('document_type')) {
+      db.exec('ALTER TABLE contracts ADD COLUMN document_type TEXT');
+    }
   }
 
   function createConversation({ kommun_kod, kommun_namn, role, contact_email, scheduled_send_at }) {
@@ -672,8 +677,8 @@ export function openDb(path) {
                              auto_renews, renewal_term, last_cancellation_date, extension_option_until,
                              annual_value_sek, one_time_value_sek, pricing_model,
                              unit_price_sek, unit, quantity, value_incl_moms,
-                             is_contract, summary, confidence, analysis_json, model)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                             is_contract, document_type, summary, confidence, analysis_json, model)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       c.attachment_id, c.vendor_id ?? null, c.avtalsvarde ?? null, c.valuta ?? null,
       c.period_start ?? null, c.period_end ?? null,
@@ -682,7 +687,7 @@ export function openDb(path) {
       c.annual_value_sek ?? null, c.one_time_value_sek ?? null, c.pricing_model ?? null,
       c.unit_price_sek ?? null, c.unit ?? null, c.quantity ?? null,
       c.value_incl_moms == null ? null : (c.value_incl_moms ? 1 : 0),
-      c.is_contract ?? 1,
+      c.is_contract ?? 1, c.document_type ?? null,
       c.summary ?? null, c.confidence ?? null,
       c.analysis_json != null ? JSON.stringify(c.analysis_json) : null, c.model ?? null,
     );

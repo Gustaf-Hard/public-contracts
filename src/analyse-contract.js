@@ -358,7 +358,7 @@ export function storeContractAnalysis(db, attachmentId, analysis, { model, log =
   // Read the existing row (with vendor name) so the merge can preserve it.
   const existing = db.raw.prepare(`
     SELECT c.id AS contract_id,
-           c.is_contract, c.period_start, c.period_end, c.avtalsvarde, c.valuta,
+           c.is_contract, c.document_type, c.period_start, c.period_end, c.avtalsvarde, c.valuta,
            c.auto_renews, c.renewal_term, c.last_cancellation_date, c.extension_option_until,
            c.annual_value_sek, c.one_time_value_sek, c.pricing_model, c.unit_price_sek,
            c.unit, c.quantity, c.value_incl_moms,
@@ -411,6 +411,7 @@ export function storeContractAnalysis(db, attachmentId, analysis, { model, log =
     quantity: merged.quantity,
     value_incl_moms: merged.value_incl_moms,
     is_contract: merged.is_contract ? 1 : 0,
+    document_type: merged.document_type ?? null,
     summary: merged.summary,
     confidence: merged.confidence,
     analysis_json: merged,
