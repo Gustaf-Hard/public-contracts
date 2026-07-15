@@ -365,6 +365,47 @@ describe('GET /attachments/:id', () => {
   });
 });
 
+describe('honest document classification on kommun page (2026-07-15)', () => {
+  it('header counts only real avtal and badges bilagor as muted (never hidden)', async () => {
+    // One conversation, one message, two attachments: a real avtal + a bilaga.
+    const convId = db.createConversation({
+      kommun_kod: '2418', kommun_namn: 'Malå', role: 'central',
+      contact_email: 'kommun@mala.se', scheduled_send_at: '2026-04-01T08:00:00Z',
+    });
+    const msgId = db.recordMessage({
+      conversation_id: convId, gmail_message_id: `gm-${Math.random()}`, direction: 'inbound',
+      from_email: 'kommun@mala.se', to_email: 'me@x.com', subject: 'Avtal', body_text: '',
+      classification: null, classification_confidence: null,
+      received_at: '2026-04-13T10:00:00Z', attachment_count: 2,
+    });
+    const contractsDir = join(tmp, 'contracts');
+    for (const fn of ['Huvudavtal Skolon.pdf', 'Bilaga 3 - Säkerhet.pdf']) {
+      const p = join(contractsDir, '2418', fn);
+      mkdirSync(dirname(p), { recursive: true });
+      writeFileSync(p, '%PDF-1.4 test');
+    }
+    const avtalAtt = db.recordAttachment({ message_id: msgId, filename: 'Huvudavtal Skolon.pdf', saved_path: join(contractsDir, '2418', 'Huvudavtal Skolon.pdf'), mime_type: 'application/pdf', size_bytes: 13 });
+    const bilagaAtt = db.recordAttachment({ message_id: msgId, filename: 'Bilaga 3 - Säkerhet.pdf', saved_path: join(contractsDir, '2418', 'Bilaga 3 - Säkerhet.pdf'), mime_type: 'application/pdf', size_bytes: 13 });
+    const v = db.upsertVendor('Skolon');
+    db.recordContract({ attachment_id: avtalAtt, vendor_id: v.id, is_contract: 1, document_type: 'avtal' });
+    db.recordContract({ attachment_id: bilagaAtt, vendor_id: null, is_contract: 0, document_type: 'bilaga' });
+
+    const app = createDashboardApp({
+      db, contractsDir,
+      municipalitiesLoader: () => [{ kommun_kod: '2418', kommun_namn: 'Malå', lan: 'X', folkmangd: 1, contacts: [] }],
+    });
+    const res = await get(app, '/kommun/2418');
+    // honest header: 2 documents, 1 avtal
+    expect(res.text).toMatch(/Mottagna dokument \(2\)/);
+    expect(res.text).toMatch(/1 avtal/);
+    // bilaga is still visible (not hidden/deleted) and badged
+    expect(res.text).toContain('Bilaga 3 - Säkerhet.pdf');
+    expect(res.text).toContain('Huvudavtal Skolon.pdf');
+    expect(res.text).toMatch(/Bilaga/);
+    expect(res.text).toMatch(/Avtal/);
+  });
+});
+
 describe('clickable contract links on kommun page', () => {
   it('Mottagna avtal table and timeline link to /attachments/:id', async () => {
     const { attId, contractsDir } = seedPdfAttachment();

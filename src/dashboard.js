@@ -635,7 +635,16 @@ export function createDashboardApp({
         const msgs = db.raw.prepare('SELECT * FROM messages WHERE conversation_id = ? ORDER BY received_at, id').all(conv.id);
         messagesByConv[conv.id] = msgs;
         for (const m of msgs) {
-          const atts = db.raw.prepare('SELECT * FROM attachments WHERE message_id = ?').all(m.id);
+          // Carry each attachment's contract classification (LEFT JOIN so
+          // un-analysed / non-PDF attachments still appear). The kommun page's
+          // "Mottagna dokument" section badges + counts by is_contract /
+          // document_type (2026-07-15 contract-validation).
+          const atts = db.raw.prepare(`
+            SELECT a.*, c.is_contract AS contract_is_contract, c.document_type AS contract_document_type
+            FROM attachments a
+            LEFT JOIN contracts c ON c.attachment_id = a.id
+            WHERE a.message_id = ?
+          `).all(m.id);
           if (atts.length) attachmentsByMsg[m.id] = atts;
           if (m.signature_extracted) {
             const sig = parseSignatureJson(m.signature_extracted);
