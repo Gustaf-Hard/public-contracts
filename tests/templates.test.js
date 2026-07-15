@@ -34,6 +34,19 @@ describe('T_INITIAL', () => {
     expect(m.body).toMatch(/gustaf@mediagraf.se/);
   });
 
+  it('narrows the request to the actual avtal with price/commercial terms and disclaims bilagor + PUB-avtal', () => {
+    const m = T_INITIAL(ctx);
+    // ask only for the real contract with price/commercial terms
+    expect(m.body).toMatch(/själva avtal/i);
+    expect(m.body).toMatch(/pris och kommersiella villkor/);
+    // explicitly NOT the annexes / DPA
+    expect(m.body).toMatch(/behöver (inte|ej)/i);
+    expect(m.body).toMatch(/bilagor/);
+    expect(m.body).toMatch(/kravspecifikationer/);
+    expect(m.body).toMatch(/SLA/);
+    expect(m.body).toMatch(/personuppgiftsbiträdesavtal/);
+  });
+
   it('uses "inom kommunen" as scope regardless of role (qualifier narrows the topic, not the förvaltning)', () => {
     const central = T_INITIAL({ ...ctx, role: 'central' });
     const utbildning = T_INITIAL({ ...ctx, role: 'utbildning' });
@@ -197,6 +210,17 @@ describe('T_REQUEST_MISSING', () => {
     expect(m.body).toMatch(/andra digitala tjänster inom skolan/);
     expect(m.body).toMatch(/Binogi/);            // a watchlisted vendor is named
     expect(m.body).toMatch(/eller liknande\?/);
+  });
+  it('narrows the ask to the avtal with price terms and disclaims bilagor + PUB-avtal (probe kept)', () => {
+    const m = T_REQUEST_MISSING({ ...base, received: ['Skolon'], missing: ['Quiculum'] });
+    expect(m.body).toMatch(/pris och kommersiella villkor/);
+    expect(m.body).toMatch(/behöver (inte|ej)/i);
+    expect(m.body).toMatch(/bilagor/);
+    expect(m.body).toMatch(/kravspecifikationer/);
+    expect(m.body).toMatch(/SLA/);
+    expect(m.body).toMatch(/personuppgiftsbiträdesavtal/);
+    // the watchlist probe must still be present
+    expect(m.body).toMatch(/andra digitala tjänster inom skolan/);
   });
 });
 

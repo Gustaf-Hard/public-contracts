@@ -31,6 +31,8 @@ export function T_INITIAL(ctx) {
       '- Avtalsvärde eller årskostnad',
       '- Avtalstid (start- och slutdatum)',
       '',
+      'Jag efterfrågar själva avtalshandlingarna med pris och kommersiella villkor. Jag behöver inte tillhörande bilagor (såsom kravspecifikationer, servicenivåavtal/SLA, säkerhets- eller definitionsbilagor) och inte heller personuppgiftsbiträdesavtal.',
+      '',
       'Handlingarna önskas i digital form (PDF eller motsvarande).',
       '',
       'Om delar av handlingarna bedöms sekretessbelagda ber jag om ett motiverat avslagsbeslut för dessa delar enligt 6 kap. 3 § offentlighets- och sekretesslagen.',
@@ -240,8 +242,11 @@ export function T_REQUEST_MISSING(ctx) {
   // about OTHER digital school services, naming the watchlisted vendors. Bake it
   // in from the watchlist (single source of truth) so it no longer needs editing.
   const probe = `Har ni därutöver avtal för andra digitala tjänster inom skolan, till exempel ${listSv(WATCHLIST.map((w) => w.canonical))} eller liknande?`;
+  // Narrow the scope so we get the commercial avtal, not the annex stack: no
+  // bilagor (kravspec/SLA/säkerhet/definitioner) and no PUB-avtal (2026-07-15).
+  const scopeNote = 'Det räcker med själva avtalen med pris och kommersiella villkor – jag behöver inte tillhörande bilagor (kravspecifikationer, servicenivåavtal/SLA, säkerhets- eller definitionsbilagor) eller personuppgiftsbiträdesavtal.';
   return {
     subject: `Re: ${ctx.thread_subject}`,
-    body: ['Hej,', '', ask, '', probe, '', signature(ctx)].join('\n'),
+    body: ['Hej,', '', ask, '', scopeNote, '', probe, '', signature(ctx)].join('\n'),
   };
 }
