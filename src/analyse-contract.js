@@ -271,8 +271,13 @@ export function expandCoverageRows(analysis) {
 // meant to FILL new/NULL lifecycle fields, not to destroy known-good ones.
 //
 // Rules, given a previously-stored `existing` row for this attachment:
-//   - is_contract: never flip a good 1 → 0. If it was a contract, it stays one
-//     unless the new pass ALSO says contract (upgrades 0 → 1 are fine).
+//   - is_contract follows the freshest CONFIDENT document_type verdict. A
+//     confident (confidence >= 0.8) non-'avtal' re-classification flips a stale
+//     1 → 0 and adopts the new document_type (the 2026-07-15 contract-validation
+//     fix for the Huddinge bilagor stuck at is_contract=1). A LOW-confidence
+//     "not a contract" re-run is treated as a degraded pass and never flips a
+//     good positive — and the preserved positive is kept consistent (its
+//     document_type is not overwritten with the shaky non-'avtal' value).
 //   - vendor / period_start / period_end / avtalsvarde / valuta / renewal_term /
 //     last_cancellation_date / extension_option_until: keep the existing
 //     non-null value when the new pass returns null (fill-only). A new non-null
@@ -284,12 +289,22 @@ export function mergePreserving(existing, fresh) {
   const changes = [];
   const merged = { ...fresh };
 
-  // is_contract: protect a good positive.
+  // is_contract follows the freshest CONFIDENT document_type. `merged` already
+  // carries fresh.is_contract + fresh.document_type from the spread, so a
+  // confident flip (avtal↔non-avtal) and 0→1 upgrades need no extra work. The
+  // only case we override is a LOW-confidence "not a contract" re-run against a
+  // good positive: protect the positive AND keep it consistent (don't leave a
+  // is_contract=1 row stamped with a shaky non-'avtal' document_type).
   const oldIsContract = existing.is_contract === 1 || existing.is_contract === true;
   const newIsContract = fresh.is_contract === true;
-  if (oldIsContract && !newIsContract) {
+  const freshConfident = typeof fresh.confidence === 'number' && fresh.confidence >= 0.8;
+  if (oldIsContract && !newIsContract && !freshConfident) {
     merged.is_contract = true;
-    changes.push(['is_contract', 'preserved 1 (new pass said 0)', 1]);
+    merged.document_type = existing.document_type ?? 'avtal';
+    changes.push(['is_contract', 'preserved 1 (new pass 0, low confidence)', 1]);
+  } else if (oldIsContract && !newIsContract && freshConfident) {
+    // confident reclassification — record the flip for the re-analysis log.
+    changes.push(['is_contract', `flipped 1 → 0 (confident ${fresh.document_type ?? 'non-avtal'})`, 0]);
   }
 
   // Fill-only string/date/number fields — a degraded re-run (new pass null)
