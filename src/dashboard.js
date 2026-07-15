@@ -953,7 +953,7 @@ export function createDashboardApp({
       dataKommuner,
     });
     res.send(renderProductCoverage({
-      vendor, drilldown,
+      vendor, drilldown, showAll: req.query.visa === 'alla',
       heartbeat: hb(), partial: isPartial(req), escalationCount: escCount(),
     }));
   });

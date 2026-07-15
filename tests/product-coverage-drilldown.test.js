@@ -346,7 +346,8 @@ describe('renderProductCoverage — kommun×grade matrix view', () => {
 });
 
 describe('renderProductCoverage — unknown cells while collection is in progress', () => {
-  const html = renderProductCoverage({ vendor: VENDOR, drilldown: begreppaInProgress() });
+  // In-progress kommuner are hidden by default; showAll surfaces them.
+  const html = renderProductCoverage({ vendor: VENDOR, drilldown: begreppaInProgress(), showAll: true });
 
   it('an in-progress kommun lacking the product renders cov-unknown "?" — never cov-none (Arjeplog)', () => {
     const arjeplog = rowFor(html, '2506');
@@ -370,6 +371,42 @@ describe('renderProductCoverage — unknown cells while collection is in progres
 
   it('legend explains the ? state', () => {
     expect(html).toContain('? · insamling pågår (vet inte än)');
+  });
+});
+
+describe('renderProductCoverage — done-only default + show-all toggle', () => {
+  // begreppaInProgress: Ale done; Alingsås + Arjeplog still in progress.
+  it('default view hides in-progress kommuner, showing only complete ones (Ale)', () => {
+    const html = renderProductCoverage({ vendor: VENDOR, drilldown: begreppaInProgress() });
+    expect(rowFor(html, '1440')).not.toBeNull();       // Ale — done
+    expect(rowFor(html, '1489')).toBeNull();           // Alingsås — in progress, hidden
+    expect(rowFor(html, '2506')).toBeNull();           // Arjeplog — in progress, hidden
+  });
+
+  it('default summary counts only complete kommuner and names how many are hidden', () => {
+    const html = renderProductCoverage({ vendor: VENDOR, drilldown: begreppaInProgress() });
+    expect(html).toContain('1 av 1 klara kommuner har produkten');
+    expect(html).toContain('2 med pågående insamling är dolda');
+  });
+
+  it('default view offers a "visa alla" toggle carrying the in-progress count', () => {
+    const html = renderProductCoverage({ vendor: VENDOR, drilldown: begreppaInProgress() });
+    expect(html).toContain('href="/leverantor/ilt-education/produkt/begreppa?visa=alla"');
+    expect(html).toContain('Visa alla (inkl. 2 med insamling pågår)');
+  });
+
+  it('showAll reveals every kommun and offers the reverse toggle', () => {
+    const html = renderProductCoverage({ vendor: VENDOR, drilldown: begreppaInProgress(), showAll: true });
+    for (const kod of ['1440', '1489', '2506']) expect(rowFor(html, kod)).not.toBeNull();
+    expect(html).toContain('Visa endast klara kommuner');
+    expect(html).toContain('kommuner (med data) har produkten');
+  });
+
+  it('no toggle and classic wording when nothing is in progress', () => {
+    const html = renderProductCoverage({ vendor: VENDOR, drilldown: begreppa() });
+    expect(html).not.toContain('class="cov-toggle"');   // the CSS rule is always present; the link is not
+    expect(html).not.toContain('visa=alla');
+    expect(html).toContain('2 av 3 kommuner (med data) har produkten');
   });
 });
 
@@ -539,7 +576,7 @@ describe('route: GET /leverantor/:slug/produkt/:productSlug', () => {
     expect(res.text).toContain('href="/leverantor/ilt-education"');
   });
 
-  it('an in-progress kommun renders cov-unknown, never cov-none (Arjeplog DELIVERING regression)', async () => {
+  it('an in-progress kommun is hidden by default but shown (cov-unknown, never cov-none) under ?visa=alla (Arjeplog DELIVERING regression)', async () => {
     seedIltWorld();
     // Arjeplog delivered ONE contract (another non-reseller vendor's) but its
     // conversation is still DELIVERING — its missing Begreppa is unknown
@@ -550,7 +587,15 @@ describe('route: GET /leverantor/:slug/produkt/:productSlug', () => {
       vendor_id: gleerups.id, is_contract: 1,
     });
     const app = createDashboardApp({ db, municipalitiesLoader: () => MUNICIPALITIES });
-    const res = await get(app, '/leverantor/ilt-education/produkt/begreppa');
+
+    // Default view hides the in-progress kommun and offers the toggle.
+    const def = await get(app, '/leverantor/ilt-education/produkt/begreppa');
+    expect(def.status).toBe(200);
+    expect(def.text).not.toMatch(/<tr>\s*<td><a href="\/kommun\/2506"/);
+    expect(def.text).toContain('?visa=alla');
+
+    // ?visa=alla reveals it, rendered as unknown (insamling pågår), never red.
+    const res = await get(app, '/leverantor/ilt-education/produkt/begreppa?visa=alla');
     expect(res.status).toBe(200);
     const arjeplog = res.text.match(/<tr>\s*<td><a href="\/kommun\/2506"[\s\S]*?<\/tr>/)[0];
     expect(arjeplog).toContain('cov-cell cov-unknown');

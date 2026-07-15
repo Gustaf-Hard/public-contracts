@@ -336,6 +336,7 @@ const baseCss = `
      marker, not an alarm) — the elevation/border vars keep it legible in
      both colour schemes. */
   .pill-reseller { background: var(--bg-elev-2); color: var(--fg-muted); border-color: var(--border); }
+  .cov-toggle { margin-left: 8px; font-size: 12px; white-space: nowrap; }
   .heartbeat { font-size: 11px; padding: 3px 9px; border-radius: 999px; border: 1px solid; font-weight: 500; }
   .heartbeat-live  { background: #22c55e1a; color: var(--good); border-color: #22c55e66; }
   .heartbeat-stale { background: #f59e0b1a; color: var(--warn); border-color: #f59e0b66; }
@@ -2112,35 +2113,61 @@ function kommunCoverageCell(k, grade, productName) {
 }
 
 // Product-coverage drill-down (/leverantor/:slug/produkt/:productSlug): the
-// dossier matrix pivoted for ONE product — rows are every kommun we hold
-// collected contract data for, columns the 9 grade levels. `drilldown` is
-// buildProductCoverageByKommun output.
-export function renderProductCoverage({ vendor, drilldown, heartbeat = null, partial = false, escalationCount = 0 }) {
+// dossier matrix pivoted for ONE product — columns the 9 grade levels. Rows
+// default to only kommuner whose collection is COMPLETE (every conversation
+// DONE), so the picture is confident by default — a kommun mid-collection is
+// all "?" and only adds noise. `showAll` (from ?visa=alla) reveals the
+// in-progress kommuner too. `drilldown` is buildProductCoverageByKommun output.
+export function renderProductCoverage({ vendor, drilldown, showAll = false, heartbeat = null, partial = false, escalationCount = 0 }) {
   const head = GRADE_LEVELS
     .map((g) => `<th class="cov-head" title="${escapeHtml(g)}">${escapeHtml(GRADE_SHORT_LABELS[g] ?? g)}</th>`)
     .join('');
-  const rows = drilldown.kommuner.map((k) => `<tr>
+
+  // collection_done !== false: treat a row with no flag as complete (legacy
+  // callers), matching buildProductCoverageByKommun's own convention.
+  const doneKommuner = drilldown.kommuner.filter((k) => k.collection_done !== false);
+  const inProgressCount = drilldown.kommuner.length - doneKommuner.length;
+  const shown = showAll ? drilldown.kommuner : doneKommuner;
+
+  // "Has the product" = at least one green/yellow cell — matches what the grid
+  // visibly shows, so the count never claims more than the matrix.
+  const hasProduct = (k) => GRADE_LEVELS.some((g) => k.coverageByGrade[g] === 'full' || k.coverageByGrade[g] === 'partial');
+  const shownWithProduct = shown.filter(hasProduct).length;
+
+  const rows = shown.map((k) => `<tr>
     <td><a href="/kommun/${escapeHtml(k.kommun_kod)}" data-pane-link>${escapeHtml(k.kommun_namn)}</a>${resellerBadge(k.reseller_channels)}</td>
     ${GRADE_LEVELS.map((g) => kommunCoverageCell(k, g, drilldown.productName)).join('')}
   </tr>`).join('');
-  const anyReseller = drilldown.kommuner.some((k) => (k.reseller_channels ?? []).length > 0);
+  const anyReseller = shown.some((k) => (k.reseller_channels ?? []).length > 0);
   const resellerLegend = anyReseller
     ? ' · 🛒 via ramavtal — kommunen köper via ramavtal/återförsäljare, så ett ? betyder att produkten kan finnas via ramavtal utan direktavtal'
     : '';
-  const matrix = drilldown.kommuner.length === 0
-    ? '<div class="empty-state">Inga kommuner med insamlade avtal ännu.</div>'
+  const matrix = shown.length === 0
+    ? `<div class="empty-state">Inga kommuner med klar insamling ännu${inProgressCount > 0 ? ` — insamling pågår i ${inProgressCount}.` : '.'}</div>`
     : `<table class="cov-table">
         <thead><tr><th>Kommun</th>${head}</tr></thead>
         <tbody>${rows}</tbody>
       </table>
       <p class="muted honesty-note">● full täckning · ◐ delvis · ✕ har avtal med oss men inte denna produkt/nivå (insamling klar) · ? · insamling pågår (vet inte än) · – nivån förekommer inte i leverantörens avtal${resellerLegend}.</p>`;
 
+  // Summary + toggle. With nothing in progress, done-only == all, so the
+  // wording and count stay the classic "X av Y kommuner (med data)".
+  const summaryLine = (showAll || inProgressCount === 0)
+    ? `${shownWithProduct} av ${shown.length} kommuner (med data) har produkten — endast kommuner vi hämtat avtal från visas.`
+    : `${shownWithProduct} av ${shown.length} klara kommuner har produkten — ${inProgressCount} med pågående insamling är dolda.`;
+  const base = `/leverantor/${escapeHtml(vendor.slug)}/produkt/${escapeHtml(slugifyProductName(drilldown.productName))}`;
+  const toggle = inProgressCount === 0
+    ? ''
+    : (showAll
+      ? ` <a href="${base}" data-pane-link class="cov-toggle">Visa endast klara kommuner</a>`
+      : ` <a href="${base}?visa=alla" data-pane-link class="cov-toggle">Visa alla (inkl. ${inProgressCount} med insamling pågår)</a>`);
+
   const body = `
     <div class="page-head">
       <h1>${escapeHtml(drilldown.productName)} — ${escapeHtml(vendor.name)} · täckning per kommun</h1>
       <a href="/leverantor/${escapeHtml(vendor.slug)}" data-pane-link class="muted">← ${escapeHtml(vendor.name)}</a>
     </div>
-    <p class="muted">${drilldown.summary.kommun_with_product} av ${drilldown.summary.kommun_total} kommuner (med data) har produkten — endast kommuner vi hämtat avtal från visas.</p>
+    <p class="muted">${summaryLine}${toggle}</p>
     <section class="board-section">
       <h2>Täckning per skolnivå och kommun</h2>
       ${matrix}
