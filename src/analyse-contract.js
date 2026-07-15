@@ -18,8 +18,13 @@ const SYSTEM_PROMPT = `Du analyserar PDF:er som svenska kommuner lämnat ut efte
 Din uppgift: avgör dokumentets typ, om det är ett avtal, och extrahera strukturerade fält.
 
 Regler:
-- document_type: "avtal" för avtal/kontrakt/ramavtal/underskrivna beställningar. "följebrev_sammanställning" för svarsbrev eller tabeller som RÄKNAR UPP avtal/leverantörer utan att själva innehålla avtalstexten (t.ex. "Svar på begäran om allmän handling" med en tabell över leverantörer och kostnader). "prislista", "sekretessbeslut" eller "övrigt" för annat.
-- is_contract: true ENDAST när document_type = "avtal". false för följebrev_sammanställning, prislista, sekretessbeslut och övrigt. Ett brev som hänvisar till "bifogat avtal" är INTE självt ett avtal.
+- document_type — dokumentets typ. Avgörande skillnad: ett "avtal" är en KOMMERSIELL överenskommelse där kommunen BETALAR för en produkt/tjänst (pengar byts mot vara/tjänst). Använd:
+  - "avtal": ett kommersiellt avtal/kontrakt/ramavtal eller en underskriven, prissatt beställning där kommunen betalar för en produkt/tjänst (huvudavtal). Diskriminatorn är att PENGAR BYTS MOT PRODUKTER/TJÄNSTER.
+  - "bilaga": en bilaga/appendix till ett avtal som INTE själv är ett kommersiellt avtal — t.ex. servicenivåavtal/SLA, säkerhetsbilaga, kravspecifikation, funktionella krav, definitioner, IT-miljö, samverkan/ändringshantering, eller en prisbilaga som hör till ett huvudavtal. Även om texten är avtalsmässig är en fristående bilaga en "bilaga".
+  - "personuppgiftsbiträdesavtal": ett dataskyddsavtal (PUB-avtal/DPA enligt GDPR). Det är juridiskt ett avtal men INGA pengar byts, så det är INTE ett avtal i vår mening.
+  - "följebrev_sammanställning": svarsbrev eller tabeller som RÄKNAR UPP avtal/leverantörer utan att själva innehålla avtalstexten (t.ex. "Svar på begäran om allmän handling" med en tabell över leverantörer och kostnader).
+  - "prislista", "sekretessbeslut" eller "övrigt" för annat.
+- is_contract: true ENDAST när document_type = "avtal". false för bilaga, personuppgiftsbiträdesavtal, följebrev_sammanställning, prislista, sekretessbeslut och övrigt. En fristående bilaga (SLA, säkerhet, kravspec, definitioner) är INTE ett avtal även om den läser avtalsmässigt. Ett PUB-avtal är INTE ett avtal (inga pengar byts). Ett brev som hänvisar till "bifogat avtal" är INTE självt ett avtal.
 - vendor_name: leverantörens kanoniska företagsnamn utan bolagsform — "Skolon", inte "Skolon AB". null om oklart.
 - products: namngivna produkter/tjänster som avtalet omfattar. Tom array om inga kan identifieras.
 - avtalsvarde: avtalets värde eller årskostnad som text (t.ex. "120 000 kr/år"). null om det inte framgår.
@@ -48,7 +53,7 @@ const CONTRACT_SCHEMA = {
   required: ['is_contract', 'document_type', 'vendor_name', 'products', 'avtalsvarde', 'valuta', 'period_start', 'period_end', 'auto_renews', 'renewal_term', 'last_cancellation_date', 'extension_option_until', 'annual_value_sek', 'one_time_value_sek', 'pricing_model', 'unit_price_sek', 'unit', 'quantity', 'value_incl_moms', 'line_items', 'coverage', 'whole_municipality', 'summary', 'confidence', 'mentioned_agreements'],
   properties: {
     is_contract: { type: 'boolean' },
-    document_type: { type: 'string', enum: ['avtal', 'följebrev_sammanställning', 'prislista', 'sekretessbeslut', 'övrigt'] },
+    document_type: { type: 'string', enum: ['avtal', 'bilaga', 'personuppgiftsbiträdesavtal', 'följebrev_sammanställning', 'prislista', 'sekretessbeslut', 'övrigt'] },
     vendor_name: { anyOf: [{ type: 'string' }, { type: 'null' }] },
     products: { type: 'array', items: { type: 'string' } },
     avtalsvarde: { anyOf: [{ type: 'string' }, { type: 'null' }] },

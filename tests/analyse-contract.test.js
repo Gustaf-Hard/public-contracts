@@ -122,6 +122,34 @@ describe('analyseContractPdf — document_type + mentioned_agreements', () => {
     expect(schema.required).toContain('document_type');
     expect(schema.required).toContain('mentioned_agreements');
   });
+
+  it('document_type enum includes bilaga and personuppgiftsbiträdesavtal (as a plain enum, no new union)', async () => {
+    const client = fakeClientReturning({ ...GOOD, document_type: 'bilaga', is_contract: false });
+    await analyseContractPdf(pdf, ctx, { env: { ANTHROPIC_API_KEY: 'sk' }, client });
+    const schema = client.messages.create.mock.calls[0][0].output_config.format.schema;
+    const dt = schema.properties.document_type;
+    // still a bare non-nullable enum string — adds zero union-typed params
+    expect(dt.type).toBe('string');
+    expect(dt.anyOf).toBeUndefined();
+    expect(dt.enum).toEqual(expect.arrayContaining([
+      'avtal', 'bilaga', 'personuppgiftsbiträdesavtal',
+      'följebrev_sammanställning', 'prislista', 'sekretessbeslut', 'övrigt',
+    ]));
+  });
+
+  it('CONTRACT_SCHEMA stays at or below the 16 union-typed param limit', async () => {
+    const client = fakeClientReturning({ ...GOOD, document_type: 'avtal' });
+    await analyseContractPdf(pdf, ctx, { env: { ANTHROPIC_API_KEY: 'sk' }, client });
+    const schema = client.messages.create.mock.calls[0][0].output_config.format.schema;
+    const countAnyOf = (node) => {
+      if (Array.isArray(node)) return node.reduce((n, x) => n + countAnyOf(x), 0);
+      if (node && typeof node === 'object') {
+        return Object.entries(node).reduce((n, [k, v]) => n + (k === 'anyOf' ? 1 : 0) + countAnyOf(v), 0);
+      }
+      return 0;
+    };
+    expect(countAnyOf(schema)).toBeLessThanOrEqual(16);
+  });
 });
 
 describe('lifecycle extraction (2026-07-09 perpetual-refresh design Part A)', () => {
