@@ -8,6 +8,7 @@ import path from 'node:path';
 import { readFileSync, existsSync } from 'node:fs';
 import { openDb } from './storage.js';
 import { effectiveFollowUp, TERMINAL_STATES } from './conversation.js';
+import { resolveVacationConfig, isInVacation } from './vacation.js';
 import { buildOAuthClient, loadStoredToken, saveToken, makeGmail } from './gmail.js';
 import { beginReauth } from './gmail-auth.js';
 import { sendApprovedReply, sendInitial, renderInitialDraft } from './send-reply.js';
@@ -71,6 +72,19 @@ function loadMunicipalities() {
     }
   }
   return live;
+}
+
+// Resolved (default-merged) vacation window for display honesty. Read once at
+// startup; the pure conversation/vacation logic takes cfg as a parameter.
+function loadVacationConfig() {
+  try {
+    if (existsSync(OVERRIDES_PATH)) {
+      return resolveVacationConfig(JSON.parse(readFileSync(OVERRIDES_PATH, 'utf8')));
+    }
+  } catch {
+    // fall through to the default window
+  }
+  return resolveVacationConfig({});
 }
 
 function openDbOrNull() {
@@ -162,7 +176,7 @@ export function caseTooltip(conv, latestInbound, follow_up, openEsc) {
   return `${happened}\n${next}`;
 }
 
-function buildOverviewRows(municipalities, db) {
+function buildOverviewRows(municipalities, db, vacationConfig = { enabled: false }) {
   const allConvs = db ? db.listAllConversations() : [];
   const convsByKod = new Map();
   for (const c of allConvs) {
@@ -224,7 +238,7 @@ function buildOverviewRows(municipalities, db) {
       const candidate = c.last_outbound_at && c.state_changed_at && c.last_outbound_at > c.state_changed_at
         ? c.last_outbound_at : c.state_changed_at;
       if (!lastActivityAt || candidate > lastActivityAt) lastActivityAt = candidate;
-      const fu = effectiveFollowUp(c);
+      const fu = effectiveFollowUp(c, vacationConfig);
       if (fu.date && (!earliestFollowUp || fu.date < earliestFollowUp)) {
         earliestFollowUp = fu.date;
         earliestFollowUpSource = fu.source;
@@ -238,7 +252,7 @@ function buildOverviewRows(municipalities, db) {
       states: convs.map((c) => ({
         role: c.role,
         state: c.state,
-        tooltip: caseTooltip(c, latestInboundByConvId.get(c.id), effectiveFollowUp(c), latestOpenEscByConvId.get(c.id)),
+        tooltip: caseTooltip(c, latestInboundByConvId.get(c.id), effectiveFollowUp(c, vacationConfig), latestOpenEscByConvId.get(c.id)),
       })),
       open_escalations: openEsc,
       contracts,
@@ -527,6 +541,7 @@ export function createDashboardApp({
   env = process.env,
   contractsDir = process.env.PILOT_CONTRACTS_DIR ?? 'data/contracts',
   slackClient = process.env.SLACK_BOT_TOKEN ? makeSlackClient(process.env.SLACK_BOT_TOKEN) : null,
+  vacationConfig = loadVacationConfig(),
 } = {}) {
   const app = express();
   // Best-effort chat.update so dashboard resolutions also strip the Slack
@@ -567,7 +582,7 @@ export function createDashboardApp({
 
   app.get('/', (req, res) => {
     const municipalities = municipalitiesLoader();
-    const rows = buildOverviewRows(municipalities, db);
+    const rows = buildOverviewRows(municipalities, db, vacationConfig);
     const summary = buildSummary(rows);
     // Home defaults to active kommuner; full 290-list is behind ?filter=all.
     const filter = req.query.filter ?? 'active';
@@ -591,6 +606,7 @@ export function createDashboardApp({
       totalKommuner: municipalities.length,
       actionQueue: buildActionQueue(db),
       waiting: buildWaiting(db),
+      vacationActive: isInVacation(new Date().toISOString().slice(0, 10), vacationConfig),
       heartbeat: hb(), partial: isPartial(req), escalationCount: escCount(),
     }));
   });
