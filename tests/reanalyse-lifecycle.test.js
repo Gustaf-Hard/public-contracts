@@ -61,6 +61,35 @@ describe('mergePreserving (pure) — guards a good row against a degraded re-run
     expect(changes.some(([f]) => f === 'is_contract')).toBe(true);
   });
 
+  // 2026-07-15 contract-validation: a CONFIDENT non-avtal re-classification must
+  // flip is_contract 1 → 0 and adopt the new document_type. This resolves the
+  // Huddinge contradiction (rows stuck at is_contract=1 + document_type='övrigt'/
+  // 'bilaga'). Only the classification flips — extracted data stays fill-only.
+  it('flips is_contract 1 → 0 on a confident non-avtal verdict (Huddinge: bilaga)', () => {
+    const fresh = { is_contract: false, document_type: 'bilaga', vendor_name: null, confidence: 0.9 };
+    const { merged, changes } = mergePreserving(good, fresh);
+    expect(merged.is_contract).toBe(false);
+    expect(merged.document_type).toBe('bilaga');
+    // data preserved fill-only — the flip must not wipe a known vendor/period
+    expect(merged.vendor_name).toBe('Skolon');
+    expect(merged.period_end).toBe('2026-12-31');
+    expect(changes.some(([f]) => f === 'is_contract')).toBe(true);
+  });
+
+  it('flips is_contract 1 → 0 on a confident övrigt verdict too', () => {
+    const fresh = { is_contract: false, document_type: 'övrigt', confidence: 0.85 };
+    expect(mergePreserving(good, fresh).merged.is_contract).toBe(false);
+    expect(mergePreserving(good, fresh).merged.document_type).toBe('övrigt');
+  });
+
+  it('does NOT flip on a LOW-confidence non-contract verdict (stays consistent avtal)', () => {
+    const shaky = { is_contract: false, document_type: 'övrigt', confidence: 0.4 };
+    const { merged } = mergePreserving(good, shaky);
+    expect(merged.is_contract).toBe(true);
+    // consistency: a preserved positive must not carry a non-avtal document_type
+    expect(merged.document_type).not.toBe('övrigt');
+  });
+
   it('preserves a set period/vendor when the new pass returns null (fill-only)', () => {
     const degraded = { is_contract: true, vendor_name: null, period_end: null, period_start: null, auto_renews: true };
     const { merged } = mergePreserving(good, degraded);

@@ -455,6 +455,10 @@ const baseCss = `
   .contracts-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
   .contracts-table th, .contracts-table td { padding: 6px 10px; text-align: left; border-bottom: 1px solid var(--border); }
   .contracts-table th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--fg-muted); }
+  .doc-badge { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; border: 1px solid; }
+  .doc-badge-avtal { background: #22c55e1a; color: var(--good); border-color: #22c55e66; }
+  .doc-badge-muted { background: var(--bg-elev-2); color: var(--fg-muted); border-color: var(--border); font-weight: 500; }
+  .doc-row-muted { opacity: 0.62; }
   .quick-actions { display: flex; flex-direction: column; gap: 6px; }
   .quick-actions a { font-size: 12px; padding: 6px 10px; border-radius: 6px; background: var(--bg-elev-2); border: 1px solid var(--border); color: var(--fg); text-decoration: none; display: flex; align-items: center; gap: 6px; }
   .quick-actions a:hover { border-color: var(--accent); color: var(--accent); }
@@ -1106,6 +1110,8 @@ function aggregateContracts(conversations, messagesByConv, attachmentsByMsg) {
           received_at: m.received_at,
           role: conv.role,
           conv_id: conv.id,
+          is_contract: att.contract_is_contract,
+          document_type: att.contract_document_type,
         });
       }
     }
@@ -1118,6 +1124,24 @@ function fmtBytes(n) {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} kB`;
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+// Type badge for a received document (2026-07-15 contract-validation). A real
+// avtal (is_contract=1) is prominent; bilagor / PUB-avtal / följebrev / övrigt
+// are muted — visible but de-emphasized. NULL classification (legacy / not-yet
+// re-analysed) gets no badge rather than a wrong one.
+function docTypeBadge(att) {
+  const isContract = att.is_contract === 1 || att.is_contract === true;
+  if (isContract) return { label: 'Avtal', muted: false };
+  switch (att.document_type) {
+    case 'bilaga': return { label: 'Bilaga', muted: true };
+    case 'personuppgiftsbiträdesavtal': return { label: 'PUB-avtal', muted: true };
+    case 'följebrev_sammanställning': return { label: 'Följebrev', muted: true };
+    case 'prislista':
+    case 'sekretessbeslut':
+    case 'övrigt': return { label: 'Övrigt', muted: true };
+    default: return null; // NULL / unknown → no badge
+  }
 }
 
 export function renderKommunDetail({ kommun, conversations, messagesByConv, attachmentsByMsg, escalationsByConv, signatures, followUpByConv = {}, threadsByConv = {}, initialDrafts = {}, gmailReady = false, vendorSlugsByName = new Map(), handoffContacts = [], heartbeat = null, partial = false, escalationCount = 0 }) {
@@ -1179,7 +1203,7 @@ export function renderKommunDetail({ kommun, conversations, messagesByConv, atta
       <div class="kpi-grid">
         <div class="kpi-cell"><div class="kpi-label">Aktiva ärenden</div><div class="kpi-value">${activeCases.length}</div></div>
         <div class="kpi-cell"><div class="kpi-label">Stängda</div><div class="kpi-value">${closedCases.length}</div></div>
-        <div class="kpi-cell"><div class="kpi-label">Avtal mottagna</div><div class="kpi-value">${contracts.length}</div></div>
+        <div class="kpi-cell"><div class="kpi-label">Avtal mottagna</div><div class="kpi-value">${contracts.filter((c) => c.is_contract === 1 || c.is_contract === true).length}</div></div>
         <div class="kpi-cell"><div class="kpi-label">Behöver dig</div><div class="kpi-value ${needsHumanCount > 0 ? 'danger' : ''}">${needsHumanCount}</div></div>
       </div>
 
@@ -1214,20 +1238,28 @@ export function renderKommunDetail({ kommun, conversations, messagesByConv, atta
         <p style="margin:6px 0"><a class="btn btn-primary" style="display:inline-block;text-decoration:none" href="/kommun/${escapeHtml(kommun.kommun_kod)}/compose">📨 Skapa och skicka begäran →</a></p>
       </div>`;
 
+  const avtalCount = contracts.filter((c) => c.is_contract === 1 || c.is_contract === true).length;
   const contractsSection = contracts.length === 0
-    ? `<div class="card"><h3>Mottagna avtal (0)</h3><p class="muted">Inga avtal mottagna ännu.</p></div>`
+    ? `<div class="card"><h3>Mottagna dokument (0)</h3><p class="muted">Inga dokument mottagna ännu.</p></div>`
     : `<div class="card">
-        <h3>Mottagna avtal (${contracts.length})</h3>
+        <h3>Mottagna dokument (${contracts.length}) · ${avtalCount} avtal</h3>
         <table class="contracts-table">
-          <thead><tr><th>Datum</th><th>Ärende</th><th>Roll</th><th>Filnamn</th><th>Storlek</th></tr></thead>
-          <tbody>${contracts.map((c) => `
-            <tr>
+          <thead><tr><th>Datum</th><th>Ärende</th><th>Roll</th><th>Typ</th><th>Filnamn</th><th>Storlek</th></tr></thead>
+          <tbody>${contracts.map((c) => {
+            const badge = docTypeBadge(c);
+            const badgeHtml = badge
+              ? `<span class="doc-badge ${badge.muted ? 'doc-badge-muted' : 'doc-badge-avtal'}">${escapeHtml(badge.label)}</span>`
+              : '<span class="muted">—</span>';
+            return `
+            <tr class="${badge && badge.muted ? 'doc-row-muted' : ''}">
               <td>${escapeHtml(c.received_at?.slice(0, 10) ?? '')}</td>
               <td><a href="#case-${c.conv_id}">#${c.conv_id}</a></td>
               <td>${escapeHtml(c.role)}</td>
+              <td>${badgeHtml}</td>
               <td><a href="/attachments/${c.id}" target="_blank" rel="noopener">📎 ${escapeHtml(c.filename)}</a>${isPdfAttachment(c) ? '' : ' <span class="muted">— sparad, ej avtalsanalyserad (ej PDF)</span>'}</td>
               <td>${escapeHtml(fmtBytes(c.size_bytes))}</td>
-            </tr>`).join('')}</tbody>
+            </tr>`;
+          }).join('')}</tbody>
         </table>
       </div>`;
 

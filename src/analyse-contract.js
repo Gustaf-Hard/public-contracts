@@ -18,8 +18,13 @@ const SYSTEM_PROMPT = `Du analyserar PDF:er som svenska kommuner lämnat ut efte
 Din uppgift: avgör dokumentets typ, om det är ett avtal, och extrahera strukturerade fält.
 
 Regler:
-- document_type: "avtal" för avtal/kontrakt/ramavtal/underskrivna beställningar. "följebrev_sammanställning" för svarsbrev eller tabeller som RÄKNAR UPP avtal/leverantörer utan att själva innehålla avtalstexten (t.ex. "Svar på begäran om allmän handling" med en tabell över leverantörer och kostnader). "prislista", "sekretessbeslut" eller "övrigt" för annat.
-- is_contract: true ENDAST när document_type = "avtal". false för följebrev_sammanställning, prislista, sekretessbeslut och övrigt. Ett brev som hänvisar till "bifogat avtal" är INTE självt ett avtal.
+- document_type — dokumentets typ. Avgörande skillnad: ett "avtal" är en KOMMERSIELL överenskommelse där kommunen BETALAR för en produkt/tjänst (pengar byts mot vara/tjänst). Använd:
+  - "avtal": ett kommersiellt avtal/kontrakt/ramavtal eller en underskriven, prissatt beställning där kommunen betalar för en produkt/tjänst (huvudavtal). Diskriminatorn är att PENGAR BYTS MOT PRODUKTER/TJÄNSTER.
+  - "bilaga": en bilaga/appendix till ett avtal som INTE själv är ett kommersiellt avtal — t.ex. servicenivåavtal/SLA, säkerhetsbilaga, kravspecifikation, funktionella krav, definitioner, IT-miljö, samverkan/ändringshantering, eller en prisbilaga som hör till ett huvudavtal. Även om texten är avtalsmässig är en fristående bilaga en "bilaga".
+  - "personuppgiftsbiträdesavtal": ett dataskyddsavtal (PUB-avtal/DPA enligt GDPR). Det är juridiskt ett avtal men INGA pengar byts, så det är INTE ett avtal i vår mening.
+  - "följebrev_sammanställning": svarsbrev eller tabeller som RÄKNAR UPP avtal/leverantörer utan att själva innehålla avtalstexten (t.ex. "Svar på begäran om allmän handling" med en tabell över leverantörer och kostnader).
+  - "prislista", "sekretessbeslut" eller "övrigt" för annat.
+- is_contract: true ENDAST när document_type = "avtal". false för bilaga, personuppgiftsbiträdesavtal, följebrev_sammanställning, prislista, sekretessbeslut och övrigt. En fristående bilaga (SLA, säkerhet, kravspec, definitioner) är INTE ett avtal även om den läser avtalsmässigt. Ett PUB-avtal är INTE ett avtal (inga pengar byts). Ett brev som hänvisar till "bifogat avtal" är INTE självt ett avtal.
 - vendor_name: leverantörens kanoniska företagsnamn utan bolagsform — "Skolon", inte "Skolon AB". null om oklart.
 - products: namngivna produkter/tjänster som avtalet omfattar. Tom array om inga kan identifieras.
 - avtalsvarde: avtalets värde eller årskostnad som text (t.ex. "120 000 kr/år"). null om det inte framgår.
@@ -48,7 +53,7 @@ const CONTRACT_SCHEMA = {
   required: ['is_contract', 'document_type', 'vendor_name', 'products', 'avtalsvarde', 'valuta', 'period_start', 'period_end', 'auto_renews', 'renewal_term', 'last_cancellation_date', 'extension_option_until', 'annual_value_sek', 'one_time_value_sek', 'pricing_model', 'unit_price_sek', 'unit', 'quantity', 'value_incl_moms', 'line_items', 'coverage', 'whole_municipality', 'summary', 'confidence', 'mentioned_agreements'],
   properties: {
     is_contract: { type: 'boolean' },
-    document_type: { type: 'string', enum: ['avtal', 'följebrev_sammanställning', 'prislista', 'sekretessbeslut', 'övrigt'] },
+    document_type: { type: 'string', enum: ['avtal', 'bilaga', 'personuppgiftsbiträdesavtal', 'följebrev_sammanställning', 'prislista', 'sekretessbeslut', 'övrigt'] },
     vendor_name: { anyOf: [{ type: 'string' }, { type: 'null' }] },
     products: { type: 'array', items: { type: 'string' } },
     avtalsvarde: { anyOf: [{ type: 'string' }, { type: 'null' }] },
@@ -266,8 +271,13 @@ export function expandCoverageRows(analysis) {
 // meant to FILL new/NULL lifecycle fields, not to destroy known-good ones.
 //
 // Rules, given a previously-stored `existing` row for this attachment:
-//   - is_contract: never flip a good 1 → 0. If it was a contract, it stays one
-//     unless the new pass ALSO says contract (upgrades 0 → 1 are fine).
+//   - is_contract follows the freshest CONFIDENT document_type verdict. A
+//     confident (confidence >= 0.8) non-'avtal' re-classification flips a stale
+//     1 → 0 and adopts the new document_type (the 2026-07-15 contract-validation
+//     fix for the Huddinge bilagor stuck at is_contract=1). A LOW-confidence
+//     "not a contract" re-run is treated as a degraded pass and never flips a
+//     good positive — and the preserved positive is kept consistent (its
+//     document_type is not overwritten with the shaky non-'avtal' value).
 //   - vendor / period_start / period_end / avtalsvarde / valuta / renewal_term /
 //     last_cancellation_date / extension_option_until: keep the existing
 //     non-null value when the new pass returns null (fill-only). A new non-null
@@ -279,12 +289,22 @@ export function mergePreserving(existing, fresh) {
   const changes = [];
   const merged = { ...fresh };
 
-  // is_contract: protect a good positive.
+  // is_contract follows the freshest CONFIDENT document_type. `merged` already
+  // carries fresh.is_contract + fresh.document_type from the spread, so a
+  // confident flip (avtal↔non-avtal) and 0→1 upgrades need no extra work. The
+  // only case we override is a LOW-confidence "not a contract" re-run against a
+  // good positive: protect the positive AND keep it consistent (don't leave a
+  // is_contract=1 row stamped with a shaky non-'avtal' document_type).
   const oldIsContract = existing.is_contract === 1 || existing.is_contract === true;
   const newIsContract = fresh.is_contract === true;
-  if (oldIsContract && !newIsContract) {
+  const freshConfident = typeof fresh.confidence === 'number' && fresh.confidence >= 0.8;
+  if (oldIsContract && !newIsContract && !freshConfident) {
     merged.is_contract = true;
-    changes.push(['is_contract', 'preserved 1 (new pass said 0)', 1]);
+    merged.document_type = existing.document_type ?? 'avtal';
+    changes.push(['is_contract', 'preserved 1 (new pass 0, low confidence)', 1]);
+  } else if (oldIsContract && !newIsContract && freshConfident) {
+    // confident reclassification — record the flip for the re-analysis log.
+    changes.push(['is_contract', `flipped 1 → 0 (confident ${fresh.document_type ?? 'non-avtal'})`, 0]);
   }
 
   // Fill-only string/date/number fields — a degraded re-run (new pass null)
@@ -338,7 +358,7 @@ export function storeContractAnalysis(db, attachmentId, analysis, { model, log =
   // Read the existing row (with vendor name) so the merge can preserve it.
   const existing = db.raw.prepare(`
     SELECT c.id AS contract_id,
-           c.is_contract, c.period_start, c.period_end, c.avtalsvarde, c.valuta,
+           c.is_contract, c.document_type, c.period_start, c.period_end, c.avtalsvarde, c.valuta,
            c.auto_renews, c.renewal_term, c.last_cancellation_date, c.extension_option_until,
            c.annual_value_sek, c.one_time_value_sek, c.pricing_model, c.unit_price_sek,
            c.unit, c.quantity, c.value_incl_moms,
@@ -391,6 +411,7 @@ export function storeContractAnalysis(db, attachmentId, analysis, { model, log =
     quantity: merged.quantity,
     value_incl_moms: merged.value_incl_moms,
     is_contract: merged.is_contract ? 1 : 0,
+    document_type: merged.document_type ?? null,
     summary: merged.summary,
     confidence: merged.confidence,
     analysis_json: merged,
