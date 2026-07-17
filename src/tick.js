@@ -10,6 +10,7 @@ import { saveAttachment, extractPdfsFromZip, dedupeFilenames, isTrivialImage } f
 import { extractSignature } from './extract-signature.js';
 import { analyseMessage, analysisToLegacyClassification, addDaysIso } from './analyse-message.js';
 import { analysePendingContracts } from './analyse-contract.js';
+import { isInVacation, vacationDaysBetween } from './vacation.js';
 
 const TEMPLATES = { T_INITIAL, T_PRECISION, T_RECEIPT, T_FOLLOWUP_NUDGE, T_FOLLOWUP_CLOSE, T_REQUEST_MISSING, T_UPDATE, T_DELAY_ACK };
 
@@ -707,9 +708,28 @@ export async function runTick(deps) {
 
 export async function runDailyFollowup(deps) {
   const { db, now, log } = deps;
+  // Vacation window (2026-07-17): during the Swedish summer the proactive
+  // staleness loop pauses and the summer days do NOT count toward staleness.
+  // runTick (real inbound) and runRefreshScan (T_UPDATE) are untouched. Absent
+  // cfg defaults to a disabled no-op (mirrors effectiveFollowUp) so callers
+  // that don't inject it are unaffected; the daemon always injects the resolved
+  // window via resolveVacation(overrides).
+  const cfg = deps.vacationConfig ?? { enabled: false };
   const todayIso = now.toISOString().slice(0, 10);
+  let vacationPauseLogged = false;
   const all = db.listAllConversations();
   for (const conv of all) {
+    // Gate the whole proactive loop while inside the vacation window: don't
+    // mint any nudge/close/escalation. Logged once per tick (not per conv) to
+    // avoid log spam.
+    if (isInVacation(todayIso, cfg)) {
+      if (!vacationPauseLogged) {
+        log?.('FOLLOWUP paused — vacation mode active');
+        vacationPauseLogged = true;
+      }
+      continue;
+    }
+
     // At most one ACTIVE next-action per conversation (review H1 + hardening
     // finding 2/3): while an escalation sits unapproved (open), is mid-send
     // (sending), or is parked after an ambiguous Gmail outcome (send_failed /
@@ -719,7 +739,15 @@ export async function runDailyFollowup(deps) {
     // Slack; the conversation needs a human, not another nudge.
     if (db.hasActiveEscalation(conv.id)) continue;
 
-    const days = daysBetween(new Date(conv.state_changed_at), now);
+    // Discount the clock: subtract whole vacation days elapsed since the state
+    // change so a conversation quiet across the summer doesn't accrue stale
+    // days it can't help. staleAction stays pure/unchanged — it just sees a
+    // smaller `days`.
+    const raw = daysBetween(new Date(conv.state_changed_at), now);
+    const vac = conv.state_changed_at
+      ? vacationDaysBetween(conv.state_changed_at.slice(0, 10), todayIso, cfg)
+      : 0;
+    const days = Math.max(0, raw - vac);
     const action = staleAction(conv.state, days, conv.followup_count, {
       today: todayIso,
       follow_up_at: conv.follow_up_at ?? null,

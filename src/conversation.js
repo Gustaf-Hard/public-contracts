@@ -1,3 +1,5 @@
+import { isInVacation } from './vacation.js';
+
 export function nextActionForClassification(state, classification, opts = {}) {
   if (classification === 'unknown') {
     return { nextState: 'NEEDS_HUMAN', action: 'escalate' };
@@ -79,7 +81,12 @@ export const QUIESCENT_STATES = new Set(['REFRESH_DUE']);
 //   - 'our_followup'   — no promise; we'll nudge them after the stale
 //     rule fires. Red in the dashboard: we'll have to reach out again.
 // Terminal states return {date: null, source: null}.
-export function effectiveFollowUp(conv) {
+// `cfg` is the resolved vacation window (2026-07-17). Default is a disabled
+// no-op so existing callers/tests are unaffected unless they pass cfg. When a
+// computed our_followup date lands inside the window we push it to the day
+// after the window ends — the daily loop is paused then, so the dashboard must
+// not advertise a date it won't act on.
+export function effectiveFollowUp(conv, cfg = { enabled: false }) {
   const none = { date: null, source: null };
   if (!conv) return none;
   // Terminal wins over a lingering kommun promise (review M10): a DONE or
@@ -91,10 +98,18 @@ export function effectiveFollowUp(conv) {
   if (!rule || !conv.state_changed_at) return none;
   const t = new Date(conv.state_changed_at).getTime();
   if (Number.isNaN(t)) return none;
-  return {
-    date: new Date(t + rule.days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
-    source: 'our_followup',
-  };
+  const date = new Date(t + rule.days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  return { date: pushPastVacation(date, cfg), source: 'our_followup' };
+}
+
+// If a YYYY-MM-DD date falls inside the vacation window, move it to the day
+// after the window ends (e.g. 07-30 → 07-31). No-op when cfg is disabled or the
+// date is outside the window.
+function pushPastVacation(iso, cfg) {
+  if (!isInVacation(iso, cfg)) return iso;
+  const year = iso.slice(0, 4);
+  const endMs = Date.parse(`${year}-${cfg.end}T00:00:00Z`);
+  return new Date(endMs + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
 // staleAction optionally honors a per-conversation `follow_up_at` override

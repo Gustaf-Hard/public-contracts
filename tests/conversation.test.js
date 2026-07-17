@@ -150,4 +150,30 @@ describe('effectiveFollowUp', () => {
     const r = effectiveFollowUp({ state: 'ACK_RECEIVED', state_changed_at: '2026-05-24T10:00:00Z', follow_up_at: null });
     expect(r).toEqual({ date: '2026-06-07', source: 'our_followup' });
   });
+
+  describe('vacation-window push (cfg param)', () => {
+    const cfg = { enabled: true, start: '06-15', end: '07-30' };
+
+    it('pushes an our_followup date that lands inside the window to the day after it ends', () => {
+      // SENT 7-day rule; state_changed 2026-06-20 → derived 2026-06-27 (inside).
+      const r = effectiveFollowUp({ state: 'SENT', state_changed_at: '2026-06-20T10:00:00Z', follow_up_at: null }, cfg);
+      expect(r).toEqual({ date: '2026-07-31', source: 'our_followup' });
+    });
+
+    it('leaves an our_followup date outside the window unchanged', () => {
+      const r = effectiveFollowUp({ state: 'SENT', state_changed_at: '2026-05-24T10:00:00Z', follow_up_at: null }, cfg);
+      expect(r).toEqual({ date: '2026-05-31', source: 'our_followup' });
+    });
+
+    it('with no cfg (default disabled) never pushes — existing callers unaffected', () => {
+      const r = effectiveFollowUp({ state: 'SENT', state_changed_at: '2026-06-20T10:00:00Z', follow_up_at: null });
+      expect(r).toEqual({ date: '2026-06-27', source: 'our_followup' });
+    });
+
+    it('enabled:false cfg never pushes', () => {
+      const off = { enabled: false, start: '06-15', end: '07-30' };
+      const r = effectiveFollowUp({ state: 'SENT', state_changed_at: '2026-06-20T10:00:00Z', follow_up_at: null }, off);
+      expect(r).toEqual({ date: '2026-06-27', source: 'our_followup' });
+    });
+  });
 });

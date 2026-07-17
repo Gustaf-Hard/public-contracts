@@ -5,7 +5,7 @@ import { openDb } from './storage.js';
 import { buildOAuthClient, loadStoredToken, saveToken, makeGmail, sendMessage as gmailSend, listInboundQuery, getMessage as gmailGet, fetchAttachment } from './gmail.js';
 // gmailSend stays imported because runTick's gmailOps below uses it.
 import { makeSlackClient, verifySlackSignature, parseInteractivityPayload, postEscalation, postAlert, openEditModal, updateEscalationResolved } from './slack.js';
-import { loadOverrides, getEffectiveNow } from './pilot-config.js';
+import { loadOverrides, getEffectiveNow, resolveVacation } from './pilot-config.js';
 import { sendApprovedReply } from './send-reply.js';
 
 const TOKEN_PATH = process.env.GMAIL_TOKEN_PATH ?? `${process.env.HOME}/.config/mediagraf/pilot-gmail-token.json`;
@@ -222,6 +222,7 @@ export async function startDaemon({ env = process.env, log = console.log } = {})
         db, gmailClient: { gmail }, gmailOps,
         slackClient: slack, slackOps,
         env, contractsDir: CONTRACTS_DIR, now, log,
+        vacationConfig: resolveVacation(overrides),
       });
       // Perpetual contract refresh (2026-07-09 design §3.3) — same daily
       // cadence, same escalation mutex, so refresh and follow-up drafts can

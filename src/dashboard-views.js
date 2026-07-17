@@ -343,6 +343,8 @@ const baseCss = `
   .heartbeat-off   { background: #ef44441a; color: var(--bad);  border-color: #ef444466; }
   .pill-list { display: flex; flex-wrap: wrap; gap: 4px; }
   .muted { color: var(--fg-muted); }
+  .vacation-banner { margin: 0 0 14px; padding: 8px 12px; border-radius: 8px; font-size: 13px;
+    background: var(--bg-elev-2); color: var(--fg-muted); border: 1px solid var(--border); }
   /* Product intelligence: coverage matrix (2026-07-10 design) */
   .cov-table th.cov-head { text-align: center; }
   .cov-table td.cov-cell { text-align: center; font-size: 13px; }
@@ -754,8 +756,14 @@ function sortHeader({ key, label, currentSort, currentOrder, filter, align = 'le
   return `<th${style}><a href="?${params.toString()}" class="th-sort${isActive ? ' th-sort-active' : ''}">${escapeHtml(label)}${indicator}</a></th>`;
 }
 
-export function renderOverview({ summary, rows, filter, sort, order, totalKommuner, q = '', actionQueue = [], waiting = [], heartbeat = null, partial = false, escalationCount = 0 }) {
+export function renderOverview({ summary, rows, filter, sort, order, totalKommuner, q = '', actionQueue = [], waiting = [], vacationActive = false, heartbeat = null, partial = false, escalationCount = 0 }) {
   const activeFilter = filter ?? 'active';
+  // Vacation mode (2026-07-17): a muted banner so the operator knows the
+  // proactive staleness loop is paused for the summer. Real inbound and the
+  // refresh scan keep running.
+  const vacationBanner = vacationActive
+    ? '<div class="vacation-banner">☀️ Sommarläge — automatisk bevakning pausad t.o.m. 30 juli</div>'
+    : '';
   const filters = [
     { key: 'active', label: `Aktiva (${summary.in_pilot})` },
     { key: 'needs-attention', label: `Behöver dig (${actionQueue.length})` },
@@ -865,6 +873,7 @@ export function renderOverview({ summary, rows, filter, sort, order, totalKommun
   const headerArgs = { currentSort: sort, currentOrder: order, filter: activeFilter };
   const body = `
     <div class="page-head"><h1>Översikt</h1></div>
+    ${vacationBanner}
     ${stats}
     <div class="board">
       ${actionSection}
