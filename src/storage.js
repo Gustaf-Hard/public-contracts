@@ -500,6 +500,21 @@ export function openDb(path) {
     `).run(status, resolved_text, id);
   }
 
+  // Vacation mode (2026-07-17): supersede every currently-open escalation that
+  // is purely staleness-driven — i.e. classifier_class = 'followup_stale',
+  // which tags every follow-up draft (nudge, close, and the escalated
+  // free-form) and NOTHING else. Real-inbound escalations carry other classes
+  // (or NULL) and are left untouched, so no data is lost. Append-only status
+  // change (no schema change, no deletion). Returns the number of rows moved.
+  function supersedeStaleNudgeEscalations() {
+    const r = db.prepare(`
+      UPDATE escalations
+      SET status = 'superseded', resolved_at = datetime('now')
+      WHERE status = 'open' AND classifier_class = 'followup_stale'
+    `).run();
+    return r.changes;
+  }
+
   // Atomically resolve an escalation only if it is still open — the same
   // claim pattern as claimEscalationForSending, for skip/close (hardening
   // finding 7). Returns true when this caller performed the resolve (exactly
@@ -1015,6 +1030,7 @@ export function openDb(path) {
     getEscalationBySlackTs,
     resolveEscalation,
     resolveEscalationIfOpen,
+    supersedeStaleNudgeEscalations,
     claimEscalationForSending,
     claimConversationForInitialSend,
     transaction,
