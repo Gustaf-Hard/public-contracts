@@ -1,8 +1,16 @@
 import { readFileSync, existsSync } from 'node:fs';
+import { resolveVacationConfig } from './vacation.js';
 
 export function loadOverrides(path = 'data/pilot-overrides.json') {
   if (!existsSync(path)) throw new Error(`Pilot overrides not found at ${path}`);
   return JSON.parse(readFileSync(path, 'utf8'));
+}
+
+// Resolved (default-merged) vacation window for the daemon/dashboard to inject
+// into the tick deps. The pure vacation module never reads the file — this is
+// the single wiring point that turns overrides into a cfg object.
+export function resolveVacation(overrides) {
+  return resolveVacationConfig(overrides ?? {});
 }
 
 export function resolveActiveKommuner(overrides, liveMunicipalities) {
