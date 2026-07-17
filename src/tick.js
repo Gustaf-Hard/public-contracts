@@ -10,7 +10,7 @@ import { saveAttachment, extractPdfsFromZip, dedupeFilenames, isTrivialImage } f
 import { extractSignature } from './extract-signature.js';
 import { analyseMessage, analysisToLegacyClassification, addDaysIso } from './analyse-message.js';
 import { analysePendingContracts } from './analyse-contract.js';
-import { isInVacation, vacationDaysBetween, defaultVacationConfig } from './vacation.js';
+import { isInVacation, vacationDaysBetween } from './vacation.js';
 
 const TEMPLATES = { T_INITIAL, T_PRECISION, T_RECEIPT, T_FOLLOWUP_NUDGE, T_FOLLOWUP_CLOSE, T_REQUEST_MISSING, T_UPDATE, T_DELAY_ACK };
 
@@ -710,8 +710,11 @@ export async function runDailyFollowup(deps) {
   const { db, now, log } = deps;
   // Vacation window (2026-07-17): during the Swedish summer the proactive
   // staleness loop pauses and the summer days do NOT count toward staleness.
-  // runTick (real inbound) and runRefreshScan (T_UPDATE) are untouched.
-  const cfg = deps.vacationConfig ?? defaultVacationConfig();
+  // runTick (real inbound) and runRefreshScan (T_UPDATE) are untouched. Absent
+  // cfg defaults to a disabled no-op (mirrors effectiveFollowUp) so callers
+  // that don't inject it are unaffected; the daemon always injects the resolved
+  // window via resolveVacation(overrides).
+  const cfg = deps.vacationConfig ?? { enabled: false };
   const todayIso = now.toISOString().slice(0, 10);
   let vacationPauseLogged = false;
   const all = db.listAllConversations();
