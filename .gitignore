@@ -20,3 +20,8 @@ data/contracts/
 # Local UI review artifacts (Playwright screenshots/snapshots)
 .playwright-mcp/
 /*.png
+
+# Agent git worktrees (git-managed working copies, not source)
+.claude/worktrees/
+# Generated edit-review report — derived from pilot.db (PII-adjacent), regenerable via scripts/08
+data/edit-review.md
