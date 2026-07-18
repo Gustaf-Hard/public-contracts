@@ -14,6 +14,7 @@ import {
   UNKNOWN,
 } from '../public/explorer-core.js';
 import { GRADE_LEVELS, slugifyProductName } from './vendor-analytics.js';
+import { matchResellers } from './resellers.js';
 
 function escapeHtml(s) {
   if (s === null || s === undefined) return '';
@@ -1105,6 +1106,23 @@ function aggregateVendors(conversations, messagesByConv) {
   return [...vendors];
 }
 
+// Distinct vendor names on this kommun's CONFIRMED contracts (is_contract=1
+// attachments carry contract_vendor_name via the route's LEFT JOIN vendors).
+// These are the vendors we actually hold a signed avtal for — a stronger
+// claim than "mentioned".
+function aggregateConfirmedVendors(conversations, messagesByConv, attachmentsByMsg) {
+  const vendors = new Set();
+  for (const conv of conversations) {
+    for (const m of messagesByConv[conv.id] ?? []) {
+      for (const att of attachmentsByMsg[m.id] ?? []) {
+        const isContract = att.contract_is_contract === 1 || att.contract_is_contract === true;
+        if (isContract && att.contract_vendor_name) vendors.add(att.contract_vendor_name);
+      }
+    }
+  }
+  return [...vendors];
+}
+
 // Flatten attachments across cases into a single "contracts inventory" list.
 function aggregateContracts(conversations, messagesByConv, attachmentsByMsg) {
   const out = [];
@@ -1164,8 +1182,34 @@ export function renderKommunDetail({ kommun, conversations, messagesByConv, atta
   const closedCases = conversations.filter((c) => CASE_STATUS[c.state]?.terminal);
   const completeness = completenessBanner(conversations);
   const people = aggregatePeople(conversations, messagesByConv, signatures);
-  const vendors = aggregateVendors(conversations, messagesByConv);
+  const mentionedVendors = aggregateVendors(conversations, messagesByConv);
+  const confirmedVendors = aggregateConfirmedVendors(conversations, messagesByConv, attachmentsByMsg);
   const contracts = aggregateContracts(conversations, messagesByConv, attachmentsByMsg);
+
+  // Reseller/framework channels this kommun buys via — union of confirmed +
+  // mentioned vendor names run through the curated matcher (src/resellers.js).
+  const channels = matchResellers([...mentionedVendors, ...confirmedVendors]);
+  const channelSet = new Set(channels.map((c) => c.toLowerCase()));
+  // A confirmed contract vendor must NEVER also appear under "Nämnda" — the
+  // stronger claim wins (data-honesty).
+  const confirmedLower = new Set(confirmedVendors.map((v) => v.toLowerCase()));
+  const mentionedOnly = mentionedVendors.filter((v) => !confirmedLower.has(v.toLowerCase()));
+  const vendorCount = new Set(
+    [...confirmedVendors, ...mentionedOnly].map((v) => v.toLowerCase())
+  ).size;
+
+  // Render one vendor as a chip: link to /leverantor/:slug when known, else
+  // plain; reseller-channel names get a muted 🛒 pill.
+  const renderVendorChip = (v, { muted = false } = {}) => {
+    const slug = vendorSlugsByName.get(v.toLowerCase());
+    const inner = slug
+      ? `<a class="tag${muted ? ' muted' : ''}" href="/leverantor/${escapeHtml(slug)}">${escapeHtml(v)}</a>`
+      : `<span class="tag${muted ? ' muted' : ''}">${escapeHtml(v)}</span>`;
+    const pill = channelSet.has(v.toLowerCase())
+      ? ` <span class="pill pill-reseller" title="${escapeHtml('Kommunen köper via ramavtal/återförsäljare — produkter kan finnas den vägen utan direktavtal med leverantören')}">🛒 ramavtal</span>`
+      : '';
+    return `${inner}${pill}`;
+  };
   const needsHumanCount = conversations.filter((c) => c.state === 'NEEDS_HUMAN').length;
 
   // ----- Sidebar -----
@@ -1190,6 +1234,29 @@ export function renderKommunDetail({ kommun, conversations, messagesByConv, atta
           ${p.email ? `<div class="person-meta"><code>${escapeHtml(p.email)}</code></div>` : ''}
           ${p.phone ? `<div class="person-meta">📞 ${escapeHtml(p.phone)}</div>` : ''}
         </div>`).join('');
+
+  // ----- Leverantörer sidebar panel (confirmed vs. merely mentioned) -----
+  const kopViaLine = channels.length === 0
+    ? ''
+    : `<p class="muted" style="font-size:12px;margin:0 0 8px" title="${escapeHtml('Kommunen köper via ramavtal/återförsäljare — produkter kan finnas den vägen utan direktavtal med leverantören')}">🛒 Köper via ramavtal: ${escapeHtml(channels.join(', '))}</p>`;
+
+  const confirmedGroup = confirmedVendors.length === 0
+    ? ''
+    : `<div style="margin-bottom:8px">
+        <div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Avtal bekräftat</div>
+        <div class="tag-list">${confirmedVendors.map((v) => renderVendorChip(v)).join('')}</div>
+      </div>`;
+
+  const mentionedGroup = mentionedOnly.length === 0
+    ? ''
+    : `<div>
+        <div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Nämnda <span title="${escapeHtml('Endast omnämnda i kommunens svar — vi har inte sett något signerat avtal.')}">?</span></div>
+        <div class="tag-list">${mentionedOnly.map((v) => renderVendorChip(v, { muted: true })).join('')}</div>
+      </div>`;
+
+  const vendorPanel = vendorCount === 0
+    ? '<p class="muted" style="font-size:12px;margin:6px 0 0">Inga leverantörer fångade ännu.</p>'
+    : `${kopViaLine}${confirmedGroup}${mentionedGroup}`;
 
   const mergedContacts = mergeContacts(kommun.contacts ?? [], handoffContacts);
   const datasetContacts = mergedContacts.length === 0
@@ -1226,6 +1293,11 @@ export function renderKommunDetail({ kommun, conversations, messagesByConv, atta
       <div class="side-section">
         <h3>Personer (${people.length})</h3>
         ${peopleHtml}
+      </div>
+
+      <div class="side-section">
+        <h3>Leverantörer (${vendorCount})</h3>
+        ${vendorPanel}
       </div>
 
       <div class="side-section">
@@ -1270,19 +1342,6 @@ export function renderKommunDetail({ kommun, conversations, messagesByConv, atta
             </tr>`;
           }).join('')}</tbody>
         </table>
-      </div>`;
-
-  const vendorsSection = vendors.length === 0
-    ? ''
-    : `<div class="card">
-        <h3>Nämnda leverantörer (${vendors.length})</h3>
-        <div class="muted" style="font-size:12px;margin-bottom:6px">Extraherade från inkommande svar via LLM-analys.</div>
-        <div class="tag-list">${vendors.map((v) => {
-          const slug = vendorSlugsByName.get(v.toLowerCase());
-          return slug
-            ? `<a class="tag" href="/leverantor/${escapeHtml(slug)}">${escapeHtml(v)}</a>`
-            : `<span class="tag">${escapeHtml(v)}</span>`;
-        }).join('')}</div>
       </div>`;
 
   const convCards = conversations.length === 0
@@ -1352,7 +1411,6 @@ export function renderKommunDetail({ kommun, conversations, messagesByConv, atta
       ${convCards}
       ${initialDraftCards}
       ${contractsSection}
-      ${vendorsSection}
     </div>`;
 
   const body = `<div class="kommun-page">${sidebar}${mainColumn}</div>`;
