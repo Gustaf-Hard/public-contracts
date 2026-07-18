@@ -449,6 +449,37 @@ describe('listKommunerWithContracts', () => {
       seedVendorContract('1440', 'Ale', 'Atea Sverige AB', { is_contract: 0 });
       expect(db.listKommunerWithContracts()[0].reseller_channels).toEqual([]);
     });
+
+    // Widened signal (2026-07-18): a channel named only in inbound prose
+    // (mentioned_vendors) counts, even without a signed contract for it — the
+    // Västerås/Läromedia case. The kommun still needs >=1 is_contract=1
+    // contract (any vendor) to appear in this list at all.
+    it('a mentioned_vendors channel counts even with no signed contract for it', () => {
+      // Unrelated confirmed contract so the kommun appears.
+      seedVendorContract('1980', 'Västerås', 'ILT Education');
+      // Läromedia only mentioned in an inbound message's analysis_json.
+      db.recordMessage({
+        conversation_id: convByKod.get('1980'), gmail_message_id: `gm-${Math.random()}`,
+        direction: 'inbound', from_email: 'reg@example.se', to_email: 'me@example.com',
+        subject: 'Svar', body_text: 'NE och Magma finns via vårt avtal med Läromedia',
+        classification: null, classification_confidence: null,
+        received_at: '2026-04-15T10:00:00Z', attachment_count: 0,
+        analysis_json: { intent: 'delivery', extracted: { mentioned_vendors: ['Läromedia'] } },
+      });
+      expect(db.listKommunerWithContracts()[0].reseller_channels).toEqual(['Läromedia']);
+    });
+
+    it('empty when neither confirmed nor mentioned vendors match a channel', () => {
+      seedVendorContract('1440', 'Ale', 'ILT Education');
+      db.recordMessage({
+        conversation_id: convByKod.get('1440'), gmail_message_id: `gm-${Math.random()}`,
+        direction: 'inbound', from_email: 'reg@example.se', to_email: 'me@example.com',
+        subject: 'Svar', body_text: '', classification: null, classification_confidence: null,
+        received_at: '2026-04-15T10:00:00Z', attachment_count: 0,
+        analysis_json: { intent: 'delivery', extracted: { mentioned_vendors: ['Nationalencyklopedin'] } },
+      });
+      expect(db.listKommunerWithContracts()[0].reseller_channels).toEqual([]);
+    });
   });
 });
 
