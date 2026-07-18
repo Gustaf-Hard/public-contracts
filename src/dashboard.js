@@ -656,9 +656,11 @@ export function createDashboardApp({
           // "Mottagna dokument" section badges + counts by is_contract /
           // document_type (2026-07-15 contract-validation).
           const atts = db.raw.prepare(`
-            SELECT a.*, c.is_contract AS contract_is_contract, c.document_type AS contract_document_type
+            SELECT a.*, c.is_contract AS contract_is_contract, c.document_type AS contract_document_type,
+                   v.name AS contract_vendor_name
             FROM attachments a
             LEFT JOIN contracts c ON c.attachment_id = a.id
+            LEFT JOIN vendors v ON v.id = c.vendor_id
             WHERE a.message_id = ?
           `).all(m.id);
           if (atts.length) attachmentsByMsg[m.id] = atts;

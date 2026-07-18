@@ -899,12 +899,22 @@ export function openDb(path) {
   // is incomplete, and the matrices must render "unknown" instead of red.
   // Derived from conversations.state; no schema change.
   // `reseller_channels` (also read-time derived, no schema change) lists the
-  // framework/reseller channels (src/resellers.js) the kommun has >=1 stored
-  // contract with. Non-empty means the kommun procures via a channel, so it
-  // can HAVE a product without a direct vendor contract — the coverage
-  // matrices must soften its confident red to unknown.
+  // framework/reseller channels (src/resellers.js) the kommun buys via. The
+  // signal pool is widened beyond signed contracts: it unions the vendor names
+  // on the kommun's `is_contract=1` contracts with `mentioned_vendors` parsed
+  // from its inbound messages' `analysis_json` — a kommun that tells us in
+  // prose "vi köper via Läromedia" genuinely procures via that channel even
+  // when the signed contract sits with the channel, not the product vendor
+  // (the Västerås/Läromedia case). Non-empty means the kommun procures via a
+  // channel, so it can HAVE a product without a direct vendor contract — the
+  // coverage matrices must soften its confident red to unknown.
   function listKommunerWithContracts() {
     const vendorNamesByKommun = new Map();
+    const addName = (kod, name) => {
+      if (!name) return;
+      if (!vendorNamesByKommun.has(kod)) vendorNamesByKommun.set(kod, []);
+      vendorNamesByKommun.get(kod).push(name);
+    };
     for (const r of db.prepare(`
       SELECT DISTINCT conv.kommun_kod AS kommun_kod, v.name AS vendor_name
       FROM contracts c
@@ -914,8 +924,20 @@ export function openDb(path) {
       JOIN vendors v ON v.id = c.vendor_id
       WHERE c.is_contract = 1
     `).all()) {
-      if (!vendorNamesByKommun.has(r.kommun_kod)) vendorNamesByKommun.set(r.kommun_kod, []);
-      vendorNamesByKommun.get(r.kommun_kod).push(r.vendor_name);
+      addName(r.kommun_kod, r.vendor_name);
+    }
+    // Widen with mentioned_vendors from inbound LLM analysis (parsed in JS).
+    for (const r of db.prepare(`
+      SELECT conv.kommun_kod AS kommun_kod, m.analysis_json AS analysis_json
+      FROM messages m
+      JOIN conversations conv ON conv.id = m.conversation_id
+      WHERE m.direction = 'inbound' AND m.analysis_json IS NOT NULL
+    `).all()) {
+      let parsed;
+      try { parsed = JSON.parse(r.analysis_json); } catch { continue; }
+      for (const name of parsed?.extracted?.mentioned_vendors ?? []) {
+        addName(r.kommun_kod, name);
+      }
     }
     return db.prepare(`
       SELECT DISTINCT conv.kommun_kod, conv.kommun_namn,
