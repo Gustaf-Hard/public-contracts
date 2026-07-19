@@ -194,7 +194,7 @@ describe('dashboard / kommun detail', () => {
     expect(res.text).toContain('Hittade inte');
   });
 
-  it('reply form shows an editable Till: field prefilled with the thread counterparty', async () => {
+  it('reply form on the focused thread page shows an editable Till: field prefilled with the thread counterparty', async () => {
     const convId = db.createConversation({
       kommun_kod: '2418', kommun_namn: 'Malå', role: 'central',
       contact_email: 'registrator@mala.se', scheduled_send_at: '2026-05-01T00:00:00Z',
@@ -210,7 +210,12 @@ describe('dashboard / kommun detail', () => {
     db.recordEscalation({ conversation_id: convId, message_id: mid, reason: 'r', draft_template: 'T_PRECISION', draft_subject: 'Re: SV', draft_body: 'svar' });
 
     const app = createDashboardApp({ db, municipalitiesLoader: () => [{ kommun_kod: '2418', kommun_namn: 'Malå', lan: 'X', folkmangd: 1, contacts: [] }] });
-    const res = await get(app, '/kommun/2418');
+    // The reply form now lives on the focused thread page. The kommun-page row
+    // is marked "behöver åtgärd" so the operator can find it.
+    const kommunPage = await get(app, '/kommun/2418');
+    expect(kommunPage.text).toContain('behöver åtgärd');
+    expect(kommunPage.text).toContain(`/kommun/2418/trad/${t.id}`);
+    const res = await get(app, `/kommun/2418/trad/${t.id}`);
     expect(res.text).toMatch(/name="to"[^>]*value="handlaggare@mala\.se"/);
   });
 });
@@ -726,8 +731,8 @@ describe('health modal', () => {
   });
 });
 
-describe('thread-grouped case view', () => {
-  it('groups the case view by thread with a status chip and a toggle form', async () => {
+describe('flat thread list on the kommun page (2026-07-19 open-thread)', () => {
+  it('lists all threads as anchors to the focused thread page with a ★ for primary and a muted class', async () => {
     const convId = db.createConversation({ kommun_kod: '2418', kommun_namn: 'Arboga', role: 'central', contact_email: 'registrator@arboga.se', scheduled_send_at: '2026-05-01T00:00:00Z' });
     db.updateConversationState(convId, 'DELIVERING', { gmail_thread_id: 'thr-orig' });
     const tA = db.upsertThread({ conversation_id: convId, gmail_thread_id: 'thr-anneli', counterparty_email: 'Anneli.Waern@arboga.se', counterparty_name: 'Anneli Waern' });
@@ -741,12 +746,18 @@ describe('thread-grouped case view', () => {
     const res = await get(app, '/kommun/2418');
     expect(res.text).toContain('Anneli Waern');
     expect(res.text).toContain('Arboga kommun');
-    expect(res.text).toMatch(/action="\/threads\/\d+\/status"/); // toggle present
-    expect(res.text).toMatch(/primary/); // status chip label
-    expect(res.text).toMatch(/muted/);
+    // Flat list: rows are anchors to the focused page, NOT accordion toggles.
+    expect(res.text).toContain(`href="/kommun/2418/trad/${tA.id}"`);
+    expect(res.text).toContain(`href="/kommun/2418/trad/${tR.id}"`);
+    expect(res.text).not.toContain('data-thread-toggle');
+    expect(res.text).toContain('thread-star');       // primary thread gets a ★
+    expect(res.text).toContain('thread-muted');       // muted thread dimmed
+    // Status toggle lives on the focused thread page now, not the list.
+    const focused = await get(app, `/kommun/2418/trad/${tA.id}`);
+    expect(focused.text).toMatch(/action="\/threads\/\d+\/status"/);
   });
 
-  it('attaches an escalation to its thread by recipient (no message_id) and flags it light red', async () => {
+  it('marks a thread with an escalation "behöver åtgärd" on the list; the reply form is on its focused page', async () => {
     const convId = db.createConversation({ kommun_kod: '2418', kommun_namn: 'Arjeplog', role: 'central', contact_email: 'kommun@arjeplog.se', scheduled_send_at: '2026-05-01T00:00:00Z' });
     db.updateConversationState(convId, 'DELIVERING', { gmail_thread_id: 'thr-p' });
     const t = db.upsertThread({ conversation_id: convId, gmail_thread_id: 'thr-p', counterparty_email: 'Stoltz Pernilla <Pernilla.Stoltz@arjeplog.se>', counterparty_name: 'Stoltz Pernilla' });
@@ -757,14 +768,18 @@ describe('thread-grouped case view', () => {
 
     const app = createDashboardApp({ db, municipalitiesLoader: () => [{ kommun_kod: '2418', kommun_namn: 'Arjeplog', lan: 'X', folkmangd: 1, contacts: [] }] });
     const res = await get(app, '/kommun/2418');
-    // The escalation attaches to Pernilla's thread, which is flagged needs-action.
-    expect(res.text).toMatch(/thread-group[^"]*thread-needs-action/);
-    // The reply form renders inside a thread body, NOT in a separate bottom block.
+    // The escalation attaches to Pernilla's thread → its row is flagged needs-action.
+    expect(res.text).toMatch(/thread-list-item[^"]*thread-needs-action/);
+    expect(res.text).toContain('behöver åtgärd');
+    // No legacy per-case escalation block on the kommun page any more.
     expect(res.text).not.toContain('Öppna eskaleringar');
-    expect(res.text).toContain('tack-mottaget');
+    // The reply form + draft live on the focused thread page (safety: reachable).
+    const focused = await get(app, `/kommun/2418/trad/${t.id}`);
+    expect(focused.text).toContain('tack-mottaget');
+    expect(focused.text).toMatch(/action="\/escalations\/\d+"/);
   });
 
-  it('renders threads as collapsed rows (accordion), newest first, body hidden until expanded', async () => {
+  it('renders threads as flat anchor rows (no accordion), newest first, with the latest snippet', async () => {
     const convId = db.createConversation({ kommun_kod: '2418', kommun_namn: 'Arboga', role: 'central', contact_email: 'registrator@arboga.se', scheduled_send_at: '2026-05-01T00:00:00Z' });
     db.updateConversationState(convId, 'DELIVERING', { gmail_thread_id: 'thr-old' });
     // Older thread (earlier last_inbound_at)
@@ -776,12 +791,12 @@ describe('thread-grouped case view', () => {
 
     const app = createDashboardApp({ db, municipalitiesLoader: () => [{ kommun_kod: '2418', kommun_namn: 'Arboga', lan: 'X', folkmangd: 1, contacts: [] }] });
     const res = await get(app, '/kommun/2418');
-    // Accordion structure: each thread has a clickable header + a hidden body.
-    expect(res.text).toMatch(/data-thread-toggle/);
-    expect(res.text).toMatch(/data-thread-body/);
+    // Flat anchor rows — no accordion machinery on the kommun page.
+    expect(res.text).toContain('thread-list-link');
+    expect(res.text).not.toMatch(/data-thread-toggle/);
     // Newest thread renders before the older one.
     expect(res.text.indexOf('New Sender')).toBeLessThan(res.text.indexOf('Old Sender'));
-    // Collapsed preview shows the latest message snippet in each row.
+    // The row preview shows the latest message snippet.
     expect(res.text).toContain('nytt-svar');
   });
 
@@ -813,9 +828,61 @@ describe('thread-grouped case view', () => {
     db.setThreadStatus(t.id, 'muted', 'manual'); // operator mutes AFTER the escalation exists
 
     const app = createDashboardApp({ db, municipalitiesLoader: () => [{ kommun_kod, kommun_namn: 'Malå', lan: 'X', folkmangd: 1, contacts: [] }] });
-    const res = await get(app, `/kommun/${kommun_kod}`);
+    // The kommun-page row for the muted thread is still flagged needs-action so
+    // the pending escalation is easy to find.
+    const kommunPage = await get(app, `/kommun/${kommun_kod}`);
+    expect(kommunPage.text).toMatch(/thread-list-item[^"]*thread-needs-action/);
+    // The reply form + draft render on the focused thread page (a muted thread
+    // must never hide an already-open escalation — send-safety).
+    const res = await get(app, `/kommun/${kommun_kod}/trad/${t.id}`);
     expect(res.text).toMatch(/action="\/escalations\/\d+"/); // reply form still rendered
     expect(res.text).toContain('utkast-svar-som-vantar'); // its draft body is visible
+  });
+});
+
+describe('focused thread route GET /kommun/:kod/trad/:threadId', () => {
+  it('200 with the thread messages for a valid id', async () => {
+    const convId = db.createConversation({ kommun_kod: '2418', kommun_namn: 'Malå', role: 'central', contact_email: 'k@mala.se', scheduled_send_at: '2026-05-01T00:00:00Z' });
+    db.updateConversationState(convId, 'DELIVERING', { gmail_thread_id: 'thr-1' });
+    const t = db.upsertThread({ conversation_id: convId, gmail_thread_id: 'thr-1', counterparty_email: 'anna@mala.se', counterparty_name: 'Anna' });
+    db.recordMessage({ conversation_id: convId, gmail_message_id: 'a-1', direction: 'inbound', from_email: 'anna@mala.se', to_email: 'me@x.se', subject: 'SV: Begäran', body_text: 'fokuserad-tradtext', classification: 'delivery', classification_confidence: 0.9, received_at: '2026-06-01T00:00:00Z', attachment_count: 0, gmail_thread_id: 'thr-1', thread_id: t.id });
+    const app = createDashboardApp({ db, municipalitiesLoader: () => [{ kommun_kod: '2418', kommun_namn: 'Malå', lan: 'X', folkmangd: 1, contacts: [] }] });
+    const res = await get(app, `/kommun/2418/trad/${t.id}`);
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('fokuserad-tradtext');
+    expect(res.text).toContain('href="/kommun/2418"'); // back link
+  });
+
+  it('404-lands on the kommun page for an unknown thread id', async () => {
+    const app = createDashboardApp({ db, municipalitiesLoader: () => [{ kommun_kod: '2418', kommun_namn: 'Malå', lan: 'X', folkmangd: 1, contacts: [] }] });
+    const res = await get(app, '/kommun/2418/trad/99999');
+    expect(res.status).toBe(404);
+    expect(res.text).toContain('Hittade inte');
+  });
+
+  it('404 when the thread belongs to a different kommun', async () => {
+    const convId = db.createConversation({ kommun_kod: '2418', kommun_namn: 'Malå', role: 'central', contact_email: 'k@mala.se', scheduled_send_at: '2026-05-01T00:00:00Z' });
+    const t = db.upsertThread({ conversation_id: convId, gmail_thread_id: 'thr-x', counterparty_email: 'a@mala.se' });
+    const app = createDashboardApp({ db, municipalitiesLoader: () => [
+      { kommun_kod: '2418', kommun_namn: 'Malå', lan: 'X', folkmangd: 1, contacts: [] },
+      { kommun_kod: '0560', kommun_namn: 'Boxholm', lan: 'Y', folkmangd: 1, contacts: [] },
+    ] });
+    const res = await get(app, `/kommun/0560/trad/${t.id}`); // wrong kommun for this thread
+    expect(res.status).toBe(404);
+  });
+});
+
+describe('ungrouped escalation stays reachable on the kommun page', () => {
+  it('surfaces a thread-less escalation in a "Behöver åtgärd" section with its reply form', async () => {
+    const convId = db.createConversation({ kommun_kod: '2418', kommun_namn: 'Malå', role: 'central', contact_email: 'k@mala.se', scheduled_send_at: '2026-05-01T00:00:00Z' });
+    db.updateConversationState(convId, 'SENT', {});
+    // No threads on this conversation, no message_id → cannot be grouped.
+    db.recordEscalation({ conversation_id: convId, reason: 'classifier=unknown', draft_template: 'free_form', draft_subject: 'Re: Begäran', draft_body: 'ogrupperat-utkast' });
+    const app = createDashboardApp({ db, municipalitiesLoader: () => [{ kommun_kod: '2418', kommun_namn: 'Malå', lan: 'X', folkmangd: 1, contacts: [] }] });
+    const res = await get(app, '/kommun/2418');
+    expect(res.text).toContain('Behöver åtgärd');
+    expect(res.text).toContain('ogrupperat-utkast'); // reply form draft is present
+    expect(res.text).toMatch(/action="\/escalations\/\d+"/);
   });
 });
 

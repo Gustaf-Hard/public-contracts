@@ -645,7 +645,26 @@ const baseCss = `
   .thread-att { display: inline-flex; align-items: center; gap: 4px; max-width: 200px; padding: 2px 8px; border: 1px solid var(--border); border-radius: 4px; font-size: 11px; color: var(--fg-muted); text-decoration: none; background: var(--bg-elev-2); }
   .thread-att:hover { border-color: var(--accent); color: var(--accent); }
   .thread-att-kind { flex: none; font-size: 9px; font-weight: 700; letter-spacing: .03em; }
+  /* Gmail-style red PDF pill on attachment chips. */
+  .thread-att-kind.att-pdf { background: #d93025; color: #fff; padding: 1px 5px; border-radius: 3px; }
   .thread-att-fn { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* Flat Gmail-style thread list on the kommun page (2026-07-19 open-thread). */
+  .thread-list { border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden;
+    background: var(--bg-elev); box-shadow: var(--shadow); margin: 0 0 var(--sp-5); }
+  .thread-list-item { border-bottom: 1px solid var(--border); }
+  .thread-list-item:last-child { border-bottom: none; }
+  .thread-list-item.thread-muted { opacity: 0.62; }
+  .thread-list-item.thread-needs-action { background: rgba(220, 38, 38, 0.06); opacity: 1; }
+  .thread-list-link { display: flex; align-items: baseline; gap: 12px; padding: 10px 14px; color: var(--fg); }
+  .thread-list-link:hover { background: var(--bg-elev-2); text-decoration: none; }
+  .thread-list-item.thread-needs-action .thread-list-link:hover { background: rgba(220, 38, 38, 0.10); }
+  .thread-list-item.thread-needs-action .thread-row-who,
+  .thread-list-item.thread-needs-action .thread-row-preview { font-weight: 700; }
+  .thread-arende-tag { flex: 0 0 auto; font-size: 11px; white-space: nowrap; }
+  .thread-needs-marker { color: var(--bad); font-weight: 700; }
+  /* Focused thread page: comfortable full-width message spacing. */
+  .thread-focused { max-width: 900px; }
+  .thread-focused .thread-msgs .msg { margin-bottom: 14px; }
   .thread-att-more { font-size: 11px; }
   .thread-body { padding: 8px 12px 12px; }
   /* Per-message quoted-history expander (··· → muted quoted block). */
@@ -1309,7 +1328,7 @@ export function renderKommunDetail({ kommun, conversations, messagesByConv, atta
     : activeCases.map((c) => {
         const step = nextStepFor(c, followUpByConv[c.id], today);
         return `<div class="next-step">
-          <a class="case-link" href="#case-${c.id}">Ärende #${c.id} · ${escapeHtml(c.role)}</a>
+          <a class="case-link" href="/arenden/${c.id}">Ärende #${c.id} · ${escapeHtml(c.role)}</a>
           <span class="step-text ${step.urgent ? 'danger' : ''}">${escapeHtml(step.text)}</span>
         </div>`;
       }).join('');
@@ -1424,7 +1443,7 @@ export function renderKommunDetail({ kommun, conversations, messagesByConv, atta
             return `
             <tr class="${badge && badge.muted ? 'doc-row-muted' : ''}">
               <td>${escapeHtml(c.received_at?.slice(0, 10) ?? '')}</td>
-              <td><a href="#case-${c.conv_id}">#${c.conv_id}</a></td>
+              <td><a href="/arenden/${c.conv_id}">#${c.conv_id}</a></td>
               <td>${escapeHtml(c.role)}</td>
               <td>${badgeHtml}</td>
               <td><a href="/attachments/${c.id}" target="_blank" rel="noopener">📎 ${escapeHtml(c.filename)}</a>${isPdfAttachment(c) ? '' : ' <span class="muted">— sparad, ej avtalsanalyserad (ej PDF)</span>'}</td>
@@ -1435,71 +1454,68 @@ export function renderKommunDetail({ kommun, conversations, messagesByConv, atta
         </table>
       </div>`;
 
-  const convCards = conversations.length === 0
-    ? (Object.keys(initialDrafts).length === 0
+  // ----- Flat Gmail-style thread list across ALL the kommun's threads -----
+  // One row per thread (any Ärende), newest message first. Clicking opens the
+  // focused thread page. Orphan messages (thread_id null) and ungrouped
+  // escalations (no thread, no counterparty match) are surfaced separately
+  // below — neither may ever vanish (data-honesty / send-safety).
+  const threadRows = [];
+  const orphanMsgs = [];
+  const ungroupedEscs = [];
+  for (const conv of conversations) {
+    const msgs = messagesByConv[conv.id] ?? [];
+    const convThreads = threadsByConv[conv.id] ?? [];
+    const escs = escalationsByConv[conv.id] ?? [];
+    // Group escalations under their thread (by triggering message, else by
+    // recipient↔counterparty match — see groupEscalationsByThread).
+    const escByThread = groupEscalationsByThread(escs, convThreads);
+    const msgsByThread = new Map();
+    for (const m of msgs) {
+      if (m.thread_id == null) { orphanMsgs.push(m); continue; }
+      if (!msgsByThread.has(m.thread_id)) msgsByThread.set(m.thread_id, []);
+      msgsByThread.get(m.thread_id).push(m);
+    }
+    for (const t of convThreads) {
+      const tmsgs = msgsByThread.get(t.id) ?? [];
+      const atts = tmsgs.flatMap((m) => attachmentsByMsg[m.id] ?? []);
+      threadRows.push({ thread: t, conv, msgs: tmsgs, atts, needsAction: (escByThread.get(t.id) ?? []).length > 0 });
+    }
+    for (const e of (escByThread.get(null) ?? [])) ungroupedEscs.push({ esc: e, conv });
+  }
+
+  const threadList = threadRows.length
+    ? renderThreadList(threadRows, { kommunKod: kommun.kommun_kod })
+    : (conversations.length === 0 && Object.keys(initialDrafts).length === 0
         ? '<p class="muted">Inga ärenden för denna kommun ännu.</p>'
-        : '')
-    : conversations.map((conv) => {
-        const msgs = messagesByConv[conv.id] ?? [];
-        const escs = escalationsByConv[conv.id] ?? [];
-        const fu = followUpByConv[conv.id] ?? { date: null, source: null };
+        : '');
 
-        const duration = caseDuration(conv, msgs);
-        const followUpBadge = fu.date ? fmtFollowUpBadge(fu.date, fu.source) : null;
-        const followUpLine = fu.date
-          ? `<span>⏳ Nästa kontakt: <strong>${escapeHtml(fu.date)}</strong> · ${followUpBadge}</span>`
-          : '';
+  // Ungrouped escalations must stay as actionable as before: render each with
+  // its reply form (returnTo = this kommun page) so a pending send never hides.
+  const needsActionSection = ungroupedEscs.length === 0 ? '' : `
+    <div class="card card-alert">
+      <h3 style="margin:0 0 4px">⚠️ Behöver åtgärd (${ungroupedEscs.length})</h3>
+      ${ungroupedEscs.map(({ esc, conv }) => `
+        <div class="card" style="background:var(--bg-elev-2);margin-top:8px">
+          <div class="muted" style="font-size:12px;margin-bottom:4px">Ärende #${conv.id} · ${escapeHtml(conv.role)} · <strong>${escapeHtml(esc.draft_template ?? 'free_form')}</strong> · ${escapeHtml(esc.reason ?? '')}</div>
+          ${renderEscalationForm(esc, gmailReady, `/kommun/${escapeHtml(kommun.kommun_kod)}`)}
+        </div>`).join('')}
+    </div>`;
 
-        // Gmail-style thread grouped by thread_id — identical rendering to the
-        // Ärenden tab (renderCaseDetailPane), so a conversation looks the same
-        // wherever it's viewed.
-        const convThreads = threadsByConv[conv.id] ?? [];
-        // Group escalations under their thread (by triggering message, else by
-        // recipient↔counterparty match — see groupEscalationsByThread).
-        const escByThread = groupEscalationsByThread(escs, convThreads);
-        const thread = convThreads.length
-          ? renderThreadGroups(convThreads, msgs, attachmentsByMsg, signatures, escByThread, gmailReady)
-          : (msgs.length
-              ? msgs.map((m, i) => threadMessage(m, attachmentsByMsg[m.id], signatures[m.id], i === msgs.length - 1)).join('')
-              : '<p class="muted">Inga meddelanden ännu.</p>');
-
-        // Only show separate escalation cards for escalations not tied to a thread
-        // (ungrouped). Thread-tied ones are rendered inside renderThreadGroups.
-        const ungroupedEscs = convThreads.length
-          ? (escByThread.get(null) ?? [])
-          : escs;
-        const escHtml = ungroupedEscs.length === 0 ? '' : `
-          <h4 style="margin:18px 0 6px;font-size:13px">⚠️ Öppna eskaleringar (${ungroupedEscs.length})</h4>
-          ${ungroupedEscs.map((e) => `
-            <div class="card" style="background:var(--bg-elev-2);margin-top:6px">
-              <strong>${escapeHtml(e.draft_template ?? 'free_form')}</strong> · <span class="muted">${escapeHtml(e.reason)}</span>
-              ${renderEscalationForm(e, gmailReady)}
-            </div>`).join('')}`;
-
-        return `
-          <div class="card" id="case-${conv.id}">
-            <div class="case-header">
-              <h3>Ärende #${conv.id} · roll: ${escapeHtml(conv.role)}</h3>
-              ${caseStatusBadge(conv.state)}
-            </div>
-            <div class="case-meta">
-              <span>📧 <code>${escapeHtml(conv.contact_email)}</code></span>
-              ${conv.arendenummer ? `<span>📌 Diarienr hos kommun: <code>${escapeHtml(conv.arendenummer)}</code></span>` : ''}
-              ${duration ? `<span>⌛ ${escapeHtml(duration)}</span>` : ''}
-              ${followUpLine}
-            </div>
-            <h4 style="margin:14px 0 8px;font-size:13px">Konversation</h4>
-            <div class="thread-msgs">${thread}</div>
-            ${escHtml}
-            ${renderCaseActions(conv, gmailReady)}
-          </div>`;
-      }).join('');
+  // Orphan messages (thread_id null, pre-backfill) never vanish — always shown
+  // inline. They have no thread id to link to, so they render in place.
+  const orphanSection = orphanMsgs.length === 0 ? '' : `
+    <div class="card">
+      <h3>Ogrupperat (${orphanMsgs.length})</h3>
+      <div class="thread-msgs">${orphanMsgs.map((m, i) => threadMessage(m, attachmentsByMsg[m.id], signatures[m.id], i === orphanMsgs.length - 1)).join('')}</div>
+    </div>`;
 
   const mainColumn = `
     <div style="min-width:0">
       <p><a href="/">← Översikt</a></p>
-      <h2 style="margin:6px 0 14px">Ärenden (${conversations.length})</h2>
-      ${convCards}
+      ${needsActionSection}
+      <h2 style="margin:6px 0 14px">Trådar (${threadRows.length})</h2>
+      ${threadList}
+      ${orphanSection}
       ${initialDraftCards}
       ${contractsSection}
     </div>`;
@@ -1634,7 +1650,7 @@ function threadStatusControls(t) {
 // thread_id when known, else by matching its resolved recipient against a
 // thread's counterparty email (handles legacy escalations with no message_id).
 // Escalations matching no thread land under the null key (rendered separately).
-function groupEscalationsByThread(escalations, threads) {
+export function groupEscalationsByThread(escalations, threads) {
   const emailOf = (s) => parseAddr(s || '').email.toLowerCase();
   const byCounterparty = new Map();
   for (const t of threads) {
@@ -1703,9 +1719,13 @@ function renderThreadAtts(atts, cap = 4) {
   if (!atts || atts.length === 0) return '';
   const shown = atts.slice(0, cap);
   const extra = atts.length - shown.length;
-  const chips = shown.map((a) =>
-    `<a class="thread-att" href="/attachments/${a.id}" target="_blank" rel="noopener" title="${escapeHtml(`Öppna ${a.filename} i ny flik`)}"><span class="thread-att-kind">${isPdfAttachment(a) ? 'PDF' : '📎'}</span> <span class="thread-att-fn">${escapeHtml(a.filename)}</span></a>`
-  ).join('');
+  const chips = shown.map((a) => {
+    // Gmail-style: PDFs get a red "PDF" pill; everything else keeps the 📎 glyph.
+    const kind = isPdfAttachment(a)
+      ? '<span class="thread-att-kind att-pdf">PDF</span>'
+      : '<span class="thread-att-kind">📎</span>';
+    return `<a class="thread-att" href="/attachments/${a.id}" target="_blank" rel="noopener" title="${escapeHtml(`Öppna ${a.filename} i ny flik`)}">${kind} <span class="thread-att-fn">${escapeHtml(a.filename)}</span></a>`;
+  }).join('');
   const more = extra > 0 ? `<span class="thread-att-more muted">+${extra}</span>` : '';
   return `<div class="thread-atts">${chips}${more}</div>`;
 }
@@ -1761,6 +1781,85 @@ export function renderThreadGroups(threads, messages, attachmentsByMsg, signatur
     groups.push(`<section class="thread-group"><div class="thread-head"><span class="muted">Ogrupperat</span></div>${body}</section>`);
   }
   return groups.join('');
+}
+
+// Flat Gmail-style thread list for the kommun page (2026-07-19 open-thread
+// design). One row per thread across ALL the kommun's conversations, newest
+// message first. Each row is an ANCHOR to the focused thread page
+// (/kommun/:kod/trad/:threadId) — NOT an in-place accordion. Pure over `rows`:
+// each row is `{ thread, conv, msgs, atts, needsAction }`.
+export function renderThreadList(rows, { kommunKod } = {}) {
+  if (!rows || rows.length === 0) return '';
+  const sorted = [...rows].sort((a, b) => latestReceivedMs(b.msgs ?? []) - latestReceivedMs(a.msgs ?? []));
+  const items = sorted.map((row) => {
+    const { thread: t, conv, msgs = [], atts = [], needsAction = false } = row;
+    const parsed = parseAddr(t.counterparty_name || t.counterparty_email || '');
+    const displayName = parsed.name || parsed.email || t.counterparty_email || 'Okänd';
+    const pv = threadPreview(msgs, displayName);
+    const star = t.status === 'primary' ? '<span class="thread-star" title="primär tråd">★</span> ' : '';
+    const middle = [pv.subject, pv.summary].filter(Boolean).join(' — ');
+    // A thread with an open escalation needs the operator — red weight + marker
+    // so it stands out in the list; the reply form itself lives on the focused
+    // thread page.
+    const marker = needsAction ? '<span class="thread-needs-marker">behöver åtgärd</span> ' : '';
+    const itemClass = `thread-list-item thread-${escapeHtml(t.status)}${needsAction ? ' thread-needs-action' : ''}`;
+    const href = `/kommun/${escapeHtml(kommunKod)}/trad/${t.id}`;
+    return `<div class="${itemClass}">
+      <a class="thread-list-link" href="${href}">
+        <span class="thread-row-who">${star}${escapeHtml(pv.participants)}</span>
+        <span class="thread-row-preview muted">${marker}${escapeHtml(middle)}</span>
+        <span class="thread-arende-tag muted">#${conv.id} · ${escapeHtml(conv.role)}</span>
+        <span class="thread-row-date muted">${escapeHtml(pv.date)}</span>
+      </a>
+      ${renderThreadAtts(atts)}
+    </div>`;
+  }).join('');
+  return `<div class="thread-list">${items}</div>`;
+}
+
+// Focused thread page (2026-07-19 open-thread design). A full-width, Gmail-like
+// conversation view for a single thread: back link, subject + status controls,
+// the thread's messages (via threadMessage, latest expanded), and any open
+// escalation reply forms (via renderEscalationForm, returnTo = this page). Pure
+// over params; the route loads the data and verifies the thread belongs to the
+// kommun (404 otherwise).
+export function renderThread({ kommun, conv, thread, messages = [], attachmentsByMsg = {}, signatures = {}, escalations = [], gmailReady = false, heartbeat = null, partial = false, escalationCount = 0 }) {
+  if (!kommun || !conv || !thread) {
+    return layout({ title: 'Saknad tråd', body: '<p>Hittade inte tråden.</p>', currentPath: '/', heartbeat, partial, escalationCount });
+  }
+  const returnTo = `/kommun/${kommun.kommun_kod}/trad/${thread.id}`;
+  const parsed = parseAddr(thread.counterparty_name || thread.counterparty_email || '');
+  const counterparty = parsed.name || parsed.email || thread.counterparty_email || 'Okänd';
+  const subject = stripSubjectPrefix(messages.find((m) => m.subject)?.subject ?? '') || `Tråd — ${kommun.kommun_namn}`;
+  const msgHtml = messages.length
+    ? messages.map((m, i) => threadMessage(m, attachmentsByMsg[m.id], signatures[m.id], i === messages.length - 1)).join('')
+    : '<p class="muted">Inga meddelanden i denna tråd ännu.</p>';
+  const replyBoxes = escalations.map((e) => `
+    <div class="reply-box">
+      <div class="reply-head">
+        <span class="avatar avatar-outbound">↩</span>
+        <span class="muted">Föreslaget svar till <strong>${escapeHtml(counterparty)}</strong></span>
+        ${intentBadge(e.classifier_class ?? 'unknown')}
+      </div>
+      ${renderEscalationForm(e, gmailReady, returnTo)}
+    </div>`).join('');
+  const body = `
+    <div class="thread thread-focused">
+      <div class="thread-head">
+        <p style="margin:0 0 8px"><a href="/kommun/${escapeHtml(kommun.kommun_kod)}">← ${escapeHtml(kommun.kommun_namn)}</a></p>
+        <div class="thread-title-row">
+          <h2 class="thread-subject">${escapeHtml(subject)}</h2>
+          ${threadStatusControls(thread)}
+        </div>
+        <div class="thread-meta muted">
+          <strong>Ärende #${conv.id} · ${escapeHtml(conv.role)}</strong>
+          · ${escapeHtml(counterparty)}
+        </div>
+      </div>
+      <div class="thread-msgs">${msgHtml}</div>
+      ${replyBoxes}
+    </div>`;
+  return layout({ title: `${kommun.kommun_namn} — tråd`, body, currentPath: '/', heartbeat, partial, escalationCount });
 }
 
 function renderCaseDetailPane(selected, gmailReady) {
