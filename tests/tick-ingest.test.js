@@ -432,6 +432,98 @@ describe('runTick — bounce short-circuit (§2)', () => {
   });
 });
 
+describe('runTick — autosvar / OOO ingest (2026-07-19 §2)', () => {
+  it('offline path: an autosvar is stored auto_reply, NO escalation, follow_up = return date + 3, state unchanged', async () => {
+    // Force the offline regex classifier (no LLM).
+    const spy = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue(null);
+    const id = seedConv({ email: 'kansli@ale.se', thread: 'thr-a' });
+    const slackOps = fakeSlackOps();
+    const gmail = fakeGmail({
+      listResult: [{ id: 'ooo-1' }],
+      getResult: {
+        'ooo-1': mkMsg('ooo-1', 'thr-a', 'K <kansli@ale.se>',
+          'Autosvar: Jag har semester och är åter 20 juli. Vid akuta ärenden kontakta min kollega.',
+          { subject: 'Autosvar: Begäran', internalDate: String(Date.parse('2026-06-24T08:00:00Z')) }),
+      },
+    });
+    await runTick(deps({ gmail, slackOps, now: new Date('2026-06-24T12:00:00Z') }));
+    spy.mockRestore();
+
+    const msg = db.raw.prepare("SELECT * FROM messages WHERE gmail_message_id='ooo-1'").get();
+    expect(msg.classification).toBe('auto_reply');           // stored, no data loss
+    const conv = db.getConversation(id);
+    expect(conv.state).toBe('SENT');                          // state unchanged (still waiting)
+    expect(conv.follow_up_at).toBe('2026-07-23');             // return date + 3 grace
+    // NO escalation and NO Slack post — replying to a machine is pointless.
+    expect(db.raw.prepare('SELECT COUNT(*) n FROM escalations WHERE conversation_id=?').get(id).n).toBe(0);
+    expect(slackOps.posts).toHaveLength(0);
+  });
+
+  it('offline path: a dateless autosvar defaults follow_up to received + 14, still no escalation', async () => {
+    const spy = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue(null);
+    const id = seedConv({ email: 'kansli@ale.se', thread: 'thr-a' });
+    const slackOps = fakeSlackOps();
+    const gmail = fakeGmail({
+      listResult: [{ id: 'ooo-2' }],
+      getResult: {
+        'ooo-2': mkMsg('ooo-2', 'thr-a', 'K <kansli@ale.se>',
+          'Automatiskt svar: Jag är för närvarande frånvarande.',
+          { subject: 'Automatiskt svar', internalDate: String(Date.parse('2026-06-24T08:00:00Z')) }),
+      },
+    });
+    await runTick(deps({ gmail, slackOps, now: new Date('2026-06-24T12:00:00Z') }));
+    spy.mockRestore();
+
+    const msg = db.raw.prepare("SELECT * FROM messages WHERE gmail_message_id='ooo-2'").get();
+    expect(msg.classification).toBe('auto_reply');
+    expect(db.getConversation(id).follow_up_at).toBe('2026-07-08'); // 2026-06-24 + 14
+    expect(db.raw.prepare('SELECT COUNT(*) n FROM escalations WHERE conversation_id=?').get(id).n).toBe(0);
+  });
+
+  it('LLM path: an auto_reply analysis stores auto_reply with the LLM follow_up and never escalates', async () => {
+    const spy = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue({
+      intent: 'auto_reply', confidence: 0.95, summary: 'Autosvar åter 20 juli.',
+      extracted: { arendenummer: null, promised_response_days: null, promised_response_date: '2026-07-20', handoff_to_email: null, handoff_to_forvaltning: null, questions: null, mentioned_vendors: null, reseller_relations: null },
+      suggested_action: 'wait', is_final_delivery: false, draft_reply: '', follow_up_at: '2026-07-23',
+    });
+    const id = seedConv({ email: 'kansli@ale.se', thread: 'thr-a' });
+    const slackOps = fakeSlackOps();
+    const gmail = fakeGmail({
+      listResult: [{ id: 'ooo-3' }],
+      getResult: { 'ooo-3': mkMsg('ooo-3', 'thr-a', 'K <kansli@ale.se>', 'Autosvar: semester, åter 20 juli.') },
+    });
+    await runTick(deps({ gmail, slackOps, now: new Date('2026-06-24T12:00:00Z') }));
+    spy.mockRestore();
+
+    const msg = db.raw.prepare("SELECT * FROM messages WHERE gmail_message_id='ooo-3'").get();
+    expect(msg.classification).toBe('auto_reply');
+    expect(db.getConversation(id).state).toBe('SENT');
+    expect(db.getConversation(id).follow_up_at).toBe('2026-07-23');
+    expect(slackOps.posts).toHaveLength(0);
+  });
+
+  it('a HUMAN delay_promise still creates the T_DELAY_ACK escalation (unchanged path)', async () => {
+    const spy = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue({
+      intent: 'delay_promise', confidence: 0.95, summary: 'Behöver 10 dagar.',
+      extracted: { arendenummer: null, promised_response_days: 10, promised_response_date: '2026-07-05', handoff_to_email: null, handoff_to_forvaltning: null, questions: null, mentioned_vendors: null, reseller_relations: null },
+      suggested_action: 'acknowledge', is_final_delivery: false, draft_reply: 'Hej, då avvaktar vi.', follow_up_at: '2026-07-08',
+    });
+    const id = seedConv({ email: 'kansli@ale.se', thread: 'thr-a' });
+    const slackOps = fakeSlackOps();
+    const gmail = fakeGmail({
+      listResult: [{ id: 'dly-1' }],
+      getResult: { 'dly-1': mkMsg('dly-1', 'thr-a', 'K <kansli@ale.se>', 'Vi behöver cirka 10 arbetsdagar för att ta fram materialet.') },
+    });
+    await runTick(deps({ gmail, slackOps, now: new Date('2026-06-24T12:00:00Z') }));
+    spy.mockRestore();
+
+    const open = db.raw.prepare("SELECT * FROM escalations WHERE conversation_id=? AND status='open'").all(id);
+    expect(open).toHaveLength(1);
+    expect(open[0].draft_template).toBe('T_DELAY_ACK');
+    expect(db.getConversation(id).follow_up_at).toBe('2026-07-08');
+  });
+});
+
 describe('fetch window derived from last_success_at (H3)', () => {
   const now = new Date('2026-08-20T12:00:00Z');
   it('floors at 30 days for recent success and with no history', () => {

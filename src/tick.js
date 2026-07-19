@@ -422,6 +422,15 @@ async function ingestMessage({ conv, item, deps }) {
     if (classification.extracted?.arendenummer) patch.arendenummer = classification.extracted.arendenummer;
     // When the kommun says "we'll get back to you by date X", honor it.
     if (analysis?.follow_up_at) patch.follow_up_at = analysis.follow_up_at;
+    // Offline path: an autoresponder (auto_reply) has no LLM follow_up_at, so
+    // derive it from the classifier's extracted return date (+3 days grace),
+    // or a 14-day default from receipt when no date was stated (design §2).
+    // Never escalates and never replies — see nextActionForClassification.
+    else if (classification.class === 'auto_reply') {
+      const ret = classification.extracted?.return_date ?? null;
+      patch.follow_up_at = (ret && addDaysIso(ret, 3))
+        || addDaysIso(receivedAt.slice(0, 10), 14);
+    }
     // A closed case has no live follow-up promise (review M10).
     if (transition.nextState === 'DONE' || transition.nextState === 'DEAD_END') {
       patch.follow_up_at = null;

@@ -234,24 +234,80 @@ describe('analyseMessage — delay_promise normalisation', () => {
   });
 });
 
-describe('buildSystemPrompt — OOO guidance', () => {
+describe('analyseMessage — auto_reply normalisation (2026-07-19 §1/§2)', () => {
+  const oooBody = 'Autosvar: Jag har semester och är åter på kontoret måndag 20 juli. Vid akuta ärenden kontakta min kollega Mirella.';
+
+  it('an auto_reply intent → action wait, no draft_reply, no handoff extraction', async () => {
+    const client = fakeClientReturning({
+      intent: 'auto_reply', confidence: 0.95,
+      summary: 'Frånvaroautosvar: åter 20 juli.',
+      extracted: { arendenummer: null, promised_response_days: null, promised_response_date: '2026-07-20', handoff_to_email: null, handoff_to_forvaltning: null, questions: null, mentioned_vendors: null, reseller_relations: null },
+      suggested_action: 'wait',
+      is_final_delivery: false,
+      draft_reply: '',
+      follow_up_at: null,
+    });
+    const r = await analyseMessage(oooBody, { ...baseCtx, today_iso: '2026-07-05' }, { env: { ANTHROPIC_API_KEY: 'k' }, client });
+    expect(r.intent).toBe('auto_reply');
+    expect(r.suggested_action).toBe('wait');
+    expect(r.draft_reply).toBe('');            // never replies to a machine
+    expect(r.extracted.handoff_to_email).toBeNull();
+    expect(r.extracted.handoff_to_forvaltning).toBeNull();
+    // follow_up_at derived from the return date + 3 grace.
+    expect(r.follow_up_at).toBe('2026-07-23');
+  });
+
+  it('coerces a Swedish prose return date to ISO and fills follow_up_at = date + 3', async () => {
+    const client = fakeClientReturning({
+      intent: 'auto_reply', confidence: 0.9, summary: 'Åter 20 juli.',
+      extracted: { arendenummer: null, promised_response_days: null, promised_response_date: '20 juli', handoff_to_email: null, handoff_to_forvaltning: null, questions: null, mentioned_vendors: null, reseller_relations: null },
+      suggested_action: 'wait', is_final_delivery: false, draft_reply: '', follow_up_at: null,
+    });
+    const r = await analyseMessage(oooBody, { ...baseCtx, today_iso: '2026-07-05' }, { env: { ANTHROPIC_API_KEY: 'k' }, client });
+    expect(r.extracted.promised_response_date).toBe('2026-07-20');
+    expect(r.follow_up_at).toBe('2026-07-23');
+  });
+
+  it('an auto_reply with NO return date defaults follow_up_at to today + 14', async () => {
+    const client = fakeClientReturning({
+      intent: 'auto_reply', confidence: 0.9, summary: 'Autosvar utan datum.',
+      extracted: { arendenummer: null, promised_response_days: null, promised_response_date: null, handoff_to_email: null, handoff_to_forvaltning: null, questions: null, mentioned_vendors: null, reseller_relations: null },
+      suggested_action: 'wait', is_final_delivery: false, draft_reply: '', follow_up_at: null,
+    });
+    const r = await analyseMessage('Autosvar: Jag är för närvarande frånvarande.', { ...baseCtx, today_iso: '2026-07-05' }, { env: { ANTHROPIC_API_KEY: 'k' }, client });
+    expect(r.follow_up_at).toBe('2026-07-19'); // today + 14
+  });
+});
+
+describe('buildSystemPrompt — autosvar/OOO guidance (2026-07-19 §1)', () => {
   const prompt = buildSystemPrompt({ from_name: 'Gustaf', from_email: 'gustaf@mediagraf.se' });
 
-  it('instructs that a vacation autoreply with a return date is delay_promise, not handoff — even with a stand-in colleague', () => {
+  it('defines auto_reply as a MACHINE autoresponder that waits silently (no reply)', () => {
+    expect(prompt).toMatch(/"auto_reply"/);
+    expect(prompt).toMatch(/MASKINELLT autosvar/);
+    expect(prompt).toMatch(/VÄNTA TYST/);
+    expect(prompt).toMatch(/INGET draft_reply/);
+  });
+
+  it('instructs that a vacation autoreply with a return date is auto_reply, not handoff — even with a stand-in colleague', () => {
     expect(prompt).toMatch(/semester/i);
     expect(prompt).toMatch(/åter/i);
     expect(prompt).toMatch(/INTE handoff/);
     expect(prompt).toMatch(/kollega/i);
   });
 
-  it('keeps the genuine delay-promise rule (promised date + 3 dagars grace)', () => {
+  it('keeps the genuine HUMAN delay-promise rule distinct (promised date + 3 dagars grace)', () => {
+    expect(prompt).toMatch(/En MÄNNISKA/);
     expect(prompt).toMatch(/utlovade datum \+ 3 dagars grace/);
     expect(prompt).toMatch(/follow_up_at = idag \+ 13 dagar/);
   });
 
-  it('contains an OOO few-shot example that extracts the return date', () => {
+  it('contains an auto_reply few-shot that extracts the return date and carries NO draft_reply', () => {
     expect(prompt).toMatch(/åter på kontoret måndag 20 juli/);
+    expect(prompt).toMatch(/"intent":"auto_reply"/);
     expect(prompt).toMatch(/"promised_response_date":"2026-07-20"/);
+    expect(prompt).toMatch(/"suggested_action":"wait"/);
+    expect(prompt).toMatch(/"draft_reply":""/);
     expect(prompt).toMatch(/"follow_up_at":"2026-07-23"/);
   });
 });
@@ -260,6 +316,10 @@ describe('analysisToLegacyClassification', () => {
   it('maps auto_ack to auto_ack and delay_promise to its own class (drives T_DELAY_ACK)', () => {
     expect(analysisToLegacyClassification({ intent: 'auto_ack', confidence: 0.9 }).class).toBe('auto_ack');
     expect(analysisToLegacyClassification({ intent: 'delay_promise', confidence: 0.9 }).class).toBe('delay_promise');
+  });
+
+  it('maps auto_reply to its own class (both paths converge on the wait-silently transition)', () => {
+    expect(analysisToLegacyClassification({ intent: 'auto_reply', confidence: 0.9 }).class).toBe('auto_reply');
   });
 
   it('maps handoff and fee_demand to unknown (escalate)', () => {

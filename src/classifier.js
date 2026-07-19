@@ -36,6 +36,68 @@ const DEAD_END_PATTERNS = [
 
 const ARENDENUMMER_RE = /Ärendenummer\s*[:\-]\s*([Kk]\d{6,})/i;
 
+// --- Autosvar / out-of-office (OOO) recognition (2026-07-19 design §1) ---
+//
+// CONSERVATIVE, high-precision markers only. The failure mode we must avoid is
+// tagging a REAL kommun reply (delivery / clarification / handoff / fee) as an
+// autoresponder — that would silently suppress a needed escalation. When in
+// doubt we do NOT match; the message falls through to the normal classifier.
+//
+// Two families of markers, both matched case-insensitively on the UNQUOTED body
+// (or subject) so a mail that merely QUOTES "semester" in its trailing history
+// can never trip the detector:
+//   1. An explicit autoresponder tag — the strongest signal a machine sent it:
+//      "Autosvar:", "Automatiskt svar", "Auto-reply", "Out of office", "OoO".
+//   2. An absence phrase ("frånvar…") COMBINED with a return/vacation cue
+//      ("är åter", "åter den", "tillbaka", "semester"). Neither half alone is
+//      enough — "tillbaka" or "semester" on their own appear in ordinary prose.
+const OOO_TAG_RE = /\bAutosvar\b|\bAutomatiskt svar\b|\bAuto-?reply\b|\bOut of office\b|\bOoO\b/i;
+const OOO_ABSENCE_RE = /\bfrånvar/i;
+const OOO_RETURN_RE = /\bär åter\b|\båter den\b|\btillbaka\b|\bsemester\b/i;
+
+function isOooText(subject, visibleBody) {
+  const hay = `${subject ?? ''}\n${visibleBody ?? ''}`;
+  if (OOO_TAG_RE.test(hay)) return true;
+  if (OOO_ABSENCE_RE.test(hay) && OOO_RETURN_RE.test(hay)) return true;
+  return false;
+}
+
+// Extract the stated return date from an OOO body (UNQUOTED). ISO first, then
+// Swedish prose ("är åter 20 juli", "tillbaka 3 augusti 2026"). Yearless dates
+// resolve to the next occurrence relative to todayIso. Returns YYYY-MM-DD or
+// null — precision over recall: an unparseable date just means no date.
+const OOO_ISO_RE = /(\d{4})-(\d{2})-(\d{2})/;
+const SV_MONTHS_CLS = {
+  januari: 1, februari: 2, mars: 3, april: 4, maj: 5, juni: 6,
+  juli: 7, augusti: 8, september: 9, oktober: 10, november: 11, december: 12,
+};
+function pad2c(n) { return String(n).padStart(2, '0'); }
+function isRealDateCls(year, month, day) {
+  const d = new Date(Date.UTC(year, month - 1, day));
+  return d.getUTCFullYear() === year && d.getUTCMonth() === month - 1 && d.getUTCDate() === day;
+}
+export function extractReturnDate(visibleBody, { todayIso } = {}) {
+  const s = String(visibleBody ?? '').toLowerCase();
+  const iso = s.match(OOO_ISO_RE);
+  if (iso) {
+    const [y, mo, d] = [Number(iso[1]), Number(iso[2]), Number(iso[3])];
+    return isRealDateCls(y, mo, d) ? `${iso[1]}-${iso[2]}-${iso[3]}` : null;
+  }
+  const m = s.match(/(\d{1,2})\s+(januari|februari|mars|april|maj|juni|juli|augusti|september|oktober|november|december)(?:\s+(\d{4}))?/);
+  if (!m) return null;
+  const day = Number(m[1]);
+  const month = SV_MONTHS_CLS[m[2]];
+  let year = m[3] ? Number(m[3]) : null;
+  if (year == null) {
+    const todayYear = todayIso && /^\d{4}-\d{2}-\d{2}$/.test(todayIso) ? Number(todayIso.slice(0, 4)) : new Date().getUTCFullYear();
+    year = todayYear;
+    const candidate = `${year}-${pad2c(month)}-${pad2c(day)}`;
+    if (todayIso && candidate < todayIso) year += 1;
+  }
+  if (!isRealDateCls(year, month, day)) return null;
+  return `${year}-${pad2c(month)}-${pad2c(day)}`;
+}
+
 // True when a trimmed line begins the quoted trailing history — a reply
 // attribution, a forwarded/Outlook header, or a dashed separator. Broadened
 // beyond the original "Den/On … skrev/wrote:" so it also catches the
@@ -107,6 +169,20 @@ function scoreClass(patterns, body) {
 export function classify(message) {
   const body = message.body ?? '';
   const attachments = message.attachment_count ?? 0;
+
+  // Autosvar / OOO recognition (2026-07-19 §1) runs FIRST, on the UNQUOTED body
+  // + subject, so a mail quoting "semester" in its history never trips it.
+  // Guarded to precision: a message CARRYING ATTACHMENTS is a real delivery, not
+  // an autoresponder — never let an OOO marker in a delivery cover shadow it.
+  const visible = stripQuotedText(body);
+  if (attachments < 1 && isOooText(message.subject, visible)) {
+    const extracted = {};
+    const arendeMatchOoo = body.match(ARENDENUMMER_RE);
+    if (arendeMatchOoo) extracted.arendenummer = arendeMatchOoo[1];
+    const returnDate = extractReturnDate(visible, { todayIso: message.today_iso });
+    if (returnDate) extracted.return_date = returnDate;
+    return { class: 'auto_reply', confidence: 0.85, signals: ['ooo_autosvar'], extracted };
+  }
 
   const candidates = {
     auto_ack: scoreClass(AUTO_ACK_PATTERNS, body),

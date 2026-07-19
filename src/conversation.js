@@ -19,6 +19,18 @@ export function nextActionForClassification(state, classification, opts = {}) {
     return { nextState: state, action: 'none' };
   }
 
+  // A machine autoresponder / out-of-office (2026-07-19 design §2). Unlike a
+  // HUMAN delay_promise (which gets a T_DELAY_ACK draft), an autoresponder must
+  // NEVER be replied to and NEVER escalated — replying to a machine risks a
+  // reply loop and demands an operator for nothing. So it mirrors auto_ack:
+  // action 'none' (no draft, no escalation), the conversation stays in its
+  // current waiting state. The follow-up timer (return date + grace) is set by
+  // the ingest, so the case re-surfaces after the person returns. Loop-safe by
+  // construction: a re-firing autoresponder just refreshes the follow-up date.
+  if (classification === 'auto_reply') {
+    return { nextState: state, action: 'none' };
+  }
+
   if (classification === 'clarification') {
     if (state === 'SENT' || state === 'ACK_RECEIVED' || state === 'AWAITING_PRECISION') {
       return { nextState: 'AWAITING_PRECISION', action: 'send_precision' };
