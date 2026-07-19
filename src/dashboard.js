@@ -1131,7 +1131,9 @@ export function createDashboardApp({
     try {
       await sendApprovedReply({
         db, gmail: gmailClient, env, conv, esc,
-        finalBody, finalSubject, finalTo: req.body.to,
+        // A bounce resend form posts the corrected recipient as `finalTo`; the
+        // normal reply form posts it as `to`.
+        finalBody, finalSubject, finalTo: req.body.finalTo ?? req.body.to,
         decision: action === 'send' ? 'approve_unmodified' : 'edit',
         slackClient,
       });
@@ -1141,6 +1143,11 @@ export function createDashboardApp({
       // inbound arrived after the draft. Nothing was double-sent.
       if (e.code === 'ESCALATION_NOT_OPEN' || e.code === 'STALE_ESCALATION') {
         return res.status(409).send(escapeForError(e.message));
+      }
+      // A bounce resend with no corrected address: nothing was sent and the
+      // escalation is still open — re-show the case so the operator enters one.
+      if (e.code === 'MISSING_RESEND_ADDRESS') {
+        return res.status(400).send(escapeForError(e.message));
       }
       return res.status(500).send(`Send failed: ${escapeForError(e.message)}`);
     }
