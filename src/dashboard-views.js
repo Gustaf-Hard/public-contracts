@@ -15,6 +15,7 @@ import {
 } from '../public/explorer-core.js';
 import { GRADE_LEVELS, slugifyProductName } from './vendor-analytics.js';
 import { matchResellers, RESELLERS } from './resellers.js';
+import { splitQuotedText } from './classifier.js';
 
 // Canonical reseller name → slug, for linking a vendor's framed ramavtal tag
 // to /ramavtal/:slug. Built once from the curated RESELLERS list.
@@ -628,16 +629,22 @@ const baseCss = `
   /* A thread with a pending escalation needs the operator — light-red tint. */
   .thread-group.thread-needs-action { background: rgba(220, 38, 38, 0.06); border-color: rgba(220, 38, 38, 0.45); opacity: 1; }
   .thread-group.thread-needs-action .thread-head:hover { background: rgba(220, 38, 38, 0.10); }
-  /* Collapsed thread row: clickable inbox-style header, hidden body until opened. */
-  .thread-group .thread-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 10px 12px; cursor: pointer; margin: 0; border-bottom: none; }
+  /* Collapsed thread row: dense one-line inbox-style header, hidden body. */
+  .thread-group .thread-head { display: flex; align-items: baseline; gap: 12px; padding: 9px 12px; cursor: pointer; margin: 0; border-bottom: none; }
   .thread-group .thread-head:hover { background: var(--bg-elev-2); }
   .thread-group[data-open] .thread-head, .thread-group .thread-head[aria-expanded="true"] { border-bottom: 1px solid var(--border); }
-  .thread-head-main { flex: 1; min-width: 0; }
-  .thread-head-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-  .thread-email { font-size: 12px; }
-  .thread-preview { font-size: 12px; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .thread-head-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; font-size: 11px; white-space: nowrap; }
+  /* One-line row: participants (fixed-ish) · subject—summary (flex, ellipsis) · date. */
+  .thread-row-who { flex: 0 0 auto; max-width: 40%; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .thread-row-preview { flex: 1 1 auto; min-width: 0; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .thread-row-date { flex: 0 0 auto; font-size: 11px; white-space: nowrap; }
+  .thread-head.thread-unread .thread-row-who, .thread-head.thread-unread .thread-row-preview { font-weight: 700; }
+  .thread-star { color: var(--accent); }
+  .thread-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
   .thread-body { padding: 8px 12px 12px; }
+  /* Per-message quoted-history expander (··· → muted quoted block). */
+  .quote-toggle { background: none; border: none; color: var(--fg-muted); cursor: pointer; font-size: 12px; padding: 4px 0; margin-top: 6px; }
+  .quote-toggle:hover { color: var(--accent); }
+  .msg-quote { white-space: pre-wrap; font-size: 12px; line-height: 1.5; color: var(--fg-muted); margin-top: 6px; padding-left: 10px; border-left: 2px solid var(--border); }
   .thread-status { font-size: 11px; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--border); }
   .thread-status-primary { color: var(--accent); border-color: var(--accent); }
   .thread-status-muted { color: var(--fg-muted); }
@@ -1546,7 +1553,7 @@ function parseAddr(raw) {
 
 // One Gmail-style message block. Latest message is expanded; older ones are
 // collapsed to a header (sender · snippet · date) you click to open.
-function threadMessage(m, attachments, sig, expanded) {
+export function threadMessage(m, attachments, sig, expanded) {
   const isOut = m.direction === 'outbound';
   const from = parseAddr(m.from_email);
   const to = parseAddr(m.to_email);
@@ -1558,7 +1565,10 @@ function threadMessage(m, attachments, sig, expanded) {
   const addr = isOut
     ? `till ${to.email || m.to_email || ''}`
     : (from.email ? `<${from.email}>` : '');
-  const snippet = (m.body_text ?? '').replace(/\s+/g, ' ').trim().slice(0, 100);
+  // Split the body: only the new text is shown; the quoted prior-thread tail is
+  // tucked behind a ··· expander (Gmail-like). Signature stays in `visible`.
+  const { visible, quoted } = splitQuotedText(m.body_text ?? '');
+  const snippet = visible.replace(/\s+/g, ' ').trim().slice(0, 100);
   const atts = (attachments ?? [])
     .map((a) => {
       const link = `<a class="msg-att" href="/attachments/${a.id}" target="_blank" rel="noopener">📎 ${escapeHtml(a.filename)}</a>`;
@@ -1586,7 +1596,9 @@ function threadMessage(m, attachments, sig, expanded) {
       <span class="msg-date muted">${escapeHtml(date)}</span>
     </div>
     <div class="msg-body" data-collapse-target${expanded ? '' : ' hidden'}>
-      <div class="msg-text">${escapeHtml(m.body_text ?? '')}</div>
+      <div class="msg-text">${escapeHtml(visible)}</div>
+      ${quoted.trim() ? `<button type="button" class="quote-toggle" data-quote-toggle aria-expanded="false">··· <span class="quote-toggle-label">Visa citerad historik</span></button>
+      <div class="msg-quote muted" data-quote-body hidden>${escapeHtml(quoted)}</div>` : ''}
       ${atts ? `<div class="msg-atts">${atts}</div>` : ''}
       ${skippedNote}
     </div>
@@ -1635,15 +1647,40 @@ function groupEscalationsByThread(escalations, threads) {
   return map;
 }
 
-// A compact preview line for a collapsed thread row: latest message's snippet,
-// its date, and the message count — so the row is informative without opening.
-function threadPreview(msgs) {
+// Strip leading reply/forward prefixes (Re:/Sv:/SV:/VB:/Fwd:) from a subject,
+// including stacked ones ("Re: Sv: …") — Gmail collapses these on the row.
+function stripSubjectPrefix(subject) {
+  return String(subject ?? '').replace(/^(?:\s*(?:re|sv|vb|fwd)\s*:\s*)+/i, '').trim();
+}
+
+// Latest message's epoch-ms received_at (0 if none) — robust thread ordering
+// regardless of the incoming message order.
+function latestReceivedMs(msgs) {
+  let max = 0;
+  for (const m of msgs) {
+    const ms = m.received_at ? Date.parse(m.received_at) : 0;
+    if (Number.isFinite(ms) && ms > max) max = ms;
+  }
+  return max;
+}
+
+// The pieces a minimal (Gmail-like) thread row needs — pure over `msgs` plus
+// the counterparty display name. `participants` = name, then `, jag` when the
+// thread has ≥1 outbound message, then ` · N` (count). `subject`/`summary` come
+// from the latest message: the LLM one-sentence summary when present, else a
+// raw quote-stripped snippet (outbound / no-analysis messages).
+export function threadPreview(msgs, displayName = 'Okänd') {
+  const count = msgs.length;
+  const hasOutbound = msgs.some((m) => m.direction === 'outbound');
+  const participants = `${displayName}${hasOutbound ? ', jag' : ''} · ${count}`;
   const latest = msgs[msgs.length - 1];
-  if (!latest) return { snippet: 'Inga meddelanden', date: '', count: 0 };
-  const who = latest.direction === 'outbound' ? 'Du: ' : '';
-  const snippet = who + (latest.body_text ?? '').replace(/\s+/g, ' ').trim().slice(0, 90);
+  if (!latest) return { participants, count, subject: '', summary: 'Inga meddelanden', date: '' };
+  const subject = stripSubjectPrefix(latest.subject);
+  const llmSummary = parseJsonSafe(latest.analysis_json)?.summary;
+  const summary = llmSummary
+    || splitQuotedText(latest.body_text ?? '').visible.replace(/\s+/g, ' ').trim().slice(0, 90);
   const date = latest.received_at ? `${latest.received_at.slice(0, 10)} · ${fmtAgo(latest.received_at)}` : '';
-  return { snippet, date, count: msgs.length };
+  return { participants, count, subject, summary, date };
 }
 
 // Render each thread as a collapsed accordion row (clickable header + hidden
@@ -1652,43 +1689,44 @@ function threadPreview(msgs) {
 // dedicated data-thread-toggle/data-thread-body pair so it never clashes with
 // the per-message data-collapse toggles inside the body. Messages with no
 // thread_id (pre-backfill) render in an always-visible "Ogrupperat" section.
-function renderThreadGroups(threads, messages, attachmentsByMsg, signatures, escalationsByThread, gmailReady) {
+export function renderThreadGroups(threads, messages, attachmentsByMsg, signatures, escalationsByThread, gmailReady) {
   const byThread = new Map();
   for (const m of messages) {
     const key = m.thread_id ?? 'none';
     if (!byThread.has(key)) byThread.set(key, []);
     byThread.get(key).push(m);
   }
-  const groups = threads.map((t) => {
-    const msgs = byThread.get(t.id) ?? [];
+  const groups = threads
+    // Latest message first — robust regardless of the thread array's order.
+    .map((t) => ({ t, msgs: byThread.get(t.id) ?? [] }))
+    .sort((a, b) => latestReceivedMs(b.msgs) - latestReceivedMs(a.msgs))
+    .map(({ t, msgs }) => {
     const parsed = parseAddr(t.counterparty_name || t.counterparty_email || '');
     const displayName = parsed.name || parsed.email || t.counterparty_email || 'Okänd';
-    const displayEmail = t.counterparty_email || '';
-    const pv = threadPreview(msgs);
-    const header = `<div class="thread-head" data-thread-toggle aria-expanded="false">
-      <div class="thread-head-main">
-        <div class="thread-head-top">
-          <strong>${escapeHtml(displayName)}</strong>
-          <span class="muted thread-email">${escapeHtml(displayEmail)}</span>
-          ${threadStatusControls(t)}
-        </div>
-        <div class="thread-preview muted">${escapeHtml(pv.snippet)}</div>
-      </div>
-      <div class="thread-head-meta muted">
-        <span>${escapeHtml(pv.date)}</span>
-        <span class="thread-count">${pv.count} meddelanden</span>
-      </div>
-    </div>`;
-    const msgHtml = msgs.map((m, i) => threadMessage(m, attachmentsByMsg[m.id], signatures[m.id], i === msgs.length - 1)).join('');
+    const pv = threadPreview(msgs, displayName);
     // Open escalations are pending actions — always render their reply forms,
     // even on a muted thread. Muting suppresses NEW suggestions at ingest; it
     // must never hide an escalation that was already opened (e.g. before the
     // operator muted the thread), or the action silently disappears.
     const threadEscs = escalationsByThread.get(t.id) ?? [];
+    // A thread with a pending escalation needs the operator (bold, "unread"-like
+    // weight + light-red tint).
+    const needsAction = threadEscs.length > 0;
+    const star = t.status === 'primary' ? '<span class="thread-star" title="primär tråd">★</span> ' : '';
+    const middle = [pv.subject, pv.summary].filter(Boolean).join(' — ');
+    // One dense line: participants+count · subject — summary · date.
+    const header = `<div class="thread-head thread-row${needsAction ? ' thread-unread' : ''}" data-thread-toggle aria-expanded="false">
+      <span class="thread-row-who">${star}${escapeHtml(pv.participants)}</span>
+      <span class="thread-row-preview muted">${escapeHtml(middle)}</span>
+      <span class="thread-row-date muted">${escapeHtml(pv.date)}</span>
+    </div>`;
+    const msgHtml = msgs.map((m, i) => threadMessage(m, attachmentsByMsg[m.id], signatures[m.id], i === msgs.length - 1)).join('');
     const replies = threadEscs.map((e) => renderEscalationForm(e, gmailReady)).join('');
-    // A thread with a pending escalation needs the operator — flag it light red.
-    const needsAction = threadEscs.length > 0 ? ' thread-needs-action' : '';
-    return `<section class="thread-group thread-${escapeHtml(t.status)}${needsAction}">${header}<div class="thread-body" data-thread-body hidden>${msgHtml}${replies}</div></section>`;
+    // Status controls live in a toolbar at the TOP of the expanded body — off
+    // the dense row.
+    const toolbar = `<div class="thread-toolbar">${threadStatusControls(t)}</div>`;
+    const needsActionClass = needsAction ? ' thread-needs-action' : '';
+    return `<section class="thread-group thread-${escapeHtml(t.status)}${needsActionClass}">${header}<div class="thread-body" data-thread-body hidden>${toolbar}${msgHtml}${replies}</div></section>`;
   });
   // Orphan messages (thread_id null — only before backfill) must never vanish.
   const orphans = byThread.get('none') ?? [];

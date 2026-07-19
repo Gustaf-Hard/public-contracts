@@ -1,5 +1,73 @@
 import { describe, it, expect } from 'vitest';
-import { classify } from '../src/classifier.js';
+import { classify, splitQuotedText, stripQuotedText } from '../src/classifier.js';
+
+describe('splitQuotedText', () => {
+  it('splits at the leading-date Gmail-sv attribution (no leading "Den")', () => {
+    const body = [
+      'Hej, här kommer avtalet.',
+      '',
+      '12 juni 2026 kl. 13:13 skrev Gustaf Hård af Segerstad <gustaf@x.se>:',
+      '> Är detta samtliga avtal?',
+    ].join('\n');
+    const { visible, quoted } = splitQuotedText(body);
+    expect(visible).toBe('Hej, här kommer avtalet.\n');
+    expect(quoted).toContain('12 juni 2026 kl. 13:13 skrev');
+    expect(quoted).toContain('samtliga avtal');
+  });
+
+  it('splits at the English "On … wrote:" attribution', () => {
+    const body = [
+      'Please find the contract attached.',
+      '',
+      'On Sat, Jun 6, 2026 at 10:09 AM Gustaf <gustaf@x.se> wrote:',
+      '> Could you send it over?',
+    ].join('\n');
+    const { visible, quoted } = splitQuotedText(body);
+    expect(visible).toBe('Please find the contract attached.\n');
+    expect(quoted).toContain('wrote:');
+    expect(quoted).toContain('Could you send it over?');
+  });
+
+  it('splits at an Outlook -----Ursprungligt/Original Message----- header', () => {
+    for (const marker of ['-----Ursprungligt meddelande-----', '-----Original Message-----']) {
+      const body = ['Nytt svar.', '', marker, 'Från: Gustaf', 'Skickat: ...'].join('\n');
+      const { visible, quoted } = splitQuotedText(body);
+      expect(visible).toBe('Nytt svar.\n');
+      expect(quoted).toContain(marker);
+    }
+  });
+
+  it('treats >-quoted lines as the start of the quoted tail', () => {
+    const body = 'Kort svar.\n> gammal text\n> mer gammal text';
+    const { visible, quoted } = splitQuotedText(body);
+    expect(visible).toBe('Kort svar.');
+    expect(quoted).toBe('> gammal text\n> mer gammal text');
+  });
+
+  it('a body with no quote returns the whole text and empty quoted', () => {
+    const body = 'Bara en rad utan citat.';
+    expect(splitQuotedText(body)).toEqual({ visible: body, quoted: '' });
+  });
+
+  it('keeps a signature in visible', () => {
+    const body = 'Tack för svaret.\n\nMed vänlig hälsning\nAnna\nSkickat från min iPhone';
+    const { visible, quoted } = splitQuotedText(body);
+    expect(visible).toContain('Med vänlig hälsning');
+    expect(visible).toContain('Skickat från min iPhone');
+    expect(quoted).toBe('');
+  });
+
+  it('stripQuotedText(x) === splitQuotedText(x).visible', () => {
+    const samples = [
+      'Hej.\n12 juni 2026 kl. 13:13 skrev Gustaf <g@x.se>:\n> citat',
+      'Hi.\nOn Sat, Jun 6, 2026 at 10:09 AM G <g@x.se> wrote:\n> quote',
+      'Svar.\n-----Ursprungligt meddelande-----\nFrån: G',
+      'Kort svar.\n> gammal text',
+      'Bara en rad.',
+    ];
+    for (const s of samples) expect(stripQuotedText(s)).toBe(splitQuotedText(s).visible);
+  });
+});
 
 function msg(overrides = {}) {
   return {
