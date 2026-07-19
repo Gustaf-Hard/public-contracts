@@ -466,6 +466,44 @@ describe('vendor pages', () => {
   });
 });
 
+describe('ramavtal pages (/ramavtal/:slug)', () => {
+  it('known slug → 200 with the ramavtal header', async () => {
+    const app = appWithFakes();
+    const res = await get(app, '/ramavtal/adda');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Adda');
+    expect(res.text).toContain('ramavtal / återförsäljare');
+  });
+
+  it('unknown slug → 404 landing on the Leverantörer overview', async () => {
+    const app = appWithFakes();
+    const res = await get(app, '/ramavtal/nope');
+    expect(res.status).toBe(404);
+    expect(res.text).toContain('Marknadsöversikt');
+  });
+
+  it('lists a kommun procuring via the channel and a vendor reached through it', async () => {
+    // Skolon confirmed contract → Malå counts as procuring via Skolon.
+    seedVendorWithContract();
+    const conv = db.raw.prepare("SELECT * FROM conversations WHERE kommun_kod = '2418'").get();
+    db.recordMessage({
+      conversation_id: conv.id, gmail_message_id: `gm-${Math.random()}`, direction: 'inbound',
+      from_email: 'a@b.se', to_email: 'me@x.com', subject: 'Re', body_text: 'NE via Skolon',
+      classification: 'delivery', classification_confidence: 0.9,
+      received_at: '2026-04-15T10:00:00Z', attachment_count: 0,
+      analysis_json: { intent: 'delivery', extracted: { mentioned_vendors: ['NE', 'Skolon'], reseller_relations: [{ vendor: 'NE', ramavtal: 'Skolon' }] } },
+    });
+    const app = createDashboardApp({
+      db,
+      municipalitiesLoader: () => [{ kommun_kod: '2418', kommun_namn: 'Malå', lan: 'X', folkmangd: 1, contacts: [] }],
+    });
+    const res = await get(app, '/ramavtal/skolon');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('href="/kommun/2418"'); // kommun procuring via Skolon
+    expect(res.text).toContain('NE'); // vendor reached through Skolon
+  });
+});
+
 describe('kommun vendor tags link to vendor pages', () => {
   it('vendor tags link to vendor page when name matches', async () => {
     seedVendorWithContract();

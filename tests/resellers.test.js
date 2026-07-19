@@ -5,7 +5,7 @@
 // Skolon marketplace, Läromedia bokhandel). Matching mirrors the watchlist:
 // whole-word on an ascii-folded, punctuation-stripped form of the name.
 import { describe, it, expect } from 'vitest';
-import { RESELLERS, matchResellers } from '../src/resellers.js';
+import { RESELLERS, matchResellers, resellerBySlug } from '../src/resellers.js';
 
 describe('RESELLERS seed set', () => {
   it('covers the four known channels', () => {
@@ -57,5 +57,29 @@ describe('matchResellers — whole-word, ascii-folded, alias-driven', () => {
     expect(matchResellers([])).toEqual([]);
     expect(matchResellers()).toEqual([]);
     expect(matchResellers([null, ''])).toEqual([]);
+  });
+});
+
+describe('reseller slugs + resellerBySlug', () => {
+  it('every entry has a slug and slugs are unique', () => {
+    const slugs = RESELLERS.map((r) => r.slug);
+    for (const s of slugs) expect(typeof s).toBe('string');
+    expect(new Set(slugs).size).toBe(slugs.length);
+  });
+
+  it('slugs are the slugified canonicals', () => {
+    expect(RESELLERS.map((r) => r.slug)).toEqual(['adda', 'skolon', 'atea', 'laromedia']);
+  });
+
+  it('resellerBySlug resolves a known slug to its entry', () => {
+    expect(resellerBySlug('adda').canonical).toBe('Adda');
+    expect(resellerBySlug('laromedia').canonical).toBe('Läromedia');
+  });
+
+  it('resellerBySlug returns null for unknown / blank slugs', () => {
+    expect(resellerBySlug('nope')).toBeNull();
+    expect(resellerBySlug('')).toBeNull();
+    expect(resellerBySlug(null)).toBeNull();
+    expect(resellerBySlug()).toBeNull();
   });
 });

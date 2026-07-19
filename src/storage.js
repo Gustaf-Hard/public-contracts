@@ -1022,6 +1022,64 @@ export function openDb(path) {
     return out;
   }
 
+  // Vendor↔ramavtal relationships the kommun explicitly stated in prose (the
+  // extracted `reseller_relations` field, 2026-07-19 design). Read-time only —
+  // no schema change; the data lives inside the existing analysis_json TEXT.
+  // Each raw relation's `ramavtal` is canonicalized through matchResellers so
+  // only curated channels survive (a non-curated ramavtal name is dropped —
+  // honesty: we only tag a vendor with a channel we actually recognise). A
+  // vendor→ramavtal tag appears ONLY because the kommun said so; nothing is
+  // inferred from the kommun's channel set. Malformed analysis_json is skipped.
+  function parseResellerRelationRows(rows) {
+    const out = [];
+    for (const r of rows) {
+      let parsed;
+      try { parsed = JSON.parse(r.analysis_json); } catch { continue; }
+      const relations = parsed?.extracted?.reseller_relations;
+      if (!Array.isArray(relations)) continue;
+      for (const rel of relations) {
+        if (!rel || typeof rel.vendor !== 'string' || typeof rel.ramavtal !== 'string') continue;
+        for (const canonical of matchResellers([rel.ramavtal])) {
+          out.push({ vendor: rel.vendor, ramavtal: canonical });
+        }
+      }
+    }
+    return out;
+  }
+
+  // Map(vendorName.toLowerCase() → [ramavtal canonical, …]) for one kommun,
+  // deduped. Feeds the kommun page's per-vendor framed ramavtal tags.
+  function listResellerRelationsForKommun(kommunKod) {
+    const rows = db.prepare(`
+      SELECT m.analysis_json AS analysis_json
+      FROM messages m
+      JOIN conversations conv ON conv.id = m.conversation_id
+      WHERE conv.kommun_kod = ?
+        AND m.direction = 'inbound' AND m.analysis_json IS NOT NULL
+    `).all(kommunKod);
+    const map = new Map();
+    for (const { vendor, ramavtal } of parseResellerRelationRows(rows)) {
+      const key = vendor.toLowerCase();
+      if (!map.has(key)) map.set(key, []);
+      const list = map.get(key);
+      if (!list.includes(ramavtal)) list.push(ramavtal);
+    }
+    return map;
+  }
+
+  // All extracted vendor↔ramavtal relations across every kommun, as an array of
+  // { vendor, ramavtal } (canonical ramavtal). Feeds the ramavtal page's
+  // "vendors reached through this channel" section (deduping is left to the
+  // caller, which distincts by vendor name).
+  function listResellerRelations() {
+    const rows = db.prepare(`
+      SELECT m.analysis_json AS analysis_json
+      FROM messages m
+      WHERE m.direction = 'inbound' AND m.analysis_json IS NOT NULL
+    `).all();
+    return parseResellerRelationRows(rows);
+  }
+
   return {
     raw: db,
     migrate,
@@ -1084,5 +1142,7 @@ export function openDb(path) {
     listVendorsOverview,
     getVendorBySlug,
     listHandoffContacts,
+    listResellerRelationsForKommun,
+    listResellerRelations,
   };
 }

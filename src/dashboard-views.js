@@ -14,7 +14,18 @@ import {
   UNKNOWN,
 } from '../public/explorer-core.js';
 import { GRADE_LEVELS, slugifyProductName } from './vendor-analytics.js';
-import { matchResellers } from './resellers.js';
+import { matchResellers, RESELLERS } from './resellers.js';
+
+// Canonical reseller name → slug, for linking a vendor's framed ramavtal tag
+// to /ramavtal/:slug. Built once from the curated RESELLERS list.
+const RESELLER_SLUG_BY_CANONICAL = new Map(RESELLERS.map((r) => [r.canonical, r.slug]));
+
+// A generic vendor glyph (small inline SVG) for the vertical Leverantörer list.
+const VENDOR_ICON = '<svg class="vendor-icon" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M8 1.8 14 5v6L8 14.2 2 11V5L8 1.8Z"/><path d="M2 5l6 3 6-3M8 8v6.2"/></svg>';
+
+// A frame ("ram" = frame in Swedish) glyph for ramavtal — the visual for the
+// framework-agreement entity in the header and the per-vendor pill.
+const FRAME_ICON = '<svg class="frame-icon" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="1.75" y="1.75" width="12.5" height="12.5" rx="1.5"/><rect x="4.75" y="4.75" width="6.5" height="6.5" rx="0.75"/></svg>';
 
 function escapeHtml(s) {
   if (s === null || s === undefined) return '';
@@ -455,6 +466,16 @@ const baseCss = `
   .person-card .person-meta { color: var(--fg-muted); }
   .tag-list { display: flex; flex-wrap: wrap; gap: 4px; }
   .tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; background: var(--bg-elev-2); border: 1px solid var(--border); color: var(--fg-muted); }
+  /* Vertical Leverantörer list (kommun page) */
+  .vendor-list { display: flex; flex-direction: column; gap: 2px; }
+  .vendor-row { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; padding: 3px 0; font-size: 12px; }
+  .vendor-row.muted { opacity: 0.72; }
+  .vendor-row .vendor-icon { flex: none; color: var(--fg-muted); }
+  .vendor-row .vendor-name { font-weight: 500; }
+  .vendor-row .vendor-name a { color: var(--fg); text-decoration: none; }
+  .vendor-row .vendor-name a:hover { color: var(--accent); text-decoration: underline; }
+  .pill-ramavtal { display: inline-flex; align-items: center; gap: 3px; padding: 1px 7px; border: 1px solid var(--border); border-radius: 4px; font-size: 10px; color: var(--fg-muted); background: var(--bg-elev-2); text-decoration: none; }
+  a.pill-ramavtal:hover { border-color: var(--accent); color: var(--accent); }
   .contracts-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
   .contracts-table th, .contracts-table td { padding: 6px 10px; text-align: left; border-bottom: 1px solid var(--border); }
   .contracts-table th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--fg-muted); }
@@ -1171,7 +1192,7 @@ function docTypeBadge(att) {
   }
 }
 
-export function renderKommunDetail({ kommun, conversations, messagesByConv, attachmentsByMsg, escalationsByConv, signatures, followUpByConv = {}, threadsByConv = {}, initialDrafts = {}, gmailReady = false, vendorSlugsByName = new Map(), handoffContacts = [], heartbeat = null, partial = false, escalationCount = 0 }) {
+export function renderKommunDetail({ kommun, conversations, messagesByConv, attachmentsByMsg, escalationsByConv, signatures, followUpByConv = {}, threadsByConv = {}, initialDrafts = {}, gmailReady = false, vendorSlugsByName = new Map(), resellerRelationsByVendor = new Map(), handoffContacts = [], heartbeat = null, partial = false, escalationCount = 0 }) {
   if (!kommun) {
     return layout({ title: 'Saknad kommun', body: '<p>Hittade inte kommunen.</p>', currentPath: '/', heartbeat, partial, escalationCount });
   }
@@ -1186,12 +1207,10 @@ export function renderKommunDetail({ kommun, conversations, messagesByConv, atta
   const confirmedVendors = aggregateConfirmedVendors(conversations, messagesByConv, attachmentsByMsg);
   const contracts = aggregateContracts(conversations, messagesByConv, attachmentsByMsg);
 
-  // Reseller/framework channels this kommun buys via — union of confirmed +
-  // mentioned vendor names run through the curated matcher (src/resellers.js).
-  const channels = matchResellers([...mentionedVendors, ...confirmedVendors]);
-  // Reseller/framework channels are named ONCE in the "Köper via ramavtal"
-  // line below. They must not also appear as "Nämnda" chips — that just
-  // duplicated the line and cluttered the panel (ADDA/Skolon/Läromedia noise).
+  // Reseller/framework channel names must not appear as "Nämnda" rows — that
+  // just clutters the panel (ADDA/Skolon/Läromedia noise). The per-vendor
+  // framed ramavtal tags below carry the specific, extracted signal instead;
+  // the old kommun-level "🛒 Köper via ramavtal" summary line is gone.
   const isChannelName = (v) => matchResellers([v]).length > 0;
   // A confirmed contract vendor must NEVER also appear under "Nämnda" — the
   // stronger claim wins (data-honesty). Confirmed avtal chips stay as-is
@@ -1204,14 +1223,26 @@ export function renderKommunDetail({ kommun, conversations, messagesByConv, atta
     [...confirmedVendors, ...mentionedOnly].map((v) => v.toLowerCase())
   ).size;
 
-  // Render one vendor as a chip: link to /leverantor/:slug when known, else
-  // plain. No per-chip reseller pill — the channel is named once in the
-  // "Köper via ramavtal" line.
-  const renderVendorChip = (v, { muted = false } = {}) => {
+  // Render one vendor as a VERTICAL row: icon + name (linked to /leverantor/:slug
+  // when we have a vendor page, else a muted plain name — no dead links), plus
+  // a bordered FRAME pill `▢ <Ramavtal>` per extracted vendor→ramavtal relation
+  // (from storage.listResellerRelationsForKommun), each linking to the ramavtal
+  // page. The tag appears ONLY when a relation was extracted for that vendor —
+  // never inferred from the kommun's channel set (data-honesty).
+  const renderVendorRow = (v, { muted = false } = {}) => {
     const slug = vendorSlugsByName.get(v.toLowerCase());
-    return slug
-      ? `<a class="tag${muted ? ' muted' : ''}" href="/leverantor/${escapeHtml(slug)}">${escapeHtml(v)}</a>`
-      : `<span class="tag${muted ? ' muted' : ''}">${escapeHtml(v)}</span>`;
+    const nameHtml = slug
+      ? `<a href="/leverantor/${escapeHtml(slug)}">${escapeHtml(v)}</a>`
+      : `<span class="muted" title="${escapeHtml('ingen leverantörssida än')}">${escapeHtml(v)}</span>`;
+    const ramavtal = resellerRelationsByVendor.get(v.toLowerCase()) ?? [];
+    const pills = ramavtal.map((r) => {
+      const rslug = RESELLER_SLUG_BY_CANONICAL.get(r);
+      const label = `▢ ${escapeHtml(r)}`;
+      return rslug
+        ? `<a class="pill-ramavtal" href="/ramavtal/${escapeHtml(rslug)}" title="${escapeHtml(`Nås via ramavtal: ${r}`)}">${label}</a>`
+        : `<span class="pill-ramavtal" title="${escapeHtml(`Nås via ramavtal: ${r}`)}">${label}</span>`;
+    }).join('');
+    return `<div class="vendor-row${muted ? ' muted' : ''}">${VENDOR_ICON}<span class="vendor-name">${nameHtml}</span>${pills}</div>`;
   };
   const needsHumanCount = conversations.filter((c) => c.state === 'NEEDS_HUMAN').length;
 
@@ -1239,27 +1270,26 @@ export function renderKommunDetail({ kommun, conversations, messagesByConv, atta
         </div>`).join('');
 
   // ----- Leverantörer sidebar panel (confirmed vs. merely mentioned) -----
-  const kopViaLine = channels.length === 0
-    ? ''
-    : `<p class="muted" style="font-size:12px;margin:0 0 8px" title="${escapeHtml('Kommunen köper via ramavtal/återförsäljare — produkter kan finnas den vägen utan direktavtal med leverantören')}">🛒 Köper via ramavtal: ${escapeHtml(channels.join(', '))}</p>`;
-
+  // A vertical list (Pipedrive-style), each vendor its own row. The old
+  // kommun-level "🛒 Köper via ramavtal" summary line is removed — the specific
+  // signal now rides on the per-vendor framed ramavtal tags.
   const confirmedGroup = confirmedVendors.length === 0
     ? ''
     : `<div style="margin-bottom:8px">
         <div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Avtal bekräftat</div>
-        <div class="tag-list">${confirmedVendors.map((v) => renderVendorChip(v)).join('')}</div>
+        <div class="vendor-list">${confirmedVendors.map((v) => renderVendorRow(v)).join('')}</div>
       </div>`;
 
   const mentionedGroup = mentionedOnly.length === 0
     ? ''
     : `<div>
         <div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Nämnda <span title="${escapeHtml('Endast omnämnda i kommunens svar — vi har inte sett något signerat avtal.')}">?</span></div>
-        <div class="tag-list">${mentionedOnly.map((v) => renderVendorChip(v, { muted: true })).join('')}</div>
+        <div class="vendor-list">${mentionedOnly.map((v) => renderVendorRow(v, { muted: true })).join('')}</div>
       </div>`;
 
   const vendorPanel = vendorCount === 0
     ? '<p class="muted" style="font-size:12px;margin:6px 0 0">Inga leverantörer fångade ännu.</p>'
-    : `${kopViaLine}${confirmedGroup}${mentionedGroup}`;
+    : `${confirmedGroup}${mentionedGroup}`;
 
   const mergedContacts = mergeContacts(kommun.contacts ?? [], handoffContacts);
   const datasetContacts = mergedContacts.length === 0
@@ -1947,6 +1977,50 @@ export function renderVendorMarket({ summary, rollups = [], facts = [], sort = n
     ${renderExplorer(facts, todayIso)}
   `;
   return layout({ title: 'Leverantörer', body, currentPath: '/leverantorer', heartbeat, partial, escalationCount });
+}
+
+// ---- Ramavtal page (/ramavtal/:slug) — a framework agreement as a first-class
+// entity (2026-07-19 design). `kommuner` = kommuner procuring via this channel
+// (derived from the kommun-level reseller_channels), each { kommun_kod,
+// kommun_namn }; `vendors` = distinct vendors reached through it (from extracted
+// reseller_relations), each { name, slug|null } (slug present → link to its
+// vendor page, else shown but not linked — no dead links). Pure: all data via
+// params. ----
+export function renderRamavtal({ reseller, kommuner = [], vendors = [], heartbeat = null, partial = false, escalationCount = 0 }) {
+  if (!reseller) {
+    return layout({ title: 'Saknat ramavtal', body: '<p>Hittade inte ramavtalet.</p>', currentPath: '/leverantorer', heartbeat, partial, escalationCount });
+  }
+
+  const kommunerSection = kommuner.length === 0
+    ? '<div class="empty-state">Inga kända kommuner som upphandlar via detta ramavtal än.</div>'
+    : `<div class="tag-list">${kommuner.map((k) =>
+        `<a class="tag" href="/kommun/${escapeHtml(k.kommun_kod)}">${escapeHtml(k.kommun_namn)}</a>`).join('')}</div>`;
+
+  const vendorsSection = vendors.length === 0
+    ? '<div class="empty-state">Inga kända leverantörer via detta ramavtal än.</div>'
+    : `<div class="vendor-list">${vendors.map((v) => {
+        const nameHtml = v.slug
+          ? `<a href="/leverantor/${escapeHtml(v.slug)}">${escapeHtml(v.name)}</a>`
+          : `<span class="muted" title="${escapeHtml('ingen leverantörssida än')}">${escapeHtml(v.name)}</span>`;
+        return `<div class="vendor-row">${VENDOR_ICON}<span class="vendor-name">${nameHtml}</span></div>`;
+      }).join('')}</div>`;
+
+  const body = `
+    <div class="page-head">
+      <h1><span class="ramavtal-head-icon">${FRAME_ICON}</span> ${escapeHtml(reseller.canonical)}</h1>
+      <span class="muted">ramavtal / återförsäljare</span>
+    </div>
+    <p class="muted honesty-note">En kommun som köper via detta ramavtal kan ha produkter den vägen utan att vi sett ett direktavtal. En leverantör listas här endast när en kommun uttryckligen angett att den nås genom ${escapeHtml(reseller.canonical)}.</p>
+    <section class="board-section">
+      <h2>Kommuner som upphandlar via ${escapeHtml(reseller.canonical)} <span class="count">${kommuner.length}</span></h2>
+      ${kommunerSection}
+    </section>
+    <section class="board-section">
+      <h2>Leverantörer som nås via ${escapeHtml(reseller.canonical)} <span class="count">${vendors.length}</span></h2>
+      ${vendorsSection}
+    </section>
+  `;
+  return layout({ title: `Ramavtal · ${reseller.canonical}`, body, currentPath: '/leverantorer', heartbeat, partial, escalationCount });
 }
 
 // ---- Surface 2: vendor dossier (/leverantor/:slug) ----

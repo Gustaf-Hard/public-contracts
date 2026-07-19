@@ -14,15 +14,24 @@
 
 import { matchVendorEntries } from './watchlist.js';
 
+// Each entry carries a stable `slug` (slugified canonical) so a ramavtal is a
+// first-class entity with its own page at /ramavtal/:slug — "every ramavtal
+// has a place in the tool" (2026-07-19 design).
 export const RESELLERS = [
-  { canonical: 'Adda',      aliases: ['adda', 'skl kommentus', 'sklkommentus', 'kommentus'] },
-  { canonical: 'Skolon',    aliases: ['skolon'] },
-  { canonical: 'Atea',      aliases: ['atea'] },
-  { canonical: 'Läromedia', aliases: ['läromedia', 'laromedia', 'läromedia bokhandel örebro'] },
+  { canonical: 'Adda',      slug: 'adda',      aliases: ['adda', 'skl kommentus', 'sklkommentus', 'kommentus'] },
+  { canonical: 'Skolon',    slug: 'skolon',    aliases: ['skolon'] },
+  { canonical: 'Atea',      slug: 'atea',      aliases: ['atea'] },
+  { canonical: 'Läromedia', slug: 'laromedia', aliases: ['läromedia', 'laromedia', 'läromedia bokhandel örebro'] },
 ];
 
 // Canonical names of reseller entries matched by any of `names`, deduped,
 // in RESELLERS order.
 export function matchResellers(names = []) {
   return matchVendorEntries(RESELLERS, names);
+}
+
+// Resolve a reseller/ramavtal by its slug. Pure; null for unknown/blank slugs.
+export function resellerBySlug(slug) {
+  if (!slug || typeof slug !== 'string') return null;
+  return RESELLERS.find((r) => r.slug === slug) ?? null;
 }

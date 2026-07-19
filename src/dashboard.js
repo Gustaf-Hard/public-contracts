@@ -23,8 +23,10 @@ import {
   renderVendorMarket,
   renderVendorDossier,
   renderProductCoverage,
+  renderRamavtal,
   mergeContacts,
 } from './dashboard-views.js';
+import { resellerBySlug } from './resellers.js';
 import {
   buildContractFacts, buildVendorRollups, buildMarketSummary, buildProductRollups,
   buildProductCoverageByKommun, slugifyProductName,
@@ -702,6 +704,7 @@ export function createDashboardApp({
       (db ? db.listVendorsOverview() : []).map((v) => [v.name.toLowerCase(), v.slug])
     );
     const handoffContacts = db ? db.listHandoffContacts(kommun.kommun_kod) : [];
+    const resellerRelationsByVendor = db ? db.listResellerRelationsForKommun(kommun.kommun_kod) : new Map();
     res.send(renderKommunDetail({
       kommun,
       conversations,
@@ -714,6 +717,7 @@ export function createDashboardApp({
       initialDrafts,
       gmailReady: !!gmailClient,
       vendorSlugsByName,
+      resellerRelationsByVendor,
       handoffContacts,
       heartbeat: hb(), partial: isPartial(req), escalationCount: escCount(),
     }));
@@ -931,6 +935,47 @@ export function createDashboardApp({
         { doneKods, resellerKods }),
       todayIso,
       resellerChannelsByKommun,
+      heartbeat: hb(), partial: isPartial(req), escalationCount: escCount(),
+    }));
+  });
+
+  // A ramavtal / reseller channel as a first-class entity (2026-07-19 design).
+  // Derives its data read-time from storage; works even for a channel with no
+  // vendors row (e.g. Adda). Unknown slug → 404 landing on the Leverantörer
+  // overview, mirroring /leverantor/:slug.
+  app.get('/ramavtal/:slug', (req, res) => {
+    const reseller = resellerBySlug(req.params.slug);
+    res.set('Content-Type', 'text/html; charset=utf-8');
+    if (!reseller) {
+      const { facts, rollups, summary, todayIso } = vendorData(new Date());
+      return res.status(404).send(renderVendorMarket({
+        summary, rollups, facts, todayIso,
+        heartbeat: hb(), partial: isPartial(req), escalationCount: escCount(),
+      }));
+    }
+    // Kommuner procuring via this channel — from the kommun-level channel
+    // derivation (reseller_channels).
+    const dataKommuner = db ? db.listKommunerWithContracts() : [];
+    const kommuner = dataKommuner
+      .filter((k) => (k.reseller_channels ?? []).includes(reseller.canonical))
+      .map((k) => ({ kommun_kod: k.kommun_kod, kommun_namn: k.kommun_namn }));
+    // Vendors reached through this channel — distinct vendors from the extracted
+    // reseller_relations across all kommuner. Linked to a vendor page when one
+    // exists; shown but not linked otherwise (no dead links).
+    const vendorSlugsByName = new Map(
+      (db ? db.listVendorsOverview() : []).map((v) => [v.name.toLowerCase(), v.slug])
+    );
+    const seen = new Set();
+    const vendors = [];
+    for (const rel of db ? db.listResellerRelations() : []) {
+      if (rel.ramavtal !== reseller.canonical) continue;
+      const key = rel.vendor.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      vendors.push({ name: rel.vendor, slug: vendorSlugsByName.get(key) ?? null });
+    }
+    res.send(renderRamavtal({
+      reseller, kommuner, vendors,
       heartbeat: hb(), partial: isPartial(req), escalationCount: escCount(),
     }));
   });
