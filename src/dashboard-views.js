@@ -442,7 +442,7 @@ const baseCss = `
   .role-tabs a { padding: 4px 12px; border-radius: 6px; background: var(--bg-elev); border: 1px solid var(--border); color: var(--fg-muted); font-size: 12px; }
   .role-tabs a.active { background: var(--accent); color: white; border-color: var(--accent); }
   /* CRM-style kommun page layout: sticky sidebar + main column */
-  .kommun-page { display: grid; grid-template-columns: 320px 1fr; gap: 24px; align-items: start; }
+  .kommun-page { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 24px; align-items: start; }
   @media (max-width: 980px) { .kommun-page { grid-template-columns: 1fr; } }
   .kommun-sidebar { position: sticky; top: 64px; align-self: start; background: var(--bg-elev); border: 1px solid var(--border); border-radius: 8px; padding: 16px 18px; max-height: calc(100vh - 80px); overflow-y: auto; }
   .kommun-sidebar h2 { margin: 0 0 2px; font-size: 18px; }
@@ -640,6 +640,13 @@ const baseCss = `
   .thread-head.thread-unread .thread-row-who, .thread-head.thread-unread .thread-row-preview { font-weight: 700; }
   .thread-star { color: var(--accent); }
   .thread-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  /* Gmail-style attachment chips under a collapsed thread row. */
+  .thread-atts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 0 12px 10px; }
+  .thread-att { display: inline-flex; align-items: center; gap: 4px; max-width: 200px; padding: 2px 8px; border: 1px solid var(--border); border-radius: 4px; font-size: 11px; color: var(--fg-muted); text-decoration: none; background: var(--bg-elev-2); }
+  .thread-att:hover { border-color: var(--accent); color: var(--accent); }
+  .thread-att-kind { flex: none; font-size: 9px; font-weight: 700; letter-spacing: .03em; }
+  .thread-att-fn { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .thread-att-more { font-size: 11px; }
   .thread-body { padding: 8px 12px 12px; }
   /* Per-message quoted-history expander (··· → muted quoted block). */
   .quote-toggle { background: none; border: none; color: var(--fg-muted); cursor: pointer; font-size: 12px; padding: 4px 0; margin-top: 6px; }
@@ -1489,7 +1496,7 @@ export function renderKommunDetail({ kommun, conversations, messagesByConv, atta
       }).join('');
 
   const mainColumn = `
-    <div>
+    <div style="min-width:0">
       <p><a href="/">← Översikt</a></p>
       <h2 style="margin:6px 0 14px">Ärenden (${conversations.length})</h2>
       ${convCards}
@@ -1689,6 +1696,20 @@ export function threadPreview(msgs, displayName = 'Okänd') {
 // dedicated data-thread-toggle/data-thread-body pair so it never clashes with
 // the per-message data-collapse toggles inside the body. Messages with no
 // thread_id (pre-backfill) render in an always-visible "Ogrupperat" section.
+// Gmail-style attachment chips for a collapsed thread row — quick open-in-new-
+// tab links to the thread's delivered documents, capped with a "+N" overflow
+// marker. Empty when the thread carries no attachments.
+function renderThreadAtts(atts, cap = 4) {
+  if (!atts || atts.length === 0) return '';
+  const shown = atts.slice(0, cap);
+  const extra = atts.length - shown.length;
+  const chips = shown.map((a) =>
+    `<a class="thread-att" href="/attachments/${a.id}" target="_blank" rel="noopener" title="${escapeHtml(`Öppna ${a.filename} i ny flik`)}"><span class="thread-att-kind">${isPdfAttachment(a) ? 'PDF' : '📎'}</span> <span class="thread-att-fn">${escapeHtml(a.filename)}</span></a>`
+  ).join('');
+  const more = extra > 0 ? `<span class="thread-att-more muted">+${extra}</span>` : '';
+  return `<div class="thread-atts">${chips}${more}</div>`;
+}
+
 export function renderThreadGroups(threads, messages, attachmentsByMsg, signatures, escalationsByThread, gmailReady) {
   const byThread = new Map();
   for (const m of messages) {
@@ -1720,13 +1741,18 @@ export function renderThreadGroups(threads, messages, attachmentsByMsg, signatur
       <span class="thread-row-preview muted">${escapeHtml(middle)}</span>
       <span class="thread-row-date muted">${escapeHtml(pv.date)}</span>
     </div>`;
+    // Gmail-style attachment chips on the collapsed row — quick open links to
+    // the thread's delivered documents. Anchor clicks are ignored by the
+    // thread-toggle handler, so opening a file never collapses the thread.
+    const threadAtts = msgs.flatMap((m) => attachmentsByMsg[m.id] ?? []);
+    const attStrip = renderThreadAtts(threadAtts);
     const msgHtml = msgs.map((m, i) => threadMessage(m, attachmentsByMsg[m.id], signatures[m.id], i === msgs.length - 1)).join('');
     const replies = threadEscs.map((e) => renderEscalationForm(e, gmailReady)).join('');
     // Status controls live in a toolbar at the TOP of the expanded body — off
     // the dense row.
     const toolbar = `<div class="thread-toolbar">${threadStatusControls(t)}</div>`;
     const needsActionClass = needsAction ? ' thread-needs-action' : '';
-    return `<section class="thread-group thread-${escapeHtml(t.status)}${needsActionClass}">${header}<div class="thread-body" data-thread-body hidden>${toolbar}${msgHtml}${replies}</div></section>`;
+    return `<section class="thread-group thread-${escapeHtml(t.status)}${needsActionClass}">${header}${attStrip}<div class="thread-body" data-thread-body hidden>${toolbar}${msgHtml}${replies}</div></section>`;
   });
   // Orphan messages (thread_id null — only before backfill) must never vanish.
   const orphans = byThread.get('none') ?? [];

@@ -138,3 +138,33 @@ describe('threadMessage', () => {
     expect(html).not.toContain('data-quote-toggle');
   });
 });
+
+describe('renderThreadGroups — attachment chips on the row', () => {
+  const msg2 = (o = {}) => ({
+    id: 1, direction: 'inbound', from_email: 'a@x.se', to_email: 'me@x.se',
+    subject: 'SV: Avtal', body_text: 'Hej', analysis_json: null,
+    received_at: '2026-06-23T10:00:00Z', attachment_count: 0, ...o,
+  });
+
+  it('shows quick-open attachment chips on the collapsed thread row', () => {
+    const html = renderThreadGroups(
+      [{ id: 10, status: 'neutral', counterparty_email: 'anna@x.se', counterparty_name: 'Anna' }],
+      [msg2({ id: 1, thread_id: 10 })],
+      { 1: [{ id: 500, filename: 'Avtal IST.pdf', mime_type: 'application/pdf' }] },
+      {}, new Map(), false,
+    );
+    expect(html).toContain('thread-atts');
+    expect(html).toContain('href="/attachments/500"');
+    expect(html).toContain('Avtal IST.pdf');
+    expect(html).toContain('target="_blank"'); // opens in a new tab
+  });
+
+  it('renders no attachment strip when the thread has no attachments', () => {
+    const html = renderThreadGroups(
+      [{ id: 10, status: 'neutral', counterparty_email: 'anna@x.se', counterparty_name: 'Anna' }],
+      [msg2({ id: 1, thread_id: 10 })],
+      {}, {}, new Map(), false,
+    );
+    expect(html).not.toContain('thread-atts');
+  });
+});
