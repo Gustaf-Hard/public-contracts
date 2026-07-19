@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { classify, splitQuotedText, stripQuotedText } from '../src/classifier.js';
+import { classify, splitQuotedText, stripQuotedText, extractReturnDate } from '../src/classifier.js';
 
 describe('splitQuotedText', () => {
   it('splits at the leading-date Gmail-sv attribution (no leading "Den")', () => {
@@ -171,6 +171,91 @@ describe('classify — unknown', () => {
   it('returns unknown when body is empty', () => {
     const r = classify(msg({ body: '' }));
     expect(r.class).toBe('unknown');
+  });
+});
+
+describe('classify — auto_reply (autosvar / OOO, 2026-07-19 §1)', () => {
+  it('the Bjuv autosvar → auto_reply with the stated return date', () => {
+    const r = classify(msg({
+      subject: 'Autosvar: Begäran om allmänna handlingar',
+      body: 'Autosvar:\n\nHej! Jag har semester och är åter 20 juli. Vid akuta ärenden kontakta min kollega.',
+      today_iso: '2026-07-05',
+    }));
+    expect(r.class).toBe('auto_reply');
+    expect(r.signals).toContain('ooo_autosvar');
+    expect(r.extracted.return_date).toBe('2026-07-20');
+  });
+
+  it('a "frånvarande … är åter" body without an explicit tag still matches (absence + return cue)', () => {
+    const r = classify(msg({
+      body: 'Jag är frånvarande på grund av semester och är åter den 3 augusti 2026.',
+      today_iso: '2026-07-05',
+    }));
+    expect(r.class).toBe('auto_reply');
+    expect(r.extracted.return_date).toBe('2026-08-03');
+  });
+
+  it('a plain autoresponder with no date → auto_reply, no return_date', () => {
+    const r = classify(msg({
+      subject: 'Automatiskt svar',
+      body: 'Automatiskt svar: Jag är för närvarande frånvarande och läser inte min e-post.',
+    }));
+    expect(r.class).toBe('auto_reply');
+    expect(r.extracted.return_date).toBeUndefined();
+  });
+
+  it('an English out-of-office → auto_reply', () => {
+    const r = classify(msg({ subject: 'Out of office', body: 'I am currently out of office.' }));
+    expect(r.class).toBe('auto_reply');
+  });
+
+  // PRECISION OVER RECALL — real replies must never be tagged auto_reply.
+  it('a genuine delivery (with attachment) is NEVER auto_reply, even if body mentions semester', () => {
+    const r = classify(msg({
+      body: 'Här kommer bifogat avtalet. Notera att handläggaren har semester men jag skickar det ändå.',
+      attachment_count: 1,
+    }));
+    expect(r.class).toBe('delivery');
+  });
+
+  it('a genuine clarification is NOT auto_reply', () => {
+    const r = classify(msg({ body: 'Kan du precisera vilken tidsperiod och vilka specifika system begäran avser?' }));
+    expect(r.class).toBe('clarification');
+  });
+
+  it('a genuine handoff/dead_end (hänvisar till) is NOT auto_reply', () => {
+    const r = classify(msg({ body: 'Vi hänvisar er till stadsledningskontoret för dessa avtal.' }));
+    expect(r.class).toBe('dead_end');
+  });
+
+  it('a reply merely QUOTING "semester" in history is NOT OOO (quoted text stripped)', () => {
+    const r = classify(msg({
+      body: [
+        'Här kommer avtalet du efterfrågade.',
+        '',
+        '12 juli 2026 kl. 09:00 skrev Gustaf <g@x.se>:',
+        '> Har ni semester nu? Jag väntar tills ni är åter.',
+      ].join('\n'),
+      attachment_count: 1,
+    }));
+    expect(r.class).not.toBe('auto_reply');
+  });
+
+  it('"semester" alone (no absence marker) does not trip the detector', () => {
+    const r = classify(msg({ body: 'Trevlig semester önskar jag er! Här är svaret på er fråga.' }));
+    expect(r.class).not.toBe('auto_reply');
+  });
+});
+
+describe('extractReturnDate (pure)', () => {
+  it('parses ISO and Swedish prose return dates', () => {
+    expect(extractReturnDate('är åter 2026-07-20')).toBe('2026-07-20');
+    expect(extractReturnDate('åter 20 juli', { todayIso: '2026-07-05' })).toBe('2026-07-20');
+    expect(extractReturnDate('tillbaka 3 augusti 2026')).toBe('2026-08-03');
+  });
+  it('returns null on no date or an impossible date', () => {
+    expect(extractReturnDate('ingen dag alls')).toBeNull();
+    expect(extractReturnDate('31 februari')).toBeNull();
   });
 });
 

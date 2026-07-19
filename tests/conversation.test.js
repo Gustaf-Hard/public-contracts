@@ -71,6 +71,14 @@ describe('nextActionForClassification', () => {
     expect(r.nextState).toBe('INITIAL');
     expect(r.action).toBe('none');
   });
+
+  it('auto_reply (machine autosvar) → state unchanged, action none (never escalate, never reply)', () => {
+    for (const state of ['SENT', 'ACK_RECEIVED', 'AWAITING_PRECISION', 'DELIVERING']) {
+      const r = nextActionForClassification(state, 'auto_reply');
+      expect(r.nextState).toBe(state); // stays in its current waiting state
+      expect(r.action).toBe('none');   // no draft, no escalation — mirrors auto_ack, unlike delay_promise
+    }
+  });
 });
 
 describe('staleAction', () => {

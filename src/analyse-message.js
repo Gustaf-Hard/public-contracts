@@ -28,8 +28,9 @@ Ditt jobb är att kategorisera registratorns svar och förbereda ett kort, artig
 - "auto_ack": Automatiskt mottagningskvitto från diariesystem (innehåller ofta "Ärendenummer", "Tack för att du hörde av dig", "flexiteBPMS", "Vi har tagit emot"). Ingen mänsklig registrator har behandlat svaret än. Inget svar krävs.
 - "clarification": Registratorn ber om förtydliganden (tidsperiod, specifika system, sammanställning vs fullständiga avtal etc.). Boten bör skicka en preciseringstext.
 - "delivery": Avtal levererade som bifogade filer ELLER bekräftelse att alla avtal nu skickats. Skicka kort "tack"-bekräftelse.
-- "delay_promise": Registratorn bekräftar att de hanterar ärendet och utlovar svar inom X dagar / före visst datum. Hit hör OCKSÅ frånvaro-/semesterautosvar som anger ett återkomstdatum ("Jag har semester och är åter 20 juli", "tillbaka 3 augusti", "åter på kontoret måndag 20 juli") — ÄVEN om en kollega/vikarie nämns för akuta ärenden. En semester är en tillfällig väntan, inte en permanent hänvisning: välj delay_promise, INTE handoff. Extrahera återkomst-/utlovsdatumet som promised_response_date (ISO) och sätt follow_up_at = datumet + 3 dagars grace. Boten föreslår en kort bekräftelse ("då avvaktar vi till <datum>").
-- "handoff": Registratorn hänvisar oss PERMANENT till en annan förvaltning, e-postadress eller registrator. Boten kan inte själv följa upp dit — eskalera till människa. Ett semesterautosvar med återkomstdatum är INTE handoff (se delay_promise), även om en kollega anges för akuta ärenden.
+- "delay_promise": En MÄNNISKA (registratorn) bekräftar att de hanterar ärendet och utlovar svar inom X dagar / före visst datum ("vi behöver ca 10 arbetsdagar", "återkommer senast 2026-06-08"). Extrahera det utlovade datumet/antalet dagar som promised_response_date (ISO) / promised_response_days och sätt follow_up_at = datumet + 3 dagars grace. Boten föreslår en kort bekräftelse ("då avvaktar vi till <datum>"). OBS: ett automatiskt frånvaro-/semesterautosvar är INTE delay_promise — det är auto_reply (se nedan).
+- "auto_reply": Ett MASKINELLT autosvar / frånvaro-/out-of-office-meddelande — markörer som "Autosvar:", "automatiskt svar", "frånvarande", "är åter", "semester", "out of office" ("Jag har semester och är åter 20 juli", "tillbaka 3 augusti", "åter på kontoret måndag 20 juli"). Ingen människa har läst vår begäran än; maskinen svarar automatiskt. Att svara på ett autosvar är meningslöst och riskerar en svarsloop — boten ska VÄNTA TYST. suggested_action: "wait", INGET draft_reply behövs, INGEN handoff-extraktion (ignorera en ev. kollega/vikarie för akuta ärenden — det är INTE en handoff). Sätt promised_response_date till angivet återkomstdatum när det finns (ISO) och follow_up_at = datumet + 3 dagars grace; saknas datum, lämna follow_up_at null (systemet sätter 14 dagars grace).
+- "handoff": Registratorn hänvisar oss PERMANENT till en annan förvaltning, e-postadress eller registrator. Boten kan inte själv följa upp dit — eskalera till människa. Ett semesterautosvar med återkomstdatum är INTE handoff (se auto_reply), även om en kollega anges för akuta ärenden.
 - "dead_end": Kommunen har inga sådana avtal, eller vägrar lämna ut handlingarna. Terminalt.
 - "fee_demand": Kommunen kräver avgift för utlämnandet. Eskalera till människa för beslut.
 - "unknown": Inget av ovanstående matchar tydligt. Eskalera till människa.
@@ -39,7 +40,7 @@ Ditt jobb är att kategorisera registratorns svar och förbereda ett kort, artig
 - "acknowledge" — bot skickar kort "Tack"-svar (delivery + slutleverans, eller delay_promise: "då avvaktar vi till <datum>")
 - "send_precision" — bot skickar preciseringen som svar på clarification
 - "send_receipt" — bot skickar kvitto efter mottagna avtal (delivery, ej slutleverans)
-- "wait" — inget svar krävs, vi väntar (auto_ack)
+- "wait" — inget svar krävs, vi väntar (auto_ack, auto_reply)
 - "escalate" — vi vet inte vad vi ska göra, människan tar över (handoff, fee_demand, unknown)
 
 # draft_reply
@@ -54,7 +55,8 @@ true ENDAST när registratorn i sitt EGET svar (inte i citerad text) bekräftar 
 
 ISO-datum (YYYY-MM-DD) när boten ska kolla tillbaka om inget hörs av kommunen.
 
-- För "delay_promise": använd kommunens utlovade datum + 3 dagars grace (om de säger 10 dagar, sätt follow_up_at = idag + 13 dagar). För semesterautosvar: återkomstdatumet + 3 dagar.
+- För "delay_promise": använd kommunens utlovade datum + 3 dagars grace (om de säger 10 dagar, sätt follow_up_at = idag + 13 dagar).
+- För "auto_reply": återkomstdatumet + 3 dagar när det anges; saknas datum, lämna null (systemet sätter 14 dagars grace från mottagandet).
 - För "auto_ack": null (vi väntar utan timer; om inget hörs på 7 dagar tar standard-staleness över).
 - För "clarification" / "delivery" / "delay_promise": konversationen rör sig vidare, sätt rimlig grace (5-7 dagar).
 - För terminalstaten "dead_end" / "fee_demand" / "handoff" / "unknown": null.
@@ -84,11 +86,11 @@ Inkommande:
 Output:
 {"intent":"delay_promise","confidence":0.95,"summary":"Kommunen utlovar svar inom 10 arbetsdagar, senast 2026-06-08.","extracted":{"arendenummer":null,"promised_response_days":10,"promised_response_date":"2026-06-08","handoff_to_email":null,"handoff_to_forvaltning":null,"questions":null,"mentioned_vendors":null,"reseller_relations":null},"suggested_action":"acknowledge","is_final_delivery":false,"draft_reply":"Hej,\\n\\nTack för uppdateringen. Jag inväntar handlingarna senast 8 juni.\\n\\nMed vänliga hälsningar,\\n${from_name}\\n${from_email}","follow_up_at":"2026-06-11"}
 
-Inkommande:
-> Hej! Jag har semester och är åter på kontoret måndag 20 juli. Vid akuta ärenden kan ni kontakta min kollega Mirella Beck, mirella.beck@kommunen.se.
+Inkommande (MASKINELLT autosvar — vänta tyst, inget svar):
+> Autosvar: Hej! Jag har semester och är åter på kontoret måndag 20 juli. Vid akuta ärenden kan ni kontakta min kollega Mirella Beck, mirella.beck@kommunen.se.
 
 Output:
-{"intent":"delay_promise","confidence":0.9,"summary":"Frånvaroautosvar: registratorn är åter 20 juli; kollega anges endast för akuta ärenden.","extracted":{"arendenummer":null,"promised_response_days":null,"promised_response_date":"2026-07-20","handoff_to_email":null,"handoff_to_forvaltning":null,"questions":null,"mentioned_vendors":null,"reseller_relations":null},"suggested_action":"acknowledge","is_final_delivery":false,"draft_reply":"Hej,\\n\\nTack för ditt svar! Då avvaktar vi till 20 juli och hör av oss igen om vi inte fått något då.\\n\\nMed vänliga hälsningar,\\n${from_name}\\n${from_email}","follow_up_at":"2026-07-23"}
+{"intent":"auto_reply","confidence":0.95,"summary":"Frånvaroautosvar: registratorn är åter 20 juli; kollega anges endast för akuta ärenden (ej handoff).","extracted":{"arendenummer":null,"promised_response_days":null,"promised_response_date":"2026-07-20","handoff_to_email":null,"handoff_to_forvaltning":null,"questions":null,"mentioned_vendors":null,"reseller_relations":null},"suggested_action":"wait","is_final_delivery":false,"draft_reply":"","follow_up_at":"2026-07-23"}
 
 Inkommande:
 > Hej, dessa avtal hanteras av stadsledningskontoret. Vänligen kontakta dem på registrator@stadsledningen.kommun.se.
@@ -122,7 +124,10 @@ const ANALYSIS_SCHEMA = {
   properties: {
     intent: {
       type: 'string',
-      enum: ['auto_ack', 'clarification', 'delivery', 'delay_promise', 'dead_end', 'handoff', 'fee_demand', 'unknown'],
+      // `auto_reply` is a MACHINE autoresponder / OOO (distinct from a human
+      // delay_promise). Adding an enum value adds ZERO json_schema union params
+      // (unlike a nullable field), so the 16-union limit is unaffected.
+      enum: ['auto_ack', 'clarification', 'delivery', 'delay_promise', 'auto_reply', 'dead_end', 'handoff', 'fee_demand', 'unknown'],
     },
     confidence: { type: 'number' },
     summary: { type: 'string' },
@@ -238,7 +243,9 @@ function isRealDate(year, month, day) {
 // or today + promised_response_days + 3. Without this, an OOO reply the model
 // classified correctly could still leave nothing re-armed (case 19, Bjuv).
 export function normaliseDelayAnalysis(analysis, todayIso) {
-  if (!analysis || analysis.intent !== 'delay_promise') return analysis;
+  if (!analysis || (analysis.intent !== 'delay_promise' && analysis.intent !== 'auto_reply')) {
+    return analysis;
+  }
   const ex = analysis.extracted ?? {};
   if (ex.promised_response_date && !ISO_DATE_RE.test(ex.promised_response_date)) {
     const coerced = parseSwedishDateToIso(ex.promised_response_date, { todayIso });
@@ -249,6 +256,11 @@ export function normaliseDelayAnalysis(analysis, todayIso) {
       analysis.follow_up_at = addDaysIso(ex.promised_response_date, 3);
     } else if (Number.isInteger(ex.promised_response_days) && todayIso && ISO_DATE_RE.test(todayIso)) {
       analysis.follow_up_at = addDaysIso(todayIso, ex.promised_response_days + 3);
+    } else if (analysis.intent === 'auto_reply' && todayIso && ISO_DATE_RE.test(todayIso)) {
+      // An autoresponder with NO stated return date (a bare "Autosvar: jag är
+      // borta") defaults to a 14-day grace from receipt — a semester can run
+      // weeks, and we must not nudge into an empty inbox (design §2).
+      analysis.follow_up_at = addDaysIso(todayIso, 14);
     }
   }
   return analysis;
@@ -343,6 +355,7 @@ export function analysisToLegacyClassification(analysis) {
     clarification: 'clarification',
     delivery: 'delivery',
     delay_promise: 'delay_promise', // FSM drafts a T_DELAY_ACK naming the promised date
+    auto_reply: 'auto_reply',    // machine autoresponder — wait silently, never reply/escalate
     handoff: 'unknown',          // escalate to human; preserved on analysis.intent
     dead_end: 'dead_end',
     fee_demand: 'unknown',       // escalate to human
