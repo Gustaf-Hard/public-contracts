@@ -11,6 +11,7 @@ import { extractSignature } from './extract-signature.js';
 import { analyseMessage, analysisToLegacyClassification, addDaysIso } from './analyse-message.js';
 import { analysePendingContracts } from './analyse-contract.js';
 import { isInVacation, vacationDaysBetween } from './vacation.js';
+import { isBounce, failedRecipient } from './bounce.js';
 
 const TEMPLATES = { T_INITIAL, T_PRECISION, T_RECEIPT, T_FOLLOWUP_NUDGE, T_FOLLOWUP_CLOSE, T_REQUEST_MISSING, T_UPDATE, T_DELAY_ACK };
 
@@ -138,7 +139,7 @@ async function recoverStuckSends(deps) {
   }
 }
 
-async function escalateWithDraft({ conv, parsedInbound, messageId = null, classification, previousState, draftTemplate, llmDraft, reason, templateCtx = {}, watchlistVendors = [], deps }) {
+async function escalateWithDraft({ conv, parsedInbound, messageId = null, classification, previousState, draftTemplate, llmDraft, reason, templateCtx = {}, watchlistVendors = [], draftSubject = null, draftBody = null, deps }) {
   const { db, slackClient, slackOps, env, log } = deps;
 
   // Never create a draft next to an unresolved send (hardening findings 2/3).
@@ -179,7 +180,13 @@ async function escalateWithDraft({ conv, parsedInbound, messageId = null, classi
 
   let subject = '(no subject)';
   let body = '';
-  if (llmDraft) {
+  if (draftSubject != null || draftBody != null) {
+    // Explicit draft (e.g. a bounce resend carries the ORIGINAL T-INITIAL
+    // subject/body verbatim so the operator sees exactly what will be resent).
+    // No template/LLM path applies.
+    subject = draftSubject ?? subject;
+    body = draftBody ?? body;
+  } else if (llmDraft) {
     const baseSubject = parsedInbound?.subject?.replace(/^Re: /, '') ?? 'Begäran om allmänna handlingar';
     subject = `Re: ${baseSubject}`;
     body = llmDraft.body;
@@ -431,6 +438,67 @@ async function ingestMessage({ conv, item, deps }) {
   };
 }
 
+// Ingest a delivery-failure notification (bounce / NDR) — NOT a kommun reply
+// (2026-07-19 bounce-handling design §2). A bounce means the T-INITIAL reached
+// nobody, so drafting a reply to mailer-daemon is meaningless; the real problem
+// is a dead address that needs a corrected recipient + resend.
+//
+// Deliberately skips the LLM analysis and the reply-draft path entirely:
+//  - The message is still STORED (no data loss) with classification 'bounce'
+//    (a new string value in the existing TEXT column — no schema change).
+//  - The conversation moves to NEEDS_HUMAN.
+//  - ONE bounce escalation is opened via escalateWithDraft, so the
+//    one-open-escalation invariant + supersede logic still hold. It carries the
+//    ORIGINAL T-INITIAL subject/body as the draft (what the operator resends)
+//    and classifier_class='bounce' / draft_template='T_RESEND_BAD_ADDRESS' so
+//    the dashboard renders the address-entry resend form instead of a reply box.
+async function ingestBounce({ conv, item, deps }) {
+  const { db, env, now } = deps;
+  const { full, parsed } = item;
+  const receivedAt = parsed.internal_date ?? now.toISOString();
+
+  const previousState = conv.state;
+  // Store the bounce atomically (thread + message), no LLM, no attachments.
+  db.transaction(() => {
+    const thread = db.upsertThread({
+      conversation_id: conv.id,
+      gmail_thread_id: full.threadId,
+      counterparty_email: parsed.from,
+      counterparty_name: parsed.from,
+      last_inbound_at: receivedAt,
+    });
+    db.recordMessage({
+      conversation_id: conv.id, gmail_message_id: item.id, direction: 'inbound',
+      from_email: parsed.from, to_email: parsed.to,
+      subject: parsed.subject, body_text: parsed.body,
+      classification: 'bounce', classification_confidence: null,
+      received_at: receivedAt, attachment_count: parsed.attachments.length,
+      gmail_thread_id: full.threadId,
+      thread_id: thread.id,
+    });
+    db.updateConversationState(conv.id, 'NEEDS_HUMAN', {});
+  });
+
+  // The dead address: prefer the one named in the NDR body, else the address we
+  // last sent to for this conversation.
+  const deadAddress = failedRecipient(parsed.body) ?? conv.contact_email;
+  // The exact T-INITIAL the operator will resend, so the escalation shows it.
+  const initial = T_INITIAL(tplCtx(db.getConversation(conv.id), env));
+
+  await escalateWithDraft({
+    conv: db.getConversation(conv.id),
+    parsedInbound: parsed,
+    messageId: null,
+    classification: { class: 'bounce', confidence: null },
+    previousState,
+    draftTemplate: 'T_RESEND_BAD_ADDRESS',
+    draftSubject: initial.subject,
+    draftBody: initial.body,
+    reason: `Leveransfel: adressen \`${deadAddress}\` finns inte — ange ny adress och skicka om begäran.`,
+    deps,
+  });
+}
+
 // Decide and dispatch the escalation for one ingested message. Runs after ALL
 // inbound is committed (review M6) so the unbounded part — per-PDF Opus
 // analysis — can never leave a half-ingested message behind.
@@ -657,6 +725,13 @@ export async function runTick(deps) {
       seenUnmatched.delete(match.messageId);
       const conv = db.getConversation(match.convId); // fresh — state may have moved this tick
       try {
+        // Bounce short-circuit (2026-07-19 §2): a delivery-failure notification
+        // is not a reply. Store it, skip the LLM/reply-draft path, and open the
+        // resend escalation directly — BEFORE any analysis is even attempted.
+        if (isBounce({ from_email: item.parsed.from, subject: item.parsed.subject, body_text: item.parsed.body })) {
+          await ingestBounce({ conv, item, deps });
+          continue;
+        }
         pendingEscalations.push(await ingestMessage({ conv, item, deps }));
       } catch (e) {
         // Nothing was committed for this message — it is retried next tick.

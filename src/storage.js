@@ -313,7 +313,7 @@ export function openDb(path) {
   }
 
   function updateConversationState(id, state, patch = {}) {
-    const allowed = ['gmail_thread_id', 'last_outbound_at', 'arendenummer', 'notes', 'followup_count', 'receipt_sent', 'follow_up_at', 'next_review_at', 'next_review_source', 'refresh_round'];
+    const allowed = ['gmail_thread_id', 'last_outbound_at', 'arendenummer', 'notes', 'followup_count', 'receipt_sent', 'follow_up_at', 'next_review_at', 'next_review_source', 'refresh_round', 'contact_email'];
     const sets = ["state = ?", "state_changed_at = datetime('now')"];
     const values = [state];
     for (const k of allowed) {

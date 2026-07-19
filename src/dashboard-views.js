@@ -989,6 +989,51 @@ export function renderEscalationForm(esc, gmailReady, returnTo = null) {
   const watchBanner = Array.isArray(watchVendors) && watchVendors.length
     ? `<div class="esc-watchlist">⚠️ Bevakad leverantör: ${escapeHtml(watchVendors.join(', '))} — kontrollera innan du svarar.</div>`
     : '';
+
+  // Bounce resend (2026-07-19 bounce-handling design §3): a delivery-failure
+  // escalation is NOT a reply — render a distinct resend form (leveransfel
+  // banner + a REQUIRED corrected-address input + the editable T-INITIAL body),
+  // with no "approve unmodified" affordance. The dead address is parsed out of
+  // the reason (`adressen \`<addr>\` finns inte`), shown struck-through.
+  if (esc.classifier_class === 'bounce' || esc.draft_template === 'T_RESEND_BAD_ADDRESS') {
+    const deadMatch = (esc.reason ?? '').match(/`([^`]+)`/);
+    const deadAddress = deadMatch ? deadMatch[1] : '';
+    const deadContext = deadAddress
+      ? `<span class="muted">Tidigare adress: <s>${escapeHtml(deadAddress)}</s></span>`
+      : '';
+    return `
+      <div class="esc-watchlist">⚠️ Leveransfel: begäran nådde aldrig fram${deadAddress ? ` — adressen <s>${escapeHtml(deadAddress)}</s> finns inte.` : '.'} Ange en ny adress och skicka om begäran.</div>
+      <form class="action-form" method="post" action="/escalations/${esc.id}"${paneAttrs}>
+        ${returnField}
+        <input type="hidden" name="action" value="edit">
+        <div class="field">
+          <label>Ny adress (obligatorisk)</label>
+          ${deadContext}
+          <!-- type=text, not email: kan vara "Namn <adress>". Required so en
+               tom adress aldrig skickas till den döda adressen. -->
+          <input type="text" name="finalTo" value="" required placeholder="ny.adress@kommun.se">
+        </div>
+        <div class="field">
+          <label>Ämne</label>
+          <input type="text" name="subject" value="${escapeHtml(esc.draft_subject ?? '')}">
+        </div>
+        <div class="field">
+          <label>Brödtext (T-INITIAL)</label>
+          <textarea name="body">${escapeHtml(esc.draft_body ?? '')}</textarea>
+        </div>
+        <div class="buttons">
+          <button class="btn ${gmailReady ? 'btn-primary' : 'btn-disabled'}" type="submit" ${disabled}>📨 Skicka om begäran (T-INITIAL)</button>
+          ${warn}
+        </div>
+      </form>
+      <form method="post" action="/escalations/${esc.id}" style="margin-top:8px"${paneAttrs}>
+        ${returnField}
+        <input type="hidden" name="action" value="skip">
+        <button class="btn btn-secondary" type="submit"
+          onclick="return confirm('Hoppa över denna eskalering utan att svara?')">Hoppa över</button>
+      </form>`;
+  }
+
   return `
     ${watchBanner}
     <form class="action-form" method="post" action="/escalations/${esc.id}"${paneAttrs}>

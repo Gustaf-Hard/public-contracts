@@ -372,6 +372,66 @@ describe('runTick — same-named attachments do not overwrite (M11)', () => {
   });
 });
 
+describe('runTick — bounce short-circuit (§2)', () => {
+  const lundBody = "** Address not found **\n\nYour message wasn't delivered to kansli@ale.se because the address couldn't be found, or is unable to receive mail.";
+
+  it('stores a bounce, skips the LLM + reply-draft, moves conv to NEEDS_HUMAN, opens ONE bounce escalation', async () => {
+    // The LLM must NOT be called on a bounce.
+    const spy = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue(null);
+    const id = seedConv({ email: 'kansli@ale.se', thread: 'thr-a' });
+    const slackOps = fakeSlackOps();
+    const gmail = fakeGmail({
+      listResult: [{ id: 'bnc-1' }],
+      getResult: {
+        'bnc-1': mkMsg('bnc-1', 'thr-a', 'Mail Delivery Subsystem <mailer-daemon@googlemail.com>', lundBody, { subject: 'Delivery Status Notification (Failure)' }),
+      },
+    });
+    await runTick(deps({ gmail, slackOps }));
+    // The LLM was never consulted for the bounce — assert BEFORE mockRestore,
+    // which clears the mock's call history.
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
+
+    // Stored (no data loss) with classification 'bounce'.
+    const msg = db.raw.prepare("SELECT * FROM messages WHERE gmail_message_id='bnc-1'").get();
+    expect(msg).toBeTruthy();
+    expect(msg.classification).toBe('bounce');
+
+    // Conversation needs a human.
+    expect(db.getConversation(id).state).toBe('NEEDS_HUMAN');
+
+    // Exactly ONE open bounce escalation, carrying the T-INITIAL as the resend
+    // draft and naming the dead address.
+    const open = db.raw.prepare("SELECT * FROM escalations WHERE conversation_id=? AND status='open'").all(id);
+    expect(open).toHaveLength(1);
+    expect(open[0].classifier_class).toBe('bounce');
+    expect(open[0].draft_template).toBe('T_RESEND_BAD_ADDRESS');
+    expect(open[0].reason).toMatch(/kansli@ale\.se/);
+    expect(open[0].draft_subject).toMatch(/Begäran om allmänna handlingar/);
+    expect(open[0].draft_body).toMatch(/offentlighetsprincipen/);
+  });
+
+  it('a normal (non-bounce) reply is unaffected — LLM path still runs and no bounce escalation is made', async () => {
+    const spy = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue(null);
+    const id = seedConv({ email: 'kansli@ale.se', thread: 'thr-a' });
+    const gmail = fakeGmail({
+      listResult: [{ id: 'ok-1' }],
+      getResult: { 'ok-1': mkMsg('ok-1', 'thr-a', 'K <kansli@ale.se>', 'Ärendenummer: K1440001') },
+    });
+    await runTick(deps({ gmail }));
+    // Assert BEFORE mockRestore (which clears call history): the LLM path WAS
+    // attempted for a normal reply (unlike a bounce, which short-circuits it).
+    expect(spy).toHaveBeenCalled();
+    spy.mockRestore();
+
+    const msg = db.raw.prepare("SELECT * FROM messages WHERE gmail_message_id='ok-1'").get();
+    expect(msg.classification).not.toBe('bounce');
+    const bounceEsc = db.raw.prepare("SELECT COUNT(*) n FROM escalations WHERE classifier_class='bounce'").get().n;
+    expect(bounceEsc).toBe(0);
+    expect(db.getConversation(id).state).toBe('ACK_RECEIVED');
+  });
+});
+
 describe('fetch window derived from last_success_at (H3)', () => {
   const now = new Date('2026-08-20T12:00:00Z');
   it('floors at 30 days for recent success and with no history', () => {
