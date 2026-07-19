@@ -7,9 +7,10 @@ import { renderKommunDetail } from '../src/dashboard-views.js';
 
 const kommun = { kommun_kod: '1980', kommun_namn: 'Västerås', lan: 'Västmanland', folkmangd: 1, contacts: [] };
 
-// One DONE conversation with two inbound messages: one mentions Skolon +
-// Läromedia in prose, one carries a CONFIRMED Skolon contract attachment.
-function baseArgs({ mentioned = ['Skolon', 'Läromedia'], confirmedVendorName = 'Skolon' } = {}) {
+// One DONE conversation with two inbound messages: one mentions channels
+// (Skolon, Läromedia) AND real product vendors (NE, Magma) in prose, one
+// carries a CONFIRMED Skolon contract attachment.
+function baseArgs({ mentioned = ['Skolon', 'Läromedia', 'NE', 'Magma'], confirmedVendorName = 'Skolon' } = {}) {
   const conversations = [{
     id: 1, kommun_kod: '1980', kommun_namn: 'Västerås', role: 'central',
     state: 'DONE', contact_email: 'reg@vasteras.se',
@@ -42,8 +43,9 @@ describe('renderKommunDetail — Leverantörer panel + Köper via', () => {
   });
 
   it('splits the Leverantörer section into "Avtal bekräftat" and "Nämnda"', () => {
+    // Skolon (confirmed) + NE + Magma (mentioned non-channel) = 3 distinct.
     const html = renderKommunDetail(baseArgs());
-    expect(html).toMatch(/Leverantörer \(2\)/);
+    expect(html).toMatch(/Leverantörer \(3\)/);
     expect(html).toContain('Avtal bekräftat');
     expect(html).toContain('Nämnda');
   });
@@ -55,14 +57,26 @@ describe('renderKommunDetail — Leverantörer panel + Köper via', () => {
     const panel = html.slice(html.indexOf('Leverantörer ('), html.indexOf('E-postadresser'));
     expect(panel.slice(0, panel.indexOf('Nämnda'))).toContain('Skolon'); // confirmed side
     const namndaPart = panel.slice(panel.indexOf('Nämnda'));
-    expect(namndaPart).toContain('Läromedia'); // mentioned only
+    expect(namndaPart).toContain('NE'); // mentioned, non-channel
     expect(namndaPart).not.toContain('Skolon'); // confirmed → excluded from Nämnda
   });
 
-  it('reseller channel vendors get the 🛒 pill', () => {
+  it('reseller-channel names are NOT listed as chips (only in the Köper via line)', () => {
     const html = renderKommunDetail(baseArgs());
-    expect(html).toContain('🛒');
-    expect(html).toContain('pill-reseller');
+    const panel = html.slice(html.indexOf('Leverantörer ('), html.indexOf('E-postadresser'));
+    const namndaPart = panel.slice(panel.indexOf('Nämnda'));
+    // Läromedia is a channel and only mentioned — it must not appear as a
+    // "Nämnda" chip (it lives in the "Köper via ramavtal" line).
+    expect(namndaPart).not.toContain('Läromedia');
+  });
+
+  it('no redundant per-chip 🛒 pill; the channel is stated once in the Köper via line', () => {
+    const html = renderKommunDetail(baseArgs());
+    // The per-chip pill rendered the label "🛒 ramavtal"; it's gone now. (Note:
+    // the ".pill-reseller" CSS rule still lives in the <style> block, so assert
+    // on the rendered label, not the class name.)
+    expect(html).not.toContain('🛒 ramavtal');
+    expect(html).toContain('Köper via ramavtal:'); // the single canonical line stays
   });
 
   it('main column no longer contains the old "Nämnda leverantörer" heading', () => {

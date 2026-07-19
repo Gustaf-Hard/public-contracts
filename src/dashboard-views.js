@@ -1189,26 +1189,29 @@ export function renderKommunDetail({ kommun, conversations, messagesByConv, atta
   // Reseller/framework channels this kommun buys via — union of confirmed +
   // mentioned vendor names run through the curated matcher (src/resellers.js).
   const channels = matchResellers([...mentionedVendors, ...confirmedVendors]);
-  const channelSet = new Set(channels.map((c) => c.toLowerCase()));
+  // Reseller/framework channels are named ONCE in the "Köper via ramavtal"
+  // line below. They must not also appear as "Nämnda" chips — that just
+  // duplicated the line and cluttered the panel (ADDA/Skolon/Läromedia noise).
+  const isChannelName = (v) => matchResellers([v]).length > 0;
   // A confirmed contract vendor must NEVER also appear under "Nämnda" — the
-  // stronger claim wins (data-honesty).
+  // stronger claim wins (data-honesty). Confirmed avtal chips stay as-is
+  // (including a signed avtal that happens to be with a reseller).
   const confirmedLower = new Set(confirmedVendors.map((v) => v.toLowerCase()));
-  const mentionedOnly = mentionedVendors.filter((v) => !confirmedLower.has(v.toLowerCase()));
+  const mentionedOnly = mentionedVendors.filter(
+    (v) => !confirmedLower.has(v.toLowerCase()) && !isChannelName(v)
+  );
   const vendorCount = new Set(
     [...confirmedVendors, ...mentionedOnly].map((v) => v.toLowerCase())
   ).size;
 
   // Render one vendor as a chip: link to /leverantor/:slug when known, else
-  // plain; reseller-channel names get a muted 🛒 pill.
+  // plain. No per-chip reseller pill — the channel is named once in the
+  // "Köper via ramavtal" line.
   const renderVendorChip = (v, { muted = false } = {}) => {
     const slug = vendorSlugsByName.get(v.toLowerCase());
-    const inner = slug
+    return slug
       ? `<a class="tag${muted ? ' muted' : ''}" href="/leverantor/${escapeHtml(slug)}">${escapeHtml(v)}</a>`
       : `<span class="tag${muted ? ' muted' : ''}">${escapeHtml(v)}</span>`;
-    const pill = channelSet.has(v.toLowerCase())
-      ? ` <span class="pill pill-reseller" title="${escapeHtml('Kommunen köper via ramavtal/återförsäljare — produkter kan finnas den vägen utan direktavtal med leverantören')}">🛒 ramavtal</span>`
-      : '';
-    return `${inner}${pill}`;
   };
   const needsHumanCount = conversations.filter((c) => c.state === 'NEEDS_HUMAN').length;
 
