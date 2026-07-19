@@ -18,6 +18,8 @@ import {
   renderOverview,
   renderArenden,
   renderKommunDetail,
+  renderThread,
+  groupEscalationsByThread,
   renderActivity,
   renderCompose,
   renderVendorMarket,
@@ -719,6 +721,60 @@ export function createDashboardApp({
       vendorSlugsByName,
       resellerRelationsByVendor,
       handoffContacts,
+      heartbeat: hb(), partial: isPartial(req), escalationCount: escCount(),
+    }));
+  });
+
+  // Focused thread page (2026-07-19 open-thread design). Loads one thread, its
+  // conversation (verified to belong to :kommun_kod), the thread's messages +
+  // attachments + signatures, and its open escalations. Unknown thread or a
+  // kommun mismatch → 404 landing on the kommun page. Presentation only — the
+  // send-safety path (escalation forms, POST actions) is untouched.
+  app.get('/kommun/:kommun_kod/trad/:threadId', (req, res) => {
+    res.set('Content-Type', 'text/html; charset=utf-8');
+    const municipalities = municipalitiesLoader();
+    const kommun = municipalities.find((m) => m.kommun_kod === req.params.kommun_kod);
+    const notFound = () => {
+      res.status(404);
+      return res.send(renderKommunDetail({ kommun: null, partial: isPartial(req), escalationCount: escCount() }));
+    };
+    if (!kommun || !db) return notFound();
+
+    const thread = db.getThreadById(parseInt(req.params.threadId, 10));
+    if (!thread) return notFound();
+    const conv = db.getConversation(thread.conversation_id);
+    // A thread whose conversation belongs to a different kommun must 404 — never
+    // leak another kommun's thread under this URL.
+    if (!conv || conv.kommun_kod !== kommun.kommun_kod) return notFound();
+
+    const messages = db.raw
+      .prepare('SELECT * FROM messages WHERE conversation_id = ? AND thread_id = ? ORDER BY received_at, id')
+      .all(conv.id, thread.id);
+    const attachmentsByMsg = {};
+    const signatures = {};
+    for (const m of messages) {
+      const atts = db.raw.prepare('SELECT * FROM attachments WHERE message_id = ?').all(m.id);
+      if (atts.length) attachmentsByMsg[m.id] = atts;
+      if (m.signature_extracted) {
+        const sig = parseSignatureJson(m.signature_extracted);
+        if (sig) signatures[m.id] = sig;
+      }
+    }
+    // Open escalations tied to THIS thread (by triggering message's thread_id,
+    // else by recipient↔counterparty match — same grouping as the kommun page).
+    const threads = db.listThreadsForConversation(conv.id);
+    const openEscs = db.raw
+      .prepare("SELECT * FROM escalations WHERE conversation_id = ? AND status = 'open' ORDER BY created_at DESC")
+      .all(conv.id)
+      .map((e) => {
+        const trigMsg = e.message_id ? db.getMessageById(e.message_id) : null;
+        return { ...e, recipient: escalationRecipient(db, e, conv), thread_id: trigMsg?.thread_id ?? null };
+      });
+    const escalations = groupEscalationsByThread(openEscs, threads).get(thread.id) ?? [];
+
+    res.send(renderThread({
+      kommun, conv, thread, messages, attachmentsByMsg, signatures, escalations,
+      gmailReady: !!gmailClient,
       heartbeat: hb(), partial: isPartial(req), escalationCount: escCount(),
     }));
   });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { threadPreview, threadMessage, renderThreadGroups } from '../src/dashboard-views.js';
+import { threadPreview, threadMessage, renderThreadGroups, renderThreadList, renderThread } from '../src/dashboard-views.js';
 
 const msg = (o = {}) => ({
   id: 1, direction: 'inbound', from_email: 'a@x.se', to_email: 'me@x.se',
@@ -110,6 +110,102 @@ describe('renderThreadGroups', () => {
     );
     expect(html).toContain('Ogrupperat');
     expect(html).toContain('orphan-body');
+  });
+});
+
+describe('renderThreadList (flat Gmail-style kommun list)', () => {
+  const row = (o = {}) => ({
+    thread: { id: 10, status: 'neutral', counterparty_email: 'anna@x.se', counterparty_name: 'Anna Berg' },
+    conv: { id: 3, role: 'central' },
+    msgs: [msg({ id: 1, thread_id: 10, subject: 'SV: Begäran', body_text: 'Kort svar' })],
+    atts: [],
+    needsAction: false,
+    ...o,
+  });
+
+  it('renders each row as an anchor to /kommun/:kod/trad/:threadId (not an accordion)', () => {
+    const html = renderThreadList([row()], { kommunKod: '2418' });
+    expect(html).toContain('href="/kommun/2418/trad/10"');
+    expect(html).not.toContain('data-thread-toggle');
+    expect(html).not.toContain('data-thread-body');
+  });
+
+  it('shows the Ärende tag (#conv · roll)', () => {
+    const html = renderThreadList([row()], { kommunKod: '2418' });
+    expect(html).toContain('#3 · central');
+  });
+
+  it('renders attachment chips on the row', () => {
+    const html = renderThreadList([row({ atts: [{ id: 500, filename: 'Avtal.pdf', mime_type: 'application/pdf' }] })], { kommunKod: '2418' });
+    expect(html).toContain('thread-atts');
+    expect(html).toContain('href="/attachments/500"');
+    expect(html).toContain('att-pdf'); // red PDF pill
+  });
+
+  it('shows a ★ only for a primary thread', () => {
+    const primary = renderThreadList([row({ thread: { id: 1, status: 'primary', counterparty_email: 'a@x.se', counterparty_name: 'A' } })], { kommunKod: '2418' });
+    const neutral = renderThreadList([row({ thread: { id: 2, status: 'neutral', counterparty_email: 'b@x.se', counterparty_name: 'B' } })], { kommunKod: '2418' });
+    expect(primary).toContain('thread-star');
+    expect(neutral).not.toContain('thread-star');
+  });
+
+  it('marks a thread with an open escalation "behöver åtgärd"', () => {
+    const html = renderThreadList([row({ needsAction: true })], { kommunKod: '2418' });
+    expect(html).toContain('behöver åtgärd');
+    expect(html).toContain('thread-needs-action');
+  });
+
+  it('sorts rows newest-message-first', () => {
+    const html = renderThreadList([
+      row({ thread: { id: 1, status: 'neutral', counterparty_email: 'old@x.se', counterparty_name: 'Old Sender' }, msgs: [msg({ id: 1, thread_id: 1, received_at: '2026-06-08T00:00:00Z' })] }),
+      row({ thread: { id: 2, status: 'neutral', counterparty_email: 'new@x.se', counterparty_name: 'New Sender' }, msgs: [msg({ id: 2, thread_id: 2, received_at: '2026-06-23T00:00:00Z' })] }),
+    ], { kommunKod: '2418' });
+    expect(html.indexOf('New Sender')).toBeLessThan(html.indexOf('Old Sender'));
+  });
+
+  it('returns empty string for no rows', () => {
+    expect(renderThreadList([], { kommunKod: '2418' })).toBe('');
+  });
+});
+
+describe('renderThread (focused thread page)', () => {
+  const base = (o = {}) => ({
+    kommun: { kommun_kod: '2418', kommun_namn: 'Malå' },
+    conv: { id: 7, role: 'central', kommun_kod: '2418' },
+    thread: { id: 10, status: 'primary', counterparty_email: 'anna@x.se', counterparty_name: 'Anna Berg' },
+    messages: [msg({ id: 1, thread_id: 10, subject: 'SV: Begäran', body_text: 'Hej från kommunen' })],
+    attachmentsByMsg: {},
+    signatures: {},
+    escalations: [],
+    gmailReady: true,
+    ...o,
+  });
+
+  it('renders a back link to the kommun page, the subject, and the messages', () => {
+    const html = renderThread(base());
+    expect(html).toContain('href="/kommun/2418"');
+    expect(html).toContain('Malå');
+    expect(html).toContain('Begäran');
+    expect(html).toContain('Hej från kommunen');
+    expect(html).toContain('Ärende #7 · central');
+  });
+
+  it('renders the primary/muted status control', () => {
+    const html = renderThread(base());
+    expect(html).toContain('action="/threads/10/status"');
+    expect(html).toContain('primary');
+  });
+
+  it('renders the open escalation reply form with returnTo = the focused thread URL', () => {
+    const html = renderThread(base({ escalations: [{ id: 5, recipient: 'anna@x.se', draft_subject: 'Re: SV', draft_body: 'mitt-utkast' }] }));
+    expect(html).toContain('action="/escalations/5"');
+    expect(html).toContain('mitt-utkast');
+    expect(html).toContain('value="/kommun/2418/trad/10"'); // returnTo
+  });
+
+  it('404-style body when the thread is missing', () => {
+    const html = renderThread({ kommun: { kommun_kod: '2418', kommun_namn: 'Malå' }, conv: null, thread: null });
+    expect(html).toContain('Hittade inte');
   });
 });
 
