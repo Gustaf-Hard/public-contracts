@@ -95,6 +95,64 @@ describe('analyseMessage', () => {
     const r = await analyseMessage('Test body', baseCtx, { env: { ANTHROPIC_API_KEY: 'k' }, client });
     expect(r).toBeNull();
   });
+
+  it('carries the reseller_relations array through when the model returns it', async () => {
+    const expected = {
+      intent: 'delivery', confidence: 0.85,
+      summary: 'NE och Magma via Läromedia.',
+      extracted: {
+        arendenummer: null, promised_response_days: null, promised_response_date: null,
+        handoff_to_email: null, handoff_to_forvaltning: null, questions: null,
+        mentioned_vendors: ['NE', 'Magma', 'Läromedia'],
+        reseller_relations: [
+          { vendor: 'NE', ramavtal: 'Läromedia' },
+          { vendor: 'Magma', ramavtal: 'Läromedia' },
+        ],
+      },
+      suggested_action: 'send_receipt', is_final_delivery: false,
+      draft_reply: 'Hej, ...', follow_up_at: null,
+    };
+    const client = fakeClientReturning(expected);
+    const r = await analyseMessage('NE och Magma finns i vårt avtal med Läromedia.', baseCtx, { env: { ANTHROPIC_API_KEY: 'k' }, client });
+    expect(r.extracted.reseller_relations).toEqual([
+      { vendor: 'NE', ramavtal: 'Läromedia' },
+      { vendor: 'Magma', ramavtal: 'Läromedia' },
+    ]);
+    // mentioned_vendors is untouched (back-compat)
+    expect(r.extracted.mentioned_vendors).toEqual(['NE', 'Magma', 'Läromedia']);
+    // the schema declares the field
+    const call = client.messages.create.mock.calls[0][0];
+    const props = call.output_config.format.schema.properties.extracted.properties;
+    expect(props.reseller_relations).toBeTruthy();
+    expect(call.output_config.format.schema.properties.extracted.required).toContain('reseller_relations');
+  });
+
+  it('handles absent / null reseller_relations without error', async () => {
+    const expected = {
+      intent: 'auto_ack', confidence: 0.9, summary: 'Kvitto.',
+      extracted: {
+        arendenummer: 'K1', promised_response_days: null, promised_response_date: null,
+        handoff_to_email: null, handoff_to_forvaltning: null, questions: null,
+        mentioned_vendors: null, reseller_relations: null,
+      },
+      suggested_action: 'wait', is_final_delivery: false, draft_reply: 'Hej', follow_up_at: null,
+    };
+    const r = await analyseMessage('Ärendenummer: K1', baseCtx, { env: { ANTHROPIC_API_KEY: 'k' }, client: fakeClientReturning(expected) });
+    expect(r.extracted.reseller_relations).toBeNull();
+  });
+});
+
+describe('buildSystemPrompt — reseller_relations guidance + few-shot', () => {
+  const prompt = buildSystemPrompt({ from_name: 'Gustaf', from_email: 'gustaf@mediagraf.se' });
+
+  it('documents the reseller_relations field and the honesty rule (never guess)', () => {
+    expect(prompt).toMatch(/reseller_relations/);
+    expect(prompt).toMatch(/Gissa ALDRIG/);
+  });
+
+  it('contains the Läromedia few-shot mapping NE and Magma to the ramavtal', () => {
+    expect(prompt).toMatch(/"reseller_relations":\[\{"vendor":"NE","ramavtal":"Läromedia"\},\{"vendor":"Magma","ramavtal":"Läromedia"\}\]/);
+  });
 });
 
 describe('date helpers (pure)', () => {
