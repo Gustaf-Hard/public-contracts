@@ -74,16 +74,35 @@ export async function sendApprovedReply({ db, gmail, env, conv, esc, finalBody, 
   const subject = finalSubject ?? esc.draft_subject ?? 'Re: Begäran om allmänna handlingar';
   const triggeringMessage = esc.message_id ? db.getMessageById(esc.message_id) : null;
 
+  // Bounce resend (2026-07-19 bounce-handling design §4): the T-INITIAL bounced
+  // off a dead address, so this is a fresh T-INITIAL to a corrected recipient in
+  // a NEW thread — never a reply into the bounce thread. It reuses this exact
+  // two-phase atomic-claim path (nothing bypasses the claim), only the routing
+  // (recipient + thread + target state) differs below.
+  const isBounceResend = esc.draft_template === 'T_RESEND_BAD_ADDRESS' || esc.classifier_class === 'bounce';
+
+  // The corrected address is REQUIRED and must never fall back to the dead one.
+  // Checked before the claim (like the staleness guard) so a rejected resend
+  // leaves the escalation OPEN for the operator to enter an address and retry —
+  // it is never parked, never sent to the bounced address.
+  if (isBounceResend && !(typeof finalTo === 'string' && finalTo.trim())) {
+    throw errWithCode(
+      `Escalation ${esc.id} is a bounce resend: a corrected recipient address is required (the original address bounced).`,
+      'MISSING_RESEND_ADDRESS'
+    );
+  }
+
   // Staleness guard — checked before the claim so a blocked approve leaves the
   // escalation open for re-review rather than parked.
   //
   // A refresh (T_UPDATE) is exempt (findings 1/4): it opens a NEW outreach round
   // and answers no inbound, so a PRIOR round's delivery is not "newer context"
-  // that should block it — it always compares stale by construction. Every other
-  // draft (including proactive follow-ups) keeps the guard: a newer inbound
-  // arriving mid-conversation must still force a re-review.
+  // that should block it — it always compares stale by construction. A bounce
+  // resend is exempt for the same reason (it answers no inbound — the original
+  // never arrived). Every other draft (including proactive follow-ups) keeps the
+  // guard: a newer inbound arriving mid-conversation must still force a re-review.
   const isRefreshEsc = esc.draft_template === 'T_UPDATE' || conv.state === 'REFRESH_DUE';
-  if (decision === 'approve_unmodified' && !isRefreshEsc) {
+  if (decision === 'approve_unmodified' && !isRefreshEsc && !isBounceResend) {
     const escCreated = parseDbTime(esc.created_at);
     // Precision matters here (hardening finding 6):
     //  - Exclude the inbound the draft answers (esc.message_id) — it is by
@@ -128,7 +147,9 @@ export async function sendApprovedReply({ db, gmail, env, conv, esc, finalBody, 
   const to = (typeof finalTo === 'string' && finalTo.trim())
     ? finalTo.trim()
     : (isRefreshSend ? conv.contact_email : resolved.to);
-  const threadId = isRefreshSend ? undefined : (resolved.threadId ?? conv.gmail_thread_id);
+  // A bounce resend goes to a BRAND-NEW thread (like a refresh): never reply into
+  // the bounce thread, so no threadId → no In-Reply-To/References to the NDR.
+  const threadId = (isRefreshSend || isBounceResend) ? undefined : (resolved.threadId ?? conv.gmail_thread_id);
   let sent;
   try {
     sent = await gmailSendImpl(gmail, {
@@ -187,6 +208,14 @@ export async function sendApprovedReply({ db, gmail, env, conv, esc, finalBody, 
     patch.followup_count = 0;  // stale-clock restarts for the new round
     patch.follow_up_at = null;
     patch.gmail_thread_id = sent.threadId ?? null; // the newly-opened thread
+  } else if (isBounceResend) {
+    // The corrected T-INITIAL just went out in a fresh thread: re-enter the
+    // normal reply/delivery FSM at SENT, pointing at the NEW thread + the
+    // CORRECTED address so future inbound matching and follow-up use it. The
+    // original send reached no one, so this is not a double-message.
+    targetState = 'SENT';
+    patch.gmail_thread_id = sent.threadId ?? null;
+    patch.contact_email = to;
   } else if (conv.state === 'NEEDS_HUMAN' && esc.draft_template === 'free_form' && esc.previous_state) {
     targetState = esc.previous_state;
   }
