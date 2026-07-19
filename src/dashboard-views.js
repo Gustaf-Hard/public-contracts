@@ -15,6 +15,7 @@ import {
 } from '../public/explorer-core.js';
 import { GRADE_LEVELS, slugifyProductName } from './vendor-analytics.js';
 import { matchResellers, RESELLERS } from './resellers.js';
+import { canonicalVendorName } from './vendor-aliases.js';
 import { splitQuotedText } from './classifier.js';
 
 // Canonical reseller name → slug, for linking a vendor's framed ramavtal tag
@@ -1214,7 +1215,9 @@ function aggregateVendors(conversations, messagesByConv) {
   for (const conv of conversations) {
     for (const m of messagesByConv[conv.id] ?? []) {
       const a = parseJsonSafe(m.analysis_json);
-      for (const v of a?.extracted?.mentioned_vendors ?? []) vendors.add(v);
+      // Canonicalize read-time so near-dupes (NE / Nationalencyklopedin,
+      // Microsoft / Microsoft 365) collapse to one row (2026-07-19 design).
+      for (const v of a?.extracted?.mentioned_vendors ?? []) vendors.add(canonicalVendorName(v));
     }
   }
   return [...vendors];
@@ -1230,7 +1233,7 @@ function aggregateConfirmedVendors(conversations, messagesByConv, attachmentsByM
     for (const m of messagesByConv[conv.id] ?? []) {
       for (const att of attachmentsByMsg[m.id] ?? []) {
         const isContract = att.contract_is_contract === 1 || att.contract_is_contract === true;
-        if (isContract && att.contract_vendor_name) vendors.add(att.contract_vendor_name);
+        if (isContract && att.contract_vendor_name) vendors.add(canonicalVendorName(att.contract_vendor_name));
       }
     }
   }
@@ -1301,13 +1304,32 @@ export function renderKommunDetail({ kommun, conversations, messagesByConv, atta
   const confirmedVendors = aggregateConfirmedVendors(conversations, messagesByConv, attachmentsByMsg);
   const contracts = aggregateContracts(conversations, messagesByConv, attachmentsByMsg);
 
+  // Vendor rows below are canonicalized, so re-key the incoming lookup maps
+  // (built raw in dashboard.js from the vendors table / extracted relations)
+  // by CANONICAL vendor name (lowercased). A canonical inherits a member's
+  // slug when any raw variant had one — else it stays unlinked (no dead link).
+  const canonicalSlugsByName = new Map();
+  for (const [rawKey, slug] of vendorSlugsByName) {
+    const k = canonicalVendorName(rawKey).toLowerCase();
+    if (!canonicalSlugsByName.has(k) && slug) canonicalSlugsByName.set(k, slug);
+  }
+  const canonicalRelationsByVendor = new Map();
+  for (const [rawKey, ramavtal] of resellerRelationsByVendor) {
+    const k = canonicalVendorName(rawKey).toLowerCase();
+    const merged = canonicalRelationsByVendor.get(k) ?? [];
+    for (const r of ramavtal) if (!merged.includes(r)) merged.push(r);
+    canonicalRelationsByVendor.set(k, merged);
+  }
+
   // Received documents grouped by their contract vendor (lowercased) — drives
   // the per-vendor hover popover in the Leverantörer list. Only confirmed
   // vendors have documents; mentioned-only vendors map to nothing.
+  // Keyed by the CANONICAL vendor name (lowercased) so the per-vendor popover
+  // lines up with the canonicalized vendor rows below (2026-07-19 design).
   const docsByVendor = new Map();
   for (const c of contracts) {
     if (!c.vendor_name) continue;
-    const k = c.vendor_name.toLowerCase();
+    const k = canonicalVendorName(c.vendor_name).toLowerCase();
     if (!docsByVendor.has(k)) docsByVendor.set(k, []);
     docsByVendor.get(k).push(c);
   }
@@ -1335,11 +1357,11 @@ export function renderKommunDetail({ kommun, conversations, messagesByConv, atta
   // page. The tag appears ONLY when a relation was extracted for that vendor —
   // never inferred from the kommun's channel set (data-honesty).
   const renderVendorRow = (v, { muted = false } = {}) => {
-    const slug = vendorSlugsByName.get(v.toLowerCase());
+    const slug = canonicalSlugsByName.get(v.toLowerCase());
     const nameHtml = slug
       ? `<a href="/leverantor/${escapeHtml(slug)}">${escapeHtml(v)}</a>`
       : `<span class="muted" title="${escapeHtml('ingen leverantörssida än')}">${escapeHtml(v)}</span>`;
-    const ramavtal = resellerRelationsByVendor.get(v.toLowerCase()) ?? [];
+    const ramavtal = canonicalRelationsByVendor.get(v.toLowerCase()) ?? [];
     const pills = ramavtal.map((r) => {
       const rslug = RESELLER_SLUG_BY_CANONICAL.get(r);
       const label = `▢ ${escapeHtml(r)}`;
@@ -2177,8 +2199,13 @@ function marketRollupRow(r, todayIso) {
   const renewal = r.next_renewal_date
     ? renewalCell({ next_review_date: r.next_renewal_date }, todayIso)
     : '<span class="muted">okänt</span>';
+  // No dead links: a canonical vendor without a slug (grouping may merge a
+  // slugged + un-slugged variant) renders as a muted plain name.
+  const vendorCell = r.vendor_slug
+    ? `<a class="kommun-link" href="/leverantor/${escapeHtml(r.vendor_slug)}" data-pane-link>${escapeHtml(r.vendor_name)}</a>`
+    : `<span class="muted">${escapeHtml(r.vendor_name)}</span>`;
   return `<tr>
-    <td><a class="kommun-link" href="/leverantor/${escapeHtml(r.vendor_slug)}" data-pane-link>${escapeHtml(r.vendor_name)}</a></td>
+    <td>${vendorCell}</td>
     <td class="num">${r.kommun_count}</td>
     <td class="num">${r.contract_count}</td>
     <td class="num">${total}${share}</td>
