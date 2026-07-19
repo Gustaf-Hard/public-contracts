@@ -367,7 +367,8 @@ describe('buildProductRollups — reseller-procuring kommuner cannot anchor red 
 describe('avg annual per kommun (vendor rollup KPI)', () => {
   it('total known annual ÷ distinct kommuner, rounded', () => {
     const rollups = buildVendorRollups(iltFacts(), { now: NOW });
-    const ilt = rollups.find((r) => r.vendor_name === 'ILT Education');
+    // 'ILT Education' canonicalizes to the ILT cluster (2026-07-19 design).
+    const ilt = rollups.find((r) => r.vendor_name === 'Inläsningstjänst (ILT)');
     expect(ilt.total_annual_sek).toBe(685649);
     expect(ilt.kommun_count).toBe(2);
     expect(ilt.avg_annual_per_kommun).toBe(342825); // round(685649 / 2)

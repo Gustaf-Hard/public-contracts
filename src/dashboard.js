@@ -976,9 +976,16 @@ export function createDashboardApp({
     const { facts, rollups, todayIso } = vendorData(new Date());
     const vendorFacts = facts.filter((f) => f.vendor_id === vendor.id);
     const { doneKods, resellerKods, resellerChannelsByKommun } = kommunCoverageContext();
+    // Market rollups group by CANONICAL name (2026-07-19), so the representative
+    // vendor_id may not equal this page's vendor.id (a duplicate vendor PAGE —
+    // page unification is a deferred follow-up). Fall back to a rollup built
+    // from THIS vendor's facts so the dossier KPIs stay honest (never 0-of-N).
+    const dossierRollup = rollups.find((r) => r.vendor_id === vendor.id)
+      ?? buildVendorRollups(vendorFacts, { now: new Date() })[0]
+      ?? null;
     res.send(renderVendorDossier({
       vendor,
-      rollup: rollups.find((r) => r.vendor_id === vendor.id) ?? null,
+      rollup: dossierRollup,
       facts: vendorFacts,
       // Product intelligence (2026-07-10 design): line items + coverage rows
       // for the whole DB — buildProductRollups joins them onto this vendor's

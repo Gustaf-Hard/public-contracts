@@ -272,6 +272,26 @@ describe('buildVendorRollups', () => {
   it('sorted by total_annual_sek desc, unknown-value vendors last', () => {
     expect(rollups[0].vendor_name).toBe('Skolon');
   });
+
+  // 2026-07-19 vendor-name normalization: grouping is by CANONICAL name, so
+  // near-dupe vendor rows (distinct vendor_ids) collapse into one row with
+  // summed facts — only the grouping key changes, never per-contract data.
+  it('collapses Oribi / Oribi Texthelp under one canonical Oribi row with summed facts', () => {
+    const collapsed = buildVendorRollups(buildContractFacts([
+      row({ contract_id: 1, vendor_id: 10, vendor_name: 'Oribi', vendor_slug: 'oribi',
+            kommun_kod: '1980', annual_value_sek: 100000 }),
+      row({ contract_id: 2, vendor_id: 11, vendor_name: 'Oribi Texthelp', vendor_slug: null,
+            kommun_kod: '0180', kommun_namn: 'Stockholm', annual_value_sek: 50000 }),
+    ], { lanByKommunKod: LAN, now: NOW }), { now: NOW });
+    expect(collapsed).toHaveLength(1);
+    const oribi = collapsed[0];
+    expect(oribi.vendor_name).toBe('Oribi');
+    expect(oribi.contract_count).toBe(2);
+    expect(oribi.kommun_count).toBe(2);
+    expect(oribi.total_annual_sek).toBe(150000);
+    // Representative slug prefers a member that HAS a vendor page (no dead link).
+    expect(oribi.vendor_slug).toBe('oribi');
+  });
 });
 
 describe('buildMarketSummary + completeness', () => {

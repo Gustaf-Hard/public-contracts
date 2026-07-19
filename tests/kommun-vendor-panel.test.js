@@ -98,7 +98,8 @@ describe('renderKommunDetail — vertical Leverantörer panel', () => {
     const panel = html.slice(html.indexOf('Leverantörer ('), html.indexOf('E-postadresser'));
     expect(panel.slice(0, panel.indexOf('Nämnda'))).toContain('Skolon'); // confirmed side
     const namndaPart = panel.slice(panel.indexOf('Nämnda'));
-    expect(namndaPart).toContain('NE'); // mentioned, non-channel
+    // 'NE' canonicalizes to 'Nationalencyklopedin' at read-time (2026-07-19).
+    expect(namndaPart).toContain('Nationalencyklopedin'); // mentioned, non-channel
     expect(namndaPart).not.toContain('>Skolon<'); // confirmed → excluded from Nämnda
   });
 
@@ -132,5 +133,38 @@ describe('renderKommunDetail — vertical Leverantörer panel', () => {
     const html = renderKommunDetail(baseArgs({ mentioned: ['NE'], confirmedVendorName: null }));
     const panel = html.slice(html.indexOf('Leverantörer ('), html.indexOf('E-postadresser'));
     expect(panel).not.toContain('vendor-pop');
+  });
+
+  // 2026-07-19 vendor-name normalization: read-time canonicalization collapses
+  // near-dupe vendor names into ONE row and counts them once.
+  it('collapses Microsoft + Microsoft 365 into ONE Microsoft row; vendorCount counts once', () => {
+    const html = renderKommunDetail(baseArgs({
+      mentioned: ['Microsoft', 'Microsoft 365'],
+      confirmedVendorName: null,
+      resellerRelationsByVendor: new Map(),
+    }));
+    // One canonical vendor → Leverantörer (1).
+    expect(html).toMatch(/Leverantörer \(1\)/);
+    const panel = html.slice(html.indexOf('Leverantörer ('), html.indexOf('E-postadresser'));
+    // Exactly one Microsoft vendor row (canonical label), no "Microsoft 365".
+    expect(panel).not.toContain('Microsoft 365');
+    const rows = panel.match(/class="vendor-row/g) ?? [];
+    expect(rows).toHaveLength(1);
+  });
+
+  it('collapses a confirmed NE and a mentioned Nationalencyklopedin into one canonical vendor', () => {
+    // Confirmed "NE" + mentioned "Nationalencyklopedin" are the SAME canonical:
+    // the mentioned one must not double as a separate Nämnda row.
+    const html = renderKommunDetail(baseArgs({
+      mentioned: ['Nationalencyklopedin'],
+      confirmedVendorName: 'NE',
+      resellerRelationsByVendor: new Map(),
+    }));
+    expect(html).toMatch(/Leverantörer \(1\)/);
+    const panel = html.slice(html.indexOf('Leverantörer ('), html.indexOf('E-postadresser'));
+    const rows = panel.match(/class="vendor-row/g) ?? [];
+    expect(rows).toHaveLength(1);
+    // Rendered once, under the confirmed (Avtal bekräftat) side, as canonical.
+    expect(panel).toContain('Nationalencyklopedin');
   });
 });
