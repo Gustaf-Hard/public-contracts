@@ -36,23 +36,44 @@ const DEAD_END_PATTERNS = [
 
 const ARENDENUMMER_RE = /Ärendenummer\s*[:\-]\s*([Kk]\d{6,})/i;
 
+// True when a trimmed line begins the quoted trailing history — a reply
+// attribution, a forwarded/Outlook header, or a dashed separator. Broadened
+// beyond the original "Den/On … skrev/wrote:" so it also catches the
+// leading-date Gmail Swedish attribution ("12 juni 2026 kl. 13:13 skrev Gustaf
+// Hård af Segerstad <…>:") and the English "On Sat, Jun 6 … wrote:".
+function startsQuotedTail(t) {
+  if (!t) return false;
+  if (/^-{2,}\s*Ursprungligt meddelande\s*-{2,}/i.test(t)) return true; // Outlook sv
+  if (/^-{2,}\s*Original Message\s*-{2,}/i.test(t)) return true;
+  if (/^-{3,}.+-{3,}$/.test(t)) return true; // generic "-----… -----" header
+  if (/^(Från|From):\s/i.test(t)) return true; // forwarded header block
+  if (/^(Den|On) .{4,80}skrev.*:$/i.test(t)) return true; // Gmail sv "Den … skrev X:"
+  if (/ skrev .*:$/i.test(t)) return true; // leading-date "… skrev … <…>:"
+  if (/wrote:$/i.test(t)) return true; // English "On … wrote:"
+  return false;
+}
+
+// Split a mail body into the new visible text and the quoted trailing history.
+// `visible` = everything before the first quote marker (an attribution line, a
+// forwarded/Outlook header, or a '>'-prefixed line); `quoted` = that marker
+// line and everything after it. A body with no quoted tail returns
+// `{ visible: whole, quoted: '' }`. Signature lines stay in `visible`.
+export function splitQuotedText(body) {
+  const lines = String(body ?? '').split('\n');
+  let cut = -1;
+  for (let i = 0; i < lines.length; i++) {
+    const t = lines[i].trim();
+    if (startsQuotedTail(t) || t.startsWith('>')) { cut = i; break; }
+  }
+  if (cut === -1) return { visible: lines.join('\n'), quoted: '' };
+  return { visible: lines.slice(0, cut).join('\n'), quoted: lines.slice(cut).join('\n') };
+}
+
 // Strip quoted reply content so patterns never match OUR OWN text echoed back
 // (a kommun reply usually quotes the T_RECEIPT question "Är detta samtliga
-// avtal…?"). Drops '>'-prefixed lines and everything after common Swedish/
-// Outlook/Gmail reply markers.
+// avtal…?"). Thin wrapper over splitQuotedText — the visible part only.
 export function stripQuotedText(body) {
-  const lines = String(body ?? '').split('\n');
-  const out = [];
-  for (const line of lines) {
-    const t = line.trim();
-    if (/^-{2,}\s*Ursprungligt meddelande\s*-{2,}/i.test(t)) break; // Outlook sv
-    if (/^-{2,}\s*Original Message\s*-{2,}/i.test(t)) break;
-    if (/^(Den|On) .{4,80}skrev.*:$/i.test(t)) break; // Gmail sv "Den … skrev X:"
-    if (/^Från:\s/i.test(t) || /^From:\s/i.test(t)) break; // forwarded header block
-    if (t.startsWith('>')) continue;
-    out.push(line);
-  }
-  return out.join('\n');
+  return splitQuotedText(body).visible;
 }
 
 // Fallback "this was everything" detector over the UNQUOTED part of the body

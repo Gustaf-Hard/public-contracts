@@ -99,6 +99,22 @@
     head.setAttribute('aria-expanded', String(!body.hidden));
   });
 
+  // Quoted-history expander: a [data-quote-toggle] button reveals its sibling
+  // [data-quote-body] (the collapsed quoted prior thread) and flips its label.
+  // It's a <button>, so the data-thread-toggle handler above already ignores it
+  // (never collapses the thread); it lives in the msg-body, not the msg-head,
+  // so the data-collapse handler never matches it either.
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest && e.target.closest('[data-quote-toggle]');
+    if (!btn) return;
+    var q = btn.parentElement.querySelector('[data-quote-body]');
+    if (!q) return;
+    q.hidden = !q.hidden;
+    btn.setAttribute('aria-expanded', String(!q.hidden));
+    var label = btn.querySelector('.quote-toggle-label');
+    if (label) label.textContent = q.hidden ? 'Visa citerad historik' : 'Dölj';
+  });
+
   // Light/dark theme toggle, persisted in localStorage (applied pre-paint by
   // the inline bootstrap in <head>).
   document.addEventListener('click', function (e) {
