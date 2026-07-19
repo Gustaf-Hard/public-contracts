@@ -27,6 +27,10 @@ const VENDOR_ICON = '<svg class="vendor-icon" width="12" height="12" viewBox="0 
 // framework-agreement entity in the header and the per-vendor pill.
 const FRAME_ICON = '<svg class="frame-icon" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="1.75" y="1.75" width="12.5" height="12.5" rx="1.5"/><rect x="4.75" y="4.75" width="6.5" height="6.5" rx="0.75"/></svg>';
 
+// An "open in a new tab" glyph — a quick affordance next to each stored
+// document so the operator can open the file without hunting for the filename.
+const EXTLINK_ICON = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>';
+
 function escapeHtml(s) {
   if (s === null || s === undefined) return '';
   return String(s)
@@ -479,6 +483,8 @@ const baseCss = `
   .contracts-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
   .contracts-table th, .contracts-table td { padding: 6px 10px; text-align: left; border-bottom: 1px solid var(--border); }
   .contracts-table th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--fg-muted); }
+  .doc-open { display: inline-flex; align-items: center; color: var(--fg-muted); }
+  .doc-open:hover { color: var(--accent); }
   .doc-badge { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; border: 1px solid; }
   .doc-badge-avtal { background: #22c55e1a; color: var(--good); border-color: #22c55e66; }
   .doc-badge-muted { background: var(--bg-elev-2); color: var(--fg-muted); border-color: var(--border); font-weight: 500; }
@@ -1358,7 +1364,7 @@ export function renderKommunDetail({ kommun, conversations, messagesByConv, atta
     : `<div class="card">
         <h3>Mottagna dokument (${contracts.length}) · ${avtalCount} avtal</h3>
         <table class="contracts-table">
-          <thead><tr><th>Datum</th><th>Ärende</th><th>Roll</th><th>Typ</th><th>Filnamn</th><th>Storlek</th></tr></thead>
+          <thead><tr><th>Datum</th><th>Ärende</th><th>Roll</th><th>Typ</th><th>Filnamn</th><th>Storlek</th><th></th></tr></thead>
           <tbody>${contracts.map((c) => {
             const badge = docTypeBadge(c);
             const badgeHtml = badge
@@ -1372,6 +1378,7 @@ export function renderKommunDetail({ kommun, conversations, messagesByConv, atta
               <td>${badgeHtml}</td>
               <td><a href="/attachments/${c.id}" target="_blank" rel="noopener">📎 ${escapeHtml(c.filename)}</a>${isPdfAttachment(c) ? '' : ' <span class="muted">— sparad, ej avtalsanalyserad (ej PDF)</span>'}</td>
               <td>${escapeHtml(fmtBytes(c.size_bytes))}</td>
+              <td><a class="doc-open" href="/attachments/${c.id}" target="_blank" rel="noopener" title="Öppna i ny flik" aria-label="Öppna ${escapeHtml(c.filename)} i ny flik">${EXTLINK_ICON}</a></td>
             </tr>`;
           }).join('')}</tbody>
         </table>
