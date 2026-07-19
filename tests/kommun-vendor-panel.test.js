@@ -45,7 +45,7 @@ function baseArgs({
 describe('renderKommunDetail — vertical Leverantörer panel', () => {
   it('renders vendors as vertical rows, not chips', () => {
     const html = renderKommunDetail(baseArgs());
-    expect(html).toContain('class="vendor-row"'); // linked confirmed row
+    expect(html).toContain('class="vendor-row'); // row prefix (may carry has-pop/muted modifiers)
     expect(html).toContain('class="vendor-list"');
     // the old flat chip list is gone from the panel
     const panel = html.slice(html.indexOf('Leverantörer ('), html.indexOf('E-postadresser'));
@@ -116,5 +116,21 @@ describe('renderKommunDetail — vertical Leverantörer panel', () => {
     expect(html).toMatch(/Leverantörer \(0\)/);
     expect(html).toContain('Inga leverantörer fångade ännu.');
     expect(html).not.toContain('Köper via ramavtal:');
+  });
+
+  it('a confirmed vendor with a document shows a hover popover linking that document', () => {
+    // baseArgs seeds a confirmed Skolon contract attachment (id 100, Skolon.pdf).
+    const html = renderKommunDetail(baseArgs());
+    const panel = html.slice(html.indexOf('Leverantörer ('), html.indexOf('E-postadresser'));
+    expect(panel).toContain('vendor-pop');
+    expect(panel).toContain('Mottagna dokument (1)');
+    expect(panel).toContain('/attachments/100'); // opens the vendor's document
+  });
+
+  it('a mentioned-only vendor (no document) has no popover', () => {
+    // NE is mentioned-only here — no contract, so no docs, no popover trigger.
+    const html = renderKommunDetail(baseArgs({ mentioned: ['NE'], confirmedVendorName: null }));
+    const panel = html.slice(html.indexOf('Leverantörer ('), html.indexOf('E-postadresser'));
+    expect(panel).not.toContain('vendor-pop');
   });
 });
