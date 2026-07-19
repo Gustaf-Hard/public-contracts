@@ -480,6 +480,15 @@ const baseCss = `
   .vendor-row .vendor-name a:hover { color: var(--accent); text-decoration: underline; }
   .pill-ramavtal { display: inline-flex; align-items: center; gap: 3px; padding: 1px 7px; border: 1px solid var(--border); border-radius: 4px; font-size: 10px; color: var(--fg-muted); background: var(--bg-elev-2); text-decoration: none; }
   a.pill-ramavtal:hover { border-color: var(--accent); color: var(--accent); }
+  .vendor-row.has-pop { position: relative; }
+  .vendor-doc-hint { font-size: 10px; color: var(--fg-muted); }
+  .vendor-pop { display: none; position: absolute; left: 0; top: 100%; z-index: 30; min-width: 240px; max-width: 340px; background: var(--bg-elev); border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 6px 20px rgba(0,0,0,.20); padding: 6px; }
+  .vendor-row.has-pop:hover .vendor-pop { display: block; }
+  .vendor-pop-head { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: var(--fg-muted); margin: 2px 6px 5px; }
+  .vendor-pop-doc { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border-radius: 4px; text-decoration: none; color: var(--fg); }
+  .vendor-pop-doc:hover { background: var(--bg-elev-2); }
+  .vendor-pop-fn { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .vendor-pop-doc .doc-badge { flex: none; }
   .contracts-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
   .contracts-table th, .contracts-table td { padding: 6px 10px; text-align: left; border-bottom: 1px solid var(--border); }
   .contracts-table th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--fg-muted); }
@@ -1166,6 +1175,7 @@ function aggregateContracts(conversations, messagesByConv, attachmentsByMsg) {
           conv_id: conv.id,
           is_contract: att.contract_is_contract,
           document_type: att.contract_document_type,
+          vendor_name: att.contract_vendor_name ?? null,
         });
       }
     }
@@ -1213,6 +1223,17 @@ export function renderKommunDetail({ kommun, conversations, messagesByConv, atta
   const confirmedVendors = aggregateConfirmedVendors(conversations, messagesByConv, attachmentsByMsg);
   const contracts = aggregateContracts(conversations, messagesByConv, attachmentsByMsg);
 
+  // Received documents grouped by their contract vendor (lowercased) — drives
+  // the per-vendor hover popover in the Leverantörer list. Only confirmed
+  // vendors have documents; mentioned-only vendors map to nothing.
+  const docsByVendor = new Map();
+  for (const c of contracts) {
+    if (!c.vendor_name) continue;
+    const k = c.vendor_name.toLowerCase();
+    if (!docsByVendor.has(k)) docsByVendor.set(k, []);
+    docsByVendor.get(k).push(c);
+  }
+
   // Reseller/framework channel names must not appear as "Nämnda" rows — that
   // just clutters the panel (ADDA/Skolon/Läromedia noise). The per-vendor
   // framed ramavtal tags below carry the specific, extracted signal instead;
@@ -1248,7 +1269,23 @@ export function renderKommunDetail({ kommun, conversations, messagesByConv, atta
         ? `<a class="pill-ramavtal" href="/ramavtal/${escapeHtml(rslug)}" title="${escapeHtml(`Nås via ramavtal: ${r}`)}">${label}</a>`
         : `<span class="pill-ramavtal" title="${escapeHtml(`Nås via ramavtal: ${r}`)}">${label}</span>`;
     }).join('');
-    return `<div class="vendor-row${muted ? ' muted' : ''}">${VENDOR_ICON}<span class="vendor-name">${nameHtml}</span>${pills}</div>`;
+    // Hover popover: this vendor's received documents from this kommun, each a
+    // quick open-in-new-tab link. Only for vendors that actually have docs.
+    const docs = docsByVendor.get(v.toLowerCase()) ?? [];
+    let hint = '';
+    let popover = '';
+    if (docs.length > 0) {
+      hint = ` <span class="vendor-doc-hint" aria-hidden="true">📄 ${docs.length}</span>`;
+      popover = `<div class="vendor-pop" role="tooltip">
+        <div class="vendor-pop-head">Mottagna dokument (${docs.length})</div>
+        ${docs.map((d) => {
+          const b = docTypeBadge(d);
+          const badge = b ? `<span class="doc-badge ${b.muted ? 'doc-badge-muted' : 'doc-badge-avtal'}">${escapeHtml(b.label)}</span>` : '';
+          return `<a class="vendor-pop-doc" href="/attachments/${d.id}" target="_blank" rel="noopener" title="${escapeHtml(`Öppna ${d.filename} i ny flik`)}">${badge}<span class="vendor-pop-fn">${escapeHtml(d.filename)}</span>${EXTLINK_ICON}</a>`;
+        }).join('')}
+      </div>`;
+    }
+    return `<div class="vendor-row${muted ? ' muted' : ''}${docs.length ? ' has-pop' : ''}">${VENDOR_ICON}<span class="vendor-name">${nameHtml}</span>${pills}${hint}${popover}</div>`;
   };
   const needsHumanCount = conversations.filter((c) => c.state === 'NEEDS_HUMAN').length;
 
