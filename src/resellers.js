@@ -24,10 +24,27 @@ export const RESELLERS = [
   { canonical: 'Läromedia', slug: 'laromedia', aliases: ['läromedia', 'laromedia', 'läromedia bokhandel örebro'] },
 ];
 
+// Swedish genitive: an email that says "ADDAs ramavtal" / "ADDAS ramavtal"
+// names the *Adda* framework agreement, not a vendor called "ADDAS". Whole-word
+// matching misses that trailing genitive -s, so we also try each name with a
+// per-token trailing -s stripped ("addas ramavtal" → "adda ramavtal"). Scoped
+// to the curated reseller list ONLY — never applied to the watchlist, where a
+// generic -s strip would be riskier. A stripped token that matches nothing
+// (e.g. "ramavtal"→"ramavta") is simply inert.
+function genitiveVariant(name) {
+  return String(name ?? '').replace(/([A-Za-zÅÄÖåäöéüÉÜ])s\b/gi, '$1');
+}
+
 // Canonical names of reseller entries matched by any of `names`, deduped,
-// in RESELLERS order.
+// in RESELLERS order. Genitive-aware (see genitiveVariant).
 export function matchResellers(names = []) {
-  return matchVendorEntries(RESELLERS, names);
+  const expanded = [];
+  for (const n of names) {
+    expanded.push(n);
+    const g = genitiveVariant(n);
+    if (g !== n) expanded.push(g);
+  }
+  return matchVendorEntries(RESELLERS, expanded);
 }
 
 // Resolve a reseller/ramavtal by its slug. Pure; null for unknown/blank slugs.

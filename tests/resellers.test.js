@@ -60,6 +60,18 @@ describe('matchResellers — whole-word, ascii-folded, alias-driven', () => {
   });
 });
 
+describe('matchResellers — Swedish genitive (ADDAS = ADDAs = Adda)', () => {
+  it('recognises the genitive form as the channel, not a vendor', () => {
+    expect(matchResellers(['ADDAS'])).toEqual(['Adda']);
+    expect(matchResellers(['ADDAS ramavtal'])).toEqual(['Adda']);
+    expect(matchResellers(['Skolons marknadsplats'])).toEqual(['Skolon']);
+  });
+
+  it('does not over-strip: a look-alike ending in -s is not a false match', () => {
+    expect(matchResellers(['Adidas Sverige'])).toEqual([]); // "adidas" → "adida", not "adda"
+  });
+});
+
 describe('reseller slugs + resellerBySlug', () => {
   it('every entry has a slug and slugs are unique', () => {
     const slugs = RESELLERS.map((r) => r.slug);
