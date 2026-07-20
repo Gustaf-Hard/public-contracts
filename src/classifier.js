@@ -159,21 +159,31 @@ export function isCloserText(body) {
 // never escalate (class `handoff_internal`).
 //
 // PRECISION OVER RECALL is the whole point: a PERMANENT external redirect that
-// names a concrete other address ("kontakta registrator@x.se") must stay a
-// human escalation. So the guard is strict: a forwarding phrase must be present
-// AND the UNQUOTED body must contain NO email address. If any concrete address
-// is named we FALL THROUGH to the normal classification (which escalates as
-// `unknown`). It also only fires when nothing else classifies confidently and
-// there are no attachments, so a real delivery/clarification/dead_end always
-// wins over a stray "vidare".
+// names a concrete OTHER address ("kontakta registrator@x.se") must stay a
+// human escalation. So the guard requires the forwarding phrase AND no OTHER
+// address to contact. The sender's OWN signature address is not "another
+// recipient" — virtually every real email signs off with it — so we ignore the
+// sender's own address and only bail when a DIFFERENT address is named. It also
+// only fires when nothing else classifies confidently and there are no
+// attachments, so a real delivery/clarification/dead_end always wins.
 const INTERNAL_FORWARD_RE = /\bskickar (det |den |ärendet )?vidare\b|\bskickat vidare\b|\bskickar vidare\b|\bvidarebefordra(r|t|d|de|ts)?\b|\blämna(r|t|de|ts)? vidare\b|\bgått vidare\b|\bgår vidare\b/i;
-// Any email address anywhere in the visible text means a concrete recipient may
-// have been named — bail to escalation (precision over recall).
-const ANY_EMAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/;
-export function isInternalForwardText(visibleBody) {
+const ANY_EMAIL_RE_G = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
+const EMAIL_ADDR_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/;
+// Pull the bare address out of a "Name <addr>" or raw From header, lowercased.
+function extractEmail(raw) {
+  const s = String(raw ?? '');
+  const angle = s.match(/<([^>]+)>/);
+  const m = (angle ? angle[1] : s).match(EMAIL_ADDR_RE);
+  return m ? m[0].toLowerCase() : '';
+}
+export function isInternalForwardText(visibleBody, { fromEmail = '' } = {}) {
   const s = String(visibleBody ?? '');
   if (!INTERNAL_FORWARD_RE.test(s)) return false;
-  if (ANY_EMAIL_RE.test(s)) return false; // a concrete address -> real handoff -> escalate
+  const sender = extractEmail(fromEmail);
+  const others = (s.match(ANY_EMAIL_RE_G) ?? [])
+    .map((e) => e.toLowerCase())
+    .filter((e) => e !== sender);
+  if (others.length > 0) return false; // a DIFFERENT address named -> real handoff -> escalate
   return true;
 }
 
@@ -240,9 +250,10 @@ export function classify(message) {
   if (top.score < THRESHOLD || (top.score - (second?.score ?? 0)) < MARGIN) {
     // Soft internal forward (2026-07-20 §1): only when nothing else classified
     // confidently AND there are no attachments (a delivery is never a forward).
-    // A concrete address in the body already made isInternalForwardText false,
-    // so a genuine external redirect falls through to `unknown` → escalate.
-    if (attachments < 1 && isInternalForwardText(visible)) {
+    // A DIFFERENT address in the body (not the sender's own) makes
+    // isInternalForwardText false, so a genuine external redirect falls through
+    // to `unknown` → escalate.
+    if (attachments < 1 && isInternalForwardText(visible, { fromEmail: message.from })) {
       return { class: 'handoff_internal', confidence: 0.75, signals: ['internal_forward'], extracted };
     }
     return {

@@ -285,6 +285,16 @@ describe('classify — soft internal forward (handoff_internal, 2026-07-20 §1)'
     expect(r.class).toBe('handoff_internal');
   });
 
+  it('a signature with the sender\'s OWN address does not block it (real emails always sign off)', () => {
+    // Regression: the first cut bailed on ANY email, so every real forward (which
+    // signs off with the sender's address) fell through to escalate.
+    const r = classify(msg({
+      from: 'Joakim Jansson <joakim.jansson@bjurholm.se>',
+      body: 'Tack för ditt mail. Jag skickar det vidare till skol- och IT-chef.\n\nJoakim Jansson\nBjurholms Kommun\njoakim.jansson@bjurholm.se',
+    }));
+    expect(r.class).toBe('handoff_internal');
+  });
+
   it('PRECISION: an EXTERNAL redirect naming an address stays escalate (unknown), NOT downgraded', () => {
     const r = classify(msg({
       body: 'Dessa avtal hanteras av stadsledningskontoret. Vänligen skicka vidare din begäran till registrator@stadsledningen.kommun.se.',
@@ -322,6 +332,11 @@ describe('isInternalForwardText (pure, both directions)', () => {
   });
   it('false when a concrete address is named (external handoff)', () => {
     expect(isInternalForwardText('Jag skickar vidare till registrator@x.se.')).toBe(false);
+  });
+  it('ignores the sender\'s OWN signature address, bails on a DIFFERENT one', () => {
+    const body = 'Jag skickar det vidare internt.\n\nAnna Ek\nanna.ek@bjurholm.se';
+    expect(isInternalForwardText(body, { fromEmail: 'Anna Ek <anna.ek@bjurholm.se>' })).toBe(true);
+    expect(isInternalForwardText(body, { fromEmail: 'other@nan.se' })).toBe(false);
   });
   it('false when there is no forward phrase', () => {
     expect(isInternalForwardText('Vi återkommer inom kort.')).toBe(false);
