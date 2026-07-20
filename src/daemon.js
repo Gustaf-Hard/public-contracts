@@ -183,6 +183,13 @@ export async function startDaemon({ env = process.env, log = console.log } = {})
   };
   const slackOps = { postEscalation, postAlert, updateEscalationResolved };
 
+  // Archive-on-ingest (2026-07-20 design §2): default ON. When explicitly set
+  // to 'off'/'false'/'0'/'no', ingest never archives and we revert to
+  // send-only archiving. Read once here and threaded into runTick deps.
+  const archiveOnIngest = !['off', 'false', '0', 'no'].includes(
+    String(env.PILOT_ARCHIVE_ON_INGEST ?? '').trim().toLowerCase()
+  );
+
   // Known-unmatched inbound (spam, newsletters, out-of-scope senders): alert
   // once and skip re-FETCHING within this process's lifetime (review H5/L5),
   // but keep the {threadId, from} match inputs so every tick re-attempts
@@ -206,6 +213,7 @@ export async function startDaemon({ env = process.env, log = console.log } = {})
         env, contractsDir: CONTRACTS_DIR, now, log,
         seenUnmatched,
         refreshAllowlist: overrides.refresh_pilot_kommun_kods ?? [],
+        archiveOnIngest,
       });
     } catch (e) {
       err = e.message;

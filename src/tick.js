@@ -4,7 +4,7 @@ import { matchWatchlist } from './watchlist.js';
 import { classify, isCloserText } from './classifier.js';
 import { inferThreadStatus } from './threads.js';
 import { nextActionForClassification, staleAction } from './conversation.js';
-import { parseInboundMessage, sameEmailDomain } from './gmail.js';
+import { parseInboundMessage, sameEmailDomain, archiveThread } from './gmail.js';
 import { buildEscalationBlocks } from './slack.js';
 import { saveAttachment, extractPdfsFromZip, dedupeFilenames, isTrivialImage } from './attachments.js';
 import { extractSignature } from './extract-signature.js';
@@ -290,6 +290,27 @@ export function matchInbound(messages, convs) {
     }
   }
   return { matched, ambiguous, unmatched };
+}
+
+// Best-effort archive of an ingested message's Gmail thread (2026-07-20
+// archive-on-ingest design). Called STRICTLY AFTER the per-message ingest
+// transaction has committed — a crash mid-ingest must never archive an
+// unrecorded message, the same ordering guarantee the send path uses
+// (archiveThreadBestEffort in send-reply.js). Mirrors that best-effort shape:
+// an archive failure is logged and swallowed, never blocks or fails ingest.
+// Gated by deps.archiveOnIngest (default on) and only ever called for messages
+// that matched a tracked conversation — unmatched/ambiguous mail is never
+// archived (it stays in the inbox for the Slack-digest / human attention).
+async function archiveIngestedThreadBestEffort({ threadId, deps }) {
+  if (!threadId) return;
+  if (deps.archiveOnIngest === false) return;
+  const archiveThreadImpl = deps.archiveThreadImpl ?? archiveThread;
+  try {
+    await archiveThreadImpl(deps.gmailClient.gmail, threadId);
+    deps.log?.(`ARCHIVED ingested thread ${threadId}`);
+  } catch (e) {
+    deps.log?.(`gmail archive failed for thread ${threadId}: ${e.message}`);
+  }
 }
 
 // Ingest one matched inbound message. IO ordering is deliberate (review H4):
@@ -739,9 +760,17 @@ export async function runTick(deps) {
         // resend escalation directly — BEFORE any analysis is even attempted.
         if (isBounce({ from_email: item.parsed.from, subject: item.parsed.subject, body_text: item.parsed.body })) {
           await ingestBounce({ conv, item, deps });
+          // Bounce recorded + committed → archive its thread (best-effort,
+          // after commit). NDRs live in the operator's inbox too; the resend
+          // escalation surfaces via Slack/dashboard, not the inbox.
+          await archiveIngestedThreadBestEffort({ threadId: item.full.threadId, deps });
           continue;
         }
         pendingEscalations.push(await ingestMessage({ conv, item, deps }));
+        // Row + attachments are committed (ingestMessage returned) → archive
+        // the matched thread. STRICTLY after commit, best-effort: a failure
+        // here never affects ingest correctness.
+        await archiveIngestedThreadBestEffort({ threadId: item.full.threadId, deps });
       } catch (e) {
         // Nothing was committed for this message — it is retried next tick.
         deps.log?.(`ingest failed for message ${item.id} (${conv.kommun_namn}): ${e.message} — will retry next tick`);
@@ -788,6 +817,49 @@ export async function runTick(deps) {
       }
     }
   }
+}
+
+// One-time backfill (2026-07-20 archive-on-ingest design §3): clear the tracked
+// threads already sitting in the operator's inbox from before archive-on-ingest
+// existed. Iterates EVERY conversation's Gmail thread(s) — the primary
+// gmail_thread_id plus any threads recorded in the threads table — and archives
+// each once. Every tracked thread is fair game: the tool has already recorded
+// its content, so it belongs in All Mail, not the inbox. Archive = remove the
+// INBOX label only (never trash/delete); idempotent, so re-archiving an
+// already-archived thread is a Gmail no-op. `dryRun` lists the thread ids that
+// WOULD be archived without calling modify. Returns the count.
+//
+// Offline-testable via an injected `archiveThreadImpl`; the OPERATOR runs it
+// once, supervised — it mutates the live inbox, so confirm the count with a
+// dry-run first. No DB writes.
+export async function archiveTrackedThreads(db, { archiveThreadImpl = archiveThread, gmail = null, log = null, dryRun = false } = {}) {
+  // Collect a de-duplicated set of every tracked thread id across all
+  // conversations (a conversation may own several threads).
+  const threadIds = new Set();
+  for (const conv of db.listAllConversations()) {
+    if (conv.gmail_thread_id) threadIds.add(conv.gmail_thread_id);
+    for (const t of db.listThreadsForConversation(conv.id)) {
+      if (t.gmail_thread_id) threadIds.add(t.gmail_thread_id);
+    }
+  }
+
+  let count = 0;
+  for (const threadId of threadIds) {
+    if (dryRun) {
+      log?.(`DRY-RUN would archive tracked thread ${threadId}`);
+      count += 1;
+      continue;
+    }
+    try {
+      await archiveThreadImpl(gmail, threadId);
+      count += 1;
+    } catch (e) {
+      // Best-effort per thread — one failure must not abort the backfill.
+      log?.(`backfill archive failed for thread ${threadId}: ${e.message}`);
+    }
+  }
+  log?.(`${dryRun ? 'DRY-RUN: ' : ''}archived ${count} tracked thread(s)`);
+  return count;
 }
 
 export async function runDailyFollowup(deps) {
