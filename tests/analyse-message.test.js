@@ -279,6 +279,47 @@ describe('analyseMessage — auto_reply normalisation (2026-07-19 §1/§2)', () 
   });
 });
 
+describe('analyseMessage — handoff_internal (soft internal forward, 2026-07-20 §1)', () => {
+  const fwdBody = 'Tack för ditt mail. Jag skickar det vidare till vår skol- och IT-chef. Med anledning av semestertider kan återkopplingen ta något längre tid än vanligt.';
+
+  it('a handoff_internal intent → action wait, NO draft_reply, no external address', async () => {
+    const client = fakeClientReturning({
+      intent: 'handoff_internal', confidence: 0.92,
+      summary: 'Vidarebefordrat internt till skol- och IT-chef.',
+      extracted: { arendenummer: null, promised_response_days: null, promised_response_date: null, handoff_to_email: null, handoff_to_forvaltning: 'skol- och IT-chef', questions: null, mentioned_vendors: null, reseller_relations: null },
+      suggested_action: 'wait', is_final_delivery: false, draft_reply: '', follow_up_at: null,
+    });
+    const r = await analyseMessage(fwdBody, { ...baseCtx, today_iso: '2026-07-20' }, { env: { ANTHROPIC_API_KEY: 'k' }, client });
+    expect(r.intent).toBe('handoff_internal');
+    expect(r.suggested_action).toBe('wait');
+    expect(r.draft_reply).toBe('');                 // no reply — we just wait
+    expect(r.extracted.handoff_to_email).toBeNull(); // no external address to contact
+  });
+});
+
+describe('buildSystemPrompt — soft internal-forward guidance (2026-07-20 §1)', () => {
+  const prompt = buildSystemPrompt({ from_name: 'Gustaf', from_email: 'gustaf@mediagraf.se' });
+
+  it('defines handoff_internal as an internal forward that waits silently (no reply, no escalation)', () => {
+    expect(prompt).toMatch(/"handoff_internal"/);
+    expect(prompt).toMatch(/skickar vidare|skickar det vidare/i);
+    expect(prompt).toMatch(/INGEN ny extern adress|INGEN eskalering/);
+  });
+
+  it('keeps handoff (external redirect) distinct — a concrete external address still escalates', () => {
+    expect(prompt).toMatch(/hänvisar oss PERMANENT/);
+    expect(prompt).toMatch(/en konkret extern adress anges/);
+    expect(prompt).toMatch(/eskalera till människa/);
+  });
+
+  it('contains a handoff_internal few-shot with wait action and NO draft_reply', () => {
+    expect(prompt).toMatch(/"intent":"handoff_internal"/);
+    expect(prompt).toMatch(/skickar det vidare till vår skol- och IT-chef/);
+    expect(prompt).toMatch(/"suggested_action":"wait"/);
+    expect(prompt).toMatch(/"handoff_to_email":null/);
+  });
+});
+
 describe('buildSystemPrompt — autosvar/OOO guidance (2026-07-19 §1)', () => {
   const prompt = buildSystemPrompt({ from_name: 'Gustaf', from_email: 'gustaf@mediagraf.se' });
 
@@ -325,6 +366,12 @@ describe('analysisToLegacyClassification', () => {
   it('maps handoff and fee_demand to unknown (escalate)', () => {
     expect(analysisToLegacyClassification({ intent: 'handoff', confidence: 0.9 }).class).toBe('unknown');
     expect(analysisToLegacyClassification({ intent: 'fee_demand', confidence: 0.9 }).class).toBe('unknown');
+  });
+
+  it('maps handoff_internal to its own class (wait silently, NOT unknown/escalate) — 2026-07-20 §1', () => {
+    expect(analysisToLegacyClassification({ intent: 'handoff_internal', confidence: 0.9 }).class).toBe('handoff_internal');
+    // Precision: an EXTERNAL handoff still escalates — the two directions differ.
+    expect(analysisToLegacyClassification({ intent: 'handoff', confidence: 0.9 }).class).toBe('unknown');
   });
 
   it('preserves arendenummer in extracted', () => {

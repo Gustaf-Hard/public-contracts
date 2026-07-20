@@ -27,6 +27,35 @@ function errWithCode(message, code) {
   return e;
 }
 
+// The non-terminal waiting states a conversation can sanely resume into after a
+// free-form / soft escalation resolves. NEEDS_HUMAN and the terminal/quiescent
+// states are NOT sane resume targets.
+const WAITING_STATES = new Set(['SENT', 'ACK_RECEIVED', 'AWAITING_PRECISION', 'DELIVERING']);
+
+// Root-cause fix (2026-07-20 soft-handoff design, stuck-NEEDS_HUMAN note):
+// when a free-form escalation resolves and we need to move the conversation OFF
+// NEEDS_HUMAN, restore the state the draft was created for — but only if it is a
+// valid non-terminal waiting state. Historically previous_state could itself be
+// NEEDS_HUMAN or null (Bjuv #19, Helsingborg #22, Norrköping #24), leaving the
+// conversation stuck NEEDS_HUMAN with 0 open escalations. Fall back to a sane
+// default keyed on prior progress: DELIVERING if any inbound delivered, else
+// ACK_RECEIVED if an ack was seen, else SENT (we did send the initial request).
+export function saneRestoreState(previousState, conv, db) {
+  if (WAITING_STATES.has(previousState)) return previousState;
+  // Infer from prior progress on the conversation.
+  if (conv.receipt_sent) return 'DELIVERING';
+  try {
+    const inbound = db?.listMessages?.(conv.id)?.filter((m) => m.direction === 'inbound') ?? [];
+    if (inbound.some((m) => (m.attachment_count ?? 0) > 0 || m.classification === 'delivery')) {
+      return 'DELIVERING';
+    }
+    if (inbound.some((m) => m.classification === 'auto_ack')) return 'ACK_RECEIVED';
+  } catch {
+    // best-effort inference only — never let it break the send path
+  }
+  return 'SENT';
+}
+
 // Best-effort: replace the escalation's Slack message with a resolved,
 // button-less version. Never lets a Slack failure break the send path.
 async function stripSlackButtons({ slackClient, env, esc, kommun_namn, status, detail, log }) {
@@ -216,8 +245,12 @@ export async function sendApprovedReply({ db, gmail, env, conv, esc, finalBody, 
     targetState = 'SENT';
     patch.gmail_thread_id = sent.threadId ?? null;
     patch.contact_email = to;
-  } else if (conv.state === 'NEEDS_HUMAN' && esc.draft_template === 'free_form' && esc.previous_state) {
-    targetState = esc.previous_state;
+  } else if (conv.state === 'NEEDS_HUMAN' && esc.draft_template === 'free_form') {
+    // Restore to a SANE non-terminal waiting state. previous_state was the
+    // primary signal, but it could itself be NEEDS_HUMAN/null/terminal — which
+    // stranded the conversation on NEEDS_HUMAN with 0 open escalations. Clamp to
+    // a real waiting state (design 2026-07-20 stuck-NEEDS_HUMAN root cause).
+    targetState = saneRestoreState(esc.previous_state, conv, db);
   }
   db.updateConversationState(conv.id, targetState, patch);
   const resolvedStatus = decision === 'edit' ? 'resolved_edit' : 'resolved_send';

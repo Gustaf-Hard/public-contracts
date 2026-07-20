@@ -431,6 +431,22 @@ async function ingestMessage({ conv, item, deps }) {
       patch.follow_up_at = (ret && addDaysIso(ret, 3))
         || addDaysIso(receivedAt.slice(0, 10), 14);
     }
+    // A SOFT internal forward (2026-07-20 soft-handoff design §5): wait silently,
+    // never escalate/reply. The follow-up is max(today + 21d floor, the stated
+    // response date + 3 days grace). The 21-day floor is ENFORCED HERE in code,
+    // never trusted to the LLM: an internal forward + semester note genuinely
+    // takes weeks, so we must not nudge into an empty inbox before then.
+    if (classification.class === 'handoff_internal') {
+      const todayIso = now.toISOString().slice(0, 10);
+      const floor = addDaysIso(todayIso, 21);
+      // Prefer whatever date we already derived (LLM follow_up_at), else the
+      // promised response date + grace; then clamp up to the 21-day floor.
+      const stated = analysis?.follow_up_at
+        ?? (analysis?.extracted?.promised_response_date
+          ? addDaysIso(analysis.extracted.promised_response_date, 3)
+          : null);
+      patch.follow_up_at = (stated && stated > floor) ? stated : floor;
+    }
     // A closed case has no live follow-up promise (review M10).
     if (transition.nextState === 'DONE' || transition.nextState === 'DEAD_END') {
       patch.follow_up_at = null;

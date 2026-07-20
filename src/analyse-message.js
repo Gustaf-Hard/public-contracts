@@ -30,7 +30,8 @@ Ditt jobb är att kategorisera registratorns svar och förbereda ett kort, artig
 - "delivery": Avtal levererade som bifogade filer ELLER bekräftelse att alla avtal nu skickats. Skicka kort "tack"-bekräftelse.
 - "delay_promise": En MÄNNISKA (registratorn) bekräftar att de hanterar ärendet och utlovar svar inom X dagar / före visst datum ("vi behöver ca 10 arbetsdagar", "återkommer senast 2026-06-08"). Extrahera det utlovade datumet/antalet dagar som promised_response_date (ISO) / promised_response_days och sätt follow_up_at = datumet + 3 dagars grace. Boten föreslår en kort bekräftelse ("då avvaktar vi till <datum>"). OBS: ett automatiskt frånvaro-/semesterautosvar är INTE delay_promise — det är auto_reply (se nedan).
 - "auto_reply": Ett MASKINELLT autosvar / frånvaro-/out-of-office-meddelande — markörer som "Autosvar:", "automatiskt svar", "frånvarande", "är åter", "semester", "out of office" ("Jag har semester och är åter 20 juli", "tillbaka 3 augusti", "åter på kontoret måndag 20 juli"). Ingen människa har läst vår begäran än; maskinen svarar automatiskt. Att svara på ett autosvar är meningslöst och riskerar en svarsloop — boten ska VÄNTA TYST. suggested_action: "wait", INGET draft_reply behövs, INGEN handoff-extraktion (ignorera en ev. kollega/vikarie för akuta ärenden — det är INTE en handoff). Sätt promised_response_date till angivet återkomstdatum när det finns (ISO) och follow_up_at = datumet + 3 dagars grace; saknas datum, lämna follow_up_at null (systemet sätter 14 dagars grace).
-- "handoff": Registratorn hänvisar oss PERMANENT till en annan förvaltning, e-postadress eller registrator. Boten kan inte själv följa upp dit — eskalera till människa. Ett semesterautosvar med återkomstdatum är INTE handoff (se auto_reply), även om en kollega anges för akuta ärenden.
+- "handoff_internal": En MÄNSKLIG registrator bekräftar att hen har vidarebefordrat / skickat vidare vår begäran INTERNT till rätt person eller enhet inom kommunen (markörer: "skickar vidare", "skickar det vidare till", "vidarebefordrat", "skickat vidare till", "lämnat vidare till", "har gått vidare till"), ofta i kombination med en fördröjnings-/semesternotis. INGEN ny extern adress anges som VI själva måste kontakta; kommunen sköter vidarebefordran internt. Vi ska VÄNTA TYST: suggested_action "wait", INGET draft_reply behövs, INGEN eskalering. Sätt promised_response_date till angivet återkomst-/svarsdatum när det finns (ISO).
+- "handoff": Registratorn hänvisar oss PERMANENT till en annan förvaltning, e-postadress eller registrator som VI själva måste kontakta (en konkret extern adress anges). Boten kan inte själv följa upp dit, eskalera till människa. Ett semesterautosvar med återkomstdatum är INTE handoff (se auto_reply), även om en kollega anges för akuta ärenden. En INTERN vidarebefordran utan ny adress är INTE heller handoff (se handoff_internal).
 - "dead_end": Kommunen har inga sådana avtal, eller vägrar lämna ut handlingarna. Terminalt.
 - "fee_demand": Kommunen kräver avgift för utlämnandet. Eskalera till människa för beslut.
 - "unknown": Inget av ovanstående matchar tydligt. Eskalera till människa.
@@ -40,7 +41,7 @@ Ditt jobb är att kategorisera registratorns svar och förbereda ett kort, artig
 - "acknowledge" — bot skickar kort "Tack"-svar (delivery + slutleverans, eller delay_promise: "då avvaktar vi till <datum>")
 - "send_precision" — bot skickar preciseringen som svar på clarification
 - "send_receipt" — bot skickar kvitto efter mottagna avtal (delivery, ej slutleverans)
-- "wait" — inget svar krävs, vi väntar (auto_ack, auto_reply)
+- "wait" — inget svar krävs, vi väntar (auto_ack, auto_reply, handoff_internal)
 - "escalate" — vi vet inte vad vi ska göra, människan tar över (handoff, fee_demand, unknown)
 
 # draft_reply
@@ -57,6 +58,7 @@ ISO-datum (YYYY-MM-DD) när boten ska kolla tillbaka om inget hörs av kommunen.
 
 - För "delay_promise": använd kommunens utlovade datum + 3 dagars grace (om de säger 10 dagar, sätt follow_up_at = idag + 13 dagar).
 - För "auto_reply": återkomstdatumet + 3 dagar när det anges; saknas datum, lämna null (systemet sätter 14 dagars grace från mottagandet).
+- För "handoff_internal": en intern vidarebefordran tar tid. Sätt promised_response_date till angivet svarsdatum när det finns; systemet väntar minst 21 dagar oavsett (golvet sätts i koden), så lämna gärna follow_up_at null om inget datum angetts.
 - För "auto_ack": null (vi väntar utan timer; om inget hörs på 7 dagar tar standard-staleness över).
 - För "clarification" / "delivery" / "delay_promise": konversationen rör sig vidare, sätt rimlig grace (5-7 dagar).
 - För terminalstaten "dead_end" / "fee_demand" / "handoff" / "unknown": null.
@@ -98,6 +100,12 @@ Inkommande:
 Output:
 {"intent":"handoff","confidence":0.95,"summary":"Hänvisas till stadsledningskontoret på registrator@stadsledningen.kommun.se.","extracted":{"arendenummer":null,"promised_response_days":null,"promised_response_date":null,"handoff_to_email":"registrator@stadsledningen.kommun.se","handoff_to_forvaltning":"stadsledningskontoret","questions":null,"mentioned_vendors":null,"reseller_relations":null},"suggested_action":"escalate","is_final_delivery":false,"draft_reply":"Hej,\\n\\nTack för hänvisningen. Jag tar kontakt med stadsledningskontoret separat.\\n\\nMed vänliga hälsningar,\\n${from_name}\\n${from_email}","follow_up_at":null}
 
+Inkommande (INTERN vidarebefordran, vänta tyst, inget svar, ingen ny adress för oss):
+> Tack för ditt mail. Jag skickar det vidare till vår skol- och IT-chef som får återkomma. Med anledning av semestertider kan återkopplingen ta något längre tid än vanligt.
+
+Output:
+{"intent":"handoff_internal","confidence":0.92,"summary":"Registratorn har skickat vår begäran vidare internt till skol- och IT-chef; semestertider kan fördröja svaret. Ingen extern adress för oss att kontakta.","extracted":{"arendenummer":null,"promised_response_days":null,"promised_response_date":null,"handoff_to_email":null,"handoff_to_forvaltning":"skol- och IT-chef","questions":null,"mentioned_vendors":null,"reseller_relations":null},"suggested_action":"wait","is_final_delivery":false,"draft_reply":"","follow_up_at":null}
+
 Inkommande:
 > Här bifogas avtalet med Skolon och Google Workspace-avtalet. Hör av dig om något saknas.
 
@@ -127,7 +135,7 @@ const ANALYSIS_SCHEMA = {
       // `auto_reply` is a MACHINE autoresponder / OOO (distinct from a human
       // delay_promise). Adding an enum value adds ZERO json_schema union params
       // (unlike a nullable field), so the 16-union limit is unaffected.
-      enum: ['auto_ack', 'clarification', 'delivery', 'delay_promise', 'auto_reply', 'dead_end', 'handoff', 'fee_demand', 'unknown'],
+      enum: ['auto_ack', 'clarification', 'delivery', 'delay_promise', 'auto_reply', 'dead_end', 'handoff', 'handoff_internal', 'fee_demand', 'unknown'],
     },
     confidence: { type: 'number' },
     summary: { type: 'string' },
@@ -356,7 +364,8 @@ export function analysisToLegacyClassification(analysis) {
     delivery: 'delivery',
     delay_promise: 'delay_promise', // FSM drafts a T_DELAY_ACK naming the promised date
     auto_reply: 'auto_reply',    // machine autoresponder — wait silently, never reply/escalate
-    handoff: 'unknown',          // escalate to human; preserved on analysis.intent
+    handoff_internal: 'handoff_internal', // internal forward: wait silently >=21d, never reply/escalate
+    handoff: 'unknown',          // external redirect — escalate to human; preserved on analysis.intent
     dead_end: 'dead_end',
     fee_demand: 'unknown',       // escalate to human
     unknown: 'unknown',
