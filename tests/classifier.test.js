@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { classify, splitQuotedText, stripQuotedText, extractReturnDate } from '../src/classifier.js';
+import { classify, splitQuotedText, stripQuotedText, extractReturnDate, isInternalForwardText } from '../src/classifier.js';
 
 describe('splitQuotedText', () => {
   it('splits at the leading-date Gmail-sv attribution (no leading "Den")', () => {
@@ -263,5 +263,67 @@ describe('classify — arendenummer extraction', () => {
   it('exposes the captured Ärendenummer for storage', () => {
     const r = classify(msg({ body: 'Ärendenummer: K202642713\n\nVi svarar inom 4 veckor.' }));
     expect(r.extracted?.arendenummer).toBe('K202642713');
+  });
+});
+
+describe('classify — soft internal forward (handoff_internal, 2026-07-20 §1)', () => {
+  it('Bjurholm-style internal forward with NO address → handoff_internal (wait, no escalate)', () => {
+    const r = classify(msg({
+      body: 'Tack för ditt mail. Jag skickar det vidare till vår skol- och IT-chef som får återkomma. Med anledning av semestertider kan återkopplingen ta något längre tid än vanligt.',
+    }));
+    expect(r.class).toBe('handoff_internal');
+    expect(r.signals).toContain('internal_forward');
+  });
+
+  it('Avesta-style "vidare till Upphandlingsenheten" → handoff_internal', () => {
+    const r = classify(msg({ body: 'Hej, jag har skickat vidare din begäran till Upphandlingsenheten.' }));
+    expect(r.class).toBe('handoff_internal');
+  });
+
+  it('"vidarebefordrat till Bildning" (Eda) → handoff_internal', () => {
+    const r = classify(msg({ body: 'Din förfrågan är vidarebefordrad till Bildningsförvaltningen internt.' }));
+    expect(r.class).toBe('handoff_internal');
+  });
+
+  it('PRECISION: an EXTERNAL redirect naming an address stays escalate (unknown), NOT downgraded', () => {
+    const r = classify(msg({
+      body: 'Dessa avtal hanteras av stadsledningskontoret. Vänligen skicka vidare din begäran till registrator@stadsledningen.kommun.se.',
+    }));
+    expect(r.class).not.toBe('handoff_internal');
+    expect(r.class).toBe('unknown');
+  });
+
+  it('PRECISION: a plain address named without a forward phrase is not handoff_internal', () => {
+    expect(classify(msg({ body: 'Kontakta oss på registrator@kommun.se om du har frågor.' })).class).not.toBe('handoff_internal');
+  });
+
+  it('a real delivery with attachments is never a handoff_internal, even if it mentions "vidare"', () => {
+    const r = classify(msg({ body: 'Här bifogas avtalet. Jag skickar även vidare till dig senare.', attachment_count: 2 }));
+    expect(r.class).toBe('delivery');
+  });
+
+  it('a clarification reply keeps its own class (not handoff_internal)', () => {
+    const r = classify(msg({ body: 'För att precisera din begäran, önskar jag veta vilken tidsperiod som avses.' }));
+    expect(r.class).toBe('clarification');
+  });
+
+  it('a forward phrase quoted only in the trailing history does not trip it', () => {
+    const r = classify(msg({
+      body: 'Hej, jag är osäker på vad ni menar.\n\nDen 5 juli 2026 skrev Gustaf <g@x.se>:\n> Jag skickar det vidare till er.',
+    }));
+    expect(r.class).not.toBe('handoff_internal');
+  });
+});
+
+describe('isInternalForwardText (pure, both directions)', () => {
+  it('true for a forward phrase with no address', () => {
+    expect(isInternalForwardText('Jag skickar det vidare till skolchefen.')).toBe(true);
+    expect(isInternalForwardText('Din begäran är vidarebefordrad internt.')).toBe(true);
+  });
+  it('false when a concrete address is named (external handoff)', () => {
+    expect(isInternalForwardText('Jag skickar vidare till registrator@x.se.')).toBe(false);
+  });
+  it('false when there is no forward phrase', () => {
+    expect(isInternalForwardText('Vi återkommer inom kort.')).toBe(false);
   });
 });

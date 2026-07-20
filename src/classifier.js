@@ -150,6 +150,33 @@ export function isCloserText(body) {
   return CLOSER_RE.test(stripQuotedText(body));
 }
 
+// --- Soft internal-forward recognition (2026-07-20 soft-handoff design §1) ---
+//
+// A reply where the HUMAN registrator says they have forwarded our request
+// INTERNALLY to the right person/unit ("skickar det vidare till skol- och
+// IT-chef", "vidarebefordrat till upphandlingsenheten", often + a semester
+// note) and gives NO new external address for us to contact -> wait silently,
+// never escalate (class `handoff_internal`).
+//
+// PRECISION OVER RECALL is the whole point: a PERMANENT external redirect that
+// names a concrete other address ("kontakta registrator@x.se") must stay a
+// human escalation. So the guard is strict: a forwarding phrase must be present
+// AND the UNQUOTED body must contain NO email address. If any concrete address
+// is named we FALL THROUGH to the normal classification (which escalates as
+// `unknown`). It also only fires when nothing else classifies confidently and
+// there are no attachments, so a real delivery/clarification/dead_end always
+// wins over a stray "vidare".
+const INTERNAL_FORWARD_RE = /\bskickar (det |den |ärendet )?vidare\b|\bskickat vidare\b|\bskickar vidare\b|\bvidarebefordra(r|t|d|de|ts)?\b|\blämna(r|t|de|ts)? vidare\b|\bgått vidare\b|\bgår vidare\b/i;
+// Any email address anywhere in the visible text means a concrete recipient may
+// have been named — bail to escalation (precision over recall).
+const ANY_EMAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/;
+export function isInternalForwardText(visibleBody) {
+  const s = String(visibleBody ?? '');
+  if (!INTERNAL_FORWARD_RE.test(s)) return false;
+  if (ANY_EMAIL_RE.test(s)) return false; // a concrete address -> real handoff -> escalate
+  return true;
+}
+
 const THRESHOLD = 0.6;
 const DELIVERY_THRESHOLD = 0.5;
 const MARGIN = 0.2;
@@ -211,6 +238,13 @@ export function classify(message) {
   }
 
   if (top.score < THRESHOLD || (top.score - (second?.score ?? 0)) < MARGIN) {
+    // Soft internal forward (2026-07-20 §1): only when nothing else classified
+    // confidently AND there are no attachments (a delivery is never a forward).
+    // A concrete address in the body already made isInternalForwardText false,
+    // so a genuine external redirect falls through to `unknown` → escalate.
+    if (attachments < 1 && isInternalForwardText(visible)) {
+      return { class: 'handoff_internal', confidence: 0.75, signals: ['internal_forward'], extracted };
+    }
     return {
       class: 'unknown',
       confidence: top.score,

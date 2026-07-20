@@ -31,6 +31,18 @@ export function nextActionForClassification(state, classification, opts = {}) {
     return { nextState: state, action: 'none' };
   }
 
+  // A SOFT internal forward (2026-07-20 soft-handoff design §2): the registrator
+  // forwarded our request internally to the right person/unit and gave NO new
+  // external address for us to contact. Unlike `handoff` (an external redirect
+  // that maps to `unknown` → escalate), this must NOT demand the operator: the
+  // only correct action is to wait. Mirrors auto_reply — action 'none' (no
+  // draft, no escalation), state unchanged. The ingest pushes follow_up_at to a
+  // 21-day floor so the case re-surfaces only after the internal handling has
+  // had time; loop-safe because it never sends and never escalates.
+  if (classification === 'handoff_internal') {
+    return { nextState: state, action: 'none' };
+  }
+
   if (classification === 'clarification') {
     if (state === 'SENT' || state === 'ACK_RECEIVED' || state === 'AWAITING_PRECISION') {
       return { nextState: 'AWAITING_PRECISION', action: 'send_precision' };

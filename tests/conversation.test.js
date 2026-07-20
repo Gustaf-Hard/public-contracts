@@ -79,6 +79,20 @@ describe('nextActionForClassification', () => {
       expect(r.action).toBe('none');   // no draft, no escalation — mirrors auto_ack, unlike delay_promise
     }
   });
+
+  it('handoff_internal (soft internal forward) → state unchanged, action none (wait, never escalate/reply)', () => {
+    for (const state of ['SENT', 'ACK_RECEIVED', 'AWAITING_PRECISION', 'DELIVERING']) {
+      const r = nextActionForClassification(state, 'handoff_internal');
+      expect(r.nextState).toBe(state); // stays in its current waiting state, mirrors auto_reply
+      expect(r.action).toBe('none');   // no draft, no escalation
+    }
+  });
+
+  it('unknown (external handoff maps here) still escalates — the two directions differ', () => {
+    const r = nextActionForClassification('SENT', 'unknown');
+    expect(r.nextState).toBe('NEEDS_HUMAN');
+    expect(r.action).toBe('escalate');
+  });
 });
 
 describe('staleAction', () => {
