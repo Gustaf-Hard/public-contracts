@@ -64,9 +64,20 @@
     var form = e.target.closest && e.target.closest('form[data-pane-form]');
     if (!form) return;
     e.preventDefault();
-    var body = new URLSearchParams(new FormData(form));
+    // Pass the submitter so a clicked button's name/value is serialised —
+    // new FormData(form) alone drops it, which silently 400'd button-borne
+    // actions. Fall back to appending it for older engines lacking the arg.
+    var fd = new FormData(form, e.submitter);
+    if (e.submitter && e.submitter.name && !fd.has(e.submitter.name)) {
+      fd.append(e.submitter.name, e.submitter.value);
+    }
+    var body = new URLSearchParams(fd);
     fetch(form.action, { method: 'POST', body: body })
       .then(function (res) {
+        // A server error (400/409/503) must NOT masquerade as success by
+        // reloading the same pane — fall back to a full submit so the
+        // operator actually sees the error response.
+        if (!res.ok && !res.redirected) { form.submit(); return; }
         var next = res.redirected ? res.url.replace(location.origin, '')
           : (form.getAttribute('data-return') || content().dataset.path || '/');
         return loadPane(next, true);

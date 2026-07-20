@@ -628,8 +628,8 @@ const baseCss = `
   .thread-group { border: 1px solid var(--border); border-radius: 8px; margin: 10px 0; overflow: hidden; }
   .thread-group.thread-muted { opacity: 0.72; }
   /* A thread with a pending escalation needs the operator — light-red tint. */
-  .thread-group.thread-needs-action { background: rgba(220, 38, 38, 0.06); border-color: rgba(220, 38, 38, 0.45); opacity: 1; }
-  .thread-group.thread-needs-action .thread-head:hover { background: rgba(220, 38, 38, 0.10); }
+  .thread-group.thread-needs-action { background: rgba(220, 38, 38, 0.07); border-color: rgba(220, 38, 38, 0.55); border-left: 4px solid #d93025; opacity: 1; }
+  .thread-group.thread-needs-action .thread-head:hover { background: rgba(220, 38, 38, 0.12); }
   /* Collapsed thread row: dense one-line inbox-style header, hidden body. */
   .thread-group .thread-head { display: flex; align-items: baseline; gap: 12px; padding: 9px 12px; cursor: pointer; margin: 0; border-bottom: none; }
   .thread-group .thread-head:hover { background: var(--bg-elev-2); }
@@ -655,7 +655,7 @@ const baseCss = `
   .thread-list-item { border-bottom: 1px solid var(--border); }
   .thread-list-item:last-child { border-bottom: none; }
   .thread-list-item.thread-muted { opacity: 0.62; }
-  .thread-list-item.thread-needs-action { background: rgba(220, 38, 38, 0.06); opacity: 1; }
+  .thread-list-item.thread-needs-action { background: rgba(220, 38, 38, 0.07); border-left: 4px solid #d93025; opacity: 1; }
   .thread-list-link { display: flex; align-items: baseline; gap: 12px; padding: 10px 14px; color: var(--fg); }
   .thread-list-link:hover { background: var(--bg-elev-2); text-decoration: none; }
   .thread-list-item.thread-needs-action .thread-list-link:hover { background: rgba(220, 38, 38, 0.10); }
@@ -1039,6 +1039,11 @@ export function renderEscalationForm(esc, gmailReady, returnTo = null) {
     ${watchBanner}
     <form class="action-form" method="post" action="/escalations/${esc.id}"${paneAttrs}>
       ${returnField}
+      <!-- action lives in a hidden field, NOT on the submit button: the pane
+           fetch handler serialises with new FormData(form), which omits the
+           clicked button's name/value, so a button-borne action would arrive
+           undefined and the send would silently 400. -->
+      <input type="hidden" name="action" value="edit">
       <div class="field">
         <label>Till</label>
         <!-- type=text, not email: the recipient is an RFC 5322 "Namn <adress>"
@@ -1054,7 +1059,7 @@ export function renderEscalationForm(esc, gmailReady, returnTo = null) {
         <textarea name="body">${escapeHtml(esc.draft_body ?? '')}</textarea>
       </div>
       <div class="buttons">
-        <button class="btn ${gmailReady ? 'btn-primary' : 'btn-disabled'}" type="submit" name="action" value="edit" ${disabled}>📨 Skicka</button>
+        <button class="btn ${gmailReady ? 'btn-primary' : 'btn-disabled'}" type="submit" ${disabled}>📨 Skicka</button>
         ${warn}
       </div>
     </form>
@@ -1611,6 +1616,13 @@ function renderCaseList(cases, selectedId) {
   if (cases.length === 0) return '<div class="empty-state">Inga ärenden ännu.</div>';
   const groups = { behover_dig: [], oppna: [], stangda: [] };
   for (const c of cases) groups[caseBucket(c)].push(c);
+  // Order within each bucket (rows otherwise fall in enrollment order, which
+  // reads as unsorted). Behöver dig: longest-waiting first (oldest `since` on
+  // top) so the most-overdue action surfaces. Öppna: soonest follow-up due
+  // first. Stängda: most-recently-closed first. Missing keys sort last.
+  groups.behover_dig.sort((a, b) => (a.since ?? '9999').localeCompare(b.since ?? '9999'));
+  groups.oppna.sort((a, b) => (a.follow_up_at ?? '9999-12-31').localeCompare(b.follow_up_at ?? '9999-12-31'));
+  groups.stangda.sort((a, b) => (b.since ?? '').localeCompare(a.since ?? ''));
   return ARENDEN_BUCKETS.map((b) => {
     const items = groups[b.key];
     if (items.length === 0) return '';
@@ -1823,8 +1835,11 @@ export function renderThreadGroups(threads, messages, attachmentsByMsg, signatur
     const star = t.status === 'primary' ? '<span class="thread-star" title="primär tråd">★</span> ' : '';
     const middle = [pv.subject, pv.summary].filter(Boolean).join(' — ');
     // One dense line: participants+count · subject — summary · date.
+    const needsMarker = needsAction
+      ? '<span class="thread-needs-marker" title="Öppen eskalering – behöver dig">● Behöver dig</span> '
+      : '';
     const header = `<div class="thread-head thread-row${needsAction ? ' thread-unread' : ''}" data-thread-toggle aria-expanded="false">
-      <span class="thread-row-who">${star}${escapeHtml(pv.participants)}</span>
+      <span class="thread-row-who">${needsMarker}${star}${escapeHtml(pv.participants)}</span>
       <span class="thread-row-preview muted">${escapeHtml(middle)}</span>
       <span class="thread-row-date muted">${escapeHtml(pv.date)}</span>
     </div>`;

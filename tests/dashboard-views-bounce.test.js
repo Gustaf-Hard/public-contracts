@@ -55,4 +55,14 @@ describe('renderEscalationForm — a normal reply is unchanged', () => {
     expect(html).not.toMatch(/name="finalTo"/);
     expect(html).toMatch(/name="to"/);
   });
+
+  // Regression: the pane submit handler serialises with new FormData(form),
+  // which omits the clicked button's name/value. The action MUST therefore
+  // ride in a hidden input, never on the <button>, or the send silently 400s
+  // ("nothing happens when I click Skicka").
+  it('carries action=edit in a hidden input, not on the submit button', () => {
+    const html = renderEscalationForm(normalEsc, true);
+    expect(html).toMatch(/<input type="hidden" name="action" value="edit">/);
+    expect(html).not.toMatch(/<button[^>]*name="action"/);
+  });
 });
