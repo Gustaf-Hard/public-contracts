@@ -11,6 +11,7 @@ import { effectiveFollowUp, TERMINAL_STATES } from './conversation.js';
 import { resolveVacationConfig, isInVacation } from './vacation.js';
 import { buildOAuthClient, loadStoredToken, saveToken, makeGmail } from './gmail.js';
 import { beginReauth } from './gmail-auth.js';
+import { requireAuth, requireOriginToken, mountAuthRoutes } from './web-auth.js';
 import { sendApprovedReply, sendInitial, renderInitialDraft } from './send-reply.js';
 import { makeSlackClient, updateEscalationResolved } from './slack.js';
 import { resolveReplyRecipient } from './threads.js';
@@ -546,8 +547,16 @@ export function createDashboardApp({
   contractsDir = process.env.PILOT_CONTRACTS_DIR ?? 'data/contracts',
   slackClient = process.env.SLACK_BOT_TOKEN ? makeSlackClient(process.env.SLACK_BOT_TOKEN) : null,
   vacationConfig = loadVacationConfig(),
+  authDeps = {},
 } = {}) {
   const app = express();
+  // Edge/auth chain (inert on loopback): reject anything not arriving through
+  // CloudFront (ORIGIN_TOKEN), then gate every request behind Google Sign-In
+  // for the single operator (AUTH_ENABLED). Both are no-ops until their env
+  // vars are set, so local dev + the test-suite are untouched. See
+  // docs/superpowers/specs/2026-07-28-aws-deployment-design.md §3.
+  app.set('trust proxy', true);
+  app.use(requireOriginToken({ env }));
   // Best-effort chat.update so dashboard resolutions also strip the Slack
   // message's live buttons. The atomic DB claim is the real double-send guard.
   const stripSlackButtons = async (esc, kommunNamn, status) => {
@@ -561,6 +570,12 @@ export function createDashboardApp({
     }
   };
   app.use(express.urlencoded({ extended: false, limit: '1mb' }));
+  // Auth endpoints are registered before the gate so the login round-trip can
+  // complete; the gate then protects everything after it (incl. static + all
+  // routes). The OAuth callback persists the refresh token to TOKEN_PATH — the
+  // same credential the daemon sends with, so "logged in ⇒ can send".
+  mountAuthRoutes(app, { env, tokenPath: TOKEN_PATH, ...authDeps });
+  app.use(requireAuth({ env }));
   app.use(express.static('public'));
   // Pipeline health drives the heartbeat pill + the health modal (one object,
   // already threaded everywhere as `heartbeat`).
