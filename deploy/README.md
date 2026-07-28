@@ -169,5 +169,5 @@ Decide at cutover.
 
 ## Cost
 
-t4g.micro ~$6/mo · EBS gp3 30 GB ~$2.4/mo · EIP (attached) $0 · CloudFront
+t4g.micro ~$6/mo · EBS gp3 30 GB ~$2.4/mo · CloudFront
 (personal traffic) ~$0 · S3 ~pennies · SSM standard free. **≈ $8-10/mo.**

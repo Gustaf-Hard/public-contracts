@@ -129,13 +129,6 @@ Resources:
       Tags:
         - { Key: Name, Value: !Sub '${ProjectName}-sg' }
 
-  ElasticIP:
-    Type: AWS::EC2::EIP
-    Properties:
-      Domain: vpc
-      Tags:
-        - { Key: Name, Value: !Sub '${ProjectName}-eip' }
-
   Instance:
     Type: AWS::EC2::Instance
     Properties:
@@ -179,15 +172,9 @@ Resources:
           chown -R mediagraf:mediagraf /opt/mediagraf/app
           bash /opt/mediagraf/app/deploy/box/install.sh
 
-  EIPAssociation:
-    Type: AWS::EC2::EIPAssociation
-    Properties:
-      AllocationId: !GetAtt ElasticIP.AllocationId
-      InstanceId: !Ref Instance
-
   Distribution:
     Type: AWS::CloudFront::Distribution
-    DependsOn: EIPAssociation
+    DependsOn: Instance
     Properties:
       DistributionConfig:
         Enabled: true
@@ -196,7 +183,10 @@ Resources:
         PriceClass: PriceClass_100
         Origins:
           - Id: box
-            DomainName: !Ref ElasticIP
+            # CloudFront rejects a raw IP as origin, so use the instance public
+            # DNS. Stable while the box stays running (changes only on stop/start
+            # of the instance, which the always-on setup avoids).
+            DomainName: !GetAtt Instance.PublicDnsName
             CustomOriginConfig:
               HTTPPort: !Ref AppPort
               OriginProtocolPolicy: http-only
@@ -226,8 +216,6 @@ Outputs:
     Value: !GetAtt Distribution.DomainName
   InstanceId:
     Value: !Ref Instance
-  ElasticIP:
-    Value: !Ref ElasticIP
   AppBucketName:
     Value: !Ref AppBucket
   WebAuthRedirectUri:
