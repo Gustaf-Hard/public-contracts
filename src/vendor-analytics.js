@@ -11,6 +11,7 @@
 
 import { computeNextReviewDate } from './contract-lifecycle.js';
 import { canonicalVendorName } from './vendor-aliases.js';
+import { resolveCompany } from './vendor-kb.js';
 
 // ---- Grade-level coverage schema (2026-07-10-product-intelligence design) ----
 
@@ -281,6 +282,15 @@ function nextFutureDate(facts, now) {
   return future[0] ?? null;
 }
 
+// Grouping/display name for the market rollups: prefer the curated KB company
+// (so product/company fragments — NE / NE.se, ILT Education / Inläsningstjänst,
+// Tieto / Tietoevry — collapse to one company), falling back to the vendor-alias
+// near-dupe canonical for names the KB does not know. Read-time only; never
+// mutates stored rows.
+function groupingCompanyName(name) {
+  return resolveCompany(name)?.canonical ?? canonicalVendorName(name);
+}
+
 // Per-vendor market rollup. Vendor-less contracts (vendor unknown) stay in
 // the facts/explorer/completeness but do not form a vendor row here.
 // Sorted by total known annual SEK desc; vendors with no known value last.
@@ -296,7 +306,7 @@ export function buildVendorRollups(facts, { now }) {
   const byVendor = new Map();
   for (const f of facts) {
     if (f.vendor_id == null) continue;
-    const key = canonicalVendorName(f.vendor_name).toLowerCase();
+    const key = groupingCompanyName(f.vendor_name).toLowerCase();
     if (!byVendor.has(key)) byVendor.set(key, []);
     byVendor.get(key).push(f);
   }
@@ -323,7 +333,7 @@ export function buildVendorRollups(facts, { now }) {
     const rep = group.find((f) => f.vendor_slug) ?? group[0];
     rollups.push({
       vendor_id: rep.vendor_id,
-      vendor_name: canonicalVendorName(group[0].vendor_name),
+      vendor_name: groupingCompanyName(group[0].vendor_name),
       vendor_slug: rep.vendor_slug,
       contract_count: group.length,
       kommun_count: new Set(group.map((f) => f.kommun_kod)).size,
@@ -601,7 +611,7 @@ export function buildMarketSummary(facts, { now }) {
     // matches the collapsed market rollups — near-dupes count once.
     vendor_count: new Set(
       facts.filter((f) => f.vendor_id != null)
-        .map((f) => canonicalVendorName(f.vendor_name).toLowerCase())
+        .map((f) => groupingCompanyName(f.vendor_name).toLowerCase())
     ).size,
     kommun_count: new Set(facts.map((f) => f.kommun_kod)).size,
     contract_count: facts.length,
