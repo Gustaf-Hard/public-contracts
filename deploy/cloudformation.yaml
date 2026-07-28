@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  Mediagraf pilot — always-on box, CloudFront-fronted, Google-Sign-In-gated.
+  Mediagraf pilot - always-on box, CloudFront-fronted, Google-Sign-In-gated.
   One t4g.micro (arm64) running the dashboard + daemon under systemd, reachable
   ONLY through CloudFront (origin-facing prefix list + X-Origin-Token header).
   SQLite + contracts on EBS; nightly backup to a versioned private S3 bucket.
@@ -79,7 +79,7 @@ Resources:
             Principal: { Service: ec2.amazonaws.com }
             Action: sts:AssumeRole
       ManagedPolicyArns:
-        # Session Manager access — no SSH port, no key pair.
+        # Session Manager access - no SSH port, no key pair.
         - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
       Policies:
         - PolicyName: mediagraf-runtime
@@ -118,7 +118,7 @@ Resources:
   SecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: !Sub '${ProjectName} — inbound only from CloudFront'
+      GroupDescription: !Sub '${ProjectName} - inbound only from CloudFront'
       VpcId: !Ref VpcId
       SecurityGroupIngress:
         - IpProtocol: tcp
@@ -210,9 +210,9 @@ Resources:
           Compress: true
           AllowedMethods: [GET, HEAD, OPTIONS, PUT, POST, PATCH, DELETE]
           CachedMethods: [GET, HEAD]
-          # Managed-CachingDisabled — dynamic private tool, never cache.
+          # Managed-CachingDisabled - dynamic private tool, never cache.
           CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad
-          # Managed-AllViewerExceptHostHeader — forward cookies/query/headers to
+          # Managed-AllViewerExceptHostHeader - forward cookies/query/headers to
           # a custom origin without clobbering Host.
           OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac
         ViewerCertificate:
