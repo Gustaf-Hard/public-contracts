@@ -1,0 +1,235 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Mediagraf pilot — always-on box, CloudFront-fronted, Google-Sign-In-gated.
+  One t4g.micro (arm64) running the dashboard + daemon under systemd, reachable
+  ONLY through CloudFront (origin-facing prefix list + X-Origin-Token header).
+  SQLite + contracts on EBS; nightly backup to a versioned private S3 bucket.
+  Secrets live in SSM Parameter Store (set out of band). Region: eu-central-1.
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: mediagraf
+  InstanceType:
+    Type: String
+    Default: t4g.micro
+    Description: arm64 instance type (bump to t4g.small if PDF batches pressure RAM).
+  AmiId:
+    Type: AWS::EC2::Image::Id
+    Default: ami-0d4009f1875697189
+    Description: Amazon Linux 2023 arm64 AMI (resolve the latest with the deploy README command; the IAM user cannot read the /aws/ SSM public parameter namespace).
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Default: vpc-01e7e737f8682cda8
+  SubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Default: subnet-078ebc07caf9e27a3
+    Description: A public subnet in the default VPC (auto-assign public IP).
+  CloudFrontPrefixListId:
+    Type: String
+    Default: pl-a3a144ca
+    Description: eu-central-1 com.amazonaws.global.cloudfront.origin-facing managed prefix list.
+  OriginToken:
+    Type: String
+    NoEcho: true
+    Description: >
+      Shared secret CloudFront injects as X-Origin-Token; the app rejects any
+      request without it. MUST equal the /mediagraf/ORIGIN_TOKEN SSM value.
+    MinLength: 16
+  AppPort:
+    Type: Number
+    Default: 3100
+    Description: Port the dashboard binds on the box (CloudFront origin port).
+
+Resources:
+  AppBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub '${ProjectName}-${AWS::AccountId}-${AWS::Region}'
+      VersioningConfiguration:
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-old-backup-versions
+            Status: Enabled
+            NoncurrentVersionExpirationInDays: 30
+          - Id: expire-backups
+            Status: Enabled
+            Prefix: backups/
+            ExpirationInDays: 30
+
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ec2.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        # Session Manager access — no SSH port, no key pair.
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: mediagraf-runtime
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: ReadOwnSsmParams
+                Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                  - ssm:GetParametersByPath
+                Resource: !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${ProjectName}/*'
+              - Sid: DecryptSsmSecureStrings
+                Effect: Allow
+                Action: kms:Decrypt
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    kms:ViaService: !Sub 'ssm.${AWS::Region}.amazonaws.com'
+              - Sid: AppBucketReadWrite
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:ListBucket
+                Resource:
+                  - !GetAtt AppBucket.Arn
+                  - !Sub '${AppBucket.Arn}/*'
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: [!Ref InstanceRole]
+
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub '${ProjectName} — inbound only from CloudFront'
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: !Ref AppPort
+          ToPort: !Ref AppPort
+          SourcePrefixListId: !Ref CloudFrontPrefixListId
+          Description: CloudFront origin-facing prefix list only
+      Tags:
+        - { Key: Name, Value: !Sub '${ProjectName}-sg' }
+
+  ElasticIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags:
+        - { Key: Name, Value: !Sub '${ProjectName}-eip' }
+
+  Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref AmiId
+      InstanceType: !Ref InstanceType
+      IamInstanceProfile: !Ref InstanceProfile
+      MetadataOptions:
+        HttpTokens: required
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeType: gp3
+            VolumeSize: 30
+            Encrypted: true
+            DeleteOnTermination: true
+      NetworkInterfaces:
+        - DeviceIndex: 0
+          AssociatePublicIpAddress: true
+          SubnetId: !Ref SubnetId
+          GroupSet: [!Ref SecurityGroup]
+      Tags:
+        - { Key: Name, Value: !Ref ProjectName }
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -euxo pipefail
+          exec > /var/log/mediagraf-userdata.log 2>&1
+          dnf -y install tar gzip unzip || true
+          if ! command -v aws >/dev/null 2>&1; then
+            curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o /tmp/awscliv2.zip
+            (cd /tmp && unzip -q awscliv2.zip && ./aws/install)
+          fi
+          id mediagraf >/dev/null 2>&1 || useradd -r -m -d /var/lib/mediagraf -s /usr/sbin/nologin mediagraf
+          mkdir -p /opt/mediagraf /var/lib/mediagraf/contracts /etc/mediagraf
+          printf 'BUCKET=%s\nREGION=%s\nAPP_PORT=%s\n' "${AppBucket}" "${AWS::Region}" "${AppPort}" > /etc/mediagraf/deploy.conf
+          chown -R mediagraf:mediagraf /opt/mediagraf /var/lib/mediagraf
+          echo "Waiting for app tarball at s3://${AppBucket}/deploy/app.tar.gz ..."
+          until aws s3 cp "s3://${AppBucket}/deploy/app.tar.gz" /tmp/app.tar.gz --region "${AWS::Region}"; do sleep 20; done
+          rm -rf /opt/mediagraf/app && mkdir -p /opt/mediagraf/app
+          tar -xzf /tmp/app.tar.gz -C /opt/mediagraf/app
+          chown -R mediagraf:mediagraf /opt/mediagraf/app
+          bash /opt/mediagraf/app/deploy/box/install.sh
+
+  EIPAssociation:
+    Type: AWS::EC2::EIPAssociation
+    Properties:
+      AllocationId: !GetAtt ElasticIP.AllocationId
+      InstanceId: !Ref Instance
+
+  Distribution:
+    Type: AWS::CloudFront::Distribution
+    DependsOn: EIPAssociation
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: !Sub '${ProjectName} dashboard'
+        HttpVersion: http2and3
+        PriceClass: PriceClass_100
+        Origins:
+          - Id: box
+            DomainName: !Ref ElasticIP
+            CustomOriginConfig:
+              HTTPPort: !Ref AppPort
+              OriginProtocolPolicy: http-only
+              OriginReadTimeout: 60
+            OriginCustomHeaders:
+              - HeaderName: X-Origin-Token
+                HeaderValue: !Ref OriginToken
+        DefaultCacheBehavior:
+          TargetOriginId: box
+          ViewerProtocolPolicy: redirect-to-https
+          Compress: true
+          AllowedMethods: [GET, HEAD, OPTIONS, PUT, POST, PATCH, DELETE]
+          CachedMethods: [GET, HEAD]
+          # Managed-CachingDisabled — dynamic private tool, never cache.
+          CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad
+          # Managed-AllViewerExceptHostHeader — forward cookies/query/headers to
+          # a custom origin without clobbering Host.
+          OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac
+        ViewerCertificate:
+          CloudFrontDefaultCertificate: true
+
+Outputs:
+  DashboardUrl:
+    Description: Bookmark this on the phone; use for OAuth redirect + Slack.
+    Value: !Sub 'https://${Distribution.DomainName}'
+  CloudFrontDomainName:
+    Value: !GetAtt Distribution.DomainName
+  InstanceId:
+    Value: !Ref Instance
+  ElasticIP:
+    Value: !Ref ElasticIP
+  AppBucketName:
+    Value: !Ref AppBucket
+  WebAuthRedirectUri:
+    Description: Add this as an authorized redirect URI in Google Cloud, and set it as /mediagraf/WEB_AUTH_REDIRECT_URI.
+    Value: !Sub 'https://${Distribution.DomainName}/auth/callback'

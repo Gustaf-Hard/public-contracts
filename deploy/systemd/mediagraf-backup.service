@@ -1,0 +1,8 @@
+[Unit]
+Description=Mediagraf nightly SQLite + contracts backup to S3
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/mediagraf-backup

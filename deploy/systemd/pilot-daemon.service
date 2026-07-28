@@ -1,0 +1,24 @@
+[Unit]
+Description=Mediagraf pilot daemon (cron ticks + daily follow-up + Slack)
+After=network-online.target mediagraf-render-env.service
+Wants=network-online.target
+Requires=mediagraf-render-env.service
+
+[Service]
+Type=simple
+User=mediagraf
+WorkingDirectory=/opt/mediagraf/app
+EnvironmentFile=/etc/mediagraf/pilot.env
+Environment=NODE_ENV=production
+Environment=HOME=/var/lib/mediagraf
+Environment=PILOT_DB_PATH=/var/lib/mediagraf/pilot.db
+Environment=PILOT_CONTRACTS_DIR=/var/lib/mediagraf/contracts
+Environment=PILOT_OVERRIDES_PATH=/var/lib/mediagraf/pilot-overrides.json
+Environment=GMAIL_TOKEN_PATH=/var/lib/mediagraf/pilot-gmail-token.json
+Environment=PILOT_MUNICIPALITIES_PATH=/opt/mediagraf/app/data/municipalities.json
+ExecStart=/usr/local/bin/node scripts/pilot-daemon.js
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

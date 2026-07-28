@@ -1,0 +1,30 @@
+[Unit]
+Description=Mediagraf pilot dashboard (Express + Google Sign-In gate)
+After=network-online.target mediagraf-render-env.service
+Wants=network-online.target
+Requires=mediagraf-render-env.service
+
+[Service]
+Type=simple
+User=mediagraf
+WorkingDirectory=/opt/mediagraf/app
+EnvironmentFile=/etc/mediagraf/pilot.env
+Environment=NODE_ENV=production
+Environment=HOME=/var/lib/mediagraf
+Environment=PILOT_DB_PATH=/var/lib/mediagraf/pilot.db
+Environment=PILOT_CONTRACTS_DIR=/var/lib/mediagraf/contracts
+Environment=PILOT_OVERRIDES_PATH=/var/lib/mediagraf/pilot-overrides.json
+Environment=GMAIL_TOKEN_PATH=/var/lib/mediagraf/pilot-gmail-token.json
+Environment=PILOT_MUNICIPALITIES_PATH=/opt/mediagraf/app/data/municipalities.json
+# Exposure: bind all interfaces (reachable only via CloudFront + origin token),
+# gated by Google Sign-In. AUTH_ENABLED=1 is required for a non-loopback bind.
+Environment=AUTH_ENABLED=1
+Environment=AUTH_COOKIE_SECURE=1
+Environment=PILOT_DASHBOARD_HOST=0.0.0.0
+Environment=PILOT_DASHBOARD_PORT=3100
+ExecStart=/usr/local/bin/node scripts/pilot-dashboard.js
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
