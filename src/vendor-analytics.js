@@ -295,10 +295,11 @@ function groupingCompanyName(name) {
 // the facts/explorer/completeness but do not form a vendor row here.
 // Sorted by total known annual SEK desc; vendors with no known value last.
 //
-// Grouping is by CANONICAL vendor name (2026-07-19 design), so near-dupes
-// (Oribi / Oribi Texthelp, NE / Nationalencyklopedin) roll up under ONE row
+// Grouping is by KB company name (2026-07-28), falling back to the alias
+// canonical, so fragments (Oribi / Oribi Texthelp, NE / NE.se / Nationalencyklopedin,
+// ILT Education / Inläsningstjänst, Tieto / Tietoevry) roll up under ONE row
 // with summed facts — only the grouping KEY changes, never the per-contract
-// data. The row's vendor_name is the canonical; vendor_id/vendor_slug come
+// data. The row's vendor_name is that company name; vendor_id/vendor_slug come
 // from the first member that carries a slug (else the first member), so a
 // linkable page is preferred without fabricating a slug.
 export function buildVendorRollups(facts, { now }) {
@@ -607,8 +608,8 @@ export function buildMarketSummary(facts, { now }) {
   const horizon = new Date(now.getTime() + 365 * 86400000).toISOString().slice(0, 10);
   const known = facts.filter((f) => f.annual_value_sek != null);
   return {
-    // Count DISTINCT CANONICAL vendors (2026-07-19 design) so the header
-    // matches the collapsed market rollups — near-dupes count once.
+    // Count DISTINCT KB-company vendors (2026-07-28) so the header
+    // matches the collapsed market rollups — fragments count once.
     vendor_count: new Set(
       facts.filter((f) => f.vendor_id != null)
         .map((f) => groupingCompanyName(f.vendor_name).toLowerCase())
