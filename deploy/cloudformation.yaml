@@ -15,14 +15,14 @@ Parameters:
     Default: t4g.micro
     Description: arm64 instance type (bump to t4g.small if PDF batches pressure RAM).
   AmiId:
-    Type: AWS::EC2::Image::Id
+    Type: String
     Default: ami-0d4009f1875697189
-    Description: Amazon Linux 2023 arm64 AMI (resolve the latest with the deploy README command; the IAM user cannot read the /aws/ SSM public parameter namespace).
+    Description: Amazon Linux 2023 arm64 AMI (resolve the latest with the deploy README command; the IAM user cannot read the /aws/ SSM public parameter namespace). Plain String, not AWS::EC2::Image::Id, to avoid a ResourceExistenceCheck early-validation false-positive.
   VpcId:
-    Type: AWS::EC2::VPC::Id
+    Type: String
     Default: vpc-01e7e737f8682cda8
   SubnetId:
-    Type: AWS::EC2::Subnet::Id
+    Type: String
     Default: subnet-078ebc07caf9e27a3
     Description: A public subnet in the default VPC (auto-assign public IP).
   CloudFrontPrefixListId:

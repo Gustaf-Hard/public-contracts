@@ -146,6 +146,17 @@ verification.
 - **Restore from backup:** copy a `s3://<bucket>/backups/YYYY/MM/DD/pilot-*.db`
   onto a fresh box's `/var/lib/mediagraf/pilot.db`.
 
+## Troubleshooting
+
+- **`AWS::EarlyValidation::ResourceExistenceCheck` failed on create:** the S3
+  backup bucket has `DeletionPolicy: Retain`, so if a *first* create rolls back
+  after the bucket was made, the bucket survives and every retry then fails
+  ("can't create a bucket that already exists"). Fix: `aws s3 rb
+  s3://mediagraf-<acct>-<region>` (only if empty) before recreating, or reuse it
+  via a stack import. This is by design — retained backups must outlive the stack.
+- **`Character sets beyond ASCII are not supported`:** an EC2 property (e.g. the
+  SecurityGroup description) contained a non-ASCII char. Keep the template ASCII.
+
 ## Open decision — Slack interactivity
 
 Only the dashboard (port 3100) is exposed through CloudFront. The daemon's Slack
