@@ -1323,7 +1323,19 @@ export function startDashboard({
   // email as the operator + read the full PII corpus. Never expose it on the
   // LAN by default; set PILOT_DASHBOARD_HOST explicitly to override.
   host = process.env.PILOT_DASHBOARD_HOST ?? '127.0.0.1',
+  env = process.env,
 } = {}) {
+  // Fail-closed exposure guard: the dashboard can send mail as the operator and
+  // read the full PII corpus, so it may only bind a non-loopback host once the
+  // Google Sign-In gate is on. This makes "auth gate before exposure" (spec
+  // 2026-07-28) impossible to violate by config mistake.
+  const loopback = host === '127.0.0.1' || host === 'localhost' || host === '::1';
+  if (!loopback && env.AUTH_ENABLED !== '1') {
+    throw new Error(
+      `Refusing to bind ${host} without AUTH_ENABLED=1: the dashboard is ` +
+      'unauthenticated on loopback and must not be exposed without the auth gate.'
+    );
+  }
   const app = createDashboardApp();
   return new Promise((resolve) => {
     const server = app.listen(port, host, () => {

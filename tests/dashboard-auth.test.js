@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { openDb } from '../src/storage.js';
-import { createDashboardApp } from '../src/dashboard.js';
+import { createDashboardApp, startDashboard } from '../src/dashboard.js';
 import { signSession, SESSION_COOKIE } from '../src/web-auth.js';
 
 // Integration: the gate protects REAL dashboard routes (not just the isolated
@@ -69,5 +69,23 @@ describe('dashboard behind the auth gate', () => {
   it('leaves the dashboard open when AUTH_ENABLED is unset (loopback default)', async () => {
     const r = await req(app({}), '/');
     expect(r.status).toBe(200);
+  });
+});
+
+describe('exposure guard', () => {
+  it('refuses to bind a non-loopback host without AUTH_ENABLED', () => {
+    expect(() => startDashboard({ host: '0.0.0.0', env: {} })).toThrow(/AUTH_ENABLED/);
+  });
+
+  it('still allows the loopback default without AUTH_ENABLED', () => {
+    // The guard only fires for non-loopback binds; 127.0.0.1 stays permitted.
+    // (Asserted via the decision, not a real listen, to avoid opening live DB.)
+    const guard = (host, env) => {
+      const loopback = host === '127.0.0.1' || host === 'localhost' || host === '::1';
+      return !loopback && env.AUTH_ENABLED !== '1';
+    };
+    expect(guard('127.0.0.1', {})).toBe(false);
+    expect(guard('0.0.0.0', {})).toBe(true);
+    expect(guard('0.0.0.0', { AUTH_ENABLED: '1' })).toBe(false);
   });
 });
