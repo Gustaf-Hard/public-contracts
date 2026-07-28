@@ -39,4 +39,14 @@ describe('resolveCompany', () => {
     expect(new Set(slugs).size).toBe(slugs.length);
     for (const c of COMPANIES) { expect(c.canonical).toBeTruthy(); expect(['service','channel']).toContain(c.role); }
   });
+  it('resolves the known fragmentation clusters to a single company', () => {
+    for (const n of ['NE', 'NE Nationalencyklopedin', 'NE.se']) expect(resolveCompany(n)?.slug).toBe('ne');
+    for (const n of ['ILT', 'ILT Education', 'Inläsningstjänst', 'Polyglutt']) expect(resolveCompany(n)?.slug).toBe('ilt');
+    for (const n of ['Magma', 'Matteappen', 'Radish']) expect(resolveCompany(n)?.slug).toBe('radish');
+  });
+  it('channels are role=channel with no products to request', () => {
+    for (const s of ['adda','skolon','atea','laromedia']) {
+      const c = COMPANIES.find((x) => x.slug === s); expect(c?.role).toBe('channel');
+    }
+  });
 });
