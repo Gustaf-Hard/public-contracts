@@ -699,6 +699,51 @@ const baseCss = `
   .renewal-item { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px dashed var(--border); font-size: 13px; }
   .renewal-item:last-child { border-bottom: none; }
   .renewal-date { font-variant-numeric: tabular-nums; font-weight: 600; min-width: 90px; }
+
+  /* ---- Phone / narrow viewport (AWS "works well on my phone", 2026-07-28) ----
+     The app shell is a fixed 208px sidebar beside the content; below 760px that
+     steals half a phone screen and clips everything. Stack the sidebar into a
+     top bar, reclaim full width, and enlarge tap targets. */
+  @media (max-width: 760px) {
+    body { flex-direction: column; }
+    .sidebar {
+      width: 100%; height: auto; position: sticky; top: 0; z-index: 20;
+      flex-direction: row; flex-wrap: wrap; align-items: center; gap: var(--sp-2);
+      padding: var(--sp-2) var(--sp-3);
+      border-right: none; border-bottom: 1px solid var(--border);
+    }
+    .sidebar .brand { padding: 0 6px 0 0; font-size: 13px; }
+    .sidebar nav { flex-direction: row; flex-wrap: wrap; gap: 2px; }
+    .sidebar .nav-item { padding: 8px 12px; }
+    .sidebar-foot { margin: 0 0 0 auto; flex-direction: row; align-items: center; gap: var(--sp-2); }
+    .theme-toggle { width: auto; }
+
+    header { padding: 12px var(--sp-3); gap: 12px; }
+    header h1 { font-size: 16px; }
+    main#content { padding: var(--sp-3) var(--sp-3) 60px; }
+
+    /* Collapse every multi-column layout (some only break at 980/1100px). */
+    .kommun-page, .master-detail, .board { grid-template-columns: 1fr; }
+
+    /* Tap targets >= 44px; buttons wrap and fill the row. */
+    .btn { padding: 11px 16px; font-size: 14px; min-height: 44px; }
+    .action-form .buttons { flex-wrap: wrap; }
+    .action-form .buttons .btn { flex: 1 1 auto; text-align: center; }
+    .nav-item, .theme-toggle { min-height: 40px; display: inline-flex; align-items: center; }
+
+    /* Prevent iOS zoom-on-focus (needs >= 16px) and keep the textarea usable. */
+    .action-form input[type=text], .action-form textarea, .action-form select { font-size: 16px; }
+    .action-form textarea { min-height: 160px; }
+    .table-search input[type=search], .explorer-controls input[type=search] { width: 100%; min-width: 0; font-size: 16px; }
+    .explorer-controls { flex-wrap: wrap; }
+
+    /* Tighten the widest case/mail rows so they fit without clipping. */
+    .mail-row { grid-template-columns: 8px 70px minmax(0, 1fr) auto; gap: 8px; font-size: 13px; }
+    .queue-row { gap: var(--sp-2); }
+
+    /* Wide analytics tables scroll horizontally instead of overflowing. */
+    main#content table { display: block; overflow-x: auto; white-space: nowrap; }
+  }
 </style>
 `;
 
