@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveCompany, normalizeVendorName, companyBySlug, COMPANIES } from '../src/vendor-kb.js';
+import { resolveCompany, normalizeVendorName, companyBySlug, probeName, COMPANIES } from '../src/vendor-kb.js';
 
 describe('normalizeVendorName', () => {
   it('folds Swedish letters, lowercases, collapses punctuation/space', () => {
@@ -48,5 +48,23 @@ describe('resolveCompany', () => {
     for (const s of ['adda','skolon','atea','laromedia']) {
       const c = COMPANIES.find((x) => x.slug === s); expect(c?.role).toBe('channel');
     }
+  });
+});
+
+describe('probeName', () => {
+  // A kommun recognizes the brand it buys, not the company that owns it: asking
+  // "har ni avtal med Radish?" reads as a stranger's question, "Magma" does not.
+  it('gives watchlist companies their kommun-facing brand', () => {
+    expect(probeName(companyBySlug('radish'))).toBe('Magma');
+    expect(probeName(companyBySlug('ilt'))).toBe('Inläsningstjänst');
+    expect(probeName(companyBySlug('ne'))).toBe('NE');
+    expect(probeName(companyBySlug('binogi'))).toBe('Binogi');
+  });
+  it('every watchlisted company has a probe name', () => {
+    for (const c of COMPANIES.filter((x) => x.watchlist)) expect(probeName(c)).toBeTruthy();
+  });
+  it('falls back to the canonical name and tolerates a missing company', () => {
+    expect(probeName(companyBySlug('unikum'))).toBe('Unikum');
+    expect(probeName(undefined)).toBe('');
   });
 });

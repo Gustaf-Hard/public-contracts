@@ -6,20 +6,25 @@
 
 export const COMPANIES = [
   // ---- Watchlisted services ----
+  // `probeLabel` is what we call the company when ASKING a kommun about it: the
+  // brand they buy, not the company that owns it. "Har ni avtal med Radish?"
+  // reads as a stranger's question; "Magma" is the name on their invoice.
   { canonical: 'Radish', slug: 'radish', role: 'service', category: 'läromedel',
-    aliases: ['radish'],
+    aliases: ['radish'], probeLabel: 'Magma',
     products: ['Magma', 'Matteappen', 'Magma Pedagogik'], watchlist: true },
   { canonical: 'Nationalencyklopedin', slug: 'ne', role: 'service', category: 'läromedel',
-    aliases: ['ne', 'nationalencyklopedin', 'ne nationalencyklopedin'],
+    aliases: ['ne', 'nationalencyklopedin', 'ne nationalencyklopedin'], probeLabel: 'NE',
     products: ['NE.se', 'NE Junior', 'NE Play', 'NE Ordböcker', 'NE 360',
       'NE.se internettjänst', 'E-språk', 'Världens länder', 'Språklexikon',
       'Kunskapstjänster'], watchlist: true },
   { canonical: 'ILT Education', slug: 'ilt', role: 'service', category: 'läromedel',
     aliases: ['ilt', 'ilt education', 'ilt inläsningstjänst', 'inläsningstjänst'],
+    probeLabel: 'Inläsningstjänst',
     products: ['Polyglutt', 'Polylino', 'Begreppa', 'Inlästa läromedel', 'Trovy',
       'Aski Raski', 'Polyglutt Home Access'], watchlist: true },
   { canonical: 'Binogi', slug: 'binogi', role: 'service', category: 'läromedel',
-    aliases: ['binogi'], products: ['Binogi.se', 'Språkprojektet'], watchlist: true },
+    aliases: ['binogi'], probeLabel: 'Binogi',
+    products: ['Binogi.se', 'Språkprojektet'], watchlist: true },
 
   // ---- Services: skoladministration / lärplattform ----
   { canonical: 'Tietoevry', slug: 'tietoevry', role: 'service', category: 'skoladministration',
@@ -137,6 +142,10 @@ function wholeWord(alias, normedName) {
 
 const BY_SLUG = new Map(COMPANIES.map((c) => [c.slug, c]));
 export function companyBySlug(slug) { return BY_SLUG.get(slug); }
+
+// How to name a company TO a kommun. Falls back to the canonical name for
+// companies with no curated brand label.
+export function probeName(company) { return company?.probeLabel ?? company?.canonical ?? ''; }
 
 export function resolveCompany(name) {
   const normed = normalizeVendorName(name);
