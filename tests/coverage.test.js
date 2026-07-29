@@ -89,6 +89,16 @@ describe('buildCoverageFacts', () => {
     expect(buildCoverageFacts()).toMatchObject({ received: [], undocumented: [], has_missing: false });
   });
 
+  it('credits the service, not the reseller, when a contract row names both', () => {
+    // Realistic Atea/Skolon shape: the extracted vendor is the reseller, the
+    // product is the real service. Crediting only Atea would leave us probing
+    // ILT for a contract we already hold.
+    const f = buildCoverageFacts([row(1, 'Atea', { products: ['Polyglutt'], mentioned_agreements: [] })]);
+    expect(f.received.map((r) => r.slug)).toEqual(['ilt']);
+    expect(f.channels_seen.map((c) => c.slug)).toEqual(['atea']);
+    expect(f.not_yet_seen.map((c) => c.slug)).not.toContain('ilt');
+  });
+
   it('a channel appearing as a real contract row is a channel, not a received service', () => {
     // An Adda ramavtal PDF is a genuine document, but Adda is not a service we
     // want an avtal from — it drives the avrop ask instead.

@@ -43,24 +43,25 @@ export function buildCoverageFacts(rows = []) {
   for (const { r, a } of parsed) {
     const products = (a?.products ?? []).filter(Boolean);
     const names = [r.vendor_name, ...products].filter(Boolean);
-    let resolved = null;
-    for (const n of names) {
-      resolved = resolveCompany(n);
-      if (resolved) break;
+    const hits = names.map((n) => resolveCompany(n)).filter(Boolean);
+    for (const h of hits) {
+      mentioned.add(h.slug);
+      // A ramavtal PDF is a real document, but not an avtal with a service.
+      if (h.role === 'channel') noteChannel(h);
     }
-    if (resolved) mentioned.add(resolved.slug);
+    // Prefer the service over the channel: a contract extracted as vendor "Atea"
+    // with product "Polyglutt" is an ILT service bought through a reseller, and
+    // crediting only Atea would leave us probing for a contract we hold.
+    const resolved = hits.find((h) => h.role === 'service') ?? null;
     if (!r.is_contract) continue;
 
     if (!resolved) {
+      // Channel-only rows are already filed as channels, not as a missing vendor.
+      if (hits.length) continue;
       if (r.vendor_name && !seenUnresolved.has(r.vendor_name.toLowerCase())) {
         seenUnresolved.add(r.vendor_name.toLowerCase());
         receivedUnresolved.push(r.vendor_name);
       }
-      continue;
-    }
-    if (resolved.role === 'channel') {
-      // A ramavtal PDF is a real document, but not an avtal with a service.
-      noteChannel(resolved);
       continue;
     }
     const entry = received.get(resolved.slug)
