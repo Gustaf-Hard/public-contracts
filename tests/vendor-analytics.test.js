@@ -303,6 +303,8 @@ describe('buildVendorRollups', () => {
     expect(ne).toHaveLength(1);
     expect(ne[0].contract_count).toBe(3);
     expect(ne[0].kommun_count).toBe(3);
+    // The row must link to the one member that HAS a vendor page, not a null slug.
+    expect(ne[0].vendor_slug).toBe('ne');
   });
 });
 
