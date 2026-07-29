@@ -244,17 +244,30 @@ export function T_UPDATE(ctx) {
 export function T_REQUEST_MISSING(ctx) {
   const facts = ctx.facts ?? {};
   const gotSomething = (facts.received?.length ?? 0) > 0 || (facts.received_unresolved?.length ?? 0) > 0;
+  // No facts at all (a caller without coverage data) falls back to asking: this
+  // template is only ever chosen because something looked outstanding.
+  const hasMissing = ctx.facts ? Boolean(facts.has_missing) : true;
 
   // Open-ended, name-free. The kommun knows what they sent; we do not claim it.
-  const ask = gotSomething
-    ? 'Tack för avtalen. Jag saknar dock ännu de faktiska avtalshandlingarna för en del av det som nämns. Kan ni skicka dem?'
-    : 'Tack för ert svar. Jag ser dock inte de faktiska avtalshandlingarna bifogade. Kan ni skicka de fullständiga avtalen?';
+  // The "saknar" sentence only appears when a document really is outstanding:
+  // a kommun that delivered everything they named (live Borlänge) must not be
+  // told otherwise.
+  let ask;
+  if (hasMissing && gotSomething) {
+    ask = 'Tack för avtalen. Jag saknar dock ännu de faktiska avtalshandlingarna för en del av det som nämns. Kan ni skicka dem?';
+  } else if (hasMissing) {
+    ask = 'Tack för ert svar. Jag ser dock inte de faktiska avtalshandlingarna bifogade. Kan ni skicka de fullständiga avtalen?';
+  } else {
+    ask = 'Tack för avtalen, jag har tagit emot dem.';
+  }
 
   // Narrow the scope so we get the commercial avtal, not the annex stack: no
   // bilagor (kravspec/SLA/säkerhet/definitioner) and no PUB-avtal (2026-07-15).
+  // Only meaningful while we are still asking for documents.
   const scopeNote = 'Det räcker med själva avtalen med pris och kommersiella villkor. Jag behöver inte tillhörande bilagor (kravspecifikationer, servicenivåavtal/SLA, säkerhets- eller definitionsbilagor) eller personuppgiftsbiträdesavtal.';
 
-  const parts = ['Hej,', '', ask, '', scopeNote];
+  const parts = ['Hej,', '', ask];
+  if (hasMissing || (facts.channels_seen?.length ?? 0) > 0) parts.push('', scopeNote);
 
   // Stage-2 shaped avrop ask (2026-07-20 operator rule): for ramavtal and
   // inköpscentral deliveries, always ask for the kommun's own avrop.
