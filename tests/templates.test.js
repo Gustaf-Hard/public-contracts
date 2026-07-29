@@ -260,6 +260,23 @@ describe('T_REQUEST_MISSING', () => {
     expect(m.body).toMatch(/personuppgiftsbiträdesavtal/);
   });
 
+  it('never claims something is missing when the facts say nothing is', () => {
+    // Live Borlänge (conv 31): every company they named, they delivered. What
+    // remains is the avrop ask and the NE probe. Claiming missing handlingar
+    // here would be exactly the dishonesty this template exists to remove.
+    const m = T_REQUEST_MISSING({ ...base, facts: facts({
+      received: [{ slug: 'radish', canonical: 'Radish', products: ['Magma'] }],
+      channels_seen: [{ slug: 'adda', canonical: 'Adda' }],
+      not_yet_seen: [{ slug: 'ne', canonical: 'Nationalencyklopedin', probeLabel: 'NE' }],
+      has_missing: false,
+    }) });
+    expect(m.body).not.toMatch(/saknar/);
+    expect(m.body).not.toMatch(/inte .*bifogade/);
+    expect(m.body).toMatch(/Tack för avtalen/);
+    expect(m.body).toMatch(/avrop/);
+    expect(m.body).toMatch(/NE eller liknande/);
+  });
+
   it('thanks for what arrived without naming it, and still asks when nothing real arrived', () => {
     const withDelivery = T_REQUEST_MISSING({ ...base, facts: facts({
       received: [{ slug: 'unikum', canonical: 'Unikum', products: [] }], undocumented: [{ name: 'X' }], has_missing: true,
