@@ -1,6 +1,7 @@
 import { T_INITIAL, T_PRECISION, T_RECEIPT, T_FOLLOWUP_NUDGE, T_FOLLOWUP_CLOSE, T_REQUEST_MISSING, T_UPDATE, T_DELAY_ACK, computeReceivedMissing, chooseDeliveryReply } from './templates.js';
 import { computeKommunReview } from './contract-lifecycle.js';
 import { matchWatchlist } from './watchlist.js';
+import { buildCoverageFacts } from './coverage.js';
 import { classify, isCloserText } from './classifier.js';
 import { inferThreadStatus } from './threads.js';
 import { nextActionForClassification, staleAction } from './conversation.js';
@@ -29,6 +30,8 @@ function tplCtx(conv, env, extra = {}) {
     days_since_send: extra.days_since_send ?? 0,
     received: extra.received ?? [],
     missing: extra.missing ?? [],
+    // Coverage facts (src/coverage.js) grounding T_REQUEST_MISSING.
+    facts: extra.facts ?? null,
     // Perpetual-refresh (T_UPDATE) context, forwarded when present.
     arendenummer: extra.arendenummer ?? conv.arendenummer ?? null,
     review_contracts: extra.review_contracts ?? [],
@@ -597,17 +600,20 @@ async function dispatchEscalationForIngest(pending, deps) {
     const analyseContracts = deps.analyseContracts ?? analysePendingContracts;
     try {
       await analyseContracts({ db, env, log: deps.log, onlyMessageId: messageId });
-      const { received, missing, all } = computeReceivedMissing(db.listContractInfoForMessage(messageId));
+      const { all } = computeReceivedMissing(db.listContractInfoForMessage(messageId));
       watchlistVendors = matchWatchlist(all);
+      // Coverage spans the CONVERSATION, not just this message: scoped to one
+      // message the draft would re-ask for what an earlier batch delivered.
+      const facts = buildCoverageFacts(db.listContractInfoForConversation(updated.id));
       if (watchlistVendors.length > 0) {
         // Hold: no sendable draft, so the operator consciously authors the reply.
         draftTemplate = 'free_form';
         llmDraft = null;
         templateCtx = {};
-      } else if (chooseDeliveryReply({ received, missing }).template === 'T_REQUEST_MISSING') {
+      } else if (chooseDeliveryReply({ facts }).template === 'T_REQUEST_MISSING') {
         draftTemplate = 'T_REQUEST_MISSING';
         llmDraft = null; // the PDF-blind LLM draft must not win here
-        templateCtx = { received, missing };
+        templateCtx = { facts };
       }
     } catch (e) {
       deps.log?.(`inline contract analysis error: ${e.message}`);

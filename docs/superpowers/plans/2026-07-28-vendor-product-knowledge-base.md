@@ -296,7 +296,183 @@ git commit -m "feat(watchlist): derive from vendor-kb; delivered product satisfi
 
 ---
 
-## Phases 2–5 — Roadmap (detailed just-in-time, one plan section each)
+## Phase 3 — Coverage facts + fact-grounded missing-contracts draft
+
+Delivers the fix for the Borlänge draft: a deterministic `buildCoverageFacts`
+over what the kommun actually delivered, and a `T_REQUEST_MISSING` written
+entirely from those facts.
+
+**Build-time decision (operator, 2026-07-29):** the draft body stays a
+**deterministic template**, not LLM prose. The spec's §Consumers-4 sketched
+"LLM writes the reply from the facts"; the operator chose deterministic
+rendering because the 2026-07-20 hallucination incident
+(Huddinge/Boxholm/Bräcke) came from exactly that surface, and `tick.js`
+already nulls `llmDraft` on this path (`// the PDF-blind LLM draft must not
+win here`). `buildCoverageFacts` is nonetheless shaped so it *could* feed a
+prompt later (Phase 5 territory).
+
+Three rules the rendered body must satisfy, all from
+[[followup-draft-strategy]]:
+
+1. **No extracted vendor names in the ask.** Exposing our (possibly wrong)
+   extraction as fact narrows what the kommun sends back. The ask is
+   open-ended: "Tack för avtalen. Jag saknar dock ännu de faktiska
+   avtalshandlingarna."
+2. **Channels get an avrop ask, never a contract ask.** A delivered/mentioned
+   `role: 'channel'` (Adda, Skolon, LäroMedia, …) produces "kan jag även få ta
+   del av kommunens egna avrop/beställningar under det ramavtalet?" — never
+   "skicka Addas avtal".
+3. **The probe names only ABSENT watchlist companies, by their kommun-facing
+   brand.** A kommun recognizes *Magma* and *Inläsningstjänst*, not *Radish*
+   and *ILT Education* — hence `probeLabel` in Task 1. A watchlist company
+   already received (Magma delivered ⇒ Radish received) drops out of the probe.
+
+### Task 1: Kommun-facing `probeLabel` on watchlist companies
+
+**Files:**
+- Modify: `src/vendor-kb.js`
+- Test: `tests/vendor-kb.test.js`
+
+**Interfaces:**
+- Produces: optional `probeLabel: string` on a company entry; `probeName(company)`
+  → `probeLabel ?? canonical`.
+
+- [ ] **Step 1: Failing test** — every `watchlist: true` company resolves to a
+  brand a kommun would recognize:
+
+```js
+import { COMPANIES, probeName, companyBySlug } from '../src/vendor-kb.js';
+it('watchlist companies expose a kommun-facing probe label', () => {
+  expect(probeName(companyBySlug('radish'))).toBe('Magma');
+  expect(probeName(companyBySlug('ilt'))).toBe('Inläsningstjänst');
+  expect(probeName(companyBySlug('ne'))).toBe('NE');
+  expect(probeName(companyBySlug('binogi'))).toBe('Binogi');
+  for (const c of COMPANIES.filter((x) => x.watchlist)) expect(probeName(c)).toBeTruthy();
+});
+```
+
+- [ ] **Step 2:** `npx vitest run tests/vendor-kb.test.js` → FAIL (no `probeName`).
+- [ ] **Step 3:** Add `probeLabel` to the four watchlist entries + export
+  `probeName`. Non-watchlist companies keep no label (`probeName` falls back to
+  `canonical`).
+- [ ] **Step 4:** Re-run → PASS.
+- [ ] **Step 5:** `git commit -m "feat(vendor-kb): kommun-facing probeLabel for watchlist companies"`
+
+### Task 2: `src/coverage.js` — `buildCoverageFacts`
+
+**Files:**
+- Create: `src/coverage.js`
+- Test: `tests/coverage.test.js`
+
+**Interfaces:**
+- Consumes: `COMPANIES`, `resolveCompany`, `probeName` (`vendor-kb.js`); rows in
+  the `listContractInfoForMessage` shape `{ is_contract, vendor_name,
+  analysis_json }`.
+- Produces:
+
+```js
+buildCoverageFacts(rows) → {
+  received: [{ slug, canonical, role, matchedAs, products: string[] }],
+  received_unresolved: string[],   // real contracts whose vendor is not in the KB
+  channels_seen: [{ slug, canonical }],
+  undocumented: [{ slug, canonical } | { name }],  // mentioned, doc_attached=false, services only
+  not_yet_seen: [{ slug, canonical, probeLabel }], // watchlist services with no trace at all
+  has_missing: boolean,
+}
+```
+
+Rules: a received product resolves to its company (Magma ⇒ Radish received);
+a company in `received` is never in `undocumented` or `not_yet_seen`;
+`role: 'channel'` names go **only** to `channels_seen`; KB-unknown names are
+preserved verbatim (`received_unresolved` / `undocumented[].name`) and never
+invented or dropped ([[data-honesty-ethos]]).
+
+- [ ] **Step 1: Failing tests** — the Borlänge replay is the headline case:
+
+```js
+it('replays Borlänge: Magma delivered ⇒ Radish received, channels never missing', () => {
+  const rows = [
+    { is_contract: 1, vendor_name: 'Magma', analysis_json: JSON.stringify({
+      products: ['Magma'],
+      mentioned_agreements: [
+        { vendor: 'Adda', product: '', doc_attached: false },
+        { vendor: 'LäroMedia', product: '', doc_attached: false },
+      ] }) },
+  ];
+  const f = buildCoverageFacts(rows);
+  expect(f.received.map((r) => r.slug)).toEqual(['radish']);
+  expect(f.not_yet_seen.map((c) => c.slug)).not.toContain('radish');
+  expect(f.undocumented).toEqual([]);                       // channels are not missing contracts
+  expect(f.channels_seen.map((c) => c.slug)).toEqual(['adda', 'laromedia']);
+});
+```
+Plus: unknown vendor preserved verbatim; a genuinely undocumented *service*
+lands in `undocumented`; `not_yet_seen` lists the untouched watchlist companies.
+
+- [ ] **Step 2:** run → FAIL (module missing).
+- [ ] **Step 3:** implement `src/coverage.js` (pure, no IO — same rule as
+  `vendor-kb.js`).
+- [ ] **Step 4:** `npx vitest run tests/coverage.test.js` → PASS.
+- [ ] **Step 5:** `git commit -m "feat(coverage): deterministic buildCoverageFacts over delivered contracts"`
+
+### Task 3: `T_REQUEST_MISSING` rendered from the facts
+
+**Files:**
+- Modify: `src/templates.js`
+- Test: `tests/templates.test.js` (rewrite the `T_REQUEST_MISSING` block —
+  the old assertions encode the behaviour we are deliberately replacing)
+
+**Interfaces:**
+- Consumes: `ctx.facts` (Task 2 shape). `computeReceivedMissing` /
+  `chooseDeliveryReply` keep their signatures (other callers/tests).
+
+- [ ] **Step 1: Failing tests** for the three rules — no vendor names in the
+  ask; avrop sentence iff `channels_seen`; probe names absent watchlist brands
+  and omits received ones. Explicitly assert `Radish` never appears when Magma
+  was delivered, and that no em-dash/en-dash is in the body
+  ([[email-style-no-emdash]]).
+- [ ] **Step 2:** run → FAIL.
+- [ ] **Step 3:** rewrite the body from `ctx.facts`, keeping the scope note
+  (no bilagor / no PUB-avtal).
+- [ ] **Step 4:** `npx vitest run tests/templates.test.js` → PASS.
+- [ ] **Step 5:** `git commit -m "feat(templates): T_REQUEST_MISSING written from coverage facts"`
+
+### Task 4: Conversation-scoped wiring in `tick.js`
+
+**Files:**
+- Modify: `src/storage.js` (add `listContractInfoForConversation`), `src/tick.js`
+- Test: `tests/tick.test.js`
+
+**Interfaces:**
+- Produces: `db.listContractInfoForConversation(conversationId)` — the same
+  projection as `listContractInfoForMessage`, joined through `messages` for the
+  whole conversation. Read-only `SELECT`; **no schema change**.
+- `tick.js` delivery path: build facts from the conversation's rows, pass
+  `templateCtx = { facts, received, missing }`.
+
+Coverage must span the whole conversation, not the latest message: a second
+delivery batch would otherwise re-ask for a contract batch one already
+delivered — the same class of bug as the Borlänge draft.
+
+- [ ] **Step 1: Failing test** — two deliveries in one conversation, the second
+  message's draft does not re-ask for the first message's vendor.
+- [ ] **Step 2:** run → FAIL.
+- [ ] **Step 3:** add the query + wire the delivery path.
+- [ ] **Step 4:** `npx vitest run` → full suite PASS.
+- [ ] **Step 5:** `git commit -m "feat(tick): coverage facts span the conversation, not one message"`
+
+### Task 5: Live check — re-draft the open Borlänge escalation
+
+Requires a deploy to the live box and touches a real open escalation, so it is
+**operator-gated**: do not run it as part of the build. Sequence when
+authorized: deploy via `./deploy/deploy.sh` → supersede conv 31's open
+escalation with a regenerated draft → operator reviews in the dashboard →
+approve/send by hand. The send-safety model is unchanged (one open escalation,
+human approval).
+
+---
+
+## Phases 2, 4–5 — Roadmap (detailed just-in-time, one plan section each)
 
 These build on Phase 1's `resolveCompany`. Each is independently shippable and
 will be expanded into full TDD tasks (like Phase 1 above) when it starts —
@@ -304,16 +480,12 @@ detailing them now would require guessing exact signatures in
 `vendor-analytics.js`, `templates.js`, `tick.js`, and `analyse-contract.js` that
 are best read immediately before editing. Deliverables and interfaces are fixed:
 
-**Phase 2 — Analytics grouping (visible win in `/leverantorer`).**
+**Phase 2 — Analytics grouping (visible win in `/leverantorer`).** ✅ DONE (merge `7e70c83`).
 - Modify `src/vendor-analytics.js`: group rollups by `resolveCompany(name)?.canonical ?? canonicalVendorName(name)` so NE/ILT/Tieto fragments collapse to one company each with products nested; channels render as channels.
 - Tests: a rollup fixture where `NE`, `NE Nationalencyklopedin`, `NE.se` collapse to one row.
 - Deliverable: `/leverantorer` shows one company per real vendor.
 
-**Phase 3 — Coverage facts + KB-grounded LLM draft.**
-- Create `src/coverage.js`: `buildCoverageFacts(conv, db) → { received:[{slug,canonical,role,via,products}], channels_seen:[slug], not_yet_seen:[slug], stage }`, deterministic over delivered attachments/vendors via `resolveCompany`.
-- Modify the missing-contracts draft path (`src/templates.js` `computeReceivedMissing`/`chooseDeliveryReply` + `src/analyse-message.js` draft prompt) to write the reply from those facts + the full KB, with the rules: never re-ask a received service; never request a channel's own contract; ask for real services/avrop behind channels.
-- Tests: `buildCoverageFacts` replaying Borlänge (Magma delivered ⇒ Radish received, not in `not_yet_seen`; Adda/LäroMedia never listed as missing).
-- Deliverable: re-draft the open Borlänge escalation correctly as the live check.
+**Phase 3 — Coverage facts + fact-grounded draft.** Detailed above.
 
 **Phase 4 — 3-stage engagement + completeness.**
 - `src/storage.js`: append-only probes for `conversations.channel_probe_sent_at`, `conversations.crosscheck_sent_at`; new table `coverage_confirmations(conversation_id, company_slug, status, at)`.
