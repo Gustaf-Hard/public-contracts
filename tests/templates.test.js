@@ -188,39 +188,103 @@ describe('chooseDeliveryReply', () => {
 
 describe('T_REQUEST_MISSING', () => {
   const base = { thread_subject: 'Begäran', from_name: 'Gustaf Hård af Segerstad', from_email: 'gustaf@mediagraf.se' };
-  it('acknowledges received and names missing when both present', () => {
-    const m = T_REQUEST_MISSING({ ...base, received: ['Skolon'], missing: ['Quiculum', 'Teachiq'] });
+  // Facts come from buildCoverageFacts; these are hand-built equivalents.
+  const facts = (over = {}) => ({
+    received: [], received_unresolved: [], channels_seen: [], undocumented: [],
+    not_yet_seen: [], has_missing: false, ...over,
+  });
+
+  it('keeps our extracted vendor names OUT of the ask', () => {
+    // Operator rule (2026-07-05, Arjeplog #11): exposing our extraction as fact
+    // narrows what the kommun sends back, and it may simply be wrong.
+    const m = T_REQUEST_MISSING({ ...base, facts: facts({
+      received: [{ slug: 'unikum', canonical: 'Unikum', products: [] }],
+      undocumented: [{ slug: 'vklass', canonical: 'Vklass' }, { name: 'Quiculum' }],
+      has_missing: true,
+    }) });
     expect(m.subject).toBe('Re: Begäran');
-    expect(m.body).toMatch(/Tack för avtalen gällande Skolon/);
-    expect(m.body).toMatch(/Quiculum och Teachiq/);
-    expect(m.body).toMatch(/Gustaf Hård af Segerstad/);
-  });
-  it('asks for the documents when nothing real arrived', () => {
-    const m = T_REQUEST_MISSING({ ...base, received: [], missing: ['Quiculum'] });
-    expect(m.body).toMatch(/inte (vara )?bifogade/);
-    expect(m.body).toMatch(/Quiculum/);
-  });
-  it('falls back to a generic ask when there are no names', () => {
-    const m = T_REQUEST_MISSING({ ...base, received: [], missing: [] });
     expect(m.body).toMatch(/faktiska avtalshandlingarna/);
+    expect(m.body).toMatch(/Gustaf Hård af Segerstad/);
+    for (const name of ['Unikum', 'Vklass', 'Quiculum']) expect(m.body).not.toMatch(name);
   });
-  it('always appends the net-new / watchlist probe naming watchlisted vendors', () => {
-    // edit-review finding: the operator adds this to every T_REQUEST_MISSING draft.
-    const m = T_REQUEST_MISSING({ ...base, received: ['Skolon'], missing: ['Quiculum'] });
-    expect(m.body).toMatch(/andra digitala tjänster inom skolan/);
-    expect(m.body).toMatch(/Binogi/);            // a watchlisted vendor is named
-    expect(m.body).toMatch(/eller liknande\?/);
+
+  it('never names a company we already received, under any of its names', () => {
+    // Borlänge: Magma delivered. Neither "Magma" nor "Radish" may appear.
+    const m = T_REQUEST_MISSING({ ...base, facts: facts({
+      received: [{ slug: 'radish', canonical: 'Radish', products: ['Magma'] }],
+      not_yet_seen: [{ slug: 'ne', canonical: 'Nationalencyklopedin', probeLabel: 'NE' }],
+    }) });
+    expect(m.body).not.toMatch(/Radish/);
+    expect(m.body).not.toMatch(/Magma/);
+    expect(m.body).toMatch(/NE/);
   });
-  it('narrows the ask to the avtal with price terms and disclaims bilagor + PUB-avtal (probe kept)', () => {
-    const m = T_REQUEST_MISSING({ ...base, received: ['Skolon'], missing: ['Quiculum'] });
+
+  it('asks for the kommuns own avrop when a procurement channel appeared, never the framework contract', () => {
+    const m = T_REQUEST_MISSING({ ...base, facts: facts({
+      channels_seen: [{ slug: 'adda', canonical: 'Adda' }, { slug: 'laromedia', canonical: 'LäroMedia Bokhandel Örebro' }],
+    }) });
+    expect(m.body).toMatch(/avrop/);
+    expect(m.body).toMatch(/Adda/);              // named as a channel we buy through
+    expect(m.body).not.toMatch(/Addas avtal/);   // never their own contract
+  });
+
+  it('omits the avrop paragraph entirely when no channel appeared', () => {
+    const m = T_REQUEST_MISSING({ ...base, facts: facts({ undocumented: [{ name: 'X' }], has_missing: true }) });
+    expect(m.body).not.toMatch(/avrop/);
+  });
+
+  it('probes only the ABSENT watchlist companies, by the brand a kommun recognizes', () => {
+    const m = T_REQUEST_MISSING({ ...base, facts: facts({
+      received: [{ slug: 'radish', canonical: 'Radish', products: ['Magma'] }],
+      not_yet_seen: [
+        { slug: 'ilt', canonical: 'ILT Education', probeLabel: 'Inläsningstjänst' },
+        { slug: 'binogi', canonical: 'Binogi', probeLabel: 'Binogi' },
+      ],
+    }) });
+    expect(m.body).toMatch(/Inläsningstjänst, Binogi eller liknande\?/);
+    expect(m.body).not.toMatch(/ILT Education/);  // company canonical, not the brand
+  });
+
+  it('drops the probe when every watchlist company is accounted for', () => {
+    const m = T_REQUEST_MISSING({ ...base, facts: facts({ undocumented: [{ name: 'X' }], has_missing: true }) });
+    expect(m.body).not.toMatch(/eller liknande/);
+  });
+
+  it('narrows the ask to the avtal with price terms and disclaims bilagor + PUB-avtal', () => {
+    const m = T_REQUEST_MISSING({ ...base, facts: facts({ has_missing: true, undocumented: [{ name: 'X' }] }) });
     expect(m.body).toMatch(/pris och kommersiella villkor/);
     expect(m.body).toMatch(/behöver (inte|ej)/i);
     expect(m.body).toMatch(/bilagor/);
     expect(m.body).toMatch(/kravspecifikationer/);
     expect(m.body).toMatch(/SLA/);
     expect(m.body).toMatch(/personuppgiftsbiträdesavtal/);
-    // the watchlist probe must still be present
-    expect(m.body).toMatch(/andra digitala tjänster inom skolan/);
+  });
+
+  it('thanks for what arrived without naming it, and still asks when nothing real arrived', () => {
+    const withDelivery = T_REQUEST_MISSING({ ...base, facts: facts({
+      received: [{ slug: 'unikum', canonical: 'Unikum', products: [] }], undocumented: [{ name: 'X' }], has_missing: true,
+    }) });
+    expect(withDelivery.body).toMatch(/Tack för avtalen/);
+    const withoutDelivery = T_REQUEST_MISSING({ ...base, facts: facts({ undocumented: [{ name: 'X' }], has_missing: true }) });
+    expect(withoutDelivery.body).toMatch(/Tack för ert svar/);
+    expect(withoutDelivery.body).toMatch(/faktiska avtalshandlingarna/);
+  });
+
+  it('contains no em-dash or en-dash (reads AI-written)', () => {
+    const m = T_REQUEST_MISSING({ ...base, facts: facts({
+      received: [{ slug: 'radish', canonical: 'Radish', products: ['Magma'] }],
+      channels_seen: [{ slug: 'adda', canonical: 'Adda' }],
+      undocumented: [{ slug: 'vklass', canonical: 'Vklass' }],
+      not_yet_seen: [{ slug: 'ne', canonical: 'Nationalencyklopedin', probeLabel: 'NE' }],
+      has_missing: true,
+    }) });
+    expect(m.body).not.toMatch(/[—–]/);
+  });
+
+  it('renders a usable draft when facts are absent (old callers, empty conversation)', () => {
+    const m = T_REQUEST_MISSING({ ...base });
+    expect(m.body).toMatch(/faktiska avtalshandlingarna/);
+    expect(m.body).toMatch(/Gustaf Hård af Segerstad/);
   });
 });
 

@@ -1,5 +1,3 @@
-import { WATCHLIST } from './watchlist.js';
-
 function scopeText(role) {
   return role === 'central' ? 'kommunen' : 'utbildningsförvaltningen';
 }
@@ -226,27 +224,52 @@ export function T_UPDATE(ctx) {
 }
 
 // Follow-up when a delivery lacks (some of) the actual avtal documents.
+//
+// Every sentence is grounded in `ctx.facts` (src/coverage.js buildCoverageFacts)
+// over the conversation's real stored contracts. Three operator rules shape it
+// (see docs/superpowers/specs/2026-07-28-vendor-product-knowledge-base-design.md):
+//
+//   1. Our extracted vendor names stay OUT of the ask. Exposing a possibly-wrong
+//      extraction as fact narrows what the kommun sends back (Arjeplog #11).
+//   2. A procurement channel gets an avrop ask, never a contract ask: the
+//      framework agreement is Adda's, the avrop is the kommun's and shows the
+//      real products and volumes.
+//   3. The probe names only watchlist companies with NO trace in the
+//      conversation, by the brand the kommun recognizes (probeLabel: "Magma",
+//      not "Radish").
 export function T_REQUEST_MISSING(ctx) {
-  const received = ctx.received ?? [];
-  const missing = ctx.missing ?? [];
-  let ask;
-  if (missing.length && received.length) {
-    ask = `Tack för avtalen gällande ${listSv(received)}. Jag saknar dock ännu de faktiska avtalshandlingarna för ${listSv(missing)} — kan ni skicka dem?`;
-  } else if (missing.length) {
-    ask = `Tack för ert svar. Själva avtalshandlingarna verkar dock inte vara bifogade — kan ni skicka de fullständiga avtalen för ${listSv(missing)}?`;
-  } else {
-    ask = 'Tack för ert svar. Jag ser dock inte de faktiska avtalshandlingarna bifogade — kan ni skicka de fullständiga avtalen?';
-  }
-  // Net-new / watchlist probe. edit-review showed T_REQUEST_MISSING was the one
-  // template the operator consistently rewrote — every time to append a question
-  // about OTHER digital school services, naming the watchlisted vendors. Bake it
-  // in from the watchlist (single source of truth) so it no longer needs editing.
-  const probe = `Har ni därutöver avtal för andra digitala tjänster inom skolan, till exempel ${listSv(WATCHLIST.map((w) => w.canonical))} eller liknande?`;
+  const facts = ctx.facts ?? {};
+  const gotSomething = (facts.received?.length ?? 0) > 0 || (facts.received_unresolved?.length ?? 0) > 0;
+
+  // Open-ended, name-free. The kommun knows what they sent; we do not claim it.
+  const ask = gotSomething
+    ? 'Tack för avtalen. Jag saknar dock ännu de faktiska avtalshandlingarna för en del av det som nämns. Kan ni skicka dem?'
+    : 'Tack för ert svar. Jag ser dock inte de faktiska avtalshandlingarna bifogade. Kan ni skicka de fullständiga avtalen?';
+
   // Narrow the scope so we get the commercial avtal, not the annex stack: no
   // bilagor (kravspec/SLA/säkerhet/definitioner) and no PUB-avtal (2026-07-15).
-  const scopeNote = 'Det räcker med själva avtalen med pris och kommersiella villkor – jag behöver inte tillhörande bilagor (kravspecifikationer, servicenivåavtal/SLA, säkerhets- eller definitionsbilagor) eller personuppgiftsbiträdesavtal.';
-  return {
-    subject: `Re: ${ctx.thread_subject}`,
-    body: ['Hej,', '', ask, '', scopeNote, '', probe, '', signature(ctx)].join('\n'),
-  };
+  const scopeNote = 'Det räcker med själva avtalen med pris och kommersiella villkor. Jag behöver inte tillhörande bilagor (kravspecifikationer, servicenivåavtal/SLA, säkerhets- eller definitionsbilagor) eller personuppgiftsbiträdesavtal.';
+
+  const parts = ['Hej,', '', ask, '', scopeNote];
+
+  // Stage-2 shaped avrop ask (2026-07-20 operator rule): for ramavtal and
+  // inköpscentral deliveries, always ask for the kommun's own avrop.
+  const channels = facts.channels_seen ?? [];
+  if (channels.length) {
+    parts.push('', `Jag ser att ni köper vissa tjänster via ${listSv(channels.map((c) => c.canonical))}. Kan jag även få ta del av kommunens egna avrop och beställningar under de ramavtalen? Det är där de faktiska tjänsterna och volymerna framgår.`);
+  }
+
+  // Net-new probe. edit-review showed T_REQUEST_MISSING was the one template the
+  // operator consistently rewrote, every time to append this question. Only
+  // companies with no trace at all are named: asking about something they just
+  // delivered is exactly the Borlänge bug.
+  // Comma-joined, not listSv: the operator's own wording is "Inläsningstjänst,
+  // Binogi, NE eller liknande?" — an "och" before "eller liknande" reads clumsy.
+  const absent = (facts.not_yet_seen ?? []).map((c) => c.probeLabel ?? c.canonical).filter(Boolean);
+  if (absent.length) {
+    parts.push('', `Stämmer det att ni inte har avtal för andra digitala läromedel och tjänster inom skolan, till exempel ${absent.join(', ')} eller liknande?`);
+  }
+
+  parts.push('', signature(ctx));
+  return { subject: `Re: ${ctx.thread_subject}`, body: parts.join('\n') };
 }
