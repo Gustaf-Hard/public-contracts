@@ -292,6 +292,18 @@ describe('buildVendorRollups', () => {
     // Representative slug prefers a member that HAS a vendor page (no dead link).
     expect(oribi.vendor_slug).toBe('oribi');
   });
+
+  it('collapses NE / NE Nationalencyklopedin / NE.se into one KB company row', () => {
+    const collapsed = buildVendorRollups(buildContractFacts([
+      row({ contract_id: 1, vendor_id: 20, vendor_name: 'NE', vendor_slug: 'ne', kommun_kod: '1980' }),
+      row({ contract_id: 2, vendor_id: 21, vendor_name: 'NE Nationalencyklopedin', vendor_slug: null, kommun_kod: '0180' }),
+      row({ contract_id: 3, vendor_id: 22, vendor_name: 'NE.se', vendor_slug: null, kommun_kod: '1489' }),
+    ], { lanByKommunKod: LAN, now: NOW }), { now: NOW });
+    const ne = collapsed.filter((r) => r.vendor_name === 'Nationalencyklopedin');
+    expect(ne).toHaveLength(1);
+    expect(ne[0].contract_count).toBe(3);
+    expect(ne[0].kommun_count).toBe(3);
+  });
 });
 
 describe('buildMarketSummary + completeness', () => {

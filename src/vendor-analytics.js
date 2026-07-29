@@ -11,6 +11,7 @@
 
 import { computeNextReviewDate } from './contract-lifecycle.js';
 import { canonicalVendorName } from './vendor-aliases.js';
+import { resolveCompany } from './vendor-kb.js';
 
 // ---- Grade-level coverage schema (2026-07-10-product-intelligence design) ----
 
@@ -281,14 +282,24 @@ function nextFutureDate(facts, now) {
   return future[0] ?? null;
 }
 
+// Grouping/display name for the market rollups: prefer the curated KB company
+// (so product/company fragments — NE / NE.se, ILT Education / Inläsningstjänst,
+// Tieto / Tietoevry — collapse to one company), falling back to the vendor-alias
+// near-dupe canonical for names the KB does not know. Read-time only; never
+// mutates stored rows.
+function groupingCompanyName(name) {
+  return resolveCompany(name)?.canonical ?? canonicalVendorName(name);
+}
+
 // Per-vendor market rollup. Vendor-less contracts (vendor unknown) stay in
 // the facts/explorer/completeness but do not form a vendor row here.
 // Sorted by total known annual SEK desc; vendors with no known value last.
 //
-// Grouping is by CANONICAL vendor name (2026-07-19 design), so near-dupes
-// (Oribi / Oribi Texthelp, NE / Nationalencyklopedin) roll up under ONE row
+// Grouping is by KB company name (2026-07-28), falling back to the alias
+// canonical, so fragments (Oribi / Oribi Texthelp, NE / NE.se / Nationalencyklopedin,
+// ILT Education / Inläsningstjänst, Tieto / Tietoevry) roll up under ONE row
 // with summed facts — only the grouping KEY changes, never the per-contract
-// data. The row's vendor_name is the canonical; vendor_id/vendor_slug come
+// data. The row's vendor_name is that company name; vendor_id/vendor_slug come
 // from the first member that carries a slug (else the first member), so a
 // linkable page is preferred without fabricating a slug.
 export function buildVendorRollups(facts, { now }) {
@@ -296,7 +307,7 @@ export function buildVendorRollups(facts, { now }) {
   const byVendor = new Map();
   for (const f of facts) {
     if (f.vendor_id == null) continue;
-    const key = canonicalVendorName(f.vendor_name).toLowerCase();
+    const key = groupingCompanyName(f.vendor_name).toLowerCase();
     if (!byVendor.has(key)) byVendor.set(key, []);
     byVendor.get(key).push(f);
   }
@@ -323,7 +334,7 @@ export function buildVendorRollups(facts, { now }) {
     const rep = group.find((f) => f.vendor_slug) ?? group[0];
     rollups.push({
       vendor_id: rep.vendor_id,
-      vendor_name: canonicalVendorName(group[0].vendor_name),
+      vendor_name: groupingCompanyName(group[0].vendor_name),
       vendor_slug: rep.vendor_slug,
       contract_count: group.length,
       kommun_count: new Set(group.map((f) => f.kommun_kod)).size,
@@ -597,11 +608,11 @@ export function buildMarketSummary(facts, { now }) {
   const horizon = new Date(now.getTime() + 365 * 86400000).toISOString().slice(0, 10);
   const known = facts.filter((f) => f.annual_value_sek != null);
   return {
-    // Count DISTINCT CANONICAL vendors (2026-07-19 design) so the header
-    // matches the collapsed market rollups — near-dupes count once.
+    // Count DISTINCT KB-company vendors (2026-07-28) so the header
+    // matches the collapsed market rollups — fragments count once.
     vendor_count: new Set(
       facts.filter((f) => f.vendor_id != null)
-        .map((f) => canonicalVendorName(f.vendor_name).toLowerCase())
+        .map((f) => groupingCompanyName(f.vendor_name).toLowerCase())
     ).size,
     kommun_count: new Set(facts.map((f) => f.kommun_kod)).size,
     contract_count: facts.length,

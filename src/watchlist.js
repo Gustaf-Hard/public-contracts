@@ -4,12 +4,10 @@
 // authors the reply (see docs/superpowers/specs/2026-07-04-watchlist-vendor-confirmation-design.md).
 // Pure: no IO.
 
-export const WATCHLIST = [
-  { canonical: 'Nationalencyklopedin',   aliases: ['nationalencyklopedin', 'ne'] },
-  { canonical: 'Magma',                  aliases: ['magma'] },
-  { canonical: 'Inläsningstjänst (ILT)', aliases: ['inläsningstjänst', 'ilt'] },
-  { canonical: 'Binogi',                 aliases: ['binogi'] },
-];
+import { COMPANIES, resolveCompany } from './vendor-kb.js';
+
+// Watchlisted companies, canonical names — derived from the KB.
+export const WATCHLIST = COMPANIES.filter((c) => c.watchlist).map((c) => ({ canonical: c.canonical, aliases: c.aliases }));
 
 // Lowercase, ASCII-fold Swedish letters, punctuation→space, collapse whitespace.
 function normalize(s) {
@@ -47,7 +45,14 @@ export function matchVendorEntries(entries, names = []) {
   return matched;
 }
 
-// Canonical names of watchlist entries matched by any of `names`.
+// Canonical names of watchlisted companies matched by any of `names`, resolving
+// products to their parent company (so "Magma" -> "Radish"). Returned in
+// WATCHLIST (COMPANIES) order, deduped.
 export function matchWatchlist(names = []) {
-  return matchVendorEntries(WATCHLIST, names);
+  const hitSlugs = new Set();
+  for (const n of names) {
+    const r = resolveCompany(n);
+    if (r) hitSlugs.add(r.slug);
+  }
+  return COMPANIES.filter((c) => c.watchlist && hitSlugs.has(c.slug)).map((c) => c.canonical);
 }
