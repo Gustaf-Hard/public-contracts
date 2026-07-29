@@ -816,7 +816,10 @@ describe('runTick — contract-aware delivery draft', () => {
 
     const esc = db.raw.prepare('SELECT * FROM escalations WHERE conversation_id = ?').get(convId);
     expect(esc.draft_template).toBe('T_REQUEST_MISSING');
-    expect(esc.draft_body).toMatch(/Quiculum/);
+    expect(esc.draft_body).toMatch(/faktiska avtalshandlingarna/);
+    // Our extraction stays out of the outbound text (Phase 3): the kommun knows
+    // what they sent, and naming a possibly-wrong extraction narrows the reply.
+    expect(esc.draft_body).not.toMatch(/Quiculum/);
     expect(esc.draft_body).not.toMatch(/Tack så mycket för avtalen!/); // LLM draft overridden
   });
 
@@ -895,5 +898,68 @@ describe('runTick — contract-aware delivery draft', () => {
     const esc = db.raw.prepare('SELECT * FROM escalations WHERE conversation_id = ?').get(convId);
     expect(esc.draft_template).toBe('T_RECEIPT');
     expect(esc.draft_body).toContain('Tack för leveransen!');
+  });
+
+  it('coverage spans the whole conversation: a second batch does not re-probe what batch one delivered', async () => {
+    // Batch 1 delivers the Magma contract (a Radish product); batch 2 delivers an
+    // unrelated följebrev. The batch-2 draft must not probe for Magma — the bug
+    // that produced the Borlänge draft, which asked for a contract it had.
+    const convId = db.createConversation({ kommun_kod: '3', kommun_namn: 'Borlänge', role: 'central', contact_email: 'kommun@borlange.se', scheduled_send_at: '2026-05-01T00:00:00Z' });
+    db.updateConversationState(convId, 'SENT', { gmail_thread_id: 'thr-cov', last_outbound_at: '2026-05-01T00:00:00Z' });
+
+    const spy = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue({
+      intent: 'delivery', confidence: 0.9, summary: 'Svar bifogat.',
+      suggested_action: 'send_receipt', draft_reply: 'Tack!', follow_up_at: null, extracted: {},
+    });
+
+    const delivery = (id, attId, filename) => ({
+      id, threadId: 'thr-cov',
+      payload: { headers: [
+        { name: 'From', value: 'Kommun <kommun@borlange.se>' },
+        { name: 'To', value: 'me@x.se' }, { name: 'Subject', value: 'Svar' },
+      ], mimeType: 'multipart/mixed', parts: [
+        { mimeType: 'text/plain', body: { data: b64('Bifogat finner du svar.') } },
+        { mimeType: 'application/pdf', filename, body: { attachmentId: attId, size: 100 } },
+      ] },
+    });
+
+    // Batch 1: a real Magma contract.
+    const analyseBatch1 = async ({ db: d, onlyMessageId }) => {
+      const atts = d.raw.prepare('SELECT id FROM attachments WHERE message_id = ?').all(onlyMessageId);
+      for (const a of atts) {
+        storeContractAnalysis(d, a.id, {
+          is_contract: true, document_type: 'avtal', vendor_name: 'Magma', products: ['Magma'],
+          avtalsvarde: null, valuta: null, period_start: null, period_end: null,
+          summary: 'avtal', confidence: 0.9, mentioned_agreements: [],
+        }, { model: 'test' });
+      }
+      return atts.length;
+    };
+    await runTick(makeDeps({ gmail: fakeGmail({ listResult: [{ id: 'cov-1' }], getResult: { 'cov-1': delivery('cov-1', 'att-c1', 'Magma.pdf') } }), analyseContracts: analyseBatch1 }));
+
+    // Batch 2: a följebrev naming an undocumented service, so a draft is due.
+    const analyseBatch2 = async ({ db: d, onlyMessageId }) => {
+      const atts = d.raw.prepare('SELECT id FROM attachments WHERE message_id = ?').all(onlyMessageId);
+      for (const a of atts) {
+        storeContractAnalysis(d, a.id, {
+          is_contract: false, document_type: 'följebrev_sammanställning', vendor_name: null, products: [],
+          avtalsvarde: null, valuta: null, period_start: null, period_end: null,
+          summary: 'följebrev', confidence: 0.9,
+          mentioned_agreements: [{ vendor: 'Vklass', product: null, doc_attached: false }],
+        }, { model: 'test' });
+      }
+      return atts.length;
+    };
+    await runTick(makeDeps({ gmail: fakeGmail({ listResult: [{ id: 'cov-2' }], getResult: { 'cov-2': delivery('cov-2', 'att-c2', 'Foljebrev.pdf') } }), analyseContracts: analyseBatch2 }));
+    spy.mockRestore();
+
+    const escs = db.raw.prepare("SELECT * FROM escalations WHERE conversation_id = ? ORDER BY id").all(convId);
+    const last = escs[escs.length - 1];
+    expect(last.draft_template).toBe('T_REQUEST_MISSING');
+    // Radish (Magma's company) was received in batch 1, so it is not probed.
+    expect(last.draft_body).not.toMatch(/Magma/);
+    expect(last.draft_body).not.toMatch(/Radish/);
+    // The other watchlist companies, with no trace in either batch, still are.
+    expect(last.draft_body).toMatch(/Inläsningstjänst/);
   });
 });

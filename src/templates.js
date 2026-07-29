@@ -136,9 +136,13 @@ function listSv(items) {
   return items.slice(0, -1).join(', ') + ' och ' + items[items.length - 1];
 }
 
-// Which reply to draft for a delivery, from what actually arrived.
-export function chooseDeliveryReply({ received = [], missing = [] } = {}) {
-  return { template: missing.length > 0 ? 'T_REQUEST_MISSING' : 'T_RECEIPT' };
+// Which reply to draft for a delivery, from what actually arrived. Prefer
+// `facts` (src/coverage.js, conversation-wide) when the caller has them: a doc
+// merely mentioned in an earlier message may since have been delivered, and
+// only the conversation-wide view knows that.
+export function chooseDeliveryReply({ received = [], missing = [], facts = null } = {}) {
+  const hasMissing = facts ? Boolean(facts.has_missing) : missing.length > 0;
+  return { template: hasMissing ? 'T_REQUEST_MISSING' : 'T_RECEIPT' };
 }
 
 // Derive received (real contracts), missing (named but undocumented), and all

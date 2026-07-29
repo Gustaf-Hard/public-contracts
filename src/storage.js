@@ -813,6 +813,21 @@ export function openDb(path) {
     `).all(messageId);
   }
 
+  // Same projection as listContractInfoForMessage, for the WHOLE conversation.
+  // Coverage facts must span every delivery: scoped to one message, a second
+  // batch would re-ask for contracts the first batch already delivered.
+  function listContractInfoForConversation(conversationId) {
+    return db.prepare(`
+      SELECT c.is_contract AS is_contract, v.name AS vendor_name, c.analysis_json AS analysis_json
+      FROM attachments a
+      JOIN contracts c ON c.attachment_id = a.id
+      JOIN messages m ON m.id = a.message_id
+      LEFT JOIN vendors v ON v.id = c.vendor_id
+      WHERE m.conversation_id = ?
+      ORDER BY a.id
+    `).all(conversationId);
+  }
+
   function productsForContractIds(ids) {
     if (ids.length === 0) return new Map();
     const rows = db.prepare(`
@@ -1134,6 +1149,7 @@ export function openDb(path) {
     countProductIntelligence,
     listPendingContractAttachments,
     listContractInfoForMessage,
+    listContractInfoForConversation,
     listContractsForVendor,
     listContractsForKommun,
     listContractFacts,
