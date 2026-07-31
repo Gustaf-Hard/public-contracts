@@ -828,6 +828,57 @@ export function openDb(path) {
     `).all(conversationId);
   }
 
+  // --- Collection velocity (read-only; no schema change) ---
+  // A machine reply is auto_ack (diariesystem receipt) or auto_reply (OOO).
+  // `unknown` and NULL count as HUMAN: no robot marker matched, so a person
+  // almost certainly wrote it. This is the ONLY place that definition lives.
+  const ROBOT_CLASSES = "('auto_ack','auto_reply')";
+
+  function listContractDeliveryEvents() {
+    return db.prepare(`
+      SELECT m.conversation_id AS conversation_id, conv.kommun_namn AS kommun_namn,
+             m.received_at AS received_at
+      FROM contracts c
+      JOIN attachments a ON a.id = c.attachment_id
+      JOIN messages m ON m.id = a.message_id
+      JOIN conversations conv ON conv.id = m.conversation_id
+      WHERE c.is_contract = 1
+      ORDER BY m.received_at
+    `).all();
+  }
+
+  function listCaseTimings() {
+    return db.prepare(`
+      SELECT conv.id AS conversation_id, conv.kommun_namn AS kommun_namn,
+        (SELECT min(m.received_at) FROM messages m
+           WHERE m.conversation_id = conv.id AND m.direction = 'outbound') AS first_outbound_at,
+        (SELECT min(m.received_at) FROM messages m
+           WHERE m.conversation_id = conv.id AND m.direction = 'inbound'
+             AND COALESCE(m.classification, 'unknown') NOT IN ${ROBOT_CLASSES}) AS first_human_inbound_at,
+        (SELECT min(m.received_at) FROM contracts c
+           JOIN attachments a ON a.id = c.attachment_id
+           JOIN messages m ON m.id = a.message_id
+           WHERE m.conversation_id = conv.id AND c.is_contract = 1) AS first_contract_at
+      FROM conversations conv
+      ORDER BY conv.id
+    `).all();
+  }
+
+  // Every attachment split by what the analysis decided it was. An attachment
+  // with no contract row is 'ej analyserad' rather than dropped — the split
+  // must always add up to the total.
+  function countFilesByDocumentType() {
+    const total = db.prepare('SELECT count(*) AS n FROM attachments').get().n;
+    const by_type = db.prepare(`
+      SELECT COALESCE(c.document_type, 'ej analyserad') AS document_type, count(*) AS n
+      FROM attachments a
+      LEFT JOIN contracts c ON c.attachment_id = a.id
+      GROUP BY document_type
+      ORDER BY n DESC
+    `).all();
+    return { total, by_type };
+  }
+
   function productsForContractIds(ids) {
     if (ids.length === 0) return new Map();
     const rows = db.prepare(`
@@ -1150,6 +1201,9 @@ export function openDb(path) {
     listPendingContractAttachments,
     listContractInfoForMessage,
     listContractInfoForConversation,
+    listContractDeliveryEvents,
+    listCaseTimings,
+    countFilesByDocumentType,
     listContractsForVendor,
     listContractsForKommun,
     listContractFacts,
