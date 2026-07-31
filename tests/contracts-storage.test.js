@@ -654,8 +654,25 @@ describe('listHandoffContacts', () => {
   it('extracts handoff_to_email + forvaltning + role for a kommun', () => {
     seedConvWithHandoff();
     const rows = db.listHandoffContacts('1984');
+    // role is derived from the förvaltning the kommun named, not from the
+    // conversation that happened to reveal it — that one is 'central' here.
     expect(rows).toEqual([
-      { email: 'barn.utbildning@arboga.se', forvaltning: 'Barn- och utbildningsförvaltningen', role: 'central' },
+      { email: 'barn.utbildning@arboga.se', forvaltning: 'Barn- och utbildningsförvaltningen', role: 'barn' },
+    ]);
+  });
+
+  it('splits an extraction that packs several addresses into one field', () => {
+    // Live Göteborg #63: the LLM returns 'a@x.se;b@y.se' in handoff_to_email.
+    // Treated as one address it yields an unusable recipient in the compose
+    // dropdown, so each address must come back as its own contact.
+    seedConvWithHandoff({
+      kommun_kod: '1480', role: 'upphandling',
+      handoff_email: 'info@educ.goteborg.se;grundskola@grundskola.goteborg.se',
+      handoff_forv: 'Utbildningsförvaltningen och Grundskoleförvaltningen',
+    });
+    expect(db.listHandoffContacts('1480')).toEqual([
+      { email: 'info@educ.goteborg.se', forvaltning: 'Utbildningsförvaltningen', role: 'utbildning' },
+      { email: 'grundskola@grundskola.goteborg.se', forvaltning: 'Grundskoleförvaltningen', role: 'grundskola' },
     ]);
   });
 

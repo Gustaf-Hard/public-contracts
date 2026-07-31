@@ -54,14 +54,17 @@ function roleFromForvaltning(forvaltning) {
   return stem.length >= 3 ? stem : 'handoff';
 }
 
-export function parseHandoffTargets({ analysis, bodyText = '', homeDomain = null, usedRoles = [] }) {
-  if (!analysis || analysis.intent !== 'handoff') return [];
-  const raw = analysis.extracted?.handoff_to_email;
-  if (!raw) return [];
+// Split one extraction's raw fields into one contact per address. The LLM packs
+// several addresses into handoff_to_email ('a@x.se;b@x.se'), so anything that
+// treats the field as a single address produces an unusable recipient. Shared
+// by the suggestion panel and storage.listHandoffContacts so the two cannot
+// drift apart.
+export function splitHandoffContacts({ email, forvaltning, usedRoles = [] }) {
+  if (!email) return [];
 
   const emails = [];
   const seen = new Set();
-  for (const part of String(raw).split(/[;,\s]+/)) {
+  for (const part of String(email).split(/[;,\s]+/)) {
     const e = part.trim().toLowerCase();
     if (!e || !e.includes('@') || seen.has(e)) continue;
     seen.add(e);
@@ -69,7 +72,7 @@ export function parseHandoffTargets({ analysis, bodyText = '', homeDomain = null
   }
   if (emails.length === 0) return [];
 
-  const labels = String(analysis.extracted?.handoff_to_forvaltning ?? '')
+  const labels = String(forvaltning ?? '')
     .split(/\s+och\s+|,/)
     .map((s) => s.trim())
     .filter(Boolean);
@@ -78,23 +81,31 @@ export function parseHandoffTargets({ analysis, bodyText = '', homeDomain = null
   const paired = labels.length === emails.length;
   const fullLabel = labels.join(' och ');
 
-  const body = String(bodyText ?? '').toLowerCase();
   const taken = new Set(usedRoles);
-  return emails.map((email, i) => {
-    const forvaltning = paired ? labels[i] : fullLabel;
-    let roleSlug = roleFromForvaltning(forvaltning);
+  return emails.map((e, i) => {
+    const label = paired ? labels[i] : fullLabel;
+    let roleSlug = roleFromForvaltning(label);
     if (taken.has(roleSlug)) {
       let n = 2;
       while (taken.has(`${roleSlug}-${n}`)) n++;
       roleSlug = `${roleSlug}-${n}`;
     }
     taken.add(roleSlug);
-    return {
-      email,
-      forvaltning,
-      verbatim: body.includes(email),
-      sameDomain: onDomain(email, homeDomain),
-      roleSlug,
-    };
+    return { email: e, forvaltning: label, roleSlug };
   });
+}
+
+export function parseHandoffTargets({ analysis, bodyText = '', homeDomain = null, usedRoles = [] }) {
+  if (!analysis || analysis.intent !== 'handoff') return [];
+
+  const body = String(bodyText ?? '').toLowerCase();
+  return splitHandoffContacts({
+    email: analysis.extracted?.handoff_to_email,
+    forvaltning: analysis.extracted?.handoff_to_forvaltning,
+    usedRoles,
+  }).map((c) => ({
+    ...c,
+    verbatim: body.includes(c.email),
+    sameDomain: onDomain(c.email, homeDomain),
+  }));
 }

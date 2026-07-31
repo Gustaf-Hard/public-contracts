@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3';
 import { matchResellers } from './resellers.js';
+import { splitHandoffContacts } from './handoff.js';
 
 // Active (non-terminal) escalation statuses — the single source of truth for
 // "this conversation already has pending or unresolved outbound work":
@@ -1065,10 +1066,14 @@ export function openDb(path) {
 
   function listHandoffContacts(kommunKod) {
     // Handoff addresses the kommun explicitly gave us, derived from inbound
-    // LLM analysis. Dedup by lowercased email; first occurrence wins for role.
+    // LLM analysis. One extraction can name several förvaltningar, so the raw
+    // field is often 'a@x.se;b@y.se' — splitHandoffContacts breaks it into one
+    // contact per address and pairs each with its own förvaltning and a role
+    // derived from it. Reading the field as a single address (as this did
+    // until 2026-07-31) puts a semicolon-joined pair in the compose dropdown.
+    // Dedup by lowercased email; first occurrence wins.
     const rows = db.prepare(`
-      SELECT conv.role AS role,
-             json_extract(m.analysis_json, '$.extracted.handoff_to_email') AS email,
+      SELECT json_extract(m.analysis_json, '$.extracted.handoff_to_email') AS email,
              json_extract(m.analysis_json, '$.extracted.handoff_to_forvaltning') AS forvaltning
       FROM messages m
       JOIN conversations conv ON conv.id = m.conversation_id
@@ -1080,10 +1085,11 @@ export function openDb(path) {
     const seen = new Set();
     const out = [];
     for (const r of rows) {
-      const key = r.email.toLowerCase();
-      if (seen.has(key)) continue;
-      seen.add(key);
-      out.push({ email: r.email, forvaltning: r.forvaltning ?? null, role: r.role });
+      for (const c of splitHandoffContacts({ email: r.email, forvaltning: r.forvaltning })) {
+        if (seen.has(c.email)) continue;
+        seen.add(c.email);
+        out.push({ email: c.email, forvaltning: c.forvaltning || null, role: c.roleSlug });
+      }
     }
     return out;
   }
