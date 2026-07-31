@@ -666,6 +666,25 @@ describe('home buckets', () => {
     expect(w.some((x) => x.conv_id === escId)).toBe(false); // in the action queue instead
   });
 
+  it('counts real avtal, not every attachment, for the tile and the column', () => {
+    // 3 files on one delivery: 1 avtal, 1 bilaga, 1 unanalysed. Only the avtal
+    // is an avtal — the tile used to report all 3.
+    const convId = db.createConversation({ kommun_kod: '2418', kommun_namn: 'Malå', role: 'central', contact_email: 'k@mala.se', scheduled_send_at: '2026-07-01T00:00:00Z' });
+    db.recordMessage({ conversation_id: convId, gmail_message_id: 'in-x', direction: 'inbound',
+      from_email: 'k@mala.se', to_email: 'me@x.se', subject: 'Sv', body_text: 'b',
+      classification: 'delivery', classification_confidence: 0.9, received_at: '2026-07-08T00:00:00Z', attachment_count: 3 });
+    const msgId = db.raw.prepare("SELECT id FROM messages WHERE gmail_message_id = 'in-x'").get().id;
+    const att = (n) => db.raw.prepare('INSERT INTO attachments (message_id, filename, saved_path, mime_type, size_bytes) VALUES (?,?,?,?,?)')
+      .run(msgId, n, `/tmp/${n}`, 'application/pdf', 10).lastInsertRowid;
+    const a1 = att('avtal.pdf'), a2 = att('bilaga.pdf'); att('okand.pdf');
+    const vId = db.upsertVendor('Lev').id;
+    const con = (a, isC, type) => db.raw.prepare('INSERT INTO contracts (attachment_id, vendor_id, is_contract, document_type, analysis_json) VALUES (?,?,?,?,?)').run(a, vId, isC, type, '{}');
+    con(a1, 1, 'avtal'); con(a2, 0, 'bilaga');
+
+    const rows = buildOverviewRows([{ kommun_kod: '2418', kommun_namn: 'Malå', lan: 'X', folkmangd: 1, contacts: [] }], db);
+    expect(rows.find((r) => r.kommun_kod === '2418').contracts).toBe(1);   // not 3
+  });
+
   it("applyFilter('active') drops never-contacted kommuner", () => {
     db.createConversation({ kommun_kod: '2418', kommun_namn: 'Malå', role: 'central', contact_email: 'k@mala.se', scheduled_send_at: '2026-05-24T10:00:00Z' });
     const munis = JSON.parse(require('node:fs').readFileSync(muniPath, 'utf8'));

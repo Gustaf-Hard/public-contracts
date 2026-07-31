@@ -207,15 +207,21 @@ function buildOverviewRows(municipalities, db, vacationConfig = { enabled: false
     : [];
   const latestOpenEscByConvId = new Map(latestOpenEsc.map((r) => [r.conversation_id, r]));
 
-  // Attachment count per conversation
-  const attachmentCounts = db
+  // Avtal per conversation — is_contract=1 only. This deliberately counts
+  // contracts, not attachments: counting every file made "Avtal mottagna" read
+  // 154 when only 91 were avtal, the rest being bilagor, PUB-avtal, prislistor
+  // and följebrev. The /takt page shows the full file split.
+  const avtalCounts = db
     ? db.raw.prepare(`
-        SELECT m.conversation_id, count(a.id) as n
-        FROM attachments a JOIN messages m ON m.id = a.message_id
+        SELECT m.conversation_id, count(c.id) as n
+        FROM contracts c
+        JOIN attachments a ON a.id = c.attachment_id
+        JOIN messages m ON m.id = a.message_id
+        WHERE c.is_contract = 1
         GROUP BY m.conversation_id
       `).all()
     : [];
-  const attachByConvId = new Map(attachmentCounts.map((r) => [r.conversation_id, r.n]));
+  const avtalByConvId = new Map(avtalCounts.map((r) => [r.conversation_id, r.n]));
 
   // Latest inbound message per conversation — feeds the hover tooltip's "Senast: …"
   const latestInbound = db
@@ -239,7 +245,7 @@ function buildOverviewRows(municipalities, db, vacationConfig = { enabled: false
     let earliestFollowUpSource = null;
     for (const c of convs) {
       openEsc += openEscByConvId.get(c.id) ?? 0;
-      contracts += attachByConvId.get(c.id) ?? 0;
+      contracts += avtalByConvId.get(c.id) ?? 0;
       const candidate = c.last_outbound_at && c.state_changed_at && c.last_outbound_at > c.state_changed_at
         ? c.last_outbound_at : c.state_changed_at;
       if (!lastActivityAt || candidate > lastActivityAt) lastActivityAt = candidate;
