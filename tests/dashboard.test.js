@@ -1077,3 +1077,76 @@ describe('overview one-click send (quick-init)', () => {
     expect(html).toMatch(/<form[^>]*data-row-form/);
   });
 });
+
+describe('handoff suggested ärenden', () => {
+  const GBG_ANALYSIS = JSON.stringify({
+    intent: 'handoff', confidence: 0.88,
+    extracted: {
+      handoff_to_email: 'info@educ.goteborg.se;grundskola@grundskola.goteborg.se',
+      handoff_to_forvaltning: 'Utbildningsförvaltningen och Grundskoleförvaltningen',
+    },
+  });
+  const BODY = 'Kontakta info@educ.goteborg.se och grundskola@grundskola.goteborg.se';
+
+  function seedHandoff() {
+    const convId = db.createConversation({ kommun_kod: '1480', kommun_namn: 'Göteborg', role: 'upphandling', contact_email: 'ink@ink.goteborg.se', scheduled_send_at: '2026-07-31T07:00:00Z' });
+    db.updateConversationState(convId, 'NEEDS_HUMAN', {});
+    db.recordMessage({ conversation_id: convId, gmail_message_id: 'in-h', direction: 'inbound',
+      from_email: 'ink@ink.goteborg.se', to_email: 'me@x.se', subject: 'SV', body_text: BODY,
+      classification: 'unknown', classification_confidence: 0.88,
+      received_at: '2026-07-31T07:44:00Z', attachment_count: 0, analysis_json: GBG_ANALYSIS });
+    return convId;
+  }
+  const MUNIS = [{ kommun_kod: '1480', kommun_namn: 'Göteborg', lan: 'X', folkmangd: 1,
+    webbplats: 'http://www.goteborg.se', contacts: [] }];
+  const appG = (extra = {}) => createDashboardApp({ db, municipalitiesLoader: () => MUNIS, ...extra });
+  const appGmail = () => appG({ gmailClient: { gmail: {} },
+    env: { GMAIL_USER_EMAIL: 'me@x.se', GMAIL_FROM_NAME: 'Test' } });
+
+  it('offers one suggestion per extracted address, with its signals', async () => {
+    const convId = seedHandoff();
+    const res = await get(appG(), `/arenden/${convId}`);
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Föreslagna ärenden');
+    expect(res.text).toContain('info@educ.goteborg.se');
+    expect(res.text).toContain('grundskola@grundskola.goteborg.se');
+    expect(res.text).toContain('Utbildningsförvaltningen');
+    expect(res.text).toMatch(/står i mejlet/);
+  });
+
+  it('shows no panel for an ärende with no handoff', async () => {
+    const convId = db.createConversation({ kommun_kod: '1480', kommun_namn: 'Göteborg', role: 'central', contact_email: 'g@goteborg.se', scheduled_send_at: '2026-07-31T07:00:00Z' });
+    db.recordMessage({ conversation_id: convId, gmail_message_id: 'in-n', direction: 'inbound',
+      from_email: 'g@goteborg.se', to_email: 'me@x.se', subject: 'Sv', body_text: 'Hej',
+      classification: 'clarification', classification_confidence: 0.9,
+      received_at: '2026-07-31T07:00:00Z', attachment_count: 0,
+      analysis_json: JSON.stringify({ intent: 'clarification', extracted: {} }) });
+    const res = await get(appG(), `/arenden/${convId}`);
+    expect(res.text).not.toContain('Föreslagna ärenden');
+  });
+
+  it('starts an ärende for a suggested address and sends T-INITIAL once', async () => {
+    const convId = seedHandoff();
+    const spy = vi.spyOn(gmailMod, 'sendMessage').mockResolvedValue({ id: 'm9', threadId: 't9' });
+    try {
+      const res = await postForm(appGmail(), `/arenden/${convId}/handoff-start`, { email: 'info@educ.goteborg.se' });
+      expect(res.status).toBe(302);
+      expect(spy).toHaveBeenCalledTimes(1);
+      const created = db.raw.prepare("SELECT * FROM conversations WHERE kommun_kod = '1480' AND role != 'upphandling'").all();
+      expect(created).toHaveLength(1);
+      expect(created[0].contact_email).toBe('info@educ.goteborg.se');
+      expect(created[0].role).toBe('utbildning');
+      expect(created[0].state).toBe('SENT');
+    } finally { spy.mockRestore(); }
+  });
+
+  it('refuses an address that is not among the extracted targets', async () => {
+    const convId = seedHandoff();
+    const spy = vi.spyOn(gmailMod, 'sendMessage').mockResolvedValue({ id: 'm9', threadId: 't9' });
+    try {
+      const res = await postForm(appGmail(), `/arenden/${convId}/handoff-start`, { email: 'angripare@example.com' });
+      expect(res.status).toBe(400);
+      expect(spy).not.toHaveBeenCalled();   // nothing may be mailed
+    } finally { spy.mockRestore(); }
+  });
+});

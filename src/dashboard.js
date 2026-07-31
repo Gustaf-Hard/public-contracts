@@ -14,6 +14,7 @@ import { buildOAuthClient, loadStoredToken, saveToken, makeGmail } from './gmail
 import { beginReauth } from './gmail-auth.js';
 import { requireAuth, requireOriginToken, mountAuthRoutes } from './web-auth.js';
 import { sendApprovedReply, sendInitial, renderInitialDraft } from './send-reply.js';
+import { parseHandoffTargets, homeDomainFromWebbplats } from './handoff.js';
 import { makeSlackClient, updateEscalationResolved } from './slack.js';
 import { resolveReplyRecipient } from './threads.js';
 import {
@@ -484,8 +485,10 @@ function escalationRecipient(db, esc, conv) {
   return resolveReplyRecipient({ triggeringMessage, conv, primaryThreads }).to;
 }
 
-// Full detail for one conversation (Ärenden detail pane).
-function loadCaseDetail(db, convId) {
+// Full detail for one conversation (Ärenden detail pane). `kommunFor` looks a
+// kommun record up by kod — passed as a function so the caller does not have to
+// repeat getConversation() just to learn the kod before calling.
+function loadCaseDetail(db, convId, kommunFor = () => null) {
   if (!db) return null;
   const conv = db.getConversation(convId);
   if (!conv) return null;
@@ -509,7 +512,28 @@ function loadCaseDetail(db, convId) {
       return { ...e, recipient: escalationRecipient(db, e, conv), thread_id: trigMsg?.thread_id ?? null };
     });
   const threads = db.listThreadsForConversation(convId);
-  return { conv, messages, attachmentsByMsg, signatures, escalations, threads, follow_up: effectiveFollowUp(conv) };
+
+  // Suggested ärenden from the most recent EXTERNAL handoff. Newest wins: an
+  // older redirect that a later message superseded is not re-suggested. The
+  // intent lives in analysis_json — the classification column says 'unknown'
+  // for a handoff on purpose, so a rule keyed on it would never fire.
+  let handoff_targets = [];
+  const lastHandoff = [...messages].reverse().find((m) => {
+    if (m.direction !== 'inbound' || !m.analysis_json) return false;
+    try { return JSON.parse(m.analysis_json)?.intent === 'handoff'; } catch { return false; }
+  });
+  if (lastHandoff) {
+    const usedRoles = db.raw.prepare('SELECT role FROM conversations WHERE kommun_kod = ?')
+      .all(conv.kommun_kod).map((r) => r.role);
+    handoff_targets = parseHandoffTargets({
+      analysis: JSON.parse(lastHandoff.analysis_json),
+      bodyText: lastHandoff.body_text ?? '',
+      homeDomain: homeDomainFromWebbplats(kommunFor(conv.kommun_kod)?.webbplats),
+      usedRoles,
+    });
+  }
+
+  return { conv, messages, attachmentsByMsg, signatures, escalations, threads, handoff_targets, follow_up: effectiveFollowUp(conv) };
 }
 
 // Sort vendor rollups for the market table. Default (no sort param) keeps
@@ -864,9 +888,11 @@ export function createDashboardApp({
     }));
   });
 
+  const kommunByKod = (kod) => (municipalitiesLoader() ?? []).find((m) => m.kommun_kod === kod) ?? null;
+
   app.get('/arenden/:id', (req, res) => {
     const cases = loadCaseSummaries(db);
-    const detail = loadCaseDetail(db, parseInt(req.params.id, 10));
+    const detail = loadCaseDetail(db, parseInt(req.params.id, 10), kommunByKod);
     res.set('Content-Type', 'text/html; charset=utf-8');
     if (!detail) {
       return res.status(404).send(renderArenden({
@@ -1335,6 +1361,46 @@ export function createDashboardApp({
       if (e.code === 'INITIAL_CLAIM_LOST' || /already exists/i.test(e.message)) {
         return done();
       }
+      return res.status(500).send(`Send failed: ${escapeForError(e.message)}`);
+    }
+    done();
+  });
+
+  // Start an ärende for an address the KOMMUN named in a handoff. The posted
+  // email is validated against the targets re-derived from the stored message:
+  // the form is a convenience, not the authority, so a hand-crafted POST cannot
+  // mail an arbitrary address. Förvaltning and role come from the re-derived
+  // target too, never from the body. Sending goes through sendInitial, unchanged.
+  app.post('/arenden/:id/handoff-start', async (req, res) => {
+    if (!db) return res.status(503).send('No DB');
+    if (!gmailClient) return res.status(503).send('Gmail not configured — run pilot-auth first.');
+
+    const convId = parseInt(req.params.id, 10);
+    const detail = loadCaseDetail(db, convId, kommunByKod);
+    if (!detail) return res.status(404).send('Ärende not found');
+    const wanted = String(req.body.email ?? '').trim().toLowerCase();
+    const target = (detail.handoff_targets ?? []).find((t) => t.email === wanted);
+    if (!target) return res.status(400).send('Adressen finns inte bland de föreslagna ärendena');
+
+    const { conv } = detail;
+    const wantsNoBody = req.get('X-Partial') === '1';
+    const done = () => (wantsNoBody ? res.status(204).end() : res.redirect(`/arenden/${convId}`));
+
+    const { subject, body } = renderInitialDraft({ kommun_namn: conv.kommun_namn, role: target.roleSlug, env });
+    try {
+      await sendInitial({
+        db, gmail: gmailClient, env,
+        kommun_kod: conv.kommun_kod,
+        kommun_namn: conv.kommun_namn,
+        role: target.roleSlug,
+        contact_email: target.email,
+        subject,
+        body,
+      });
+    } catch (e) {
+      // Lost claim or an already-existing conversation are benign no-ops —
+      // nothing double-sent.
+      if (e.code === 'INITIAL_CLAIM_LOST' || /already exists/i.test(e.message)) return done();
       return res.status(500).send(`Send failed: ${escapeForError(e.message)}`);
     }
     done();

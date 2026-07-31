@@ -2028,7 +2028,7 @@ export function renderThread({ kommun, conv, thread, messages = [], attachmentsB
 
 function renderCaseDetailPane(selected, gmailReady) {
   if (!selected) return '<div class="detail-empty"><p class="muted">Välj ett ärende i listan till vänster.</p></div>';
-  const { conv, messages, attachmentsByMsg, signatures, escalations, threads = [], follow_up } = selected;
+  const { conv, messages, attachmentsByMsg, signatures, escalations, threads = [], handoff_targets = [], follow_up } = selected;
   const returnTo = `/arenden/${conv.id}`;
   const duration = caseDuration(conv, messages);
   const fuBadge = fmtFollowUpBadge(follow_up?.date, follow_up?.source);
@@ -2075,8 +2075,41 @@ function renderCaseDetailPane(selected, gmailReady) {
     </div>
     <div class="thread-msgs">${thread}</div>
     ${replyBoxes}
+    ${renderHandoffSuggestions(handoff_targets, conv.id)}
     ${renderCaseActions(conv, gmailReady, returnTo)}
   </div>`;
+}
+
+// The kommun redirected us. Offer one ärende per address it named, with the two
+// signals that make a bad extraction obvious: whether the address is actually
+// written in the mail, and whether it sits on the kommun's own domain. The
+// badges are shown, not enforced — the operator is the gate, and nothing at all
+// is created until they click.
+function renderHandoffSuggestions(targets, convId) {
+  if (!targets.length) return '';
+  const badge = (ok, yes, no) => ok
+    ? `<span class="pill pill-promise">✓ ${yes}</span>`
+    : `<span class="pill pill-overdue">⚠ ${no}</span>`;
+  return `
+    <section class="board-section handoff-suggestions">
+      <h2>Föreslagna ärenden <span class="count">${targets.length}</span></h2>
+      <p class="muted">Kommunen hänvisade vidare. Inget skickas förrän du klickar.</p>
+      <table>
+        <thead><tr><th>Adress</th><th>Förvaltning</th><th>Kontroll</th><th>Roll</th><th></th></tr></thead>
+        <tbody>${targets.map((t) => `<tr data-handoff-email="${escapeHtml(t.email)}">
+          <td>${escapeHtml(t.email)}</td>
+          <td>${escapeHtml(t.forvaltning)}</td>
+          <td>${badge(t.verbatim, 'står i mejlet', 'hittades inte i mejlet')} ${badge(t.sameDomain, 'kommunens domän', 'annan domän')}</td>
+          <td class="muted">${escapeHtml(t.roleSlug)}</td>
+          <td data-state-cell>
+            <form method="post" action="/arenden/${convId}/handoff-start" data-row-form>
+              <input type="hidden" name="email" value="${escapeHtml(t.email)}">
+              <button type="submit" class="compose-link" title="Starta ärende och skicka T-INITIAL">📨 Skicka</button>
+            </form>
+          </td>
+        </tr>`).join('')}</tbody>
+      </table>
+    </section>`;
 }
 
 export function renderArenden({ cases = [], selected = null, selectedId = null, gmailReady = false, heartbeat = null, partial = false, escalationCount = 0 }) {
