@@ -7,6 +7,7 @@ import express from 'express';
 import path from 'node:path';
 import { readFileSync, existsSync } from 'node:fs';
 import { openDb } from './storage.js';
+import { buildVelocityFacts } from './collection-velocity.js';
 import { effectiveFollowUp, TERMINAL_STATES } from './conversation.js';
 import { resolveVacationConfig, isInVacation } from './vacation.js';
 import { buildOAuthClient, loadStoredToken, saveToken, makeGmail } from './gmail.js';
@@ -22,6 +23,7 @@ import {
   renderThread,
   groupEscalationsByThread,
   renderActivity,
+  renderVelocity,
   renderCompose,
   renderVendorMarket,
   renderVendorDossier,
@@ -906,6 +908,22 @@ export function createDashboardApp({
 
   // Escalations are now handled inside Ärenden — redirect old links there.
   app.get('/escalations', (req, res) => res.redirect('/arenden?bucket=behover-dig'));
+
+  // Collection velocity: how fast avtal are actually arriving. All three
+  // queries are read-only; the facts are computed by the pure module.
+  app.get('/takt', (req, res) => {
+    const empty = { total: 0, by_type: [] };
+    const facts = buildVelocityFacts({
+      contractEvents: db ? db.listContractDeliveryEvents() : [],
+      caseTimings: db ? db.listCaseTimings() : [],
+      files: db ? db.countFilesByDocumentType() : empty,
+      now: new Date().toISOString(),
+    });
+    res.set('Content-Type', 'text/html; charset=utf-8');
+    res.send(renderVelocity({
+      facts, heartbeat: hb(), partial: isPartial(req), escalationCount: escCount(),
+    }));
+  });
 
   app.get('/activity', (req, res) => {
     if (!db) {

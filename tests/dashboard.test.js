@@ -965,6 +965,51 @@ describe('thread status toggle', () => {
   });
 });
 
+describe('/takt collection velocity', () => {
+  it('says so plainly when nothing has arrived yet', async () => {
+    const res = await get(appWithFakes(), '/takt');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Inga avtal mottagna än');
+  });
+
+  it('renders both panels, the definitions and the weekly figures', async () => {
+    const convId = db.createConversation({ kommun_kod: '2418', kommun_namn: 'Malå', role: 'central', contact_email: 'k@mala.se', scheduled_send_at: '2026-07-01T00:00:00Z' });
+    db.recordMessage({ conversation_id: convId, gmail_message_id: 'out-t', direction: 'outbound',
+      from_email: 'me@x.se', to_email: 'k@mala.se', subject: 'B', body_text: 'b',
+      classification: null, classification_confidence: null, received_at: '2026-07-01T00:00:00Z', attachment_count: 0 });
+    db.recordMessage({ conversation_id: convId, gmail_message_id: 'in-t', direction: 'inbound',
+      from_email: 'k@mala.se', to_email: 'me@x.se', subject: 'Sv', body_text: 'b',
+      classification: 'delivery', classification_confidence: 0.9, received_at: '2026-07-08T00:00:00Z', attachment_count: 1 });
+    const msgId = db.raw.prepare("SELECT id FROM messages WHERE gmail_message_id = 'in-t'").get().id;
+    const attId = db.raw.prepare('INSERT INTO attachments (message_id, filename, saved_path, mime_type, size_bytes) VALUES (?,?,?,?,?)')
+      .run(msgId, 'a.pdf', '/tmp/a.pdf', 'application/pdf', 10).lastInsertRowid;
+    db.raw.prepare('INSERT INTO contracts (attachment_id, vendor_id, is_contract, document_type, analysis_json) VALUES (?,?,?,?,?)')
+      .run(attId, db.upsertVendor('Lev').id, 1, 'avtal', '{}');
+
+    const res = await get(appWithFakes(), '/takt');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Avtal per vecka');
+    expect(res.text).toContain('Kumulativt');
+    // Two separate <svg> panels — never one plot with two y-scales.
+    expect((res.text.match(/<svg/g) ?? []).length).toBeGreaterThanOrEqual(2);
+    // The robot rule is stated on the page, not just in the spec.
+    expect(res.text).toMatch(/autosvar/i);
+    expect(res.text).toContain('Tratt');
+    expect(res.text).toContain('Tysta kommuner');
+  });
+
+  it('renders an empty timing as a dash, never as 0 days', async () => {
+    // Contacted, but no reply and no avtal: both medians are unmeasured.
+    const cid = db.createConversation({ kommun_kod: '2418', kommun_namn: 'Malå', role: 'central', contact_email: 'k@mala.se', scheduled_send_at: '2026-07-01T00:00:00Z' });
+    db.recordMessage({ conversation_id: cid, gmail_message_id: 'out-z', direction: 'outbound',
+      from_email: 'me@x.se', to_email: 'k@mala.se', subject: 'B', body_text: 'b',
+      classification: null, classification_confidence: null, received_at: '2026-07-01T00:00:00Z', attachment_count: 0 });
+    const res = await get(appWithFakes(), '/takt');
+    expect(res.text).toContain('inga mätvärden än');
+    expect(res.text).not.toMatch(/>0 d</);
+  });
+});
+
 describe('overview one-click send (quick-init)', () => {
   const baseArgs = (states) => ({
     summary: { in_pilot: 0, delivering: 0, done: 0, dead_end: 0, contracts: 0, avg_reply_days: null },
@@ -1012,6 +1057,14 @@ describe('overview one-click send (quick-init)', () => {
     } finally {
       spy.mockRestore();
     }
+  });
+
+  it('links the Avtal-mottagna tile to /takt', () => {
+    const html = renderOverview({
+      summary: { in_pilot: 0, delivering: 0, done: 0, dead_end: 0, contracts: 7, avg_reply_days: null },
+      rows: [], totalKommuner: 0, filter: 'all',
+    });
+    expect(html).toMatch(/href="\/takt"[\s\S]{0,200}Avtal mottagna/);
   });
 
   it('makes the row and its state cell addressable so a send can swap in place', () => {

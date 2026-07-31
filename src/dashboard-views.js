@@ -251,6 +251,10 @@ const baseCss = `
     --good: #16a34a;
     --warn: #d97706;
     --bad: #dc2626;
+    /* Chart marks. Validated with the dataviz palette validator against the
+       card surface: #4f46e5 on #ffffff passes every check. The UI accent is
+       reused here in light mode; dark mode needs its own step (see below). */
+    --chart-series: #4f46e5;
     --r-1: 4px; --r-2: 8px; --r-3: 12px;
     --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 24px; --sp-6: 32px;
     --shadow: 0 1px 2px rgba(16,24,40,.04), 0 1px 3px rgba(16,24,40,.06);
@@ -267,6 +271,9 @@ const baseCss = `
     --good: #22c55e;
     --warn: #f59e0b;
     --bad: #ef4444;
+    /* NOT the UI accent #818cf8: it fails the chart lightness band (L 0.68 vs
+       a 0.67 ceiling) against the dark card surface. #6d7ff5 passes all checks. */
+    --chart-series: #6d7ff5;
     --shadow: 0 1px 2px rgba(0,0,0,.35);
   }
   * { box-sizing: border-box; }
@@ -573,6 +580,24 @@ const baseCss = `
   .vendor-item .vi-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 6px; font-size: 12px; }
   .vendor-item .vi-name { font-weight: 600; font-size: 14px; }
   .chip-row { display: flex; flex-wrap: wrap; gap: 4px; }
+  /* --- Takt (collection velocity) --- */
+  .chart { width: 100%; height: auto; display: block; margin-bottom: var(--sp-2); }
+  .ch-title { font-size: 13px; font-weight: 600; margin: var(--sp-4) 0 var(--sp-1); }
+  .ch-tick { fill: var(--fg-muted); font-size: 11px; }
+  .ch-table { margin-top: var(--sp-4); }
+  .ch-table td, .ch-table th { font-variant-numeric: tabular-nums; }
+  .timing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--sp-3); }
+  .timing-card { background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--sp-3) var(--sp-4); }
+  .timing-card .label { color: var(--fg-muted); font-size: 12px; text-transform: uppercase; letter-spacing: .4px; }
+  .timing-value { font-size: 30px; font-weight: 700; line-height: 1.2; }
+  .timing-unit { font-size: 12px; font-weight: 500; color: var(--fg-muted); margin-left: 8px; text-transform: uppercase; letter-spacing: .4px; }
+  .funnel-row { display: grid; grid-template-columns: 200px 1fr 90px; align-items: center; gap: var(--sp-3); padding: 5px 0; }
+  .funnel-bar { background: var(--bg-elev-2); border-radius: var(--r-1); height: 12px; overflow: hidden; }
+  .funnel-fill { display: block; height: 100%; background: var(--chart-series); border-radius: var(--r-1); }
+  .funnel-n { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+  .stat-card-link { text-decoration: none; color: inherit; display: block; }
+  .stat-card-link:hover { text-decoration: none; }
+  .stat-card-link:hover .stat-card { border-color: var(--accent); }
   .quick-init { display: inline; } .quick-init-edit { margin-left: 6px; text-decoration: none; }
   /* One-click send, in flight: the row dims and the button stops accepting
      clicks, so a slow Gmail call cannot be double-submitted. */
@@ -833,6 +858,7 @@ export function layout({ title, body, currentPath = '/', heartbeat = null, parti
       ${navItem('/arenden', 'Ärenden')}
       ${navItem('/escalations', 'Eskaleringar', escBadge)}
       ${navItem('/leverantorer', 'Leverantörer')}
+      ${navItem('/takt', 'Takt')}
       ${navItem('/activity', 'Aktivitet')}
     </nav>
     <div class="sidebar-foot">
@@ -921,7 +947,7 @@ export function renderOverview({ summary, rows, filter, sort, order, totalKommun
       <div class="stat-card"><div class="label">Aktiva</div><div class="value">${summary.in_pilot}</div></div>
       <div class="stat-card"><div class="label">Levererar</div><div class="value good">${summary.delivering}</div></div>
       <div class="stat-card"><div class="label">Klart</div><div class="value good">${summary.done}</div></div>
-      <div class="stat-card"><div class="label">Avtal mottagna</div><div class="value">${summary.contracts}</div></div>
+      <a class="stat-card-link" href="/takt" data-pane-link title="Se takten: avtal per vecka, svarstider och tratt"><div class="stat-card"><div class="label">Avtal mottagna</div><div class="value">${summary.contracts}</div></div></a>
       <div class="stat-card"><div class="label">Snittsvarstid</div><div class="value">${summary.avg_reply_days === null ? '—' : summary.avg_reply_days + ' d'}</div></div>
     </div>
   `;
@@ -2082,6 +2108,169 @@ export function renderActivity({ events, heartbeat = null, partial = false, esca
         </tbody>
       </table>`;
   return layout({ title: 'Aktivitet', body: `<div class="page-head"><h1>Aktivitet</h1><span class="muted">senaste ${events.length}</span></div>${body}`, currentPath: '/activity', heartbeat, partial, escalationCount });
+}
+
+// ---- Takt (collection velocity) ----
+
+// Two panels, one shared x-axis. Deliberately NOT one plot with two y-scales:
+// avtal-per-week tops out around 23 while the cumulative reaches 91, and a
+// dual-axis chart is the one chart form that reliably misleads. Server-rendered
+// SVG with no client JS, so it survives the app.js pane swap (scripts inside
+// innerHTML never execute).
+const CHART = { w: 720, barsH: 150, lineH: 90, padL: 34, padR: 8, padT: 8, axisH: 18 };
+
+function velocityChart(weeks) {
+  const { w, barsH, lineH, padL, padR, padT, axisH } = CHART;
+  const plotW = w - padL - padR;
+  const maxBar = Math.max(1, ...weeks.map((x) => x.contracts));
+  const maxCum = Math.max(1, ...weeks.map((x) => x.cumulative));
+  const slot = plotW / weeks.length;
+  const barW = Math.max(2, slot - 2);          // 2px surface gap between bars
+  const x = (i) => padL + i * slot + (slot - barW) / 2;
+
+  // Label every week when they fit, otherwise every other one, so ticks never collide.
+  const tickEvery = slot >= 34 ? 1 : Math.ceil(34 / slot);
+  const weekLabel = (wk) => wk.iso_week.replace(/^\d{4}-W/, 'v.');
+
+  const gridLines = (h, max) => [0, 0.5, 1].map((f) => {
+    const y = padT + h - f * h;
+    return `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${w - padR}" y2="${y.toFixed(1)}" stroke="var(--border)" stroke-width="1"/>`
+      + `<text x="${padL - 6}" y="${(y + 3.5).toFixed(1)}" text-anchor="end" class="ch-tick">${Math.round(f * max)}</text>`;
+  }).join('');
+
+  const bars = weeks.map((wk, i) => {
+    const h = (wk.contracts / maxBar) * barsH;
+    const y = padT + barsH - h;
+    const label = `${weekLabel(wk)} (${wk.week_start}): ${wk.contracts} avtal, ${wk.kommuner} kommuner`;
+    // A zero week draws no bar but keeps its slot, so a gap looks like a gap.
+    return wk.contracts === 0
+      ? `<g><title>${escapeHtml(label)}</title><rect x="${x(i).toFixed(1)}" y="${padT + barsH - 2}" width="${barW.toFixed(1)}" height="2" fill="var(--border)"/></g>`
+      : `<g><title>${escapeHtml(label)}</title><rect x="${x(i).toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" rx="4" fill="var(--chart-series)"/></g>`;
+  }).join('');
+
+  const ticks = weeks.map((wk, i) => (i % tickEvery === 0
+    ? `<text x="${(x(i) + barW / 2).toFixed(1)}" y="${padT + barsH + 13}" text-anchor="middle" class="ch-tick">${escapeHtml(weekLabel(wk))}</text>`
+    : '')).join('');
+
+  const cumPoints = weeks.map((wk, i) => {
+    const cy = padT + lineH - (wk.cumulative / maxCum) * lineH;
+    return `${(x(i) + barW / 2).toFixed(1)},${cy.toFixed(1)}`;
+  }).join(' ');
+  const cumDots = weeks.map((wk, i) => {
+    const cy = padT + lineH - (wk.cumulative / maxCum) * lineH;
+    return `<g><title>${escapeHtml(`${weekLabel(wk)}: ${wk.cumulative} avtal totalt`)}</title>`
+      + `<circle cx="${(x(i) + barW / 2).toFixed(1)}" cy="${cy.toFixed(1)}" r="4" fill="var(--chart-series)"/></g>`;
+  }).join('');
+
+  const totalAvtal = weeks.length ? weeks[weeks.length - 1].cumulative : 0;
+  return `
+    <h3 class="ch-title">Avtal per vecka</h3>
+    <svg class="chart" viewBox="0 0 ${w} ${padT + barsH + axisH}" role="img"
+         aria-label="Stapeldiagram: antal avtal mottagna per vecka, ${weeks.length} veckor, som mest ${maxBar} på en vecka.">
+      ${gridLines(barsH, maxBar)}${bars}${ticks}
+    </svg>
+    <h3 class="ch-title">Kumulativt</h3>
+    <svg class="chart" viewBox="0 0 ${w} ${padT + lineH + axisH}" role="img"
+         aria-label="Linjediagram: totalt antal avtal över tid, ${totalAvtal} avtal totalt.">
+      ${gridLines(lineH, maxCum)}
+      <polyline points="${cumPoints}" fill="none" stroke="var(--chart-series)" stroke-width="2" stroke-linejoin="round"/>
+      ${cumDots}
+      ${weeks.map((wk, i) => (i % tickEvery === 0
+        ? `<text x="${(x(i) + barW / 2).toFixed(1)}" y="${padT + lineH + 13}" text-anchor="middle" class="ch-tick">${escapeHtml(weekLabel(wk))}</text>`
+        : '')).join('')}
+    </svg>`;
+}
+
+// "median · spann min–max · n av N kontaktade". An empty sample renders "—",
+// never 0 — a fabricated zero would read as "instant".
+function timingBlock(title, t) {
+  const value = t.median === null ? '—' : `${String(t.median).replace('.', ',')} d`;
+  const detail = t.n === 0
+    ? `inga mätvärden än · 0 av ${t.of} kontaktade`
+    : `spann ${String(t.min).replace('.', ',')}–${String(t.max).replace('.', ',')} d · ${t.n} av ${t.of} kontaktade`;
+  return `<div class="timing-card">
+    <div class="label">${escapeHtml(title)}</div>
+    <div class="timing-value">${escapeHtml(value)}<span class="timing-unit">median</span></div>
+    <div class="muted">${escapeHtml(detail)}</div>
+  </div>`;
+}
+
+export function renderVelocity({ facts, heartbeat = null, partial = false, escalationCount = 0 }) {
+  const { weeks, timings, funnel, silent, files } = facts;
+
+  const chart = weeks.length === 0
+    ? '<div class="empty-state">Inga avtal mottagna än.</div>'
+    : `${velocityChart(weeks)}
+       <table class="ch-table">
+         <thead><tr><th>Vecka</th><th class="num">Avtal</th><th class="num">Kommuner</th><th class="num">Totalt</th></tr></thead>
+         <tbody>${weeks.map((w) => `<tr>
+           <td>${escapeHtml(w.iso_week.replace(/^\d{4}-W/, 'v.'))} <span class="muted">${escapeHtml(w.week_start)}</span></td>
+           <td class="num">${w.contracts}</td><td class="num">${w.kommuner}</td><td class="num">${w.cumulative}</td>
+         </tr>`).join('')}</tbody>
+       </table>`;
+
+  const funnelRow = (label, n, of) => {
+    const pct = of > 0 ? Math.round((n / of) * 100) : 0;
+    return `<div class="funnel-row">
+      <span class="funnel-label">${escapeHtml(label)}</span>
+      <span class="funnel-bar"><span class="funnel-fill" style="width:${pct}%"></span></span>
+      <span class="funnel-n">${n}<span class="muted"> · ${pct}%</span></span>
+    </div>`;
+  };
+
+  const SILENT_CAP = 10;
+  const silentShown = silent.slice(0, SILENT_CAP);
+  const silentRest = silent.length - silentShown.length;
+  const silentList = silent.length === 0
+    ? '<div class="empty-state">Alla kontaktade kommuner har svarat.</div>'
+    : `<table>
+        <thead><tr><th>Kommun</th><th class="num">Väntat</th></tr></thead>
+        <tbody>${silentShown.map((s) => `<tr>
+          <td><a href="/arenden/${s.conversation_id}" data-pane-link>${escapeHtml(s.kommun_namn)}</a></td>
+          <td class="num">${s.days_waiting} d</td>
+        </tr>`).join('')}</tbody>
+      </table>${silentRest > 0 ? `<p class="muted">+${silentRest} fler</p>` : ''}`;
+
+  const body = `
+    <div class="page-head"><h1>Takt</h1><span class="muted">insamlingens hastighet</span></div>
+
+    <section class="board-section">
+      ${chart}
+    </section>
+
+    <section class="board-section">
+      <h2>Två hastigheter</h2>
+      <div class="timing-grid">
+        ${timingBlock('Första svar från människa', timings.first_human_reply)}
+        ${timingBlock('Första kontakt till första avtal', timings.first_contract)}
+      </div>
+      <p class="muted">Ett maskinellt svar (autosvar från diariesystem eller frånvaromeddelande) räknas inte som svar. Medianen räknas per ärende, inte per meddelande.</p>
+    </section>
+
+    <section class="board-section">
+      <h2>Tratt</h2>
+      ${funnelRow('Kontaktade', funnel.contacted, funnel.contacted)}
+      ${funnelRow('Svarat med människa', funnel.human_replied, funnel.contacted)}
+      ${funnelRow('Levererat avtal', funnel.delivered, funnel.contacted)}
+    </section>
+
+    <section class="board-section">
+      <h2>Tysta kommuner <span class="count">${silent.length}</span></h2>
+      ${silentList}
+    </section>
+
+    <section class="board-section">
+      <h2>Filer</h2>
+      <p class="muted">${files.avtal} av ${files.total} mottagna filer är faktiska avtal. Resten är bilagor, prislistor, personuppgiftsbiträdesavtal och följebrev.</p>
+      <table>
+        <thead><tr><th>Typ</th><th class="num">Antal</th></tr></thead>
+        <tbody>${files.by_type.map((t) => `<tr>
+          <td>${escapeHtml(t.document_type)}</td><td class="num">${t.n}</td>
+        </tr>`).join('')}</tbody>
+      </table>
+    </section>`;
+
+  return layout({ title: 'Takt', body, currentPath: '/takt', heartbeat, partial, escalationCount });
 }
 
 function activeBadge(periodEnd) {
