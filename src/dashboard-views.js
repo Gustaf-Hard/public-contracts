@@ -2075,7 +2075,7 @@ function renderCaseDetailPane(selected, gmailReady) {
     </div>
     <div class="thread-msgs">${thread}</div>
     ${replyBoxes}
-    ${renderHandoffSuggestions(handoff_targets, conv.id)}
+    ${renderHandoffSuggestions(handoff_targets, conv.id, gmailReady)}
     ${renderCaseActions(conv, gmailReady, returnTo)}
   </div>`;
 }
@@ -2085,15 +2085,17 @@ function renderCaseDetailPane(selected, gmailReady) {
 // written in the mail, and whether it sits on the kommun's own domain. The
 // badges are shown, not enforced — the operator is the gate, and nothing at all
 // is created until they click.
-function renderHandoffSuggestions(targets, convId) {
+function renderHandoffSuggestions(targets, convId, gmailReady = false) {
   if (!targets.length) return '';
   const badge = (ok, yes, no) => ok
     ? `<span class="pill pill-promise">✓ ${yes}</span>`
     : `<span class="pill pill-overdue">⚠ ${no}</span>`;
+  const disabled = gmailReady ? '' : 'disabled';
   return `
     <section class="board-section handoff-suggestions">
       <h2>Föreslagna ärenden <span class="count">${targets.length}</span></h2>
-      <p class="muted">Kommunen hänvisade vidare. Inget skickas förrän du klickar.</p>
+      <p class="muted">Kommunen hänvisade vidare. Inget skickas förrän du klickar.
+        ${gmailReady ? '' : '<span class="send-warning">⚠️ Gmail-token saknas — kör <code>npm run pilot-auth</code></span>'}</p>
       <table>
         <thead><tr><th>Adress</th><th>Förvaltning</th><th>Kontroll</th><th>Roll</th><th></th></tr></thead>
         <tbody>${targets.map((t) => `<tr data-handoff-email="${escapeHtml(t.email)}">
@@ -2104,7 +2106,7 @@ function renderHandoffSuggestions(targets, convId) {
           <td data-state-cell>
             <form method="post" action="/arenden/${convId}/handoff-start" data-row-form>
               <input type="hidden" name="email" value="${escapeHtml(t.email)}">
-              <button type="submit" class="compose-link" title="Starta ärende och skicka T-INITIAL">📨 Skicka</button>
+              <button type="submit" class="compose-link" ${disabled} title="Starta ärende och skicka T-INITIAL">📨 Skicka</button>
             </form>
           </td>
         </tr>`).join('')}</tbody>
