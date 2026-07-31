@@ -133,11 +133,14 @@ Inputs are plain rows so the module is testable offline with fixtures:
 
 ## Page content
 
-1. **Avtal per vecka** — bars (avtal that week) + cumulative line, x-axis
-   labelled by ISO week, empty weeks present. Rendered as inline SVG with an
-   `aria-label` and `<title>`; the same weekly numbers repeat in a compact
-   table underneath, which is both the accessible fallback and the honest
-   "here are the actual figures".
+1. **Avtal per vecka** — **two stacked panels sharing one x-axis**: bars (avtal
+   that week) on top, a cumulative line below. Not one plot with two y-scales:
+   per-week tops out near 23 and cumulative at 91, so a combined chart would be
+   a dual-axis chart, the single worst chart mistake (revised at plan time,
+   2026-07-31; the approved sketch had them overlaid). X-axis labelled by ISO
+   week, empty weeks present. Inline SVG with `aria-label` and `<title>`; the
+   same weekly numbers repeat in a compact table underneath, which is both the
+   accessible fallback and the honest "here are the actual figures".
 2. **Två hastigheter** — first human reply and first contact → first avtal,
    each as `median · spann min–max · n av <funnel.contacted> kontaktade`
    (the denominator is computed, never a literal).
