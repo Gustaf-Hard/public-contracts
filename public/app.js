@@ -85,6 +85,74 @@
       .catch(function () { form.submit(); });
   });
 
+  // Row-scoped actions ([data-row-form], e.g. the overview one-click Skicka):
+  // POST via fetch and refresh ONLY that table row. The overview is ~290 rows,
+  // so a pane swap (let alone a full reload) throws away the operator's scroll
+  // position for every send. Falls back to a normal submit on any error, so a
+  // failure is never mistaken for a success.
+  document.addEventListener('submit', function (e) {
+    var form = e.target.closest && e.target.closest('form[data-row-form]');
+    if (!form) return;
+    var row = form.closest('tr');
+    var kod = row && row.getAttribute('data-kommun-kod');
+    if (!row || !kod) return;   // no row to update — let the plain POST happen
+    e.preventDefault();
+    if (row.classList.contains('row-sending')) return;  // already in flight
+
+    var btn = e.submitter || form.querySelector('button[type="submit"]');
+    row.classList.add('row-sending');
+    if (btn) { btn.disabled = true; btn.textContent = '📨 Skickar…'; }
+
+    var hardSubmit = function () {
+      row.classList.remove('row-sending');
+      if (btn) btn.disabled = false;
+      form.submit();
+    };
+
+    fetch(form.action, { method: 'POST', headers: { 'X-Partial': '1' } })
+      .then(function (res) {
+        if (!res.ok && !res.redirected) { hardSubmit(); return; }
+        return refreshRow(row, kod);
+      })
+      .catch(hardSubmit);
+  });
+
+  // Re-render one overview row from the server, keeping scroll position. The
+  // row markup stays server-rendered — we fetch the current pane and lift out
+  // the matching <tr> rather than duplicating badge markup in the client.
+  function refreshRow(row, kod) {
+    var path = (content() && content().dataset.path) || location.pathname + location.search;
+    var u = new URL(path, location.origin);
+    u.searchParams.set('partial', '1');
+    return fetch(u.toString(), { headers: { 'X-Partial': '1' } })
+      .then(function (res) {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.text();
+      })
+      .then(function (html) {
+        var doc = new DOMParser().parseFromString(html, 'text/html');
+        var fresh = doc.querySelector('tr[data-kommun-kod="' + kod + '"]');
+        if (fresh) {
+          fresh.classList.add('row-sent');
+          row.replaceWith(fresh);
+          return;
+        }
+        // The row no longer matches the active filter (it just left "ej
+        // påbörjade"). Don't yank it out from under the cursor: mark it sent.
+        var cell = row.querySelector('[data-state-cell]');
+        if (cell) cell.innerHTML = '<span class="badge">Skickat</span>';
+        row.classList.remove('row-sending');
+        row.classList.add('row-sent');
+      })
+      .catch(function () {
+        // The send itself succeeded; only the refresh failed. Say so honestly
+        // rather than leaving a spinner or implying the send failed.
+        var cell = row.querySelector('[data-state-cell]');
+        if (cell) cell.innerHTML = '<span class="badge">Skickat</span>';
+        row.classList.remove('row-sending');
+      });
+  }
+
   // Collapse/expand: a [data-collapse] toggles the sibling [data-collapse-target].
   document.addEventListener('click', function (e) {
     var t = e.target.closest && e.target.closest('[data-collapse]');

@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import * as gmailMod from '../src/gmail.js';
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
@@ -274,6 +275,25 @@ async function getRaw(app, path) {
       fetch(`http://127.0.0.1:${port}${path}`).then(async (r) => {
         const text = await r.text();
         server.close(() => resolve({ status: r.status, text, headers: r.headers }));
+      }).catch((e) => server.close(() => reject(e)));
+    });
+  });
+}
+
+// Like postForm(), but with the X-Partial header app.js sends — the route must
+// then answer 204 rather than redirecting to the whole overview.
+async function postFormPartial(app, path, fields) {
+  return new Promise((resolve, reject) => {
+    const server = app.listen(0, () => {
+      const port = server.address().port;
+      fetch(`http://127.0.0.1:${port}${path}`, {
+        method: 'POST',
+        redirect: 'manual',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Partial': '1' },
+        body: new URLSearchParams(fields).toString(),
+      }).then(async (r) => {
+        const text = await r.text();
+        server.close(() => resolve({ status: r.status, text, location: r.headers.get('location') }));
       }).catch((e) => server.close(() => reject(e)));
     });
   });
@@ -944,5 +964,44 @@ describe('overview one-click send (quick-init)', () => {
   it('shows the state pills (no send form) once a kommun is contacted', () => {
     const html = renderOverview(baseArgs([{ role: 'central', state: 'SENT', tooltip: '' }]));
     expect(html).not.toContain('/kommun/1489/quick-init');
+  });
+
+  // The endpoint answers the two callers differently: a scriptless form POST
+  // needs the redirect, a fetch from app.js needs no body at all (it re-renders
+  // one row itself). Sending the full overview HTML to a client that discards
+  // it is what made the page reload.
+  const appWithGmail = () => createDashboardApp({
+    db,
+    municipalitiesLoader: () => [{ kommun_kod: '1489', kommun_namn: 'Alingsås', lan: 'X', folkmangd: 1, contacts: [{ role: 'central', email: 'kommun@alingsas.se' }] }],
+    gmailClient: { gmail: {} },
+    env: { GMAIL_USER_EMAIL: 'me@x.se', GMAIL_FROM_NAME: 'Test Sender' },
+  });
+
+  it('answers a fetch send with 204 and no body, and still redirects a plain form POST', async () => {
+    const spy = vi.spyOn(gmailMod, 'sendMessage').mockResolvedValue({ id: 'm1', threadId: 't1' });
+    try {
+      const ajax = await postFormPartial(appWithGmail(), '/kommun/1489/quick-init', {});
+      expect(ajax.status).toBe(204);
+      expect(ajax.text).toBe('');
+      expect(db.raw.prepare('SELECT state FROM conversations WHERE kommun_kod = ?').get('1489').state).toBe('SENT');
+
+      // Second, scriptless POST: the conversation now exists, which the route
+      // treats as a benign no-op — and must answer with the redirect, not 204.
+      const plain = await postForm(appWithGmail(), '/kommun/1489/quick-init', {});
+      expect(plain.status).toBe(302);
+      expect(plain.location).toBe('/');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('makes the row and its state cell addressable so a send can swap in place', () => {
+    // app.js re-renders ONLY this row after a one-click send; without these
+    // hooks it would have to reload the whole 290-row list and lose the
+    // operator's scroll position.
+    const html = renderOverview(baseArgs([]));
+    expect(html).toContain('data-kommun-kod="1489"');
+    expect(html).toContain('data-state-cell');
+    expect(html).toMatch(/<form[^>]*data-row-form/);
   });
 });

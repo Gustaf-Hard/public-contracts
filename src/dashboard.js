@@ -1288,6 +1288,12 @@ export function createDashboardApp({
     const contact = (kommun.contacts ?? [])[0];
     if (!contact || !contact.email) return res.status(400).send('Kommunen saknar kontaktadress');
 
+    // A fetch from app.js refreshes just the one table row, so there is nothing
+    // for it to do with a redirect to the full overview. Answer 204 and let the
+    // client re-render in place; a scriptless POST still gets the redirect.
+    const wantsNoBody = req.get('X-Partial') === '1';
+    const done = () => (wantsNoBody ? res.status(204).end() : res.redirect('/'));
+
     const { subject, body } = renderInitialDraft({ kommun_namn: kommun.kommun_namn, role: contact.role, env });
     try {
       await sendInitial({
@@ -1303,11 +1309,11 @@ export function createDashboardApp({
       // Lost claim (a tick sent first) or an already-existing conversation are
       // both benign no-ops — nothing double-sent; go back to the list either way.
       if (e.code === 'INITIAL_CLAIM_LOST' || /already exists/i.test(e.message)) {
-        return res.redirect('/');
+        return done();
       }
       return res.status(500).send(`Send failed: ${escapeForError(e.message)}`);
     }
-    res.redirect('/');
+    done();
   });
 
   return app;

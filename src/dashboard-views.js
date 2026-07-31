@@ -574,6 +574,12 @@ const baseCss = `
   .vendor-item .vi-name { font-weight: 600; font-size: 14px; }
   .chip-row { display: flex; flex-wrap: wrap; gap: 4px; }
   .quick-init { display: inline; } .quick-init-edit { margin-left: 6px; text-decoration: none; }
+  /* One-click send, in flight: the row dims and the button stops accepting
+     clicks, so a slow Gmail call cannot be double-submitted. */
+  tr.row-sending { opacity: .55; }
+  tr.row-sending .quick-init button { cursor: progress; }
+  tr.row-sent { animation: rowSent 1.2s ease-out; }
+  @keyframes rowSent { from { background: var(--ok-bg, #16a34a22); } to { background: transparent; } }
   .tag-more { background: transparent; border-style: dashed; }
   /* Gmail-style inbox rows (Ärenden list) */
   .mail-row { display: grid; grid-template-columns: 10px minmax(110px, 150px) 1fr auto; align-items: center; gap: 10px;
@@ -956,7 +962,10 @@ export function renderOverview({ summary, rows, filter, sort, order, totalKommun
     : rows
         .map((r) => {
           const stateCell = r.states.length === 0
-            ? `<form method="post" action="/kommun/${escapeHtml(r.kommun_kod)}/quick-init" class="quick-init">
+            // data-row-form: the client sends this without reloading the page and
+            // swaps just this row (app.js). Without the script it stays a plain
+            // POST + redirect.
+            ? `<form method="post" action="/kommun/${escapeHtml(r.kommun_kod)}/quick-init" class="quick-init" data-row-form>
                  <button type="submit" class="compose-link" title="Skicka T-INITIAL till första kontakten">📨 Skicka</button>
                </form>
                <a class="muted quick-init-edit" href="/kommun/${escapeHtml(r.kommun_kod)}/compose" title="Redigera innan du skickar">✎</a>`
@@ -973,11 +982,13 @@ export function renderOverview({ summary, rows, filter, sort, order, totalKommun
             ? `<span title="${escapeHtml(r.last_activity_at)}">${escapeHtml(fmtAgo(r.last_activity_at))}</span>`
             : '<span class="muted">—</span>';
           const followUpCell = fmtFollowUpBadge(r.follow_up_at, r.follow_up_source) ?? '<span class="muted">—</span>';
-          return `<tr>
+          // data-kommun-kod makes the row addressable so a one-click send can be
+          // swapped in place instead of reloading the whole list.
+          return `<tr data-kommun-kod="${escapeHtml(r.kommun_kod)}">
             <td><a class="kommun-link" href="/kommun/${escapeHtml(r.kommun_kod)}">${escapeHtml(r.kommun_namn)}</a> <span class="muted">${escapeHtml(r.kommun_kod)}</span></td>
             <td>${escapeHtml(r.lan ?? '')}</td>
             <td class="num">${fmtInt(r.folkmangd)}</td>
-            <td>${stateCell}</td>
+            <td data-state-cell>${stateCell}</td>
             <td class="num">${r.contracts > 0 ? `<a href="/kommun/${escapeHtml(r.kommun_kod)}">${r.contracts}</a>` : '<span class="muted">0</span>'}</td>
             <td class="num">${escalCell}</td>
             <td>${followUpCell}</td>
