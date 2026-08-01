@@ -1140,6 +1140,31 @@ describe('handoff suggested ärenden', () => {
     } finally { spy.mockRestore(); }
   });
 
+  it('marks an address that already has an ärende and refuses to send it again', async () => {
+    // The invariant is per-kommun, not per-role: once info@educ.goteborg.se has
+    // been contacted, a second click must not mail it again. Role de-dup would
+    // otherwise slide the retry to 'utbildning-2', which sendInitial's
+    // kommun+role guard does not catch.
+    const convId = seedHandoff();
+    const spy = vi.spyOn(gmailMod, 'sendMessage').mockResolvedValue({ id: 'm9', threadId: 't9' });
+    try {
+      const app = appGmail();
+      await postForm(app, `/arenden/${convId}/handoff-start`, { email: 'info@educ.goteborg.se' });
+      expect(spy).toHaveBeenCalledTimes(1);
+
+      // The panel now shows it as started rather than offering it again.
+      const page = await get(appG(), `/arenden/${convId}`);
+      expect(page.text).toMatch(/Startat/);
+      expect(page.text).not.toContain('utbildning-2');
+
+      // And a second POST is a no-op, not a second mail.
+      const again = await postForm(app, `/arenden/${convId}/handoff-start`, { email: 'info@educ.goteborg.se' });
+      expect(again.status).toBe(302);
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(db.raw.prepare("SELECT count(*) n FROM conversations WHERE contact_email = 'info@educ.goteborg.se'").get().n).toBe(1);
+    } finally { spy.mockRestore(); }
+  });
+
   it('refuses an address that is not among the extracted targets', async () => {
     const convId = seedHandoff();
     const spy = vi.spyOn(gmailMod, 'sendMessage').mockResolvedValue({ id: 'm9', threadId: 't9' });

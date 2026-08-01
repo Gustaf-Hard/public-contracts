@@ -2102,13 +2102,13 @@ function renderHandoffSuggestions(targets, convId, gmailReady = false) {
           <td>${escapeHtml(t.email)}</td>
           <td>${escapeHtml(t.forvaltning)}</td>
           <td>${badge(t.verbatim, 'står i mejlet', 'hittades inte i mejlet')} ${badge(t.sameDomain, 'kommunens domän', 'annan domän')}</td>
-          <td class="muted">${escapeHtml(t.roleSlug)}</td>
-          <td data-state-cell>
-            <form method="post" action="/arenden/${convId}/handoff-start" data-row-form>
+          <td class="muted">${t.started_conv_id ? '' : escapeHtml(t.roleSlug)}</td>
+          <td data-state-cell>${t.started_conv_id
+            ? `<a href="/arenden/${t.started_conv_id}" data-pane-link>✓ Startat · Ärende #${t.started_conv_id}</a>`
+            : `<form method="post" action="/arenden/${convId}/handoff-start">
               <input type="hidden" name="email" value="${escapeHtml(t.email)}">
               <button type="submit" class="compose-link" ${disabled} title="Starta ärende och skicka T-INITIAL">📨 Skicka</button>
-            </form>
-          </td>
+            </form>`}</td>
         </tr>`).join('')}</tbody>
       </table>
     </section>`;

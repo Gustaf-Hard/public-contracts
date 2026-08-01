@@ -523,14 +523,20 @@ function loadCaseDetail(db, convId, kommunFor = () => null) {
     try { return JSON.parse(m.analysis_json)?.intent === 'handoff'; } catch { return false; }
   });
   if (lastHandoff) {
-    const usedRoles = db.raw.prepare('SELECT role FROM conversations WHERE kommun_kod = ?')
-      .all(conv.kommun_kod).map((r) => r.role);
+    const siblings = db.raw
+      .prepare('SELECT id, role, contact_email FROM conversations WHERE kommun_kod = ?')
+      .all(conv.kommun_kod);
+    // Which addresses have already been contacted. The double-message guard is
+    // per KOMMUN ADDRESS, not per role: role de-dup would slide a repeat click
+    // to 'utbildning-2', which sendInitial's kommun+role check does not catch.
+    const startedByEmail = new Map(
+      siblings.filter((s) => s.contact_email).map((s) => [s.contact_email.toLowerCase(), s.id]));
     handoff_targets = parseHandoffTargets({
       analysis: JSON.parse(lastHandoff.analysis_json),
       bodyText: lastHandoff.body_text ?? '',
       homeDomain: homeDomainFromWebbplats(kommunFor(conv.kommun_kod)?.webbplats),
-      usedRoles,
-    });
+      usedRoles: siblings.map((s) => s.role),
+    }).map((t) => ({ ...t, started_conv_id: startedByEmail.get(t.email) ?? null }));
   }
 
   return { conv, messages, attachmentsByMsg, signatures, escalations, threads, handoff_targets, follow_up: effectiveFollowUp(conv) };
@@ -1385,6 +1391,11 @@ export function createDashboardApp({
     const { conv } = detail;
     const wantsNoBody = req.get('X-Partial') === '1';
     const done = () => (wantsNoBody ? res.status(204).end() : res.redirect(`/arenden/${convId}`));
+
+    // Already contacted — a repeat click (or a double submit) must not mail the
+    // same address twice. Idempotent no-op, not an error: the panel will render
+    // it as started.
+    if (target.started_conv_id) return done();
 
     const { subject, body } = renderInitialDraft({ kommun_namn: conv.kommun_namn, role: target.roleSlug, env });
     try {
