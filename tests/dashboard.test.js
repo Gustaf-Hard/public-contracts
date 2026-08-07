@@ -1078,6 +1078,35 @@ describe('overview one-click send (quick-init)', () => {
   });
 });
 
+describe('Gmail re-auth entry point', () => {
+  // On the box GMAIL_OAUTH_REDIRECT_URI is the CloudFront URL, which has no
+  // port: beginReauth's `port || '80'` fallback then tries to bind privileged
+  // port 80 as a non-root service and dies with EACCES. The callback could
+  // never reach a local listener anyway (CloudFront forwards to the dashboard
+  // origin), and /auth/callback is the sign-in callback — which already
+  // persists the Gmail refresh token. So re-auth there IS sign-in.
+  const hosted = {
+    GMAIL_OAUTH_CLIENT_ID: 'c.apps.googleusercontent.com',
+    GMAIL_OAUTH_CLIENT_SECRET: 's',
+    GMAIL_OAUTH_REDIRECT_URI: 'https://d1.cloudfront.net/auth/callback',
+  };
+  const local = { ...hosted, GMAIL_OAUTH_REDIRECT_URI: 'http://127.0.0.1:49999/oauth2callback' };
+
+  it('sends the operator through sign-in when there is no local port to listen on', async () => {
+    const res = await postForm(createDashboardApp({ db, env: hosted }), '/auth/gmail/start', {});
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.text)).toMatchObject({ consentUrl: '/auth/login', viaSignIn: true });
+  });
+
+  it('still runs the local listener flow when the redirect URI is loopback', async () => {
+    const res = await postForm(createDashboardApp({ db, env: local }), '/auth/gmail/start', {});
+    expect(res.status).toBe(200);
+    const body = JSON.parse(res.text);
+    expect(body.viaSignIn).toBeFalsy();
+    expect(body.consentUrl).toMatch(/^https:\/\/accounts\.google\.com/);
+  });
+});
+
 describe('handoff suggested ärenden', () => {
   const GBG_ANALYSIS = JSON.stringify({
     intent: 'handoff', confidence: 0.88,

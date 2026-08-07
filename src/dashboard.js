@@ -921,7 +921,21 @@ export function createDashboardApp({
   // Start in-app Gmail re-auth: returns the Google consent URL for the client
   // to open. The OAuth callback is handled by the listener beginReauth() spins
   // up on the dedicated redirect port; success/failure surfaces via /status.
+  //
+  // That listener only works when the redirect URI is a loopback address with
+  // an explicit port (the laptop `pilot-auth` shape). Deployed behind
+  // CloudFront the redirect URI is an https URL with no port, so the `port ||
+  // '80'` fallback tries to bind a privileged port and dies with EACCES — and
+  // the callback would never reach a local listener anyway, since CloudFront
+  // forwards it to the dashboard origin. There, /auth/login IS the re-auth: it
+  // requests the Gmail scopes with access_type=offline + prompt=consent and its
+  // callback persists the refresh token to the same TOKEN_PATH the daemon sends
+  // with ("logged in ⇒ can send").
   app.post('/auth/gmail/start', (req, res) => {
+    if (!canSelfHostOAuthCallback(env)) {
+      reauth = null;
+      return res.json({ consentUrl: '/auth/login', viaSignIn: true });
+    }
     try {
       if (!reauth || reauth.status !== 'pending') {
         const { consentUrl, done } = beginReauth({ env, tokenPath: TOKEN_PATH });
@@ -1418,6 +1432,21 @@ export function createDashboardApp({
   });
 
   return app;
+}
+
+// Can beginReauth's own HTTP listener actually receive the OAuth callback?
+// Only for a loopback redirect URI with an explicit (unprivileged) port. Any
+// other shape — notably the CloudFront https URL used in the deployment — means
+// the callback arrives at the dashboard instead, so re-auth goes through
+// /auth/login.
+function canSelfHostOAuthCallback(env) {
+  try {
+    const u = new URL(env.GMAIL_OAUTH_REDIRECT_URI ?? '');
+    const loopback = u.hostname === 'localhost' || u.hostname === '127.0.0.1' || u.hostname === '[::1]';
+    return loopback && Boolean(u.port);
+  } catch {
+    return false;
+  }
 }
 
 function escapeForError(s) {

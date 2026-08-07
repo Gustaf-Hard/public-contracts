@@ -238,6 +238,11 @@
       .then(function (r) { return r.json(); })
       .then(function (data) {
         if (!data.consentUrl) throw new Error(data.error || 'Kunde inte starta');
+        // Deployed, re-auth is the ordinary sign-in round-trip: navigate in
+        // this tab so the session cookie and the redirect back to / both land
+        // where the operator is looking. No status to poll — arriving back on
+        // the dashboard signed in IS the success signal.
+        if (data.viaSignIn) { window.location.href = data.consentUrl; return; }
         window.open(data.consentUrl, '_blank', 'noopener');
         if (status) {
           status.innerHTML = 'Väntar på Google-inloggning… om fliken inte öppnades: ' +
