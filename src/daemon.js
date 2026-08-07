@@ -2,7 +2,7 @@ import express from 'express';
 import cron from 'node-cron';
 import { runTick, runDailyFollowup, runRefreshScan } from './tick.js';
 import { openDb } from './storage.js';
-import { buildOAuthClient, loadStoredToken, saveToken, makeGmail, sendMessage as gmailSend, listInboundQuery, getMessage as gmailGet, fetchAttachment } from './gmail.js';
+import { buildOAuthClient, loadStoredToken, saveToken, makeGmail, makeReloadingClient, sendMessage as gmailSend, listInboundQuery, getMessage as gmailGet, fetchAttachment } from './gmail.js';
 // gmailSend stays imported because runTick's gmailOps below uses it.
 import { makeSlackClient, verifySlackSignature, parseInteractivityPayload, postEscalation, postAlert, openEditModal, updateEscalationResolved } from './slack.js';
 import { loadOverrides, getEffectiveNow, resolveVacation } from './pilot-config.js';
@@ -170,6 +170,24 @@ export async function startDaemon({ env = process.env, log = console.log } = {})
       log(`failed to persist refreshed Gmail tokens: ${e.message}`);
     }
   });
+  // Pick up a token rewritten by a dashboard sign-in without a restart: the
+  // credentials are swapped on the SAME oauth client, so the 'tokens' listener
+  // above stays attached and `gmail` keeps working.
+  const currentToken = makeReloadingClient({
+    tokenPath: TOKEN_PATH,
+    build: () => loadStoredToken(TOKEN_PATH),
+  });
+  // Priming records the token already on the client, so an unchanged file
+  // returns the identical cached object and no credentials are re-applied.
+  let applied = currentToken();
+  const reloadTokenIfChanged = () => {
+    const fresh = currentToken();
+    if (!fresh || fresh === applied) return;
+    applied = fresh;
+    oauth.setCredentials(fresh);
+    log('Gmail token file changed — reloaded credentials');
+  };
+
   const gmail = makeGmail(oauth);
   const slack = makeSlackClient(env.SLACK_BOT_TOKEN);
   const db = openDb(DB_PATH);
@@ -204,6 +222,7 @@ export async function startDaemon({ env = process.env, log = console.log } = {})
   const escalationMutex = makeMutex();
 
   const tickOnce = makeExclusive(async () => {
+    reloadTokenIfChanged();
     const now = getEffectiveNow({ env, overrides });
     let err = null;
     try {

@@ -1,5 +1,5 @@
 import { google } from 'googleapis';
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, statSync } from 'node:fs';
 import { dirname } from 'node:path';
 
 export const parseBase64Url = {
@@ -211,6 +211,30 @@ export function saveToken(path, tokens) {
 
 export function makeGmail(authClient) {
   return google.gmail({ version: 'v1', auth: authClient });
+}
+
+// Re-read the token file when it changes on disk.
+//
+// The daemon and the dashboard each build their OAuth client once at startup
+// and hold it for the process lifetime. Signing in rewrites the token file —
+// but a long-running process kept using the old, dead refresh token until it
+// was restarted, which defeats the point of in-app re-auth: recovering an
+// expired token WITHOUT shell access to the box. `build` is called again
+// whenever the file's mtime changes (and once when it first appears); a
+// missing file yields null, so "no token" stays distinguishable from "token
+// present but broken".
+export function makeReloadingClient({ tokenPath, build, statImpl = statSync }) {
+  let cached = null;
+  let stamp;                       // `undefined` until the first probe
+  return function current() {
+    let mtime = null;
+    try { mtime = statImpl(tokenPath).mtimeMs; } catch { mtime = null; }
+    if (mtime !== stamp) {
+      stamp = mtime;
+      cached = mtime === null ? null : build();
+    }
+    return cached;
+  };
 }
 
 export async function sendMessage(gmail, opts) {

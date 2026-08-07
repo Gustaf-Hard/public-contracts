@@ -10,7 +10,7 @@ import { openDb } from './storage.js';
 import { buildVelocityFacts } from './collection-velocity.js';
 import { effectiveFollowUp, TERMINAL_STATES } from './conversation.js';
 import { resolveVacationConfig, isInVacation } from './vacation.js';
-import { buildOAuthClient, loadStoredToken, saveToken, makeGmail } from './gmail.js';
+import { buildOAuthClient, loadStoredToken, saveToken, makeGmail, makeReloadingClient } from './gmail.js';
 import { beginReauth } from './gmail-auth.js';
 import { requireAuth, requireOriginToken, mountAuthRoutes } from './web-auth.js';
 import { sendApprovedReply, sendInitial, renderInitialDraft } from './send-reply.js';
@@ -580,7 +580,7 @@ export { buildOverviewRows, applyFilter };
 export function createDashboardApp({
   db = openDbOrNull(),
   municipalitiesLoader = loadMunicipalities,
-  gmailClient = loadGmail(process.env),
+  gmailClient = null,
   env = process.env,
   contractsDir = process.env.PILOT_CONTRACTS_DIR ?? 'data/contracts',
   slackClient = process.env.SLACK_BOT_TOKEN ? makeSlackClient(process.env.SLACK_BOT_TOKEN) : null,
@@ -588,6 +588,12 @@ export function createDashboardApp({
   authDeps = {},
 } = {}) {
   const app = express();
+  // An injected client (tests) is used as-is. Otherwise the client is rebuilt
+  // whenever the token file changes, so signing in again takes effect on the
+  // next request instead of at the next process restart.
+  const currentGmail = gmailClient
+    ? () => gmailClient
+    : makeReloadingClient({ tokenPath: TOKEN_PATH, build: () => loadGmail(env) });
   // Edge/auth chain (inert on loopback): reject anything not arriving through
   // CloudFront (ORIGIN_TOKEN), then gate every request behind Google Sign-In
   // for the single operator (AUTH_ENABLED). Both are no-ops until their env
@@ -770,7 +776,7 @@ export function createDashboardApp({
       followUpByConv,
       threadsByConv,
       initialDrafts,
-      gmailReady: !!gmailClient,
+      gmailReady: !!currentGmail(),
       vendorSlugsByName,
       resellerRelationsByVendor,
       handoffContacts,
@@ -827,7 +833,7 @@ export function createDashboardApp({
 
     res.send(renderThread({
       kommun, conv, thread, messages, attachmentsByMsg, signatures, escalations,
-      gmailReady: !!gmailClient,
+      gmailReady: !!currentGmail(),
       heartbeat: hb(), partial: isPartial(req), escalationCount: escCount(),
     }));
   });
@@ -876,7 +882,7 @@ export function createDashboardApp({
       availableRoles,
       selectedRole,
       candidateEmails,
-      gmailReady: !!gmailClient,
+      gmailReady: !!currentGmail(),
       env,
       heartbeat: hb(), partial: isPartial(req), escalationCount: escCount(),
     }));
@@ -889,7 +895,7 @@ export function createDashboardApp({
     res.send(renderArenden({
       cases: loadCaseSummaries(db),
       selected: null,
-      gmailReady: !!gmailClient,
+      gmailReady: !!currentGmail(),
       heartbeat: hb(), partial: isPartial(req), escalationCount: escCount(),
     }));
   });
@@ -902,12 +908,12 @@ export function createDashboardApp({
     res.set('Content-Type', 'text/html; charset=utf-8');
     if (!detail) {
       return res.status(404).send(renderArenden({
-        cases, selected: null, gmailReady: !!gmailClient,
+        cases, selected: null, gmailReady: !!currentGmail(),
         heartbeat: hb(), partial: isPartial(req), escalationCount: escCount(),
       }));
     }
     res.send(renderArenden({
-      cases, selected: detail, selectedId: detail.conv.id, gmailReady: !!gmailClient,
+      cases, selected: detail, selectedId: detail.conv.id, gmailReady: !!currentGmail(),
       heartbeat: hb(), partial: isPartial(req), escalationCount: escCount(),
     }));
   });
@@ -1214,7 +1220,8 @@ export function createDashboardApp({
       return res.status(400).send(`Unknown action: ${action}`);
     }
 
-    if (!gmailClient) return res.status(503).send('Gmail not configured — run pilot-auth first.');
+    const gmail = currentGmail();
+    if (!gmail) return res.status(503).send('Gmail not configured — run pilot-auth first.');
 
     const finalBody = (action === 'edit' ? req.body.body : esc.draft_body) ?? '';
     const finalSubject = (action === 'edit' ? req.body.subject : esc.draft_subject) ?? undefined;
@@ -1222,7 +1229,7 @@ export function createDashboardApp({
 
     try {
       await sendApprovedReply({
-        db, gmail: gmailClient, env, conv, esc,
+        db, gmail, env, conv, esc,
         // A bounce resend form posts the corrected recipient as `finalTo`; the
         // normal reply form posts it as `to`.
         finalBody, finalSubject, finalTo: req.body.finalTo ?? req.body.to,
@@ -1310,7 +1317,8 @@ export function createDashboardApp({
   // POST /kommun/:kod/init  with body { role, contact_email, subject, body }
   app.post('/kommun/:kod/init', async (req, res) => {
     if (!db) return res.status(503).send('No DB');
-    if (!gmailClient) return res.status(503).send('Gmail not configured — run pilot-auth first.');
+    const gmail = currentGmail();
+    if (!gmail) return res.status(503).send('Gmail not configured — run pilot-auth first.');
 
     const municipalities = municipalitiesLoader();
     const kommun = municipalities.find((m) => m.kommun_kod === req.params.kod);
@@ -1323,7 +1331,7 @@ export function createDashboardApp({
 
     try {
       await sendInitial({
-        db, gmail: gmailClient, env,
+        db, gmail, env,
         kommun_kod: kommun.kommun_kod,
         kommun_namn: kommun.kommun_namn,
         role,
@@ -1349,7 +1357,8 @@ export function createDashboardApp({
   // only renders for kommuner with no conversation yet.
   app.post('/kommun/:kod/quick-init', async (req, res) => {
     if (!db) return res.status(503).send('No DB');
-    if (!gmailClient) return res.status(503).send('Gmail not configured — run pilot-auth first.');
+    const gmail = currentGmail();
+    if (!gmail) return res.status(503).send('Gmail not configured — run pilot-auth first.');
 
     const municipalities = municipalitiesLoader();
     const kommun = municipalities.find((m) => m.kommun_kod === req.params.kod);
@@ -1367,7 +1376,7 @@ export function createDashboardApp({
     const { subject, body } = renderInitialDraft({ kommun_namn: kommun.kommun_namn, role: contact.role, env });
     try {
       await sendInitial({
-        db, gmail: gmailClient, env,
+        db, gmail, env,
         kommun_kod: kommun.kommun_kod,
         kommun_namn: kommun.kommun_namn,
         role: contact.role,
@@ -1393,7 +1402,8 @@ export function createDashboardApp({
   // target too, never from the body. Sending goes through sendInitial, unchanged.
   app.post('/arenden/:id/handoff-start', async (req, res) => {
     if (!db) return res.status(503).send('No DB');
-    if (!gmailClient) return res.status(503).send('Gmail not configured — run pilot-auth first.');
+    const gmail = currentGmail();
+    if (!gmail) return res.status(503).send('Gmail not configured — run pilot-auth first.');
 
     const convId = parseInt(req.params.id, 10);
     const detail = loadCaseDetail(db, convId, kommunByKod);
@@ -1414,7 +1424,7 @@ export function createDashboardApp({
     const { subject, body } = renderInitialDraft({ kommun_namn: conv.kommun_namn, role: target.roleSlug, env });
     try {
       await sendInitial({
-        db, gmail: gmailClient, env,
+        db, gmail, env,
         kommun_kod: conv.kommun_kod,
         kommun_namn: conv.kommun_namn,
         role: target.roleSlug,
