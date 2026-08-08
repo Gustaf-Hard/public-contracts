@@ -1204,3 +1204,20 @@ describe('handoff suggested ärenden', () => {
     } finally { spy.mockRestore(); }
   });
 });
+
+describe('stale-page protection', () => {
+  it('marks every response no-store so a browser cannot show a healed outage as ongoing', async () => {
+    // The health modal is server-rendered once per page load. A cached copy kept
+    // telling the operator mail was not being processed hours after it was.
+    const res = await getRaw(appWithFakes(), '/');
+    expect(res.headers.get('cache-control')).toMatch(/no-store/);
+  });
+
+  it('exposes health so the client can poll the modal away', async () => {
+    db.recordHeartbeat({ kind: 'tick' });        // a clean tick just happened
+    const res = await getRaw(appWithFakes(), '/api/health');
+    const h = JSON.parse(res.text);
+    expect(h.stale).toBe(false);
+    expect(h.last_error).toBeNull();
+  });
+});

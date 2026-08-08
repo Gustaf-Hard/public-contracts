@@ -600,6 +600,15 @@ export function createDashboardApp({
   // vars are set, so local dev + the test-suite are untouched. See
   // docs/superpowers/specs/2026-07-28-aws-deployment-design.md §3.
   app.set('trust proxy', true);
+  // Never let a page be reused from cache. Every response is per-operator and
+  // states live pipeline status, so a browser-cached copy can assert something
+  // false — a stale "mail is not being processed" warning outlives the outage it
+  // described. CloudFront already runs Managed-CachingDisabled; this closes the
+  // browser side. Static assets under /public keep their own handling below.
+  app.use((req, res, next) => {
+    res.set('Cache-Control', 'no-store, must-revalidate');
+    next();
+  });
   app.use(requireOriginToken({ env }));
   // Best-effort chat.update so dashboard resolutions also strip the Slack
   // message's live buttons. The atomic DB claim is the real double-send guard.

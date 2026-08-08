@@ -289,5 +289,23 @@
         if (badge) badge.textContent = String(data.count);
       })
       .catch(function () {});
+    // The health modal is server-rendered once, so a tab left open across a
+    // recovery kept warning that mail was not being processed long after it
+    // was — the operator's only signal said the opposite of the truth. Poll it
+    // down: once the pipeline reports healthy, take the modal away and heal the
+    // heartbeat pill in place.
+    fetch('/api/health', { headers: { 'X-Partial': '1' } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (h) {
+        if (!h || h.stale) return;
+        var modal = document.querySelector('[data-health-modal]');
+        if (modal) modal.remove();
+        var pill = document.querySelector('.heartbeat');
+        if (pill && pill.classList.contains('heartbeat-off')) {
+          pill.classList.replace('heartbeat-off', 'heartbeat-live');
+          pill.textContent = '🟢 daemon · nyss';
+        }
+      })
+      .catch(function () {});
   }, 30000);
 })();
