@@ -88,6 +88,8 @@ puts ORIGIN_TOKEN             "$ORIGIN_TOKEN"      # SAME value as the stack par
 
 put  GMAIL_USER_EMAIL         "gustaf@binogi.com" # the ONLY allowed operator
 put  GMAIL_FROM_NAME          "Gustaf ..."
+put  BILLING_ENTITY           "Mediagraf i Stockholm AB"  # exact legal name, never abbreviated
+put  BILLING_ORG_NR           "556884-7924"               # only used when a kommun demands a fee
 put  GMAIL_LABEL_PREFIX       "..."
 put  ANTHROPIC_ANALYSIS_MODEL "claude-haiku-4-5-20251001"
 put  SLACK_CHANNEL_ID         "C..."
