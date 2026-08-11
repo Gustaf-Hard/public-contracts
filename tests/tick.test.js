@@ -1033,3 +1033,65 @@ describe('a kommun reply voids the pending draft', () => {
     expect(db.raw.prepare('SELECT status FROM escalations WHERE id = ?').get(escId).status).toBe('open');
   });
 });
+
+describe('runTick — final checklist', () => {
+  function seedDelivering() {
+    const id = db.createConversation({
+      kommun_kod: '88', kommun_namn: 'Slutkommun', role: 'central',
+      contact_email: 'kommun@slut.se', scheduled_send_at: '2026-05-01T00:00:00Z',
+    });
+    db.updateConversationState(id, 'DELIVERING', {
+      gmail_thread_id: 'thr-s', last_outbound_at: '2026-05-01T00:00:00Z', receipt_sent: 1,
+    });
+    return id;
+  }
+  const closer = () => vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue({
+    intent: 'delivery', confidence: 0.95, summary: 'Detta var samtliga avtal.',
+    suggested_action: 'acknowledge', is_final_delivery: true,
+    draft_reply: 'Tack!', follow_up_at: null, extracted: {},
+  });
+  const msg = {
+    listResult: [{ id: 'in-s' }],
+    getResult: { 'in-s': mkMsg('in-s', 'thr-s', 'Kommun <kommun@slut.se>', 'Det var samtliga avtal.', 'Sv') },
+  };
+
+  it('drafts the checklist and moves to CROSSCHECK when contracts are on file', async () => {
+    const id = seedDelivering();
+    // One extracted contract: ILT via Polyglutt, so the checklist must skip it.
+    const analyseContracts = async ({ db: d, onlyMessageId }) => {
+      for (const a of d.raw.prepare('SELECT id FROM attachments WHERE message_id = ?').all(onlyMessageId)) {
+        storeContractAnalysis(d, a.id, { is_contract: true, document_type: 'avtal', vendor_name: 'ILT Education',
+          products: ['Polyglutt'], avtalsvarde: null, valuta: null, period_start: null, period_end: null,
+          summary: 'a', confidence: 0.9, mentioned_agreements: [] }, { model: 'test' });
+      }
+      return 1;
+    };
+    // Give the closing message an attachment so a contract exists on it.
+    const withAtt = JSON.parse(JSON.stringify(msg));
+    withAtt.getResult['in-s'].payload = { mimeType: 'multipart/mixed', headers: withAtt.getResult['in-s'].payload.headers,
+      parts: [{ mimeType: 'text/plain', body: { data: b64('Det var samtliga avtal.') } },
+              { mimeType: 'application/pdf', filename: 'Avtal.pdf', body: { attachmentId: 'att-s', size: 10 } }] };
+
+    const spy = closer();
+    await runTick(makeDeps({ gmail: fakeGmail(withAtt), analyseContracts }));
+    spy.mockRestore();
+
+    expect(db.getConversation(id).state).toBe('CROSSCHECK');
+    const esc = db.listOpenEscalationsForConversation(id)[0];
+    expect(esc.draft_template).toBe('T_CROSSCHECK');
+    expect(esc.draft_body).toContain('- Binogi');
+    expect(esc.draft_body).not.toContain('Inläsningstjänst');   // already received
+  });
+
+  it('does not read a checklist to a kommun with nothing extracted', async () => {
+    // No contracts on file means the list would be the whole category — that is
+    // the original request over again, not a closing check.
+    const id = seedDelivering();
+    const spy = closer();
+    await runTick(makeDeps({ gmail: fakeGmail(msg) }));
+    spy.mockRestore();
+
+    expect(db.getConversation(id).state).toBe('CROSSCHECK');   // state still advances
+    expect(db.listOpenEscalationsForConversation(id)).toHaveLength(0);  // but no draft
+  });
+});

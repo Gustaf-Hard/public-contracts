@@ -145,6 +145,7 @@ const CASE_STATUS = {
   ACK_RECEIVED:       { label: 'Öppet · bekräftat',   color: '#6366f1', terminal: false },
   AWAITING_PRECISION: { label: 'Öppet · väntar precisering', color: '#a855f7', terminal: false },
   DELIVERING:         { label: 'Öppet · tar emot avtal', color: '#10b981', terminal: false },
+  CROSSCHECK:         { label: 'Slutkoll · väntar bekräftelse', color: '#14b8a6', terminal: false },
   DONE:               { label: '✅ Stängt — klart',    color: '#22c55e', terminal: true  },
   REFRESH_DUE:        { label: '🔄 Uppdatering — väntar godkännande', color: '#0ea5e9', terminal: false },
   DEAD_END:           { label: '🚫 Återvändsgränd',    color: '#9ca3af', terminal: true  },
@@ -527,6 +528,16 @@ const baseCss = `
   /* Action board */
   .board { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-4); margin-bottom: var(--sp-5); align-items: start; }
   @media (max-width: 1100px) { .board { grid-template-columns: 1fr; } }
+
+  .pl-board { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(150px, 1fr); gap: var(--sp-3); overflow-x: auto; padding-bottom: var(--sp-3); }
+  .pl-col { background: var(--bg-elev-1); border: 1px solid var(--border); border-radius: 10px; padding: var(--sp-3); min-width: 0; }
+  .pl-col > header { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: var(--sp-2); }
+  .pl-col-name { font-weight: 600; font-size: 13px; }
+  .pl-hint { flex-basis: 100%; font-size: 11px; }
+  .pl-cards { display: flex; flex-direction: column; gap: 4px; max-height: 62vh; overflow-y: auto; }
+  .pl-card { display: block; padding: 5px 8px; border-radius: 6px; background: var(--bg-elev-2); border: 1px solid var(--border); font-size: 12px; text-decoration: none; color: var(--fg); }
+  .pl-card:hover { border-color: var(--accent); }
+  .pl-card-muted { color: var(--fg-muted); background: transparent; }
   .board-section { margin-bottom: var(--sp-5); }
   .board-section > h2 { display: flex; align-items: center; gap: 8px; margin: 0 0 var(--sp-3); font-size: 14px; }
   .board-section > h2 .count { background: var(--bg-elev-2); color: var(--fg-muted); border-radius: 999px; font-size: 12px; padding: 1px 9px; font-weight: 600; }
@@ -858,6 +869,7 @@ export function layout({ title, body, currentPath = '/', heartbeat = null, parti
       ${navItem('/arenden', 'Ärenden')}
       ${navItem('/escalations', 'Eskaleringar', escBadge)}
       ${navItem('/leverantorer', 'Leverantörer')}
+      ${navItem('/pipeline', 'Pipeline')}
       ${navItem('/takt', 'Takt')}
       ${navItem('/activity', 'Aktivitet')}
     </nav>
@@ -2117,6 +2129,27 @@ function renderHandoffSuggestions(targets, convId, gmailReady = false) {
         </tr>`).join('')}</tbody>
       </table>
     </section>`;
+}
+
+
+// Pipeline board: one card per kommun, columns in stage order. Deliberately
+// plain — the value is seeing where 290 kommuner sit at a glance, not chrome.
+export function renderPipeline({ pipeline, heartbeat = null, partial = false, escalationCount = 0 }) {
+  const { stages, columns, counts } = pipeline;
+  const card = (k) => (k.conv_id
+    ? `<a class="pl-card" href="/arenden/${k.conv_id}" data-pane-link>${escapeHtml(k.kommun_namn)}</a>`
+    : `<a class="pl-card pl-card-muted" href="/kommun/${escapeHtml(k.kommun_kod)}" data-pane-link>${escapeHtml(k.kommun_namn)}</a>`);
+  const col = (st) => `
+    <section class="pl-col">
+      <header><span class="pl-col-name">${escapeHtml(st.label)}</span><span class="count">${counts[st.key]}</span>
+        <div class="muted pl-hint">${escapeHtml(st.hint)}</div></header>
+      <div class="pl-cards">${columns[st.key].map(card).join('')}</div>
+    </section>`;
+  const body = `
+    <div class="page-head"><h1>Pipeline</h1></div>
+    <p class="muted">Varje kort är en kommun. En kommun med flera förvaltningar visas i den längst gångna av dem.</p>
+    <div class="pl-board">${stages.map(col).join('')}</div>`;
+  return layout({ title: 'Pipeline', body, currentPath: '/pipeline', heartbeat, partial, escalationCount });
 }
 
 export function renderArenden({ cases = [], selected = null, selectedId = null, gmailReady = false, heartbeat = null, partial = false, escalationCount = 0 }) {

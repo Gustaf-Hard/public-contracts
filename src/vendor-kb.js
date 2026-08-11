@@ -4,6 +4,19 @@
 // the extraction/draft prompts. An unknown name resolves to null (whitelist,
 // never a guess). See docs/superpowers/specs/2026-07-28-vendor-product-knowledge-base-design.md
 
+// How a category behaves in the final checklist.
+//
+// `exclusive` means a kommun normally has exactly ONE supplier in it: they run
+// one lärplattform and one skoladministrativt system. Once we have seen theirs,
+// listing the other seven is noise that makes the mail read like an audit. An
+// additive category (digitala läromedel) is the opposite: a kommun buys several
+// in parallel, so seeing NE says nothing about whether they also have Binogi.
+export const CATEGORY_RULES = {
+  'läromedel': { exclusive: false },
+  'lärplattform': { exclusive: true },
+  'skoladministration': { exclusive: true },
+};
+
 export const COMPANIES = [
   // ---- Watchlisted services ----
   // `probeLabel` is what we call the company when ASKING a kommun about it: the
@@ -11,20 +24,20 @@ export const COMPANIES = [
   // reads as a stranger's question; "Magma" is the name on their invoice.
   { canonical: 'Radish', slug: 'radish', role: 'service', category: 'läromedel',
     aliases: ['radish'], probeLabel: 'Magma',
-    products: ['Magma', 'Matteappen', 'Magma Pedagogik'], watchlist: true },
+    products: ['Magma', 'Matteappen', 'Magma Pedagogik'], watchlist: true, checklist: true },
   { canonical: 'Nationalencyklopedin', slug: 'ne', role: 'service', category: 'läromedel',
     aliases: ['ne', 'nationalencyklopedin', 'ne nationalencyklopedin'], probeLabel: 'NE',
     products: ['NE.se', 'NE Junior', 'NE Play', 'NE Ordböcker', 'NE 360',
       'NE.se internettjänst', 'E-språk', 'Världens länder', 'Språklexikon',
-      'Kunskapstjänster'], watchlist: true },
+      'Kunskapstjänster'], watchlist: true, checklist: true },
   { canonical: 'ILT Education', slug: 'ilt', role: 'service', category: 'läromedel',
     aliases: ['ilt', 'ilt education', 'ilt inläsningstjänst', 'inläsningstjänst'],
     probeLabel: 'Inläsningstjänst',
     products: ['Polyglutt', 'Polylino', 'Begreppa', 'Inlästa läromedel', 'Trovy',
-      'Aski Raski', 'Polyglutt Home Access'], watchlist: true },
+      'Aski Raski', 'Polyglutt Home Access'], watchlist: true, checklist: true },
   { canonical: 'Binogi', slug: 'binogi', role: 'service', category: 'läromedel',
     aliases: ['binogi'], probeLabel: 'Binogi',
-    products: ['Binogi.se', 'Språkprojektet'], watchlist: true },
+    products: ['Binogi.se', 'Språkprojektet'], watchlist: true, checklist: true },
 
   // ---- Services: skoladministration / lärplattform ----
   { canonical: 'Tietoevry', slug: 'tietoevry', role: 'service', category: 'skoladministration',
@@ -83,10 +96,10 @@ export const COMPANIES = [
   { canonical: 'Symbolbruket', slug: 'symbolbruket', role: 'service', category: 'stödverktyg',
     aliases: ['symbolbruket'], products: ['InPrint 3'] },
   { canonical: 'Skolplus', slug: 'skolplus', role: 'service', category: 'läromedel',
-    aliases: ['skolplus'], products: ['skolplus.se'] },
+    aliases: ['skolplus'], products: ['skolplus.se'], checklist: true },
   { canonical: 'Sveriges Utbildningsradio', slug: 'ur', role: 'service', category: 'läromedel',
     aliases: ['sveriges utbildningsradio', 'utbildningsradio'],
-    products: ['UR-program', 'UR film och radioprogram'] },
+    products: ['UR-program', 'UR film och radioprogram'], checklist: true },
   { canonical: 'Aleido Learning', slug: 'aleido', role: 'service', category: 'lärplattform',
     aliases: ['aleido', 'aleido learning', 'aleido learning sweden'], products: [] },
   { canonical: 'Skillster', slug: 'skillster', role: 'service', category: 'övrigt',
@@ -161,4 +174,36 @@ export function resolveCompany(name) {
     if (hit) return { canonical: c.canonical, slug: c.slug, role: c.role, matchedAs: 'product', product: hit };
   }
   return null;
+}
+
+// Final cross-check list: the companies we ask a kommun to confirm against
+// before closing a case. Returns probe LABELS (what a kommun calls them), not
+// canonical names, and drops anything they already sent.
+//
+// Defaults to `läromedel` because that is where under-reporting actually
+// happens: lärplattformar and skoladministration are big, visible, centrally
+// procured systems, while digital läromedel are small licence deals often
+// bought via a reseller and easy to forget. It is also the category T_INITIAL
+// asks about, so the checklist closes that exact question.
+//
+// Asking by category matters for a second reason: a watchlist company appears
+// as one name among its peers, so the question reads as a generic completeness
+// check rather than interest in any one supplier.
+export function crosscheckLabels({ received = [] } = {}) {
+  const seen = new Set();
+  for (const n of received) {
+    const hit = resolveCompany(n);
+    if (hit) seen.add(hit.slug);
+  }
+  // An exclusive category is settled as soon as we have seen one of its
+  // suppliers: they have a lärplattform, so do not read them a list of the
+  // other seven.
+  const settled = new Set();
+  for (const c of COMPANIES) {
+    if (seen.has(c.slug) && CATEGORY_RULES[c.category]?.exclusive) settled.add(c.category);
+  }
+  return COMPANIES
+    .filter((c) => c.checklist && !seen.has(c.slug) && !settled.has(c.category))
+    .map((c) => probeName(c))
+    .filter(Boolean);
 }

@@ -8,6 +8,7 @@ import path from 'node:path';
 import { readFileSync, existsSync } from 'node:fs';
 import { openDb } from './storage.js';
 import { buildVelocityFacts } from './collection-velocity.js';
+import { buildPipeline } from './pipeline.js';
 import { effectiveFollowUp, TERMINAL_STATES } from './conversation.js';
 import { resolveVacationConfig, isInVacation } from './vacation.js';
 import { buildOAuthClient, loadStoredToken, saveToken, makeGmail, makeReloadingClient } from './gmail.js';
@@ -25,6 +26,7 @@ import {
   groupEscalationsByThread,
   renderActivity,
   renderVelocity,
+  renderPipeline,
   renderCompose,
   renderVendorMarket,
   renderVendorDossier,
@@ -976,6 +978,16 @@ export function createDashboardApp({
 
   // Escalations are now handled inside Ärenden — redirect old links there.
   app.get('/escalations', (req, res) => res.redirect('/arenden?bucket=behover-dig'));
+
+  // Pipeline board: where all 290 kommuner sit, one card each.
+  app.get('/pipeline', (req, res) => {
+    const pipeline = buildPipeline({
+      municipalities: municipalitiesLoader() ?? [],
+      conversations: db ? db.listAllConversations() : [],
+    });
+    res.set('Content-Type', 'text/html; charset=utf-8');
+    res.send(renderPipeline({ pipeline, heartbeat: hb(), partial: isPartial(req), escalationCount: escCount() }));
+  });
 
   // Collection velocity: how fast avtal are actually arriving. All three
   // queries are read-only; the facts are computed by the pure module.

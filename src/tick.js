@@ -1,6 +1,7 @@
-import { T_INITIAL, T_PRECISION, T_RECEIPT, T_FOLLOWUP_NUDGE, T_FOLLOWUP_CLOSE, T_REQUEST_MISSING, T_UPDATE, T_DELAY_ACK, computeReceivedMissing, chooseDeliveryReply } from './templates.js';
+import { T_INITIAL, T_PRECISION, T_RECEIPT, T_FOLLOWUP_NUDGE, T_FOLLOWUP_CLOSE, T_REQUEST_MISSING, T_UPDATE, T_DELAY_ACK, T_CROSSCHECK, computeReceivedMissing, chooseDeliveryReply } from './templates.js';
 import { computeKommunReview } from './contract-lifecycle.js';
 import { matchWatchlist } from './watchlist.js';
+import { crosscheckLabels } from './vendor-kb.js';
 import { buildCoverageFacts } from './coverage.js';
 import { classify, isCloserText } from './classifier.js';
 import { inferThreadStatus } from './threads.js';
@@ -14,7 +15,7 @@ import { analysePendingContracts } from './analyse-contract.js';
 import { isInVacation, vacationDaysBetween } from './vacation.js';
 import { isBounce, failedRecipient } from './bounce.js';
 
-const TEMPLATES = { T_INITIAL, T_PRECISION, T_RECEIPT, T_FOLLOWUP_NUDGE, T_FOLLOWUP_CLOSE, T_REQUEST_MISSING, T_UPDATE, T_DELAY_ACK };
+const TEMPLATES = { T_INITIAL, T_PRECISION, T_RECEIPT, T_FOLLOWUP_NUDGE, T_FOLLOWUP_CLOSE, T_REQUEST_MISSING, T_UPDATE, T_DELAY_ACK, T_CROSSCHECK };
 
 function fromHeader(env) {
   return `${env.GMAIL_FROM_NAME} <${env.GMAIL_USER_EMAIL}>`;
@@ -37,6 +38,8 @@ function tplCtx(conv, env, extra = {}) {
     // Perpetual-refresh (T_UPDATE) context, forwarded when present.
     arendenummer: extra.arendenummer ?? conv.arendenummer ?? null,
     review_contracts: extra.review_contracts ?? [],
+    // Final-checklist (T_CROSSCHECK) vendor list.
+    crosscheck_vendors: extra.crosscheck_vendors ?? [],
     // Delay/OOO acknowledgement (T_DELAY_ACK) context.
     delay_date: extra.delay_date ?? null,
   };
@@ -570,6 +573,7 @@ async function dispatchEscalationForIngest(pending, deps) {
   if (transition.action === 'send_precision') draftTemplate = 'T_PRECISION';
   else if (transition.action === 'send_receipt' && !updated.receipt_sent) draftTemplate = 'T_RECEIPT';
   else if (transition.action === 'escalate') draftTemplate = 'free_form';
+  else if (transition.action === 'send_crosscheck') draftTemplate = 'T_CROSSCHECK';
   else if (transition.action === 'send_delay_ack') {
     // Graceful "we'll wait" for a delay promise / OOO autoreply. The named
     // date is the kommun's return/promised date — follow_up_at already holds
@@ -628,6 +632,29 @@ async function dispatchEscalationForIngest(pending, deps) {
     } catch (e) {
       deps.log?.(`inline contract analysis error: ${e.message}`);
       // fall back to T_RECEIPT with the existing llmDraft — never crash the tick
+    }
+  } else if (draftTemplate === 'T_CROSSCHECK') {
+    // Analyse this message's attachments FIRST: the closing delivery usually
+    // carries the last contracts, and asking about something they just sent is
+    // the one thing this mail must not do.
+    const analyseContracts = deps.analyseContracts ?? analysePendingContracts;
+    try {
+      await analyseContracts({ db, env, log: deps.log, onlyMessageId: messageId });
+    } catch (e) {
+      deps.log?.(`crosscheck contract analysis error: ${e.message}`);
+    }
+    const info = db.listContractInfoForConversation(updated.id);
+    const { all } = computeReceivedMissing(info);
+    const vendors = info.some((r) => r.is_contract) ? crosscheckLabels({ received: all }) : [];
+    if (vendors.length > 0) {
+      templateCtx = { crosscheck_vendors: vendors };
+      llmDraft = null;   // the deterministic checklist wins over the LLM's "tack"
+    } else {
+      // Nothing extracted, or nothing left to ask: reading the whole category
+      // back would be the original request again, not a closing check. The
+      // conversation still reaches CROSSCHECK; the operator closes it.
+      deps.log?.(`SKIP crosscheck for ${updated.kommun_namn}/${updated.role}: no vendors to ask about`);
+      draftTemplate = null;
     }
   } else if (!draftTemplate && classification.class === 'delivery' && parsed.attachments.length > 0) {
     // Watchlist on later deliveries (review M5): once receipt_sent=1 a delivery

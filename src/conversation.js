@@ -6,6 +6,12 @@ export function nextActionForClassification(state, classification, opts = {}) {
   }
 
   if (classification === 'dead_end') {
+    // Answering the final checklist with "we have none of those" completes the
+    // case, it does not mean the kommun has no contracts at all: we already
+    // hold theirs. So CROSSCHECK closes to DONE, never DEAD_END.
+    if (state === 'CROSSCHECK') {
+      return { nextState: 'DONE', action: 'none' };
+    }
     if (state === 'DELIVERING' && opts.is_closer) {
       return { nextState: 'DONE', action: 'none' };
     }
@@ -70,6 +76,17 @@ export function nextActionForClassification(state, classification, opts = {}) {
   }
 
   if (classification === 'delivery') {
+    // "That was everything" earns the final checklist rather than closing on
+    // the spot: we ask them to confirm against the systems kommuner commonly
+    // have, so a licence they forgot surfaces before we call the case done.
+    // This is what makes DONE mean something other than a human giving up.
+    // `is_final_delivery` used to be computed and then ignored entirely.
+    if (opts.is_closer) {
+      return state === 'CROSSCHECK'
+        ? { nextState: 'DONE', action: 'none' }
+        : { nextState: 'CROSSCHECK', action: 'send_crosscheck' };
+    }
+    // More contracts arriving in answer to the checklist reopens delivery.
     const action = opts.receipt_sent ? 'none' : 'send_receipt';
     return { nextState: 'DELIVERING', action };
   }
@@ -82,6 +99,9 @@ export const STALE_RULES = {
   ACK_RECEIVED: { days: 14, action: 'send_followup_nudge' },
   AWAITING_PRECISION: { days: 10, action: 'send_followup_nudge' },
   DELIVERING: { days: 14, action: 'send_followup_close' },
+  // An unanswered checklist must not strand: nudge, and the nudge cap then
+  // escalates to a human rather than looping.
+  CROSSCHECK: { days: 14, action: 'send_followup_close' },
 };
 
 const MAX_NUDGES = 2;

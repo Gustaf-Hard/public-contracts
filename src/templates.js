@@ -76,6 +76,36 @@ export function T_RECEIPT(ctx) {
   };
 }
 
+// Final cross-check before closing a case. The kommun has said they sent
+// everything; this asks them to confirm against a short list of systems in the
+// category most often under-reported, so a licence they forgot surfaces before
+// we call the case done.
+//
+// Tone is verifying, not accusatory ("Stämmer det att...?") so a förvaltning
+// corrects itself rather than defends its first answer. We name only what we
+// are ASKING about, never what they sent: parroting our own extraction back
+// narrows their reply and can assert a wrong extraction as fact.
+export function T_CROSSCHECK(ctx) {
+  const vendors = (ctx.crosscheck_vendors ?? []).filter(Boolean);
+  const list = vendors.map((v) => `- ${v}`).join('\n');
+  return {
+    subject: `Re: ${ctx.thread_subject}`,
+    body: [
+      'Hej,',
+      '',
+      'Tack för beskedet, då har jag tagit emot handlingarna.',
+      '',
+      'Som en sista avstämning innan jag avslutar ärendet: stämmer det att kommunen inte har något avtal avseende följande?',
+      '',
+      list,
+      '',
+      'Finns något av dem hos er tar jag gärna del av avtalet. Hör jag inget annat betraktar jag min begäran som besvarad.',
+      '',
+      signature(ctx),
+    ].join('\n'),
+  };
+}
+
 // NEVER state elapsed time ("skickad 10 dagar sedan") in outbound prose. The
 // daemon writes the draft but a human sends it, possibly days later, so any
 // relative claim is false by the time the kommun reads it. An absolute date
