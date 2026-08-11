@@ -607,12 +607,15 @@ async function dispatchEscalationForIngest(pending, deps) {
       // Coverage spans the CONVERSATION, not just this message: scoped to one
       // message the draft would re-ask for what an earlier batch delivered.
       const facts = buildCoverageFacts(db.listContractInfoForConversation(updated.id));
-      if (watchlistVendors.length > 0) {
-        // Hold: no sendable draft, so the operator consciously authors the reply.
-        draftTemplate = 'free_form';
-        llmDraft = null;
-        templateCtx = {};
-      } else if (chooseDeliveryReply({ facts }).template === 'T_REQUEST_MISSING') {
+      // A watchlist vendor in what ARRIVED is information for the operator, not
+      // a reason to withhold the acknowledgement. This used to blank the draft
+      // ("so the operator consciously authors the reply"), but it triggered on
+      // the wrong thing: the receipt names no vendor and reveals nothing about
+      // who is asking, so there was nothing to author carefully. It just left
+      // blank pages the operator filled in by hand. Every one of these is
+      // escalated for human approval regardless, and the ⚠️ BEVAKAD LEVERANTÖR
+      // flag stays on the reason, so the signal survives without the blank.
+      if (chooseDeliveryReply({ facts }).template === 'T_REQUEST_MISSING') {
         draftTemplate = 'T_REQUEST_MISSING';
         llmDraft = null; // the PDF-blind LLM draft must not win here
         templateCtx = { facts };
@@ -624,15 +627,23 @@ async function dispatchEscalationForIngest(pending, deps) {
   } else if (!draftTemplate && classification.class === 'delivery' && parsed.attachments.length > 0) {
     // Watchlist on later deliveries (review M5): once receipt_sent=1 a delivery
     // draws no receipt draft, but a watchlisted vendor arriving in a second
-    // batch must still be held for conscious authoring — not analysed silently.
+    // batch must still surface to a human rather than be analysed silently.
     const analyseContracts = deps.analyseContracts ?? analysePendingContracts;
     try {
       await analyseContracts({ db, env, log: deps.log, onlyMessageId: messageId });
       const { all } = computeReceivedMissing(db.listContractInfoForMessage(messageId));
       watchlistVendors = matchWatchlist(all);
       if (watchlistVendors.length > 0) {
-        draftTemplate = 'free_form';
-        llmDraft = null;
+        // Escalate, but with whatever reply the analysis produced. Blank only
+        // when there is genuinely nothing to propose.
+        const facts = buildCoverageFacts(db.listContractInfoForConversation(updated.id));
+        if (chooseDeliveryReply({ facts }).template === 'T_REQUEST_MISSING') {
+          draftTemplate = 'T_REQUEST_MISSING';
+          llmDraft = null;
+          templateCtx = { facts };
+        } else {
+          draftTemplate = llmDraft ? 'llm' : 'free_form';
+        }
       }
     } catch (e) {
       deps.log?.(`watchlist contract analysis error: ${e.message}`);

@@ -823,7 +823,7 @@ describe('runTick — contract-aware delivery draft', () => {
     expect(esc.draft_body).not.toMatch(/Tack så mycket för avtalen!/); // LLM draft overridden
   });
 
-  it('holds the draft (free_form) and flags watchlist vendors when a delivery names one', async () => {
+  it('flags watchlist vendors but still drafts a reply when a delivery names one', async () => {
     const convId = db.createConversation({ kommun_kod: '1', kommun_namn: 'Testkommun', role: 'central', contact_email: 'kommun@test.se', scheduled_send_at: '2026-05-01T00:00:00Z' });
     db.updateConversationState(convId, 'SENT', { gmail_thread_id: 'thr-w', last_outbound_at: '2026-05-01T00:00:00Z' });
 
@@ -860,10 +860,18 @@ describe('runTick — contract-aware delivery draft', () => {
     spy.mockRestore();
 
     const esc = db.raw.prepare('SELECT * FROM escalations WHERE conversation_id = ?').get(convId);
-    expect(esc.draft_template).toBe('free_form');
+    // A watchlist vendor in what ARRIVED is information for the operator, not a
+    // reason to withhold the acknowledgement: the receipt names no vendor and
+    // reveals nothing about who is asking. Blanking it produced escalations the
+    // operator had to write from scratch for no gain, since every one of these
+    // is human-approved anyway. The flag stays; the draft comes back.
+    expect(esc.draft_template).not.toBe('free_form');
+    expect(esc.draft_body).not.toMatch(/ingen draft/);
+    expect(esc.draft_body).toMatch(/Tack för avtalen!/);        // LLM draft kept
     expect(JSON.parse(esc.watchlist_vendors)).toEqual(['Binogi']);
-    expect(esc.reason).toMatch(/BEVAKAD LEVERANTÖR/);
-    expect(esc.draft_body).not.toMatch(/Tack för avtalen!/); // LLM draft not used
+    expect(esc.reason).toMatch(/BEVAKAD LEVERANTÖR/);           // still flagged
+    // And it must not name the watchlist vendor back to the kommun.
+    expect(esc.draft_body).not.toMatch(/Binogi/);
   });
 
   it('falls back to T_RECEIPT with LLM draft when analyseContracts throws', async () => {
