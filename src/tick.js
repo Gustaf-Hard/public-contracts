@@ -589,15 +589,15 @@ async function dispatchEscalationForIngest(pending, deps) {
     }
   }
 
-  // T_DELAY_ACK is deterministic on purpose: it must name the exact date the
-  // loop guard deduped on, so the LLM draft never substitutes for it.
+  // T_DELAY_ACK is deterministic on purpose: the LLM's own delay wording drifts
+  // and tends to promise a date, which outbound must never do (see the template).
+  // So the LLM draft never substitutes for it.
   if (draftTemplate && draftTemplate !== 'T_DELAY_ACK' && analysis?.draft_reply) {
     llmDraft = { body: analysis.draft_reply };
   }
 
   // Contract-aware delivery: a "delivery" reply must reflect what the
-  // attachments actually contain. A watchlisted vendor supersedes the
-  // contract-aware draft and holds the reply for conscious authoring.
+  // attachments actually contain.
   if (draftTemplate === 'T_RECEIPT') {
     const analyseContracts = deps.analyseContracts ?? analysePendingContracts;
     try {

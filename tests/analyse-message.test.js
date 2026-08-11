@@ -409,3 +409,19 @@ describe('buildSystemPrompt — outbound writing rules', () => {
     for (const d of drafts) expect(d).not.toMatch(/[—–]/);
   });
 });
+
+describe('buildSystemPrompt — delay acks promise no date', () => {
+  const prompt = buildSystemPrompt({ from_name: 'Gustaf', from_email: 'gustaf@mediagraf.se' });
+
+  it('tells the model the promised date is internal only', () => {
+    expect(prompt).toMatch(/UTAN datum/);
+    expect(prompt).toMatch(/aldrig utlovas till kommunen/);
+    // The old hint literally modelled the banned sentence.
+    expect(prompt).not.toMatch(/avvaktar vi till <datum>/);
+  });
+
+  it('has no example draft that names a promised date back to the kommun', () => {
+    const drafts = [...prompt.matchAll(/draft_reply":"((?:[^"\\]|\\.)*)"/g)].map((m) => m[1]);
+    for (const d of drafts) expect(d).not.toMatch(/senast \d|senast \p{L}+ \d/u);
+  });
+});

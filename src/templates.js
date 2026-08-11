@@ -122,16 +122,24 @@ export function formatDateSv(iso) {
   return `${Number(m[3])} ${month} ${m[1]}`;
 }
 
-// Graceful "we'll wait" ack for a delay promise / out-of-office autoreply that
-// states a return date. Names the date so the counterpart (and the approving
-// operator) sees exactly what we committed to waiting for.
+// Graceful "we'll wait" ack for a delay promise / out-of-office autoreply.
+//
+// Deliberately names NO date. `ctx.delay_date` is still accepted because it
+// drives our internal follow_up_at, but it must not reach the kommun's inbox:
+//   - it is often our own derived reminder date, not anything they promised
+//     (Grästorp only said "det kommer fler mejl"; the draft still announced
+//     "vi avvaktar till 7 augusti");
+//   - a draft can sit unsent past the date it names, and then it is simply
+//     wrong (same reason T_FOLLOWUP_NUDGE states no elapsed time);
+//   - the operator deleted the date from every delay-ack they sent (4/4 in the
+//     2026-07-28 edit review), which is as clear a signal as the loop gets.
 export function T_DELAY_ACK(ctx) {
   return {
     subject: `Re: ${ctx.thread_subject}`,
     body: [
       'Hej,',
       '',
-      `Tack för ditt svar! Då avvaktar vi till ${formatDateSv(ctx.delay_date)} och hör av oss igen om vi inte fått något då.`,
+      'Tack för ditt svar! Då avvaktar vi så länge och hör av oss igen om vi inte fått något.',
       '',
       signature(ctx),
     ].join('\n'),

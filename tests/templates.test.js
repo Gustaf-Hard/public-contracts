@@ -137,20 +137,26 @@ describe('formatDateSv', () => {
 });
 
 describe('T_DELAY_ACK', () => {
-  it('is a short, warm ack that NAMES the promised return date', () => {
+  // The operator deleted the concrete date from EVERY delay-ack they sent
+  // (4/4 in the 2026-07-28 edit review). Two reasons it has to go: the date is
+  // usually our internal follow_up_at rather than anything the kommun promised,
+  // and a draft can sit unsent past the date it names (Grästorp still offered
+  // "vi avvaktar till 7 augusti" on 11 August). follow_up_at stays internal and
+  // still drives our own reminder.
+  it('is a short, warm ack that names NO date', () => {
     const m = T_DELAY_ACK({ ...ctx, delay_date: '2026-07-20' });
     expect(m.subject).toMatch(/^Re: /);
     expect(m.body).toMatch(/^Hej,\n/);
     expect(m.body).toMatch(/Tack för ditt svar!/);
-    expect(m.body).toMatch(/Då avvaktar vi till 20 juli 2026/);
-    expect(m.body).toMatch(/hör av oss igen om vi inte fått något då/);
+    expect(m.body).toMatch(/hör av oss igen om vi inte fått något/);
     expect(m.body).toMatch(/Gustaf Hård af Segerstad/);
-    expect(m.body).toMatch(/gustaf@mediagraf.se/);
+    expect(m.body).not.toMatch(/20 juli|2026-07-20|\d{4}/);
   });
 
-  it('names a non-ISO date verbatim rather than dropping it', () => {
-    const m = T_DELAY_ACK({ ...ctx, delay_date: '20 juli' });
-    expect(m.body).toMatch(/Då avvaktar vi till 20 juli/);
+  it('names no date whatever form the promise arrived in', () => {
+    for (const delay_date of ['2026-07-20', '20 juli', null, undefined, '']) {
+      expect(T_DELAY_ACK({ ...ctx, delay_date }).body).not.toMatch(/juli|augusti|\d{4}|undefined|null/);
+    }
   });
 });
 

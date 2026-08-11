@@ -274,7 +274,10 @@ describe('runTick — inbound processing', () => {
     const escs = db.listOpenEscalations();
     expect(escs).toHaveLength(1);
     expect(escs[0].draft_template).toBe('T_DELAY_ACK');
-    expect(escs[0].draft_body).toMatch(/Då avvaktar vi till 8 juni 2026/);
+    // No date in outbound: it is our internal follow_up_at, not their promise,
+    // and a draft can sit unsent past it. follow_up_at above still holds it.
+    expect(escs[0].draft_body).toMatch(/Då avvaktar vi så länge/);
+    expect(escs[0].draft_body).not.toMatch(/8 juni|2026-06-08/);
     expect(escs[0].reason).toContain('until=2026-06-08');
     expect(escs[0].classifier_class).toBe('delay_promise');
 
@@ -329,7 +332,8 @@ describe('runTick — inbound processing', () => {
     let escs = db.listOpenEscalations();
     expect(escs).toHaveLength(1);
     expect(escs[0].draft_template).toBe('T_DELAY_ACK');
-    expect(escs[0].draft_body).toMatch(/Då avvaktar vi till 20 juli 2026/);
+    expect(escs[0].draft_body).toMatch(/Då avvaktar vi så länge/);
+    expect(escs[0].draft_body).not.toMatch(/20 juli|2026-07-20/);
 
     // The autoresponder fires again for the same return date (e.g. our ack
     // triggered it): no second ack draft, and the first is NOT superseded.
