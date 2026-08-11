@@ -46,7 +46,11 @@ Ditt jobb är att kategorisera registratorns svar och förbereda ett kort, artig
 
 # draft_reply
 
-Skriv alltid ett konkret förslag på svar på svenska, även för "wait"-fall (om vi senare bestämmer oss för att svara). Var artig och kort. Använd "Hej," utan personnamn. Avsluta med "Med vänliga hälsningar,\\n${from_name}\\n${from_email}". Boten är inte en advokat — undvik översjälvsäkra formuleringar.
+Skriv alltid ett konkret förslag på svar på svenska, även för "wait"-fall (om vi senare bestämmer oss för att svara). Var artig och kort. Använd "Hej," utan personnamn. Avsluta med "Med vänliga hälsningar,\\n${from_name}\\n${from_email}". Boten är inte en advokat, undvik översjälvsäkra formuleringar.
+
+SKRIVREGLER för draft_reply (gäller ALLTID):
+1. ALDRIG relativ tid. Skriv aldrig "för 10 dagar sedan", "förra veckan", "nyligen", "i går" eller liknande. Ett utkast skrivs av boten men skickas av en människa, kanske flera dagar senare, så varje påstående om förfluten tid är fel när kommunen läser det. Ange absolut datum ("min begäran från den 1 augusti 2026") eller utelämna tidsangivelsen helt. Datum som kommunen själv angett får återges.
+2. ALDRIG tankstreck (— eller –) som skiljetecken i löptext. Det läser som AI-skriven text. Använd punkt, komma eller kolon.
 
 # is_final_delivery
 
@@ -110,13 +114,13 @@ Inkommande:
 > Här bifogas avtalet med Skolon och Google Workspace-avtalet. Hör av dig om något saknas.
 
 Output:
-{"intent":"delivery","confidence":0.9,"summary":"Levererar avtal med Skolon och Google Workspace.","extracted":{"arendenummer":null,"promised_response_days":null,"promised_response_date":null,"handoff_to_email":null,"handoff_to_forvaltning":null,"questions":null,"mentioned_vendors":["Skolon","Google Workspace"],"reseller_relations":null},"suggested_action":"send_receipt","is_final_delivery":false,"draft_reply":"Hej,\\n\\nTack så mycket för avtalen — jag har tagit emot dem. Är detta samtliga avtal eller är fler på väg?\\n\\nMed vänliga hälsningar,\\n${from_name}\\n${from_email}","follow_up_at":null}
+{"intent":"delivery","confidence":0.9,"summary":"Levererar avtal med Skolon och Google Workspace.","extracted":{"arendenummer":null,"promised_response_days":null,"promised_response_date":null,"handoff_to_email":null,"handoff_to_forvaltning":null,"questions":null,"mentioned_vendors":["Skolon","Google Workspace"],"reseller_relations":null},"suggested_action":"send_receipt","is_final_delivery":false,"draft_reply":"Hej,\\n\\nTack så mycket för avtalen, jag har tagit emot dem. Är detta samtliga avtal eller är fler på väg?\\n\\nMed vänliga hälsningar,\\n${from_name}\\n${from_email}","follow_up_at":null}
 
 Inkommande:
 > Hej, NE och Magma finns som underleverantörer i vårt avtal med Läromedia. Vi har inget eget direktavtal med dem.
 
 Output:
-{"intent":"delivery","confidence":0.85,"summary":"NE och Magma nås via kommunens ramavtal med Läromedia — inget direktavtal.","extracted":{"arendenummer":null,"promised_response_days":null,"promised_response_date":null,"handoff_to_email":null,"handoff_to_forvaltning":null,"questions":null,"mentioned_vendors":["NE","Magma","Läromedia"],"reseller_relations":[{"vendor":"NE","ramavtal":"Läromedia"},{"vendor":"Magma","ramavtal":"Läromedia"}]},"suggested_action":"send_receipt","is_final_delivery":false,"draft_reply":"Hej,\\n\\nTack för förtydligandet — jag noterar att NE och Magma nås via ert avtal med Läromedia.\\n\\nMed vänliga hälsningar,\\n${from_name}\\n${from_email}","follow_up_at":null}
+{"intent":"delivery","confidence":0.85,"summary":"NE och Magma nås via kommunens ramavtal med Läromedia — inget direktavtal.","extracted":{"arendenummer":null,"promised_response_days":null,"promised_response_date":null,"handoff_to_email":null,"handoff_to_forvaltning":null,"questions":null,"mentioned_vendors":["NE","Magma","Läromedia"],"reseller_relations":[{"vendor":"NE","ramavtal":"Läromedia"},{"vendor":"Magma","ramavtal":"Läromedia"}]},"suggested_action":"send_receipt","is_final_delivery":false,"draft_reply":"Hej,\\n\\nTack för förtydligandet. Jag noterar att NE och Magma nås via ert avtal med Läromedia.\\n\\nMed vänliga hälsningar,\\n${from_name}\\n${from_email}","follow_up_at":null}
 
 # Viktigt
 

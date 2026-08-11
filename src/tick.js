@@ -27,7 +27,9 @@ function tplCtx(conv, env, extra = {}) {
     from_email: env.GMAIL_USER_EMAIL,
     from_name: env.GMAIL_FROM_NAME,
     thread_subject: extra.thread_subject ?? 'Begäran om allmänna handlingar – avtal för digitala verktyg',
-    days_since_send: extra.days_since_send ?? 0,
+    // Absolute date of our original request. Outbound prose must never state
+    // elapsed days: the operator may send the draft long after it was written.
+    sent_date: extra.sent_date ?? null,
     received: extra.received ?? [],
     missing: extra.missing ?? [],
     // Coverage facts (src/coverage.js) grounding T_REQUEST_MISSING.
@@ -200,7 +202,7 @@ async function escalateWithDraft({ conv, parsedInbound, messageId = null, classi
   } else if (TEMPLATES[draftTemplate]) {
     const ctx = tplCtx(conv, env, {
       thread_subject: parsedInbound?.subject?.replace(/^Re: /, '') ?? undefined,
-      days_since_send: deps.daysSinceSend ?? 0,
+      sent_date: deps.sentDate ?? null,
       ...templateCtx,
     });
     const rendered = TEMPLATES[draftTemplate](ctx);
@@ -952,7 +954,7 @@ export async function runDailyFollowup(deps) {
         previousState: conv.state,
         draftTemplate,
         reason,
-        deps: { ...deps, daysSinceSend: days },
+        deps: { ...deps, sentDate: db.getFirstOutboundDate?.(conv.id) ?? null },
       });
       log?.(`FOLLOWUP drafted (${draftTemplate}) → ${conv.kommun_namn}/${conv.role}`);
     }

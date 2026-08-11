@@ -390,3 +390,22 @@ describe('analysisToLegacyClassification', () => {
     expect(analysisToLegacyClassification({ intent: 'auto_ack', confidence: 0.9 }).signals).toEqual(['llm_analysis']);
   });
 });
+
+describe('buildSystemPrompt — outbound writing rules', () => {
+  const prompt = buildSystemPrompt({ from_name: 'Gustaf', from_email: 'gustaf@mediagraf.se' });
+
+  it('forbids relative time in drafts, because a human sends them days later', () => {
+    expect(prompt).toMatch(/ALDRIG relativ tid/);
+    expect(prompt).toMatch(/dagar sedan/);          // named as the thing NOT to write
+    expect(prompt).toMatch(/absolut datum/);
+  });
+
+  it('forbids the em-dash and does not model it in any example draft', () => {
+    expect(prompt).toMatch(/ALDRIG tankstreck/);
+    // Few-shot examples are the strongest instruction in the prompt: an example
+    // that uses an em-dash teaches the banned style regardless of the rule.
+    const drafts = [...prompt.matchAll(/draft_reply":"((?:[^"\\]|\\.)*)"/g)].map((m) => m[1]);
+    expect(drafts.length).toBeGreaterThan(4);
+    for (const d of drafts) expect(d).not.toMatch(/[—–]/);
+  });
+});

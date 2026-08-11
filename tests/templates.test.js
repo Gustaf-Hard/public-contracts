@@ -14,7 +14,7 @@ const ctx = {
   from_email: 'gustaf@mediagraf.se',
   from_name: 'Gustaf Hård af Segerstad',
   thread_subject: 'Begäran om allmänna handlingar – avtal för digitala verktyg',
-  days_since_send: 7,
+  sent_date: '2026-08-01',
 };
 
 describe('T_INITIAL', () => {
@@ -96,10 +96,23 @@ describe('T_RECEIPT', () => {
 });
 
 describe('T_FOLLOWUP_NUDGE', () => {
-  it('renders a polite follow-up referencing the day count', () => {
-    const m = T_FOLLOWUP_NUDGE(ctx);
+  // A draft is written by the daemon but sent by a human, possibly days later.
+  // Any elapsed-time claim is therefore false by the time it lands: the date
+  // must be absolute, or absent.
+  it('cites the send date as an absolute date, never an elapsed day count', () => {
+    const m = T_FOLLOWUP_NUDGE({ ...ctx, sent_date: '2026-08-01' });
     expect(m.subject).toMatch(/Påminnelse/);
-    expect(m.body).toMatch(/7 dagar sedan/);
+    expect(m.body).toMatch(/1 augusti 2026/);
+    expect(m.body).not.toMatch(/dagar sedan/);
+    expect(m.body).not.toMatch(/\bdagar\b/);
+  });
+
+  it('drops the date entirely rather than inventing one when the send date is unknown', () => {
+    for (const sent_date of [null, undefined, '']) {
+      const m = T_FOLLOWUP_NUDGE({ ...ctx, sent_date });
+      expect(m.body).toMatch(/min begäran om allmänna handlingar\./);
+      expect(m.body).not.toMatch(/dagar sedan|skickad|undefined|null/);
+    }
   });
 });
 

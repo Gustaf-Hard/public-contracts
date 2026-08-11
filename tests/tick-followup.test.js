@@ -79,7 +79,11 @@ describe('runDailyFollowup — staleness drafting (M1: previously untested)', ()
     const escs = db.listOpenEscalationsForConversation(id);
     expect(escs).toHaveLength(1);
     expect(escs[0].draft_template).toBe('T_FOLLOWUP_NUDGE');
-    expect(escs[0].draft_body).toMatch(/10 dagar/);
+    // The draft is written now but sent by a human, possibly days later, so it
+    // must not claim elapsed time. No outbound message is seeded here, so there
+    // is no send date to cite either: it omits the reference rather than guess.
+    expect(escs[0].draft_body).not.toMatch(/dagar sedan/);
+    expect(escs[0].draft_body).toMatch(/min begäran om allmänna handlingar\./);
     expect(escs[0].previous_state).toBe('SENT');
     expect(slackOps.posts).toHaveLength(1);
   });

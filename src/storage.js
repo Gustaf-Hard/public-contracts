@@ -624,6 +624,19 @@ export function openDb(path) {
     `).run(error);
   }
 
+  // Date (YYYY-MM-DD) of the FIRST message we sent this kommun — the referent
+  // for "min begäran om allmänna handlingar från den ...". Deliberately not
+  // last_outbound_at, which after a nudge points at the nudge rather than the
+  // original request. Null until we have sent anything.
+  function getFirstOutboundDate(conversationId) {
+    const r = db.prepare(`
+      SELECT received_at FROM messages
+      WHERE conversation_id = ? AND direction = 'outbound'
+      ORDER BY received_at, id LIMIT 1
+    `).get(conversationId);
+    return r?.received_at ? String(r.received_at).slice(0, 10) : null;
+  }
+
   function getHeartbeat() {
     return db.prepare('SELECT * FROM daemon_heartbeat WHERE id = 1').get() ?? null;
   }
@@ -1192,6 +1205,7 @@ export function openDb(path) {
     recordHeartbeat,
     getHeartbeat,
     getTickHealth,
+    getFirstOutboundDate,
     close,
     upsertVendor,
     upsertProduct,

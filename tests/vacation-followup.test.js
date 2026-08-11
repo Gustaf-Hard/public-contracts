@@ -110,3 +110,31 @@ describe('runDailyFollowup — vacation gate', () => {
     expect(escs[0].reason).toMatch(/27 days/);
   });
 });
+
+describe('runDailyFollowup — the nudge draft dates itself absolutely', () => {
+  // A draft written today may be sent days later, so "skickad N dagar sedan"
+  // is false by the time the kommun reads it. The draft must cite the real
+  // send date instead, and that date has to survive tplCtx's allowlist.
+  it('cites the first outbound date, not an elapsed day count', async () => {
+    const id = seedConv({ stateChangedAt: '2026-08-20T00:00:00Z' });
+    db.recordMessage({
+      conversation_id: id, gmail_message_id: 'out-first', direction: 'outbound',
+      from_email: 'gustaf@mediagraf.se', to_email: 'kansli@ale.se',
+      subject: 'Begäran om allmänna handlingar', body_text: 'Hej',
+      classification: null, classification_confidence: null,
+      received_at: '2026-08-20T09:00:00Z', attachment_count: 0,
+    });
+
+    await runDailyFollowup(deps({
+      now: new Date('2026-09-05T08:00:00Z'),          // 16 days later
+      vacationConfig: defaultVacationConfig(),
+    }));
+
+    const esc = db.raw
+      .prepare("SELECT draft_body FROM escalations WHERE conversation_id = ? AND draft_template = 'T_FOLLOWUP_NUDGE'")
+      .get(id);
+    expect(esc).toBeTruthy();
+    expect(esc.draft_body).toMatch(/20 augusti 2026/);
+    expect(esc.draft_body).not.toMatch(/dagar sedan/);
+  });
+});

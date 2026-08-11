@@ -76,13 +76,21 @@ export function T_RECEIPT(ctx) {
   };
 }
 
+// NEVER state elapsed time ("skickad 10 dagar sedan") in outbound prose. The
+// daemon writes the draft but a human sends it, possibly days later, so any
+// relative claim is false by the time the kommun reads it. An absolute date
+// cannot drift; when we do not know it, say nothing rather than guess.
 export function T_FOLLOWUP_NUDGE(ctx) {
+  const sent = formatDateSv(ctx.sent_date);
+  const reference = sent
+    ? `min begäran om allmänna handlingar från den ${sent}.`
+    : 'min begäran om allmänna handlingar.';
   return {
     subject: `Påminnelse: ${ctx.thread_subject}`,
     body: [
       'Hej,',
       '',
-      `Jag vill bara följa upp om min begäran om allmänna handlingar (skickad ${ctx.days_since_send} dagar sedan). Behöver ni ytterligare information från min sida för att kunna behandla ärendet?`,
+      `Jag vill bara följa upp om ${reference} Behöver ni ytterligare information från min sida för att kunna behandla ärendet?`,
       '',
       signature(ctx),
     ].join('\n'),
