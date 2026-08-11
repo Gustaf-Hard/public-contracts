@@ -1243,3 +1243,54 @@ describe('a case the kommun answered stays in "Behöver dig" without a draft', (
     expect(html).toMatch(/ÖPPNA[\s\S]{0,400}K/i);
   });
 });
+
+describe('a case with no draft can still be answered', () => {
+  // The awaiting_us bucket puts cases the kommun answered into "Behöver dig"
+  // even when nothing is drafted. Without a way to reply, those pages offered
+  // only "Stäng som klart" and "Återvändsgränd" — the queue asked for action
+  // and then refused to allow any.
+  function seedNoDraft({ action = 'escalate', reply = 'Hej,\n\nTack för hänvisningen.\n\nMvh' } = {}) {
+    const convId = db.createConversation({
+      kommun_kod: '2418', kommun_namn: 'Malå', role: 'central',
+      contact_email: 'kommun@mala.se', scheduled_send_at: '2026-07-01T00:00:00Z',
+    });
+    db.updateConversationState(convId, 'ACK_RECEIVED', { gmail_thread_id: 'thr-n' });
+    db.recordMessage({
+      conversation_id: convId, gmail_message_id: 'in-nd', direction: 'inbound',
+      from_email: 'kommun@mala.se', to_email: 'me@x.se', subject: 'Sv: Begäran',
+      body_text: 'Kontakta utbildningsförvaltningen.', classification: 'unknown',
+      classification_confidence: 0.9, received_at: '2026-07-06T10:00:00Z', attachment_count: 0,
+      analysis_json: JSON.stringify({ intent: 'handoff', suggested_action: action, draft_reply: reply, extracted: {} }),
+    });
+    return convId;
+  }
+
+  it('offers to write one when the kommun spoke last and nothing is drafted', async () => {
+    const convId = seedNoDraft();
+    const res = await get(appWithFakes(), `/arenden/${convId}`);
+    expect(res.text).toMatch(/Inget utkast/);
+    expect(res.text).toContain(`/arenden/${convId}/draft`);
+  });
+
+  it('does not offer it while we are deliberately waiting', async () => {
+    const convId = seedNoDraft({ action: 'wait' });
+    const res = await get(appWithFakes(), `/arenden/${convId}`);
+    expect(res.text).not.toMatch(/Inget utkast/);
+  });
+
+  it('seeds the draft from the analysis so the operator is not staring at a blank page', async () => {
+    const convId = seedNoDraft();
+    const res = await postForm(appWithFakes(), `/arenden/${convId}/draft`, {});
+    expect(res.status).toBe(302);
+    const escs = db.listOpenEscalationsForConversation(convId);
+    expect(escs).toHaveLength(1);
+    expect(escs[0].draft_body).toMatch(/Tack för hänvisningen/);
+  });
+
+  it('refuses to add a second draft next to an existing one', async () => {
+    const convId = seedNoDraft();
+    await postForm(appWithFakes(), `/arenden/${convId}/draft`, {});
+    await postForm(appWithFakes(), `/arenden/${convId}/draft`, {});
+    expect(db.listOpenEscalationsForConversation(convId)).toHaveLength(1);
+  });
+});

@@ -2045,7 +2045,7 @@ export function renderThread({ kommun, conv, thread, messages = [], attachmentsB
 
 function renderCaseDetailPane(selected, gmailReady) {
   if (!selected) return '<div class="detail-empty"><p class="muted">Välj ett ärende i listan till vänster.</p></div>';
-  const { conv, messages, attachmentsByMsg, signatures, escalations, threads = [], handoff_targets = [], follow_up } = selected;
+  const { conv, messages, attachmentsByMsg, signatures, escalations, threads = [], handoff_targets = [], needs_draft = false, follow_up } = selected;
   const returnTo = `/arenden/${conv.id}`;
   const duration = caseDuration(conv, messages);
   const fuBadge = fmtFollowUpBadge(follow_up?.date, follow_up?.source);
@@ -2092,6 +2092,14 @@ function renderCaseDetailPane(selected, gmailReady) {
     </div>
     <div class="thread-msgs">${thread}</div>
     ${replyBoxes}
+    ${needs_draft ? `
+    <section class="board-section">
+      <h2>Inget utkast</h2>
+      <p class="muted">Kommunen har svarat och väntar på dig, men inget svar är förberett.</p>
+      <form method="post" action="/arenden/${conv.id}/draft" data-pane-form data-return="/arenden/${conv.id}">
+        <button class="btn btn-primary" type="submit">✍️ Skriv svar</button>
+      </form>
+    </section>` : ''}
     ${renderHandoffSuggestions(handoff_targets, conv.id, gmailReady)}
     ${renderCaseActions(conv, gmailReady, returnTo)}
   </div>`;

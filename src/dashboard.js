@@ -494,6 +494,8 @@ function escalationRecipient(db, esc, conv) {
   return resolveReplyRecipient({ triggeringMessage, conv, primaryThreads }).to;
 }
 
+const CASE_TERMINAL = new Set(['DONE', 'DEAD_END']);
+
 // Full detail for one conversation (Ärenden detail pane). `kommunFor` looks a
 // kommun record up by kod — passed as a function so the caller does not have to
 // repeat getConversation() just to learn the kod before calling.
@@ -548,7 +550,18 @@ function loadCaseDetail(db, convId, kommunFor = () => null) {
     }).map((t) => ({ ...t, started_conv_id: startedByEmail.get(t.email) ?? null }));
   }
 
-  return { conv, messages, attachmentsByMsg, signatures, escalations, threads, handoff_targets, follow_up: effectiveFollowUp(conv) };
+  // Awaiting us with nothing drafted: the queue surfaces these (caseBucket's
+  // awaiting_us), so the page must offer a way to answer rather than only
+  // "Stäng som klart".
+  const lastMsg = messages[messages.length - 1] ?? null;
+  let lastAction = null;
+  try { lastAction = JSON.parse(lastMsg?.analysis_json ?? 'null')?.suggested_action ?? null; } catch { /* unparsable */ }
+  const needs_draft = escalations.length === 0
+    && lastMsg?.direction === 'inbound'
+    && lastAction !== 'wait'
+    && !CASE_TERMINAL.has(conv.state);
+
+  return { conv, messages, attachmentsByMsg, signatures, escalations, threads, handoff_targets, needs_draft, follow_up: effectiveFollowUp(conv) };
 }
 
 // Sort vendor rollups for the market table. Default (no sort param) keeps
@@ -978,6 +991,36 @@ export function createDashboardApp({
 
   // Escalations are now handled inside Ärenden — redirect old links there.
   app.get('/escalations', (req, res) => res.redirect('/arenden?bucket=behover-dig'));
+
+  // Write a reply for a case that has none. Seeds from the analysis the daemon
+  // already produced, so the operator edits rather than starts from a blank
+  // page, and the reply then goes out through the ordinary approved-send path.
+  app.post('/arenden/:id/draft', (req, res) => {
+    if (!db) return res.status(503).send('No DB');
+    const convId = parseInt(req.params.id, 10);
+    const detail = loadCaseDetail(db, convId, kommunByKod);
+    if (!detail) return res.status(404).send('Ärende not found');
+    const wantsNoBody = req.get('X-Partial') === '1';
+    const done = () => (wantsNoBody ? res.status(204).end() : res.redirect(`/arenden/${convId}`));
+    // One open next-action per conversation, always.
+    if (db.hasActiveEscalation(convId)) return done();
+
+    const { conv, messages } = detail;
+    const lastIn = [...messages].reverse().find((m) => m.direction === 'inbound') ?? null;
+    let seeded = '';
+    try { seeded = JSON.parse(lastIn?.analysis_json ?? 'null')?.draft_reply ?? ''; } catch { /* unparsable */ }
+    const subject = 'Re: ' + String(lastIn?.subject ?? 'Begäran om allmänna handlingar').replace(/^(Re|Sv|SV):\s*/i, '');
+    db.recordEscalation({
+      conversation_id: convId,
+      message_id: lastIn?.id ?? null,
+      reason: 'utkast begärt av operatören (kommunen väntar på svar)',
+      draft_template: 'free_form',
+      draft_subject: subject,
+      draft_body: seeded.trim() || '',
+      previous_state: conv.state,
+    });
+    done();
+  });
 
   // Pipeline board: where all 290 kommuner sit, one card each.
   app.get('/pipeline', (req, res) => {
