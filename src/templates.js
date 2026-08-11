@@ -69,7 +69,7 @@ export function T_RECEIPT(ctx) {
     body: [
       'Hej,',
       '',
-      'Tack så mycket för avtalen — jag har tagit emot dem. Är detta samtliga avtal eller är fler på väg?',
+      'Tack så mycket för avtalen, jag har tagit emot dem. Är detta samtliga avtal eller är fler på väg?',
       '',
       signature(ctx),
     ].join('\n'),

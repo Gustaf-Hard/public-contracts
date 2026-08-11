@@ -358,3 +358,20 @@ describe('T_UPDATE (perpetual refresh re-contact)', () => {
     expect(m.subject).toMatch(/^Re: /);
   });
 });
+
+describe('outbound style: no em-dash in reply prose', () => {
+  // The operator's standing rule: — and – as separators read as AI-written.
+  // T_INITIAL is deliberately excluded. Its subject line is the identity every
+  // kommun already has in its diarium, and its scope sentence has gone out to
+  // the whole fleet; changing those mid-campaign is the operator's call.
+  it('holds for every reply template', () => {
+    const replies = [
+      T_RECEIPT(ctx),
+      T_PRECISION(ctx),
+      T_FOLLOWUP_NUDGE({ ...ctx, sent_date: '2026-08-01' }),
+      T_FOLLOWUP_CLOSE(ctx),
+      T_DELAY_ACK({ ...ctx, delay_date: '2026-08-20' }),
+    ];
+    for (const m of replies) expect(m.body).not.toMatch(/[—–]/);
+  });
+});
