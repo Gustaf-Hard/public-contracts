@@ -1265,32 +1265,61 @@ describe('a case with no draft can still be answered', () => {
     return convId;
   }
 
-  it('offers to write one when the kommun spoke last and nothing is drafted', async () => {
+  const appGmail = () => createDashboardApp({
+    db, municipalitiesLoader: () => JSON.parse(require('node:fs').readFileSync(muniPath, 'utf8')),
+    gmailClient: { gmail: {} }, env: { GMAIL_USER_EMAIL: 'me@x.se', GMAIL_FROM_NAME: 'Test' },
+  });
+
+  it('renders a reply box where the suggested reply would have been', async () => {
     const convId = seedNoDraft();
     const res = await get(appWithFakes(), `/arenden/${convId}`);
-    expect(res.text).toMatch(/Inget utkast/);
-    expect(res.text).toContain(`/arenden/${convId}/draft`);
+    expect(res.text).toMatch(/inget utkast/i);
+    expect(res.text).toContain(`/arenden/${convId}/reply`);
+    expect(res.text).toMatch(/<textarea name="body"/);
+    // Seeded from the analysis, so it is not a blank page.
+    expect(res.text).toMatch(/Tack för hänvisningen/);
   });
 
   it('does not offer it while we are deliberately waiting', async () => {
     const convId = seedNoDraft({ action: 'wait' });
     const res = await get(appWithFakes(), `/arenden/${convId}`);
-    expect(res.text).not.toMatch(/Inget utkast/);
+    expect(res.text).not.toMatch(/inget utkast/i);
   });
 
-  it('seeds the draft from the analysis so the operator is not staring at a blank page', async () => {
+  it('sends what the operator typed through the ordinary approved path', async () => {
     const convId = seedNoDraft();
-    const res = await postForm(appWithFakes(), `/arenden/${convId}/draft`, {});
-    expect(res.status).toBe(302);
-    const escs = db.listOpenEscalationsForConversation(convId);
-    expect(escs).toHaveLength(1);
-    expect(escs[0].draft_body).toMatch(/Tack för hänvisningen/);
+    const spy = vi.spyOn(gmailMod, 'sendMessage').mockResolvedValue({ id: 'm1', threadId: 'thr-n' });
+    try {
+      const res = await postForm(appGmail(), `/arenden/${convId}/reply`,
+        { to: 'kommun@mala.se', subject: 'Re: Begäran', body: 'Hej, här är mitt svar.' });
+      expect(res.status).toBe(302);
+      expect(spy).toHaveBeenCalledTimes(1);
+      // Recorded like any other approved send, not a side channel.
+      const esc = db.raw.prepare('SELECT * FROM escalations WHERE conversation_id = ?').get(convId);
+      expect(esc.status).toBe('resolved_edit');
+      expect(esc.draft_body).toMatch(/här är mitt svar/);
+    } finally { spy.mockRestore(); }
   });
 
-  it('refuses to add a second draft next to an existing one', async () => {
+  it('refuses an empty body', async () => {
     const convId = seedNoDraft();
-    await postForm(appWithFakes(), `/arenden/${convId}/draft`, {});
-    await postForm(appWithFakes(), `/arenden/${convId}/draft`, {});
-    expect(db.listOpenEscalationsForConversation(convId)).toHaveLength(1);
+    const spy = vi.spyOn(gmailMod, 'sendMessage').mockResolvedValue({ id: 'm1', threadId: 't' });
+    try {
+      const res = await postForm(appGmail(), `/arenden/${convId}/reply`, { body: '   ' });
+      expect(res.status).toBe(400);
+      expect(spy).not.toHaveBeenCalled();
+    } finally { spy.mockRestore(); }
+  });
+
+  it('does not stack a second reply beside a draft that appeared meanwhile', async () => {
+    const convId = seedNoDraft();
+    db.recordEscalation({ conversation_id: convId, message_id: null, reason: 'tick drafted this',
+      draft_template: 'free_form', draft_subject: 's', draft_body: 'b', previous_state: 'ACK_RECEIVED' });
+    const spy = vi.spyOn(gmailMod, 'sendMessage').mockResolvedValue({ id: 'm1', threadId: 't' });
+    try {
+      await postForm(appGmail(), `/arenden/${convId}/reply`, { body: 'mitt svar' });
+      expect(spy).not.toHaveBeenCalled();
+      expect(db.listOpenEscalationsForConversation(convId)).toHaveLength(1);
+    } finally { spy.mockRestore(); }
   });
 });

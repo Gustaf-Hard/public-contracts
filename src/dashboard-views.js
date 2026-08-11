@@ -2043,9 +2043,48 @@ export function renderThread({ kommun, conv, thread, messages = [], attachmentsB
   return layout({ title: `${kommun.kommun_namn} — tråd`, body, currentPath: '/', heartbeat, partial, escalationCount });
 }
 
+
+// A case the kommun answered with nothing drafted. Rendered where a suggested
+// reply would sit and with the same fields, so it reads as "write the reply"
+// rather than "this page is broken". Seeded with whatever the analysis already
+// proposed; empty is fine, the operator writes it.
+function renderBlankReplyBox({ conv, seed = '', to = '', subject = '', gmailReady, returnTo }) {
+  const disabled = gmailReady ? '' : 'disabled';
+  const warn = gmailReady ? '' : '<span class="send-warning">⚠️ Gmail-token saknas</span>';
+  const paneAttrs = returnTo ? ` data-pane-form data-return="${escapeHtml(returnTo)}"` : '';
+  return `
+    <div class="reply-box">
+      <div class="reply-head">
+        <span class="avatar avatar-outbound">↩</span>
+        <span class="muted">Svara <strong>${escapeHtml(to || conv.contact_email || '')}</strong></span>
+        <span class="badge" style="background:#f59e0b1a;color:#b45309;border:1px solid #f59e0b66;font-size:11px;padding:2px 8px">inget utkast</span>
+      </div>
+      <p class="muted" style="margin:0 0 8px">Kommunen har svarat och väntar på dig. Inget svar var förberett, så skriv det här.</p>
+      <form class="action-form" method="post" action="/arenden/${conv.id}/reply"${paneAttrs}>
+        ${returnTo ? `<input type="hidden" name="return" value="${escapeHtml(returnTo)}">` : ''}
+        <div class="field">
+          <label>Till</label>
+          <input type="text" name="to" value="${escapeHtml(to || conv.contact_email || '')}">
+        </div>
+        <div class="field">
+          <label>Ämne</label>
+          <input type="text" name="subject" value="${escapeHtml(subject)}">
+        </div>
+        <div class="field">
+          <label>Brödtext</label>
+          <textarea name="body" placeholder="Skriv ditt svar här…">${escapeHtml(seed)}</textarea>
+        </div>
+        <div class="buttons">
+          <button class="btn ${gmailReady ? 'btn-primary' : 'btn-disabled'}" type="submit" ${disabled}>📨 Skicka</button>
+          ${warn}
+        </div>
+      </form>
+    </div>`;
+}
+
 function renderCaseDetailPane(selected, gmailReady) {
   if (!selected) return '<div class="detail-empty"><p class="muted">Välj ett ärende i listan till vänster.</p></div>';
-  const { conv, messages, attachmentsByMsg, signatures, escalations, threads = [], handoff_targets = [], needs_draft = false, follow_up } = selected;
+  const { conv, messages, attachmentsByMsg, signatures, escalations, threads = [], handoff_targets = [], needs_draft = false, draft_seed = '', draft_to = '', draft_subject = '', follow_up } = selected;
   const returnTo = `/arenden/${conv.id}`;
   const duration = caseDuration(conv, messages);
   const fuBadge = fmtFollowUpBadge(follow_up?.date, follow_up?.source);
@@ -2092,14 +2131,7 @@ function renderCaseDetailPane(selected, gmailReady) {
     </div>
     <div class="thread-msgs">${thread}</div>
     ${replyBoxes}
-    ${needs_draft ? `
-    <section class="board-section">
-      <h2>Inget utkast</h2>
-      <p class="muted">Kommunen har svarat och väntar på dig, men inget svar är förberett.</p>
-      <form method="post" action="/arenden/${conv.id}/draft" data-pane-form data-return="/arenden/${conv.id}">
-        <button class="btn btn-primary" type="submit">✍️ Skriv svar</button>
-      </form>
-    </section>` : ''}
+    ${needs_draft ? renderBlankReplyBox({ conv, seed: draft_seed, to: draft_to, subject: draft_subject, gmailReady, returnTo }) : ''}
     ${renderHandoffSuggestions(handoff_targets, conv.id, gmailReady)}
     ${renderCaseActions(conv, gmailReady, returnTo)}
   </div>`;

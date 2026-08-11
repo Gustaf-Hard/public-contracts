@@ -561,7 +561,20 @@ function loadCaseDetail(db, convId, kommunFor = () => null) {
     && lastAction !== 'wait'
     && !CASE_TERMINAL.has(conv.state);
 
-  return { conv, messages, attachmentsByMsg, signatures, escalations, threads, handoff_targets, needs_draft, follow_up: effectiveFollowUp(conv) };
+  const lastIn = [...messages].reverse().find((m) => m.direction === 'inbound') ?? null;
+  let draft_seed = '';
+  try { draft_seed = JSON.parse(lastIn?.analysis_json ?? 'null')?.draft_reply ?? ''; } catch { /* unparsable */ }
+  const draft_to = needs_draft
+    ? resolveReplyRecipient({
+        triggeringMessage: lastIn, conv,
+        primaryThreads: threads.filter((t) => t.status === 'primary'),
+      }).to
+    : '';
+  const draft_subject = 'Re: ' + String(lastIn?.subject ?? 'Begäran om allmänna handlingar').replace(/^(Re|Sv|SV):\s*/i, '');
+
+  return { conv, messages, attachmentsByMsg, signatures, escalations, threads, handoff_targets,
+    needs_draft, draft_seed: draft_seed.trim(), draft_to, draft_subject,
+    follow_up: effectiveFollowUp(conv) };
 }
 
 // Sort vendor rollups for the market table. Default (no sort param) keeps
@@ -992,34 +1005,50 @@ export function createDashboardApp({
   // Escalations are now handled inside Ärenden — redirect old links there.
   app.get('/escalations', (req, res) => res.redirect('/arenden?bucket=behover-dig'));
 
-  // Write a reply for a case that has none. Seeds from the analysis the daemon
-  // already produced, so the operator edits rather than starts from a blank
-  // page, and the reply then goes out through the ordinary approved-send path.
-  app.post('/arenden/:id/draft', (req, res) => {
+  // Write and send a reply for a case that has no draft. Creates the
+  // escalation the send path needs, then goes through sendApprovedReply like
+  // every other outbound: same atomic claim, same recording, no new send path.
+  app.post('/arenden/:id/reply', async (req, res) => {
     if (!db) return res.status(503).send('No DB');
     const convId = parseInt(req.params.id, 10);
     const detail = loadCaseDetail(db, convId, kommunByKod);
     if (!detail) return res.status(404).send('Ärende not found');
-    const wantsNoBody = req.get('X-Partial') === '1';
-    const done = () => (wantsNoBody ? res.status(204).end() : res.redirect(`/arenden/${convId}`));
-    // One open next-action per conversation, always.
-    if (db.hasActiveEscalation(convId)) return done();
+    // One open next-action per conversation: if a draft appeared meanwhile
+    // (a tick, another tab), send that one instead of stacking a second.
+    if (db.hasActiveEscalation(convId)) return res.redirect(backTo(req, `/arenden/${convId}`));
+
+    const finalBody = String(req.body.body ?? '').trim();
+    if (!finalBody) return res.status(400).send('Cannot send an empty body');
+
+    const gmail = currentGmail();
+    if (!gmail) return res.status(503).send('Gmail not configured — run pilot-auth first.');
 
     const { conv, messages } = detail;
     const lastIn = [...messages].reverse().find((m) => m.direction === 'inbound') ?? null;
-    let seeded = '';
-    try { seeded = JSON.parse(lastIn?.analysis_json ?? 'null')?.draft_reply ?? ''; } catch { /* unparsable */ }
-    const subject = 'Re: ' + String(lastIn?.subject ?? 'Begäran om allmänna handlingar').replace(/^(Re|Sv|SV):\s*/i, '');
-    db.recordEscalation({
+    const escId = db.recordEscalation({
       conversation_id: convId,
       message_id: lastIn?.id ?? null,
-      reason: 'utkast begärt av operatören (kommunen väntar på svar)',
+      reason: 'svar skrivet av operatören (inget utkast fanns)',
       draft_template: 'free_form',
-      draft_subject: subject,
-      draft_body: seeded.trim() || '',
+      draft_subject: String(req.body.subject ?? ''),
+      draft_body: finalBody,
       previous_state: conv.state,
     });
-    done();
+    const esc = db.raw.prepare('SELECT * FROM escalations WHERE id = ?').get(escId);
+
+    try {
+      await sendApprovedReply({
+        db, gmail, env, conv, esc,
+        finalBody, finalSubject: req.body.subject, finalTo: req.body.to,
+        decision: 'edit', slackClient,
+      });
+    } catch (e) {
+      if (e.code === 'ESCALATION_NOT_OPEN' || e.code === 'STALE_ESCALATION') {
+        return res.status(409).send(escapeForError(e.message));
+      }
+      return res.status(500).send(`Send failed: ${escapeForError(e.message)}`);
+    }
+    return res.redirect(backTo(req, `/arenden/${convId}`));
   });
 
   // Pipeline board: where all 290 kommuner sit, one card each.
