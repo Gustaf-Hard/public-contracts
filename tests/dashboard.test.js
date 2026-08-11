@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { openDb } from '../src/storage.js';
 import { createDashboardApp, buildActionQueue, buildWaiting, applyFilter, buildOverviewRows, contentDisposition } from '../src/dashboard.js';
-import { layout, renderEscalationForm, renderOverview } from '../src/dashboard-views.js';
+import { layout, renderEscalationForm, renderOverview, renderArenden } from '../src/dashboard-views.js';
 
 let tmp, db, dbPath, muniPath;
 
@@ -1219,5 +1219,27 @@ describe('stale-page protection', () => {
     const h = JSON.parse(res.text);
     expect(h.stale).toBe(false);
     expect(h.last_error).toBeNull();
+  });
+});
+
+describe('a case the kommun answered stays in "Behöver dig" without a draft', () => {
+  // Voiding an overtaken draft (tick.js) removes the open escalation, and the
+  // bucket used to key on that alone — so the case would silently drop out of
+  // the queue with the kommun's reply unanswered. It is exactly the work that
+  // most needs to be visible.
+  const base = (over = {}) => ({
+    conv_id: 1, kommun_kod: '1', kommun_namn: 'K', role: 'central', state: 'DELIVERING',
+    open_esc: 0, follow_up_at: null, follow_up_source: null, since: '1 dag',
+    subject: 's', snippet: 'x', last_direction: 'inbound', awaiting_us: true, ...over,
+  });
+
+  it('buckets an unanswered inbound as behöver dig', () => {
+    const html = renderArenden({ cases: [base()], selected: null });
+    expect(html).toMatch(/BEHÖVER DIG[\s\S]{0,400}K/i);
+  });
+
+  it('does not do so when we spoke last', () => {
+    const html = renderArenden({ cases: [base({ last_direction: 'outbound', awaiting_us: false })], selected: null });
+    expect(html).toMatch(/ÖPPNA[\s\S]{0,400}K/i);
   });
 });

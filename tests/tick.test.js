@@ -975,3 +975,61 @@ describe('runTick — contract-aware delivery draft', () => {
     expect(last.draft_body).toMatch(/Inläsningstjänst/);
   });
 });
+
+describe('a kommun reply voids the pending draft', () => {
+  // The daemon drafts, a human sends later. If the kommun answers in between,
+  // the draft answers a message that has been overtaken and must not survive.
+  // sendApprovedReply already refuses such a send; doing it at ingest means the
+  // operator never sees a draft that cannot be sent.
+  function seedWithOpenDraft({ receiptSent = 0 } = {}) {
+    const convId = db.createConversation({
+      kommun_kod: '77', kommun_namn: 'Voidkommun', role: 'central',
+      contact_email: 'kommun@void.se', scheduled_send_at: '2026-05-01T00:00:00Z',
+    });
+    db.updateConversationState(convId, 'DELIVERING', {
+      gmail_thread_id: 'thr-v', last_outbound_at: '2026-05-01T00:00:00Z', receipt_sent: receiptSent,
+    });
+    const escId = db.recordEscalation({
+      conversation_id: convId, message_id: null, reason: 'stale DELIVERING',
+      draft_template: 'T_FOLLOWUP_CLOSE', draft_subject: 'Re: x',
+      draft_body: 'Har ni ytterligare avtal, eller kan ärendet betraktas som slutfört?',
+      previous_state: 'DELIVERING',
+    });
+    return { convId, escId };
+  }
+
+  const reply = (body) => ({
+    listResult: [{ id: 'in-v' }],
+    getResult: { 'in-v': mkMsg('in-v', 'thr-v', 'Kommun <kommun@void.se>', body, 'Sv') },
+  });
+
+  it('voids it even when the reply itself warrants no new draft', async () => {
+    // receipt already sent, so a further delivery draws action 'none' — the old
+    // path left the stale close-question sitting there, sendable-looking.
+    const { convId, escId } = seedWithOpenDraft({ receiptSent: 1 });
+    const spy = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue({
+      intent: 'delivery', confidence: 0.9, summary: 'Fler avtal.',
+      suggested_action: 'send_receipt', draft_reply: '', follow_up_at: null, extracted: {},
+    });
+    await runTick(makeDeps({ gmail: fakeGmail(reply('Här kommer resten.')) }));
+    spy.mockRestore();
+
+    const esc = db.raw.prepare('SELECT status FROM escalations WHERE id = ?').get(escId);
+    expect(esc.status).toBe('superseded');
+    expect(db.listOpenEscalationsForConversation(convId).filter((e) => e.id === escId)).toHaveLength(0);
+  });
+
+  it('leaves the draft alone for machine traffic — an autoreply is not an answer', async () => {
+    // Nobody read our request, so the pending draft is still exactly right.
+    // Churning it would mean re-drafting on every out-of-office bounce.
+    const { escId } = seedWithOpenDraft();
+    const spy = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue({
+      intent: 'auto_reply', confidence: 0.95, summary: 'Semester.',
+      suggested_action: 'wait', draft_reply: '', follow_up_at: null, extracted: {},
+    });
+    await runTick(makeDeps({ gmail: fakeGmail(reply('Jag har semester och är åter 20 augusti.')) }));
+    spy.mockRestore();
+
+    expect(db.raw.prepare('SELECT status FROM escalations WHERE id = ?').get(escId).status).toBe('open');
+  });
+});

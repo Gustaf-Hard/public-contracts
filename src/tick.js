@@ -564,6 +564,9 @@ async function dispatchEscalationForIngest(pending, deps) {
   let templateCtx = {};
   let watchlistVendors = [];
   let reasonPrefix = null;
+  // The same out-of-office firing again (often triggered by our own ack) is not
+  // new information from the kommun, so it must not void a pending draft.
+  let isRepeatAutoresponder = false;
   if (transition.action === 'send_precision') draftTemplate = 'T_PRECISION';
   else if (transition.action === 'send_receipt' && !updated.receipt_sent) draftTemplate = 'T_RECEIPT';
   else if (transition.action === 'escalate') draftTemplate = 'free_form';
@@ -579,7 +582,9 @@ async function dispatchEscalationForIngest(pending, deps) {
       deps.log?.(`SKIP delay ack for ${updated.kommun_namn}/${updated.role}: no return date extracted`);
     } else if (db.hasDelayAckForDate(updated.id, delayDate)) {
       // Autoreply-loop guard: the same OOO re-firing (possibly triggered by
-      // our own ack) must not mint another identical draft.
+      // our own ack) must not mint another identical draft — nor void the ack
+      // that is already pending, which is still exactly right.
+      isRepeatAutoresponder = true;
       deps.log?.(`SKIP delay ack for ${updated.kommun_namn}/${updated.role}: ack for ${delayDate} already exists (autoreply loop guard)`);
     } else {
       draftTemplate = 'T_DELAY_ACK';
@@ -648,6 +653,36 @@ async function dispatchEscalationForIngest(pending, deps) {
     } catch (e) {
       deps.log?.(`watchlist contract analysis error: ${e.message}`);
       // never crash the tick; step 3 will analyse the PDFs anyway
+    }
+  }
+
+  // A reply from the kommun VOIDS any pending draft for this conversation.
+  //
+  // The daemon writes a draft but a human sends it, sometimes days later. If
+  // the kommun answers in between, the draft answers a message that has been
+  // overtaken — a reminder that asks "have you had a chance to look at this?"
+  // after they already delivered. sendApprovedReply refuses such a send
+  // (STALE_ESCALATION), but only on the unmodified path and only once the
+  // operator has clicked, so a dead draft could sit in the queue looking fine.
+  // Voiding it here means it never looks sendable in the first place.
+  //
+  // Machine traffic is not an answer: an out-of-office bounce or a diarium
+  // receipt means nobody has read our request, so the pending draft is still
+  // exactly right and churning it would re-draft on every autoresponder.
+  //
+  // escalateWithDraft supersedes open escalations too, so this only changes the
+  // case where the reply itself warrants no new draft. Only 'open' is touched —
+  // a 'sending' claim is mid-Gmail-call and a parked 'send_failed' is a human's
+  // decision to make.
+  const isMachineTraffic = classification.class === 'auto_ack' || classification.class === 'auto_reply'
+    || isRepeatAutoresponder;
+  if (!isMachineTraffic && !draftTemplate) {
+    for (const stale of db.listOpenEscalationsForConversation(updated.id)) {
+      db.resolveEscalation(stale.id, {
+        status: 'superseded',
+        resolved_text: 'voided: the kommun replied after this draft was written',
+      });
+      deps.log?.(`VOIDED escalation ${stale.id} for ${conv.kommun_namn}/${conv.role} — kommun replied after the draft`);
     }
   }
 

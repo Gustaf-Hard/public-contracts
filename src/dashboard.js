@@ -465,15 +465,22 @@ function loadCaseSummaries(db) {
       .prepare("SELECT COUNT(*) n FROM escalations WHERE conversation_id = ? AND status = 'open'")
       .get(c.id).n;
     const last = db.raw
-      .prepare('SELECT subject, body_text, direction FROM messages WHERE conversation_id = ? ORDER BY received_at DESC, id DESC LIMIT 1')
+      .prepare('SELECT subject, body_text, direction, analysis_json FROM messages WHERE conversation_id = ? ORDER BY received_at DESC, id DESC LIMIT 1')
       .get(c.id);
     const fu = effectiveFollowUp(c);
+    // Does this case need us even without a draft? The kommun spoke last and
+    // the analysis did not say to wait (an auto-ack or out-of-office is
+    // deliberate silence, not an unanswered reply).
+    let lastAction = null;
+    try { lastAction = JSON.parse(last?.analysis_json ?? 'null')?.suggested_action ?? null; } catch { /* unparsable */ }
+    const awaiting_us = last?.direction === 'inbound' && lastAction !== 'wait';
     return {
       conv_id: c.id, kommun_kod: c.kommun_kod, kommun_namn: c.kommun_namn, role: c.role,
       state: c.state, open_esc, follow_up_at: fu.date, follow_up_source: fu.source, since: caseSince(c),
       subject: last?.subject ?? 'Begäran om allmänna handlingar',
       snippet: (last?.body_text ?? '').replace(/\s+/g, ' ').trim().slice(0, 100),
       last_direction: last?.direction ?? null,
+      awaiting_us,
     };
   });
 }

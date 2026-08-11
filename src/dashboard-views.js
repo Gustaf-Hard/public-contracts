@@ -1689,6 +1689,11 @@ const ARENDEN_BUCKETS = [
 function caseBucket(c) {
   if (c.state === 'NEEDS_HUMAN' || (c.open_esc ?? 0) > 0) return 'behover_dig';
   if (CASE_STATUS[c.state]?.terminal) return 'stangda';
+  // The kommun spoke last and we are not deliberately silent. Keying the queue
+  // on open escalations alone hid exactly this: a draft voided because the
+  // kommun replied leaves no escalation, and the case would drop out of view
+  // with their reply unanswered.
+  if (c.awaiting_us) return 'behover_dig';
   return 'oppna';
 }
 
