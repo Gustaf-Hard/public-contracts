@@ -18,7 +18,26 @@ const DEFAULT_MODEL = 'claude-haiku-4-5';
 // The outbound identity (signature + sender address) comes from env, never
 // hardcoded (review M8): drafts must sign whatever GMAIL_FROM_NAME /
 // GMAIL_USER_EMAIL the daemon actually sends as. Exported for tests.
-export function buildSystemPrompt({ from_name, from_email }) {
+export function buildSystemPrompt({ from_name, from_email, billing_entity = null, billing_org_nr = null }) {
+  // A legal entity name and org number are facts, not something a model should
+  // produce: an early draft invented "Mediagraf AB" and offered it to a kommun
+  // as invoicing details. Like the signature identity, these come from env.
+  const BILLING_BLOCK = billing_entity
+    ? `# Faktureringsuppgifter
+
+HITTA ALDRIG PÅ ett företagsnamn eller organisationsnummer. Om en kommun kräver avgift och behöver faktureringsuppgifter är de exakt:
+${billing_entity}${billing_org_nr ? `
+Org.nr ${billing_org_nr}` : ''}
+${from_email}
+
+Skriv dem ordagrant, aldrig en förkortad eller gissad variant av namnet. Erbjud alltid först digital leverans (PDF via e-post) utan avgift innan du accepterar en kopieringstaxa.
+
+`
+    : `# Faktureringsuppgifter
+
+HITTA ALDRIG PÅ ett företagsnamn eller organisationsnummer. Inga faktureringsuppgifter är konfigurerade, så be operatören komplettera i stället för att gissa. Erbjud alltid först digital leverans (PDF via e-post) utan avgift innan du accepterar en kopieringstaxa.
+
+`;
   return `Du analyserar inkommande e-postsvar från svenska kommunregistratorer. En automatisk bot skickar förfrågningar om allmänna handlingar (offentlighetsprincipen, 2 kap. tryckfrihetsförordningen) avseende avtal för digitala verktyg och läromedel i skolan. Boten skickar sina förfrågningar via ${from_email} å Mediagrafs vägnar.
 
 Ditt jobb är att kategorisera registratorns svar och förbereda ett kort, artigt svar på svenska som den mänskliga operatören kan godkänna eller redigera.
@@ -52,7 +71,7 @@ SKRIVREGLER för draft_reply (gäller ALLTID):
 1. ALDRIG relativ tid. Skriv aldrig "för 10 dagar sedan", "förra veckan", "nyligen", "i går" eller liknande. Ett utkast skrivs av boten men skickas av en människa, kanske flera dagar senare, så varje påstående om förfluten tid är fel när kommunen läser det. Ange absolut datum ("min begäran från den 1 augusti 2026") eller utelämna tidsangivelsen helt. Datum som kommunen själv angett får återges.
 2. ALDRIG tankstreck (— eller –) som skiljetecken i löptext. Det läser som AI-skriven text. Använd punkt, komma eller kolon.
 
-# is_final_delivery
+${BILLING_BLOCK}# is_final_delivery
 
 true ENDAST när registratorn i sitt EGET svar (inte i citerad text) bekräftar att samtliga avtal nu har lämnats ut / att inga fler handlingar är på väg ("detta var samtliga avtal", "vi har inga ytterligare avtal"). Ett svar som bara citerar vår egen fråga "Är detta samtliga avtal?" är INTE en bekräftelse. false i alla andra fall.
 
@@ -323,6 +342,8 @@ export async function analyseMessage(body, ctx, { env = process.env, client = nu
   const systemPrompt = buildSystemPrompt({
     from_name: (env.GMAIL_FROM_NAME ?? '').trim() || 'Mediagraf',
     from_email: (env.GMAIL_USER_EMAIL ?? '').trim(),
+    billing_entity: (env.BILLING_ENTITY ?? '').trim() || null,
+    billing_org_nr: (env.BILLING_ORG_NR ?? '').trim() || null,
   });
 
   try {

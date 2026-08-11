@@ -425,3 +425,31 @@ describe('buildSystemPrompt — delay acks promise no date', () => {
     for (const d of drafts) expect(d).not.toMatch(/senast \d|senast \p{L}+ \d/u);
   });
 });
+
+describe('buildSystemPrompt — invoicing identity comes from env', () => {
+  // An early draft offered Halmstad "Mediagraf AB" as invoicing details. No such
+  // entity exists: the model invented a legal name. A company name and org
+  // number are facts, so they are configured like the signature identity and the
+  // prompt is told never to produce one.
+  it('states the configured entity verbatim and forbids inventing one', () => {
+    const p = buildSystemPrompt({
+      from_name: 'Gustaf', from_email: 'gustaf@mediagraf.se',
+      billing_entity: 'Mediagraf i Stockholm AB', billing_org_nr: '556884-7924',
+    });
+    expect(p).toContain('Mediagraf i Stockholm AB');
+    expect(p).toContain('Org.nr 556884-7924');
+    expect(p).toMatch(/HITTA ALDRIG PÅ ett företagsnamn/);
+    expect(p).toMatch(/ordagrant/);
+  });
+
+  it('asks the operator to fill it in rather than guessing when unconfigured', () => {
+    const p = buildSystemPrompt({ from_name: 'G', from_email: 'g@x.se' });
+    expect(p).toMatch(/Inga faktureringsuppgifter är konfigurerade/);
+    expect(p).not.toMatch(/Org\.nr \d/);
+  });
+
+  it('pushes free digital delivery before accepting a copying fee', () => {
+    const p = buildSystemPrompt({ from_name: 'G', from_email: 'g@x.se' });
+    expect(p).toMatch(/digital leverans .*utan avgift/);
+  });
+});
