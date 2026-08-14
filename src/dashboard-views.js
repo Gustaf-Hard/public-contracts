@@ -1908,7 +1908,7 @@ function renderThreadAtts(atts, cap = 4) {
   return `<div class="thread-atts">${chips}${more}</div>`;
 }
 
-export function renderThreadGroups(threads, messages, attachmentsByMsg, signatures, escalationsByThread, gmailReady) {
+export function renderThreadGroups(threads, messages, attachmentsByMsg, signatures, escalationsByThread, gmailReady, blankReply = null) {
   const byThread = new Map();
   for (const m of messages) {
     const key = m.thread_id ?? 'none';
@@ -1928,9 +1928,13 @@ export function renderThreadGroups(threads, messages, attachmentsByMsg, signatur
     // must never hide an escalation that was already opened (e.g. before the
     // operator muted the thread), or the action silently disappears.
     const threadEscs = escalationsByThread.get(t.id) ?? [];
+    // A case awaiting us with nothing drafted gets its write-a-reply box in the
+    // SAME slot a real draft would occupy, inside the thread it answers —
+    // rendering it below the thread list made it look like a separate widget.
+    const blankHere = blankReply && blankReply.threadId === t.id ? blankReply.html : '';
     // A thread with a pending escalation needs the operator (bold, "unread"-like
     // weight + light-red tint).
-    const needsAction = threadEscs.length > 0;
+    const needsAction = threadEscs.length > 0 || Boolean(blankHere);
     const star = t.status === 'primary' ? '<span class="thread-star" title="primär tråd">★</span> ' : '';
     const middle = [pv.subject, pv.summary].filter(Boolean).join(' — ');
     // One dense line: participants+count · subject — summary · date.
@@ -1948,7 +1952,7 @@ export function renderThreadGroups(threads, messages, attachmentsByMsg, signatur
     const threadAtts = msgs.flatMap((m) => attachmentsByMsg[m.id] ?? []);
     const attStrip = renderThreadAtts(threadAtts);
     const msgHtml = msgs.map((m, i) => threadMessage(m, attachmentsByMsg[m.id], signatures[m.id], i === msgs.length - 1)).join('');
-    const replies = threadEscs.map((e) => renderEscalationForm(e, gmailReady)).join('');
+    const replies = threadEscs.map((e) => renderEscalationForm(e, gmailReady)).join('') + blankHere;
     // Status controls live in a toolbar at the TOP of the expanded body — off
     // the dense row.
     const toolbar = `<div class="thread-toolbar">${threadStatusControls(t)}</div>`;
@@ -2095,8 +2099,21 @@ function renderCaseDetailPane(selected, gmailReady) {
   // recipient↔counterparty match — see groupEscalationsByThread).
   const escalationsByThread = groupEscalationsByThread(escalations, threads);
 
+  // Where the write-a-reply box goes: inside the thread carrying the message it
+  // answers, so it sits exactly where a drafted reply would. Only falls below
+  // the thread list when the message belongs to no thread.
+  const blankReplyHtml = needs_draft
+    ? renderBlankReplyBox({ conv, seed: draft_seed, to: draft_to, subject: draft_subject, gmailReady, returnTo })
+    : '';
+  const blankReplyThreadId = needs_draft
+    ? ([...messages].reverse().find((m) => m.direction === 'inbound')?.thread_id ?? null)
+    : null;
+  const blankReply = blankReplyHtml && blankReplyThreadId
+    ? { threadId: blankReplyThreadId, html: blankReplyHtml }
+    : null;
+
   const thread = threads.length
-    ? renderThreadGroups(threads, messages, attachmentsByMsg, signatures, escalationsByThread, gmailReady)
+    ? renderThreadGroups(threads, messages, attachmentsByMsg, signatures, escalationsByThread, gmailReady, blankReply)
     : (messages.length
         ? messages.map((m, i) => threadMessage(m, attachmentsByMsg[m.id], signatures[m.id], i === messages.length - 1)).join('')
         : '<p class="muted">Inga meddelanden ännu.</p>');
@@ -2131,7 +2148,7 @@ function renderCaseDetailPane(selected, gmailReady) {
     </div>
     <div class="thread-msgs">${thread}</div>
     ${replyBoxes}
-    ${needs_draft ? renderBlankReplyBox({ conv, seed: draft_seed, to: draft_to, subject: draft_subject, gmailReady, returnTo }) : ''}
+    ${blankReply ? '' : blankReplyHtml}
     ${renderHandoffSuggestions(handoff_targets, conv.id, gmailReady)}
     ${renderCaseActions(conv, gmailReady, returnTo)}
   </div>`;

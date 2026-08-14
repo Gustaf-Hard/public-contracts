@@ -1323,3 +1323,36 @@ describe('a case with no draft can still be answered', () => {
     } finally { spy.mockRestore(); }
   });
 });
+
+describe('the write-a-reply box sits in the thread', () => {
+  // A drafted reply renders inside its thread group. The blank box used to
+  // render below the whole thread list, so it read as a separate widget
+  // bolted on rather than "the answer goes here".
+  it('renders inside the thread group carrying the message it answers', async () => {
+    const convId = db.createConversation({
+      kommun_kod: '2418', kommun_namn: 'Malå', role: 'central',
+      contact_email: 'kommun@mala.se', scheduled_send_at: '2026-07-01T00:00:00Z',
+    });
+    db.updateConversationState(convId, 'DELIVERING', { gmail_thread_id: 'thr-t' });
+    const threadId = db.upsertThread({
+      conversation_id: convId, gmail_thread_id: 'thr-t',
+      counterparty_email: 'kommun@mala.se', counterparty_name: 'Malå',
+    }).id;
+    db.recordMessage({
+      conversation_id: convId, gmail_message_id: 'in-t', direction: 'inbound', thread_id: threadId,
+      from_email: 'kommun@mala.se', to_email: 'me@x.se', subject: 'Avtalskopior',
+      body_text: 'Här kommer avtalen.', classification: 'delivery', classification_confidence: 0.9,
+      received_at: '2026-08-01T10:00:00Z', attachment_count: 0,
+      analysis_json: JSON.stringify({ intent: 'delivery', suggested_action: 'send_receipt', draft_reply: 'Tack för avtalen!', extracted: {} }),
+    });
+
+    const res = await get(appWithFakes(), `/arenden/${convId}`);
+    const box = res.text.indexOf('/reply');
+    const groupEnd = res.text.indexOf('</section>', res.text.indexOf('thread-group'));
+    expect(box).toBeGreaterThan(-1);
+    // The box must appear before its thread group closes, i.e. inside it.
+    expect(box).toBeLessThan(groupEnd);
+    // And the thread must flag itself as needing the operator.
+    expect(res.text).toMatch(/thread-needs-action/);
+  });
+});
