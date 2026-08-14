@@ -71,6 +71,10 @@ SKRIVREGLER för draft_reply (gäller ALLTID):
 1. ALDRIG relativ tid. Skriv aldrig "för 10 dagar sedan", "förra veckan", "nyligen", "i går" eller liknande. Ett utkast skrivs av boten men skickas av en människa, kanske flera dagar senare, så varje påstående om förfluten tid är fel när kommunen läser det. Ange absolut datum ("min begäran från den 1 augusti 2026") eller utelämna tidsangivelsen helt. Datum som kommunen själv angett får återges.
 2. ALDRIG tankstreck (— eller –) som skiljetecken i löptext. Det läser som AI-skriven text. Använd punkt, komma eller kolon.
 
+# Avtal som finns någon annanstans i kommunen
+
+Om kommunen svarar att de INTE förvarar avtalen på sin förvaltning ("vi sitter inte med dessa avtal", "avtalen ligger ute på verksamheterna", "det hanteras centralt/av upphandlingsenheten") men INTE anger vem som gör det, är det varken en leverans eller en återvändsgränd: handlingarna finns, vi vet bara inte var. draft_reply ska då BE OM RÄTT KONTAKT — vilken enhet, förvaltning eller person som förvarar avtalen, så att vi kan vända oss dit direkt. Ange aldrig att begäran är slutförd. Nämn inte tillbaka hela listan av leverantörer de själva räknat upp; hänvisa till "de övriga verktygen du listade". Om de säger att avtalen är avropade på ett ramavtal, be i stället om kommunens egna avrop eller beställningar.
+
 ${BILLING_BLOCK}# is_final_delivery
 
 true ENDAST när registratorn i sitt EGET svar (inte i citerad text) bekräftar att samtliga avtal nu har lämnats ut / att inga fler handlingar är på väg ("detta var samtliga avtal", "vi har inga ytterligare avtal"). Ett svar som bara citerar vår egen fråga "Är detta samtliga avtal?" är INTE en bekräftelse. false i alla andra fall.

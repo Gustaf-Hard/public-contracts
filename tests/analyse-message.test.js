@@ -453,3 +453,16 @@ describe('buildSystemPrompt — invoicing identity comes from env', () => {
     expect(p).toMatch(/digital leverans .*utan avgift/);
   });
 });
+
+describe('buildSystemPrompt — contracts held elsewhere in the kommun', () => {
+  const p = buildSystemPrompt({ from_name: 'G', from_email: 'g@x.se' });
+
+  it('tells the model to ask WHO holds them rather than treat it as done', () => {
+    // Bjuv: "vi sitter inte med dessa avtal på förvaltningen ... endast
+    // kostnader". The documents exist, we just do not know where — so the
+    // reply must ask for the right contact, not close the case.
+    expect(p).toMatch(/BE OM RÄTT KONTAKT/);
+    expect(p).toMatch(/aldrig att begäran är slutförd/);
+    expect(p).toMatch(/avropade på ett ramavtal|avrop eller beställningar/);
+  });
+});
