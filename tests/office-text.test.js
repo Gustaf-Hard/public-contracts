@@ -82,3 +82,27 @@ describe('xlsx cell types', () => {
     expect(text.split(/\s+/)).not.toContain('1');
   });
 });
+
+describe('attachment path resolution', () => {
+  // Rows written before the AWS migration hold laptop-relative paths
+  // ("data/contracts/0381/..."). On the box those resolve to nothing, so the
+  // file is skipped forever — invisible, because the only symptom is an
+  // attachment that never gets analysed.
+  it('re-roots a legacy relative path onto the configured contracts dir', async () => {
+    const { resolveAttachmentPath } = await import('../src/analyse-contract.js');
+    expect(resolveAttachmentPath('data/contracts/0381/a.xlsx', '/var/lib/mediagraf/contracts'))
+      .toBe('/var/lib/mediagraf/contracts/0381/a.xlsx');
+  });
+
+  it('leaves an absolute path untouched', async () => {
+    const { resolveAttachmentPath } = await import('../src/analyse-contract.js');
+    expect(resolveAttachmentPath('/var/lib/mediagraf/contracts/1445/b.xlsx', '/var/lib/mediagraf/contracts'))
+      .toBe('/var/lib/mediagraf/contracts/1445/b.xlsx');
+  });
+
+  it('is a no-op when the contracts dir is the legacy one', async () => {
+    const { resolveAttachmentPath } = await import('../src/analyse-contract.js');
+    expect(resolveAttachmentPath('data/contracts/0381/a.pdf', 'data/contracts'))
+      .toContain('data/contracts/0381/a.pdf');
+  });
+});

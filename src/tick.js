@@ -610,7 +610,7 @@ async function dispatchEscalationForIngest(pending, deps) {
   if (draftTemplate === 'T_RECEIPT') {
     const analyseContracts = deps.analyseContracts ?? analysePendingContracts;
     try {
-      await analyseContracts({ db, env, log: deps.log, onlyMessageId: messageId });
+      await analyseContracts({ db, env, log: deps.log, onlyMessageId: messageId, contractsDir: deps.contractsDir });
       const { all } = computeReceivedMissing(db.listContractInfoForMessage(messageId));
       watchlistVendors = matchWatchlist(all);
       // Coverage spans the CONVERSATION, not just this message: scoped to one
@@ -639,7 +639,7 @@ async function dispatchEscalationForIngest(pending, deps) {
     // the one thing this mail must not do.
     const analyseContracts = deps.analyseContracts ?? analysePendingContracts;
     try {
-      await analyseContracts({ db, env, log: deps.log, onlyMessageId: messageId });
+      await analyseContracts({ db, env, log: deps.log, onlyMessageId: messageId, contractsDir: deps.contractsDir });
     } catch (e) {
       deps.log?.(`crosscheck contract analysis error: ${e.message}`);
     }
@@ -662,7 +662,7 @@ async function dispatchEscalationForIngest(pending, deps) {
     // batch must still surface to a human rather than be analysed silently.
     const analyseContracts = deps.analyseContracts ?? analysePendingContracts;
     try {
-      await analyseContracts({ db, env, log: deps.log, onlyMessageId: messageId });
+      await analyseContracts({ db, env, log: deps.log, onlyMessageId: messageId, contractsDir: deps.contractsDir });
       const { all } = computeReceivedMissing(db.listContractInfoForMessage(messageId));
       watchlistVendors = matchWatchlist(all);
       if (watchlistVendors.length > 0) {
@@ -887,7 +887,7 @@ export async function runTick(deps) {
   // Injectable for tests; failures must never break the tick.
   const analyseContracts = deps.analyseContracts ?? analysePendingContracts;
   try {
-    await analyseContracts({ db, env, log: deps.log });
+    await analyseContracts({ db, env, log: deps.log, contractsDir: deps.contractsDir });
   } catch (e) {
     deps.log?.(`contract analysis error: ${e.message}`);
   }

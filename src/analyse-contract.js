@@ -9,7 +9,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { readFileSync, existsSync } from 'node:fs';
 import { isOfficeDoc, officeTextFromBuffer } from './office-text.js';
-import { resolve } from 'node:path';
+import { resolve, isAbsolute, join } from 'node:path';
 import { GRADE_LEVELS, MUNICIPAL_GRADE_LEVELS, mapUnitToGradeLevels } from './vendor-analytics.js';
 
 const DEFAULT_MODEL = 'claude-opus-4-8';
@@ -482,7 +482,25 @@ export function storeContractAnalysis(db, attachmentId, analysis, { model, log =
 // Analyse every PDF attachment that has no contracts row yet. Errors on one
 // PDF never block the others, and never throw to the caller (tick safety).
 // Returns the number of attachments successfully analysed+stored.
-export async function analysePendingContracts({ db, env = process.env, client = null, log = null, force = false, onlyId = null, onlyMessageId = null } = {}) {
+
+// Where an attachment actually lives now.
+//
+// Rows written before the AWS migration carry laptop-relative paths
+// ("data/contracts/<kod>/<file>"); on the box the files sit under
+// /var/lib/mediagraf/contracts. Without re-rooting, those attachments are
+// skipped forever and the only symptom is that they are never analysed — which
+// is how 7 avtalslistor stayed unread. Absolute paths pass through untouched.
+export function resolveAttachmentPath(savedPath, contractsDir) {
+  const p = String(savedPath ?? '');
+  if (!p) return p;
+  if (isAbsolute(p)) return p;
+  const legacy = p.replace(/^\.?\/?data\/contracts\/?/, '');
+  if (legacy !== p && contractsDir) return join(contractsDir, legacy);
+  return resolve(p);
+}
+
+export async function analysePendingContracts({ db, env = process.env, client = null, log = null, force = false, onlyId = null, onlyMessageId = null, contractsDir = null } = {}) {
+  const docsDir = contractsDir ?? env.PILOT_CONTRACTS_DIR ?? 'data/contracts';
   if (!client && !(env.ANTHROPIC_API_KEY && env.ANTHROPIC_API_KEY.trim())) return 0;
 
   let pending = force
@@ -502,7 +520,7 @@ export async function analysePendingContracts({ db, env = process.env, client = 
   const model = env.ANTHROPIC_CONTRACT_MODEL ?? DEFAULT_MODEL;
   let done = 0;
   for (const att of pending) {
-    const fullPath = resolve(att.saved_path);
+    const fullPath = resolveAttachmentPath(att.saved_path, docsDir);
     if (!existsSync(fullPath)) {
       log?.(`contract-analysis: file missing on disk, skipping ${att.filename}`);
       continue;
