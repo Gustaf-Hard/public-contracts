@@ -182,3 +182,46 @@ describe('undocumented stays inside the scope we asked about', () => {
     expect(f.channels_seen.map((c) => c.canonical)).toContain('Skolon');
   });
 });
+
+describe('a bare vendor name from a ledger is not a claim', () => {
+  // An invoice ledger yields {vendor:"Visma Amili", product:""} — a name we
+  // were paid-by-invoice evidence for, with nothing saying it is a school
+  // agreement. Unknown company + no description = we do not know what it is,
+  // so we must not tell a kommun they owe us its contract.
+  const rowWith = (mentions) => ([{
+    is_contract: 0, vendor_name: null,
+    analysis_json: JSON.stringify({ mentioned_agreements: mentions }),
+  }]);
+
+  it('drops an unknown vendor with no description when it came from a ledger', () => {
+    // Contrast with the mention-inside-a-real-avtal case above, which IS kept
+    // verbatim: there the kommun's own contract names the other agreement.
+    const f = buildCoverageFacts(rowWith([
+      { vendor: 'Visma Amili', product: '', doc_attached: false },
+      { vendor: 'Secure Appbox', product: null, doc_attached: false },
+      { vendor: 'Höglandsförbundet', doc_attached: false },
+    ]));
+    expect(f.undocumented).toEqual([]);
+  });
+
+  it('keeps a KNOWN school supplier even with no description', () => {
+    // The KB already tells us SchoolSoft is a lärplattform, so the missing
+    // description costs us nothing.
+    const f = buildCoverageFacts(rowWith([
+      { vendor: 'SchoolSoft', product: '', doc_attached: false },
+      { vendor: 'Advania', product: '', doc_attached: false },
+    ]));
+    expect(f.undocumented.map((u) => u.name ?? u.canonical)).toEqual(['SchoolSoft']);
+  });
+
+  it('recognises the real out-of-scope wording from the fleet', () => {
+    const f = buildCoverageFacts(rowWith([
+      { vendor: 'Matilda FoodTech', product: 'Kostdatasystem', doc_attached: false },
+      { vendor: 'CGI', product: 'Ekonomi- och inköpssystem', doc_attached: false },
+      { vendor: 'Mediacenter', product: 'AV-produkter, hemelektronik och tjänster', doc_attached: false },
+      { vendor: 'Macsupport', product: 'Plattor och Chromebooks med tillbehör 2022', doc_attached: false },
+      { vendor: 'Konica Minolta', product: 'Skrivare och multifunktionsskrivare', doc_attached: false },
+    ]));
+    expect(f.undocumented).toEqual([]);
+  });
+});

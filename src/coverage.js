@@ -38,13 +38,15 @@ const NOT_REQUESTED = [
 // och läromedel inom skola och utbildning. Matched on the product/description
 // text, never on the vendor name: the same company can supply both.
 const OUT_OF_SCOPE = [
-  /kost(plattform|data)?\b|måltid|skolmat|livsmedel/i,
+  /kostdata|kostplattform|kost-?system|måltid|skolmat|livsmedel/i,
   /möbler|inredning|lekmaterial|läromedel.*tryckta|tryckta läromedel/i,
   /skolskjuts|transport|buss\b/i,
   /skrivare|kopiering|utskrift|\bmfp\b|papper/i,
-  /inkasso|ekonomisystem|fakturaservice|löne(system)?\b/i,
+  /inkasso|ekonomi|inköpssystem|fakturaservice|löne/i,
   /vård|omsorg|hemtjänst|bemanning|rekrytering/i,
   /städ|fastighet|larm|passersystem/i,
+  /av-produkter|hemelektronik/i,
+  /chromebook|plattor|hårdvara|dator(er)?\b|surfplatt/i,
 ];
 
 export function isOutOfScopeMention(m) {
@@ -120,7 +122,11 @@ export function buildCoverageFacts(rows = []) {
   // anything already received is not asked for again.
   const undocumented = [];
   const seenUndoc = new Set();
-  for (const { a } of parsed) {
+  for (const { r, a } of parsed) {
+    // Was this mention made INSIDE an actual avtal, or harvested from a
+    // summary/ledger? A contract that names another agreement is real evidence;
+    // an invoice line is a payment, not a statement about agreements.
+    const fromContract = Boolean(r.is_contract);
     for (const m of a?.mentioned_agreements ?? []) {
       const name = m?.vendor;
       if (!name) continue;
@@ -133,6 +139,12 @@ export function buildCoverageFacts(rows = []) {
       // Never ask for something we said we did not want, or that the document
       // says no longer exists.
       if (isNotRequestedMention(m) || isOutOfScopeMention(m)) continue;
+      // An invoice ledger yields bare names: {vendor:'Visma Amili', product:''}.
+      // If the KB does not know the company AND the document says nothing about
+      // what it supplies, we cannot claim a school contract is missing — we do
+      // not know what it is. Known KB services are exempt: the KB is the
+      // description.
+      if (!fromContract && !resolved && !String(m.product ?? '').trim()) continue;
       if (resolved) {
         if (received.has(resolved.slug) || seenUndoc.has(resolved.slug)) continue;
         seenUndoc.add(resolved.slug);
