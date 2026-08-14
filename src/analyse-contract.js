@@ -8,6 +8,7 @@
 
 import Anthropic from '@anthropic-ai/sdk';
 import { readFileSync, existsSync } from 'node:fs';
+import { isOfficeDoc, officeTextFromBuffer } from './office-text.js';
 import { resolve } from 'node:path';
 import { GRADE_LEVELS, MUNICIPAL_GRADE_LEVELS, mapUnitToGradeLevels } from './vendor-analytics.js';
 
@@ -164,6 +165,43 @@ export async function analyseContractPdf(pdfBuffer, ctx, { env = process.env, cl
     } catch {
       return null;
     }
+  } catch (e) {
+    console.warn(`[analyse-contract] LLM call failed for ${ctx.filename}: ${e.message}`);
+    return null;
+  }
+}
+
+
+// Same analysis for a document we can only read as text (xlsx/docx). The
+// prompt and schema are identical; only the content block differs, so a
+// spreadsheet of avtal is extracted exactly like a PDF of one.
+export async function analyseContractText(text, ctx, { env = process.env, client = null } = {}) {
+  if (!text || !text.trim()) return null;
+  const sdkClient = client ?? getClient(env.ANTHROPIC_API_KEY);
+  if (!sdkClient) return null;
+
+  const model = env.ANTHROPIC_CONTRACT_MODEL ?? DEFAULT_MODEL;
+  try {
+    const response = await sdkClient.messages.create({
+      model,
+      max_tokens: 2048,
+      system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
+      messages: [{
+        role: 'user',
+        content: [{
+          type: 'text',
+          text: `Kommun: ${ctx.kommun_namn}\nFilnamn: ${ctx.filename}\n\n`
+            + `Nedan är textinnehållet ur filen (kalkylblad eller dokument, inte en PDF). `
+            + `Radstrukturen kan vara förlorad. Om filen är en LISTA över avtal snarare än `
+            + `ett enskilt avtal, sätt document_type "följebrev_sammanställning" och lista `
+            + `varje nämnd leverantör i mentioned_agreements med doc_attached=false.\n\n${text}`,
+        }],
+      }],
+      output_config: { format: { type: 'json_schema', schema: CONTRACT_SCHEMA } },
+    });
+    const textBlock = (response.content ?? []).find((b) => b.type === 'text');
+    if (!textBlock?.text) return null;
+    try { return JSON.parse(textBlock.text); } catch { return null; }
   } catch (e) {
     console.warn(`[analyse-contract] LLM call failed for ${ctx.filename}: ${e.message}`);
     return null;
@@ -453,7 +491,8 @@ export async function analysePendingContracts({ db, env = process.env, client = 
         FROM attachments a
         JOIN messages m ON m.id = a.message_id
         JOIN conversations conv ON conv.id = m.conversation_id
-        WHERE (a.mime_type = 'application/pdf' OR lower(a.filename) LIKE '%.pdf')
+        WHERE (a.mime_type = 'application/pdf' OR lower(a.filename) LIKE '%.pdf'
+               OR lower(a.filename) LIKE '%.xlsx' OR lower(a.filename) LIKE '%.docx')
         ORDER BY a.id
       `).all()
     : db.listPendingContractAttachments();
@@ -468,9 +507,18 @@ export async function analysePendingContracts({ db, env = process.env, client = 
       log?.(`contract-analysis: file missing on disk, skipping ${att.filename}`);
       continue;
     }
-    const analysis = await analyseContractPdf(readFileSync(fullPath), {
-      kommun_namn: att.kommun_namn, filename: att.filename,
-    }, { env, client });
+    const buf = readFileSync(fullPath);
+    const ctx = { kommun_namn: att.kommun_namn, filename: att.filename };
+    let analysis;
+    if (isOfficeDoc(att.filename)) {
+      // A kommun that answers with a spreadsheet of avtal must be read too,
+      // not stored and ignored while the follow-up asks what they already sent.
+      const text = officeTextFromBuffer(buf, att.filename);
+      if (!text) { log?.(`contract-analysis: no readable text in ${att.filename}`); continue; }
+      analysis = await analyseContractText(text, ctx, { env, client });
+    } else {
+      analysis = await analyseContractPdf(buf, ctx, { env, client });
+    }
     if (!analysis) continue; // stays pending; next run retries
     storeContractAnalysis(db, att.id, analysis, { model, log });
     log?.(`CONTRACT analysed: ${att.filename} → ${analysis.is_contract ? (analysis.vendor_name ?? 'okänd leverantör') : 'ej avtal'}`);

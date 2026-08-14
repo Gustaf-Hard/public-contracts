@@ -668,7 +668,7 @@ describe('runTick — non-PDF attachments are stored, never silently dropped', (
     return gmail;
   }
 
-  it('stores an .xlsx attachment as a row + file on disk, but never queues it for contract analysis', async () => {
+  it('stores an .xlsx attachment as a row + file on disk, and queues it for analysis (it may be the avtalslista)', async () => {
     const id = convInState();
     const xlsxMime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
     const msg = deliveryMsg([
@@ -685,10 +685,14 @@ describe('runTick — non-PDF attachments are stored, never silently dropped', (
     expect(existsSync(rows[0].saved_path)).toBe(true);
     expect(readFileSync(rows[0].saved_path).toString()).toBe('PK-xlsx-bytes');
     // Stored — but the Opus contract analyser must never see it.
-    expect(db.listPendingContractAttachments()).toEqual([]);
+    // Essunga answered with "Avtalslista Lärresurser 2026.xlsx" — the very list
+    // of digitala läromedel we asked for. Storing it unread meant the follow-up
+    // then asked whether they had any läromedel at all.
+    expect(db.listPendingContractAttachments().map((a) => a.filename))
+      .toEqual(['Sammanställning avtal.xlsx']);
   });
 
-  it('stores a .docx alongside a .pdf; only the PDF is queued for analysis', async () => {
+  it('queues a .docx alongside a .pdf — both are readable as documents', async () => {
     const id = convInState('0180', 'Stockholm');
     const docxMime = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
     const msg = deliveryMsg([
@@ -701,7 +705,7 @@ describe('runTick — non-PDF attachments are stored, never silently dropped', (
 
     const rows = db.raw.prepare('SELECT a.* FROM attachments a JOIN messages m ON m.id=a.message_id WHERE m.conversation_id=? ORDER BY a.filename').all(id);
     expect(rows.map((a) => a.filename)).toEqual(['Avtal.pdf', 'Följebrev.docx']);
-    expect(db.listPendingContractAttachments().map((a) => a.filename)).toEqual(['Avtal.pdf']);
+    expect(db.listPendingContractAttachments().map((a) => a.filename)).toEqual(['Avtal.pdf', 'Följebrev.docx']);
   });
 
   it('skips a tiny inline signature image without even fetching it, but keeps attachment_count honest', async () => {
@@ -1093,5 +1097,28 @@ describe('runTick — final checklist', () => {
 
     expect(db.getConversation(id).state).toBe('CROSSCHECK');   // state still advances
     expect(db.listOpenEscalationsForConversation(id)).toHaveLength(0);  // but no draft
+  });
+});
+
+describe('image attachments stay out of contract analysis', () => {
+  // Widening the gate to xlsx/docx must not sweep in signature logos and
+  // screenshots: they cost an LLM call each and can never be a contract.
+  it('stores a .png but never queues it', async () => {
+    const convId = db.createConversation({
+      kommun_kod: '55', kommun_namn: 'Bildkommun', role: 'central',
+      contact_email: 'k@bild.se', scheduled_send_at: '2026-05-01T00:00:00Z',
+    });
+    db.updateConversationState(convId, 'SENT', { gmail_thread_id: 'thr-i', last_outbound_at: '2026-05-01T00:00:00Z' });
+    const msg = {
+      id: 'in-i', threadId: 'thr-i',
+      payload: { mimeType: 'multipart/mixed', headers: [
+        { name: 'From', value: 'Kommun <k@bild.se>' }, { name: 'To', value: 'me@x.se' }, { name: 'Subject', value: 'Sv' },
+      ], parts: [
+        { mimeType: 'text/plain', body: { data: b64('Se bifogad bild.') } },
+        { mimeType: 'image/png', filename: 'skarmbild.png', body: { attachmentId: 'a-png', size: 90_000 } },
+      ] },
+    };
+    await runTick(makeDeps({ gmail: fakeGmail({ listResult: [{ id: 'in-i' }], getResult: { 'in-i': msg } }) }));
+    expect(db.listPendingContractAttachments().map((a) => a.filename)).toEqual([]);
   });
 });

@@ -15,6 +15,31 @@ function parseAnalysis(a) {
   return a && typeof a === 'object' ? a : null;
 }
 
+// A mention we would never have asked for is not a missing contract.
+//
+// T_INITIAL explicitly disclaims bilagor (kravspec, SLA, säkerhet, definitioner)
+// and personuppgiftsbiträdesavtal, so counting them as "missing" contradicts our
+// own request. And a product the document itself marks as shut down cannot be
+// sent by anyone. Essunga's draft claimed contracts were withheld on the
+// strength of one line inside a Unikum contract: "Pluttra — Dokumentationsverktyg
+// (nedlagt)". This is a whitelist of noise, not a heuristic about vendors.
+const NOT_REQUESTED = [
+  /personuppgiftsbitr/i,          // PUB-avtal — explicitly not wanted
+  /\bpub[\s-]?avtal\b/i,
+  /kravspec/i,
+  /servicenivå|\bsla\b/i,
+  /säkerhetsbilaga|definitionsbilaga/i,
+  /\bbilaga\b/i,
+];
+const DISCONTINUED = /\b(nedlagt|nedlagd|avvecklad|avvecklat|upphört|upphörd|uppsagt|uppsagd|avslutat|avslutad|utgången|utgått)\b/i;
+
+export function isNotRequestedMention(m) {
+  const text = `${m?.product ?? ''} ${m?.note ?? ''}`.trim();
+  if (!text) return false;
+  if (DISCONTINUED.test(text)) return true;
+  return NOT_REQUESTED.some((re) => re.test(text));
+}
+
 // buildCoverageFacts(rows) → the honest ground truth for one conversation.
 //
 //   received            KB services we hold a real contract for, products nested
@@ -84,6 +109,9 @@ export function buildCoverageFacts(rows = []) {
         if (resolved.role === 'channel') { noteChannel(resolved); continue; }
       }
       if (m.doc_attached !== false) continue;
+      // Never ask for something we said we did not want, or that the document
+      // says no longer exists.
+      if (isNotRequestedMention(m)) continue;
       if (resolved) {
         if (received.has(resolved.slug) || seenUndoc.has(resolved.slug)) continue;
         seenUndoc.add(resolved.slug);

@@ -107,3 +107,41 @@ describe('buildCoverageFacts', () => {
     expect(f.channels_seen.map((c) => c.slug)).toEqual(['adda']);
   });
 });
+
+describe('undocumented ignores what we never asked for', () => {
+  // T_INITIAL explicitly disclaims bilagor and PUB-avtal, so counting them as
+  // "missing" contradicts our own request. And a mention flagged as shut down
+  // is not a contract anyone can send. Essunga's draft claimed contracts were
+  // missing on the strength of one line inside a Unikum contract:
+  //   { vendor: 'Pluttra', product: 'Dokumentationsverktyg (nedlagt)' }
+  const rowWith = (mentions) => ([{
+    is_contract: 1, vendor_name: 'Unikum',
+    analysis_json: JSON.stringify({ mentioned_agreements: mentions }),
+  }]);
+
+  it('does not treat a discontinued tool as a missing contract', () => {
+    const f = buildCoverageFacts(rowWith([
+      { vendor: 'Pluttra', product: 'Dokumentationsverktyg (nedlagt)', doc_attached: false },
+    ]));
+    expect(f.undocumented).toEqual([]);
+    expect(f.has_missing).toBe(false);
+  });
+
+  it('ignores the annexes and PUB-avtal our own request disclaims', () => {
+    const f = buildCoverageFacts(rowWith([
+      { vendor: 'Skola24', product: 'Personuppgiftsbiträdesavtal', doc_attached: false },
+      { vendor: 'Teachiq', product: 'PUB-avtal', doc_attached: false },
+      { vendor: 'Atea', product: 'Servicenivåavtal (SLA)', doc_attached: false },
+      { vendor: 'IST', product: 'Kravspecifikation bilaga 3', doc_attached: false },
+    ]));
+    expect(f.undocumented).toEqual([]);
+  });
+
+  it('still reports a genuinely missing contract', () => {
+    const f = buildCoverageFacts(rowWith([
+      { vendor: 'Gleerups', product: 'Digitala läromedel', doc_attached: false },
+    ]));
+    expect(f.undocumented.map((u) => u.name ?? u.canonical)).toEqual(['Gleerups']);
+    expect(f.has_missing).toBe(true);
+  });
+});

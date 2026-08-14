@@ -811,7 +811,10 @@ export function openDb(path) {
       JOIN conversations conv ON conv.id = m.conversation_id
       LEFT JOIN contracts c ON c.attachment_id = a.id
       WHERE c.id IS NULL
-        AND (a.mime_type = 'application/pdf' OR lower(a.filename) LIKE '%.pdf')
+        AND (a.mime_type = 'application/pdf' OR lower(a.filename) LIKE '%.pdf'
+             -- Spreadsheets and documents are read as text (src/office-text.js):
+             -- a kommun's "Avtalslista.xlsx" is exactly the vendor list we want.
+             OR lower(a.filename) LIKE '%.xlsx' OR lower(a.filename) LIKE '%.docx')
       ORDER BY a.id
     `).all();
   }
