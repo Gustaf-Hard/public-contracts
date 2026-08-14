@@ -29,12 +29,30 @@ function decodeXml(s) {
   });
 }
 
-// Text nodes in document order, tags dropped, runs joined with a space.
-function textFromXml(xml, tagRe) {
+// Text nodes in document order, tags dropped.
+//
+// The `<tag/>` alternative is not cosmetic: an empty cell is written
+// self-closing, and without it a `(.*?)</t>` match starting at `<t/>` runs on
+// to the NEXT element's closing tag and drags the markup in with it. Aneby's
+// supplier ledger came out full of literal "</si><si><t>" that way.
+function textFromXml(xml, tag) {
+  const re = new RegExp(`<${tag}\\b[^>]*?/>|<${tag}\\b[^>]*>([\\s\\S]*?)</${tag}>`, 'g');
   const out = [];
-  for (const m of xml.matchAll(tagRe)) {
+  for (const m of xml.matchAll(re)) {
+    if (m[1] === undefined) continue;          // self-closing: empty by definition
     const t = decodeXml(m[1]).trim();
     if (t) out.push(t);
+  }
+  return out;
+}
+
+// The shared-string table, indexed the way cells reference it: one entry per
+// <si>. An <si> may hold several <t> (rich text runs), so counting <t> shifts
+// every later index and cells resolve to the wrong supplier.
+function sharedStrings(xml) {
+  const out = [];
+  for (const si of xml.matchAll(/<si\b[^>]*?\/>|<si\b[^>]*>([\s\S]*?)<\/si>/g)) {
+    out.push(si[1] === undefined ? '' : textFromXml(si[1], 't').join(''));
   }
   return out;
 }
@@ -54,7 +72,7 @@ export function officeTextFromBuffer(buffer, filename, { maxChars = 200_000 } = 
       // Most cell text lives in the shared-string table; inline strings (<is>)
       // and numbers live in the sheets.
       const sst = files['xl/sharedStrings.xml'];
-      const shared = sst ? textFromXml(strFromU8(sst), /<t[^>]*>([\s\S]*?)<\/t>/g) : [];
+      const shared = sst ? sharedStrings(strFromU8(sst)) : [];
       for (const name of Object.keys(files)) {
         if (!/^xl\/worksheets\/.*\.xml$/i.test(name)) continue;
         const xml = strFromU8(files[name]);
@@ -70,7 +88,7 @@ export function officeTextFromBuffer(buffer, filename, { maxChars = 200_000 } = 
             const v = shared[idx];
             if (v) parts.push(v);
           } else if (type === 'inlineStr') {
-            parts.push(...textFromXml(inner, /<t[^>]*>([\s\S]*?)<\/t>/g));
+            parts.push(...textFromXml(inner, 't'));
           } else {
             const v = decodeXml(/<v>([\s\S]*?)<\/v>/.exec(inner)?.[1] ?? '').trim();
             if (v) parts.push(v);
@@ -78,10 +96,10 @@ export function officeTextFromBuffer(buffer, filename, { maxChars = 200_000 } = 
         }
       }
       // A sheet we could not walk cell-wise still yields its vocabulary.
-      if (parts.length === 0) parts.push(...shared);
+      if (parts.length === 0) parts.push(...shared.filter(Boolean));
     } else {
       const doc = files['word/document.xml'];
-      if (doc) parts.push(...textFromXml(strFromU8(doc), /<w:t[^>]*>([\s\S]*?)<\/w:t>/g));
+      if (doc) parts.push(...textFromXml(strFromU8(doc), 'w:t'));
     }
   } catch {
     return null;

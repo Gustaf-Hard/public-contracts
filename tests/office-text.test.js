@@ -106,3 +106,39 @@ describe('attachment path resolution', () => {
       .toContain('data/contracts/0381/a.pdf');
   });
 });
+
+describe('xlsx shared-string edge cases that corrupt real files', () => {
+  // Aneby's supplier ledger came back with literal "</si><si><t>" inside the
+  // text. Cause: an empty shared string is written self-closing (<t/>), which
+  // has no </t>, so a naive <t...>(.*?)</t> match swallows everything up to the
+  // NEXT cell's closing tag and drags the markup along with it.
+  it('does not swallow markup when a shared string is self-closing', () => {
+    const sst = '<?xml version="1.0"?><sst><si><t/></si><si><t>Advania</t></si><si><t>Tietoevry</t></si></sst>';
+    const sheet = `<?xml version="1.0"?><worksheet><sheetData>
+      <row><c r="A1" t="s"><v>1</v></c><c r="A2" t="s"><v>2</v></c></row>
+    </sheetData></worksheet>`;
+    const buf = Buffer.from(zipSync({
+      'xl/sharedStrings.xml': strToU8(sst), 'xl/worksheets/sheet1.xml': strToU8(sheet),
+    }));
+    const text = officeTextFromBuffer(buf, 'ledger.xlsx');
+    expect(text).not.toMatch(/<\/?si>|<\/?t>|<c |<v>/);
+    expect(text).toContain('Advania');
+    expect(text).toContain('Tietoevry');
+  });
+
+  // A rich-text shared string is <si><r><t>a</t></r><r><t>b</t></r></si> — ONE
+  // entry made of two <t>. Counting <t> instead of <si> shifts every later
+  // index, so cells resolve to the wrong supplier entirely.
+  it('keeps shared-string indices aligned when an entry has rich-text runs', () => {
+    const sst = '<?xml version="1.0"?><sst>'
+      + '<si><r><t>Konica</t></r><r><t> Minolta</t></r></si>'
+      + '<si><t>Axiell</t></si></sst>';
+    const sheet = '<?xml version="1.0"?><worksheet><sheetData>'
+      + '<row><c r="A1" t="s"><v>1</v></c></row></sheetData></worksheet>';
+    const buf = Buffer.from(zipSync({
+      'xl/sharedStrings.xml': strToU8(sst), 'xl/worksheets/sheet1.xml': strToU8(sheet),
+    }));
+    // Index 1 is Axiell. Flat <t> counting would have made it " Minolta".
+    expect(officeTextFromBuffer(buf, 'x.xlsx')).toContain('Axiell');
+  });
+});
