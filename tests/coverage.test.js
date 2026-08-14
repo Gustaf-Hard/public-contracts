@@ -145,3 +145,40 @@ describe('undocumented ignores what we never asked for', () => {
     expect(f.has_missing).toBe(true);
   });
 });
+
+describe('undocumented stays inside the scope we asked about', () => {
+  // Aneby answered with a municipality-wide avtalskatalog and supplier ledger.
+  // Read literally they say Aneby "owes" us contracts for kitchen software,
+  // printers and debt collection. Our request was digital tools for SKOLA —
+  // an out-of-scope line is not a missing contract.
+  const rowWith = (mentions) => ([{
+    is_contract: 0, vendor_name: null,
+    analysis_json: JSON.stringify({ mentioned_agreements: mentions }),
+  }]);
+
+  it('drops catering, furniture, transport, print and finance lines', () => {
+    const f = buildCoverageFacts(rowWith([
+      { vendor: 'Matilda FoodTech', product: 'Kostplattform för skolmåltider', doc_attached: false },
+      { vendor: 'Lekolar', product: 'Skolmöbler/Förskolemöbler/Lekmaterial', doc_attached: false },
+      { vendor: 'Buss i Väst', product: 'Skolskjuts', doc_attached: false },
+      { vendor: 'Konica Minolta', product: 'Skrivare/MFP', doc_attached: false },
+      { vendor: 'Visma Amili', product: 'Ekonomisystem/inkasso', doc_attached: false },
+      { vendor: 'Phoniro Systems', product: 'Vård-/omsorgssystem', doc_attached: false },
+    ]));
+    expect(f.undocumented).toEqual([]);
+  });
+
+  it('keeps the school digital tools in the same list', () => {
+    const f = buildCoverageFacts(rowWith([
+      { vendor: 'SchoolSoft', product: 'Lärplattform', doc_attached: false },
+      { vendor: 'Infomentor', product: 'lärplattform för förskola och grundskola', doc_attached: false },
+      { vendor: 'Lekolar', product: 'Skolmöbler', doc_attached: false },
+      // Skolon is a role:'channel' in the KB, so it is filed as a channel (we
+      // ask for the kommun's avrop behind it) rather than a missing contract.
+      { vendor: 'Skolon', product: 'Digitala Läromedel 2022', doc_attached: false },
+    ]));
+    expect(f.undocumented.map((u) => u.name ?? u.canonical).sort())
+      .toEqual(['Infomentor', 'SchoolSoft']);
+    expect(f.channels_seen.map((c) => c.canonical)).toContain('Skolon');
+  });
+});

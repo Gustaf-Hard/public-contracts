@@ -31,6 +31,27 @@ const NOT_REQUESTED = [
   /säkerhetsbilaga|definitionsbilaga/i,
   /\bbilaga\b/i,
 ];
+// Out of scope for THIS request. A kommun that answers with its whole
+// avtalskatalog or supplier ledger lists kitchen software, school furniture,
+// transport, printers and debt collection. Read literally those become
+// "contracts they owe us" — but we asked for digital verktyg, lärplattformar
+// och läromedel inom skola och utbildning. Matched on the product/description
+// text, never on the vendor name: the same company can supply both.
+const OUT_OF_SCOPE = [
+  /kost(plattform|data)?\b|måltid|skolmat|livsmedel/i,
+  /möbler|inredning|lekmaterial|läromedel.*tryckta|tryckta läromedel/i,
+  /skolskjuts|transport|buss\b/i,
+  /skrivare|kopiering|utskrift|\bmfp\b|papper/i,
+  /inkasso|ekonomisystem|fakturaservice|löne(system)?\b/i,
+  /vård|omsorg|hemtjänst|bemanning|rekrytering/i,
+  /städ|fastighet|larm|passersystem/i,
+];
+
+export function isOutOfScopeMention(m) {
+  const text = `${m?.product ?? ''} ${m?.note ?? ''}`.trim();
+  return Boolean(text) && OUT_OF_SCOPE.some((re) => re.test(text));
+}
+
 const DISCONTINUED = /\b(nedlagt|nedlagd|avvecklad|avvecklat|upphört|upphörd|uppsagt|uppsagd|avslutat|avslutad|utgången|utgått)\b/i;
 
 export function isNotRequestedMention(m) {
@@ -111,7 +132,7 @@ export function buildCoverageFacts(rows = []) {
       if (m.doc_attached !== false) continue;
       // Never ask for something we said we did not want, or that the document
       // says no longer exists.
-      if (isNotRequestedMention(m)) continue;
+      if (isNotRequestedMention(m) || isOutOfScopeMention(m)) continue;
       if (resolved) {
         if (received.has(resolved.slug) || seenUndoc.has(resolved.slug)) continue;
         seenUndoc.add(resolved.slug);
