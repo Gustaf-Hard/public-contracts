@@ -57,6 +57,42 @@ function sharedStrings(xml) {
   return out;
 }
 
+
+// Excel stores dates as a day count from 1899-12-30, so a raw sheet reads
+// "Slutdatum 46731". period_end drives renewal tracking, so handing the
+// extractor a five-digit number where a date belongs is worse than handing it
+// nothing. Only cells the workbook FORMATS as a date are converted — a plain
+// number (an amount, an org number) must survive untouched.
+const BUILTIN_DATE_FMTS = new Set([14, 15, 16, 17, 18, 19, 20, 21, 22, 27, 30, 36, 45, 46, 47, 50, 57]);
+
+// styles.xml → which cell-format index (the `s` attribute) means "date".
+function dateStyleIndexes(xml) {
+  const dateFmtIds = new Set(BUILTIN_DATE_FMTS);
+  for (const m of xml.matchAll(/<numFmt\b[^>]*numFmtId="(\d+)"[^>]*formatCode="([^"]*)"[^>]*\/?>/g)) {
+    // A custom format is a date format when its code has day/month/year parts
+    // and no currency-ish escape. Good enough: y/m/d outside quotes.
+    if (/[ymd]/i.test(m[2].replace(/"[^"]*"/g, ''))) dateFmtIds.add(Number(m[1]));
+  }
+  const out = new Set();
+  const cellXfs = /<cellXfs\b[^>]*>([\s\S]*?)<\/cellXfs>/.exec(xml)?.[1] ?? '';
+  let i = 0;
+  for (const xf of cellXfs.matchAll(/<xf\b[^>]*?\/>|<xf\b[^>]*>[\s\S]*?<\/xf>/g)) {
+    const id = Number(/numFmtId="(\d+)"/.exec(xf[0])?.[1] ?? 0);
+    if (dateFmtIds.has(id)) out.add(i);
+    i += 1;
+  }
+  return out;
+}
+
+// Excel serial → ISO date. Serial 1 is 1900-01-01; the epoch is 1899-12-30
+// because Excel keeps Lotus's fictional 1900 leap day.
+function serialToIso(n) {
+  if (!Number.isFinite(n) || n < 1 || n > 80_000) return null;
+  const ms = Math.round(n) * 86_400_000;
+  const d = new Date(Date.UTC(1899, 11, 30) + ms);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
+}
+
 export function officeTextFromBuffer(buffer, filename, { maxChars = 200_000 } = {}) {
   if (!buffer?.length || !isOfficeDoc(filename)) return null;
   let files;
@@ -73,6 +109,9 @@ export function officeTextFromBuffer(buffer, filename, { maxChars = 200_000 } = 
       // and numbers live in the sheets.
       const sst = files['xl/sharedStrings.xml'];
       const shared = sst ? sharedStrings(strFromU8(sst)) : [];
+      const dateStyles = files['xl/styles.xml']
+        ? dateStyleIndexes(strFromU8(files['xl/styles.xml']))
+        : new Set();
       for (const name of Object.keys(files)) {
         if (!/^xl\/worksheets\/.*\.xml$/i.test(name)) continue;
         const xml = strFromU8(files[name]);
@@ -91,7 +130,10 @@ export function officeTextFromBuffer(buffer, filename, { maxChars = 200_000 } = 
             parts.push(...textFromXml(inner, 't'));
           } else {
             const v = decodeXml(/<v>([\s\S]*?)<\/v>/.exec(inner)?.[1] ?? '').trim();
-            if (v) parts.push(v);
+            if (!v) continue;
+            const styleIdx = Number(/\bs="(\d+)"/.exec(attrs)?.[1] ?? -1);
+            const iso = dateStyles.has(styleIdx) ? serialToIso(Number(v)) : null;
+            parts.push(iso ?? v);
           }
         }
       }

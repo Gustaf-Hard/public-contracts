@@ -142,3 +142,40 @@ describe('xlsx shared-string edge cases that corrupt real files', () => {
     expect(officeTextFromBuffer(buf, 'x.xlsx')).toContain('Axiell');
   });
 });
+
+describe('xlsx dates', () => {
+  // Excel stores a date as a day count, so Aneby's avtalskatalog read
+  // "Slutdatum 46731". Left raw the extractor sees a big number where a date
+  // belongs — and period_end drives renewal tracking, so a wrong one is worse
+  // than none. Only cells the workbook FORMATS as dates are converted; a plain
+  // number like an amount must stay a number.
+  function styledXlsx() {
+    const styles = `<?xml version="1.0"?><styleSheet>
+      <numFmts><numFmt numFmtId="165" formatCode="yyyy\\-mm\\-dd"/></numFmts>
+      <cellXfs count="3">
+        <xf numFmtId="0"/><xf numFmtId="14"/><xf numFmtId="165"/>
+      </cellXfs></styleSheet>`;
+    const sheet = `<?xml version="1.0"?><worksheet><sheetData><row>
+      <c r="A1" s="0"><v>46731</v></c>
+      <c r="B1" s="1"><v>46731</v></c>
+      <c r="C1" s="2"><v>45870</v></c>
+    </row></sheetData></worksheet>`;
+    return Buffer.from(zipSync({
+      'xl/styles.xml': strToU8(styles), 'xl/worksheets/sheet1.xml': strToU8(sheet),
+    }));
+  }
+
+  it('converts built-in and custom date formats, and leaves plain numbers alone', () => {
+    const text = officeTextFromBuffer(styledXlsx(), 'katalog.xlsx');
+    expect(text).toContain('2027-12-10');   // s=1, built-in format 14
+    expect(text).toContain('2025-08-01');   // s=2, custom yyyy-mm-dd
+    // s=0 has no date format: it is just a number and must stay one.
+    expect(text).toContain('46731');
+  });
+
+  it('leaves everything alone when the workbook has no styles', () => {
+    const sheet = '<?xml version="1.0"?><worksheet><sheetData><row><c r="A1"><v>45870</v></c></row></sheetData></worksheet>';
+    const buf = Buffer.from(zipSync({ 'xl/worksheets/sheet1.xml': strToU8(sheet) }));
+    expect(officeTextFromBuffer(buf, 'x.xlsx')).toContain('45870');
+  });
+});
