@@ -14,6 +14,27 @@ import { splitHandoffContacts } from './handoff.js';
 // resolved_edit, resolved_skip, resolved_closed, superseded) is terminal.
 export const ACTIVE_ESCALATION_STATUSES = Object.freeze(['open', 'sending', 'send_failed', 'send_unconfirmed']);
 
+// How many failed extraction attempts an attachment gets before it is PARKED —
+// removed from listPendingContractAttachments so the 15-minute tick stops
+// burning an Opus call on a document that will never parse (a
+// password-protected PDF used to retry forever, silently, at ~96 calls/day).
+//
+// A permanent failure (file missing on disk, unreadable/zero-text document,
+// oversized beyond the API limit) jumps straight to the cap on the FIRST
+// attempt; a transient one (5xx, timeout, rate limit, JSON parse, schema
+// rejection) increments by one and is retried on the next tick.
+//
+// UN-PARKING (the operator's way back): nothing is deleted, so re-queueing an
+// attachment is one UPDATE —
+//     UPDATE attachments SET analysis_attempts = 0,
+//            last_analysis_error = NULL, analysis_parked_alerted_at = NULL
+//      WHERE id = <id>;
+// Clearing analysis_attempts alone is enough to make it eligible again; also
+// clearing analysis_parked_alerted_at lets a re-park raise a fresh Slack
+// digest. `analysePendingContracts({ force: true })` (npm script 06/07) ignores
+// the cap entirely and is the no-SQL escape hatch.
+export const MAX_ANALYSIS_ATTEMPTS = 5;
+
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS conversations (
   id INTEGER PRIMARY KEY,
@@ -75,7 +96,15 @@ CREATE TABLE IF NOT EXISTS attachments (
   filename TEXT NOT NULL,
   saved_path TEXT NOT NULL,
   mime_type TEXT,
-  size_bytes INTEGER
+  size_bytes INTEGER,
+  -- Extraction bookkeeping (see MAX_ANALYSIS_ATTEMPTS). analysis_attempts = 0
+  -- means "never failed" — every legacy row reads as eligible.
+  -- last_analysis_error is "<class>:<reason>", e.g. "transient:api_5xx" or
+  -- "permanent:file_missing", so the class is queryable with a LIKE.
+  analysis_attempts INTEGER NOT NULL DEFAULT 0,
+  last_analysis_error TEXT,
+  last_analysis_at TEXT,
+  analysis_parked_alerted_at TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_attachments_message ON attachments(message_id);
 
@@ -281,6 +310,22 @@ export function openDb(path) {
     // not yet re-analysed. is_contract=1 only for document_type='avtal'.
     if (!contractCols.includes('document_type')) {
       db.exec('ALTER TABLE contracts ADD COLUMN document_type TEXT');
+    }
+    // Extraction attempt tracking + park alerting. Additive only; the NOT NULL
+    // DEFAULT 0 backfills every existing row as attempt-count 0, i.e. still
+    // eligible — no data migration needed.
+    const attCols = db.prepare("PRAGMA table_info(attachments)").all().map((r) => r.name);
+    if (!attCols.includes('analysis_attempts')) {
+      db.exec('ALTER TABLE attachments ADD COLUMN analysis_attempts INTEGER NOT NULL DEFAULT 0');
+    }
+    if (!attCols.includes('last_analysis_error')) {
+      db.exec('ALTER TABLE attachments ADD COLUMN last_analysis_error TEXT');
+    }
+    if (!attCols.includes('last_analysis_at')) {
+      db.exec('ALTER TABLE attachments ADD COLUMN last_analysis_at TEXT');
+    }
+    if (!attCols.includes('analysis_parked_alerted_at')) {
+      db.exec('ALTER TABLE attachments ADD COLUMN analysis_parked_alerted_at TEXT');
     }
   }
 
@@ -815,8 +860,65 @@ export function openDb(path) {
              -- Spreadsheets and documents are read as text (src/office-text.js):
              -- a kommun's "Avtalslista.xlsx" is exactly the vendor list we want.
              OR lower(a.filename) LIKE '%.xlsx' OR lower(a.filename) LIKE '%.docx')
+        -- Parked attachments (attempt cap reached) leave the retry pool so the
+        -- 15-minute tick stops paying for a document that will never parse.
+        -- COALESCE keeps pre-migration NULLs eligible.
+        AND COALESCE(a.analysis_attempts, 0) < ${MAX_ANALYSIS_ATTEMPTS}
       ORDER BY a.id
     `).all();
+  }
+
+  // Record one failed extraction attempt. `permanent` failures jump straight to
+  // the cap (one strike, parked); transient ones increment by one. Never
+  // touches the stored file or any existing contracts row — only bookkeeping.
+  function recordAnalysisFailure(attachmentId, { reason, permanent = false, now = null } = {}) {
+    const stamp = now ?? new Date().toISOString();
+    db.prepare(`
+      UPDATE attachments
+      SET analysis_attempts = CASE WHEN ? = 1 THEN ?
+                                   ELSE MIN(COALESCE(analysis_attempts, 0) + 1, ?) END,
+          last_analysis_error = ?,
+          last_analysis_at = ?
+      WHERE id = ?
+    `).run(permanent ? 1 : 0, MAX_ANALYSIS_ATTEMPTS, MAX_ANALYSIS_ATTEMPTS, reason, stamp, attachmentId);
+    return db.prepare('SELECT analysis_attempts FROM attachments WHERE id = ?').get(attachmentId)?.analysis_attempts ?? 0;
+  }
+
+  // A successful extraction wipes the failure bookkeeping, so a document that
+  // eventually parsed is not left looking broken — and a later re-park raises a
+  // fresh digest rather than being swallowed by a stale alert stamp.
+  function clearAnalysisFailure(attachmentId) {
+    db.prepare(`
+      UPDATE attachments
+      SET analysis_attempts = 0, last_analysis_error = NULL,
+          last_analysis_at = NULL, analysis_parked_alerted_at = NULL
+      WHERE id = ?
+    `).run(attachmentId);
+  }
+
+  // Parked attachments that have never been digested. Restart-safe by
+  // construction: the "already alerted" fact lives in the DB, not in a
+  // per-process Map (the review finding against the unmatched-inbound digest).
+  function listParkedAnalysesToAlert() {
+    return db.prepare(`
+      SELECT a.id, a.filename, a.mime_type, a.analysis_attempts, a.last_analysis_error,
+             a.last_analysis_at, conv.kommun_kod, conv.kommun_namn, conv.role
+      FROM attachments a
+      JOIN messages m ON m.id = a.message_id
+      JOIN conversations conv ON conv.id = m.conversation_id
+      WHERE COALESCE(a.analysis_attempts, 0) >= ${MAX_ANALYSIS_ATTEMPTS}
+        AND a.analysis_parked_alerted_at IS NULL
+      ORDER BY a.id
+    `).all();
+  }
+
+  function markParkedAnalysesAlerted(ids, now = null) {
+    if (!ids || ids.length === 0) return 0;
+    const stamp = now ?? new Date().toISOString();
+    const stmt = db.prepare('UPDATE attachments SET analysis_parked_alerted_at = ? WHERE id = ?');
+    const run = db.transaction((list) => { for (const id of list) stmt.run(stamp, id); });
+    run(ids);
+    return ids.length;
   }
 
   function listContractInfoForMessage(messageId) {
@@ -1222,6 +1324,10 @@ export function openDb(path) {
     listCoverage,
     countProductIntelligence,
     listPendingContractAttachments,
+    recordAnalysisFailure,
+    clearAnalysisFailure,
+    listParkedAnalysesToAlert,
+    markParkedAnalysesAlerted,
     listContractInfoForMessage,
     listContractInfoForConversation,
     listContractDeliveryEvents,

@@ -440,10 +440,10 @@ describe('analysePendingContracts', () => {
     const { db } = seedDbWithPdf(tmp);
     const client = fakeClientReturning(GOOD);
     const n1 = await analysePendingContracts({ db, env: { ANTHROPIC_API_KEY: 'sk' }, client });
-    expect(n1).toBe(1);
+    expect(n1.analysed).toBe(1);
     expect(client.messages.create).toHaveBeenCalledTimes(1);
     const n2 = await analysePendingContracts({ db, env: { ANTHROPIC_API_KEY: 'sk' }, client });
-    expect(n2).toBe(0);
+    expect(n2.analysed).toBe(0);
     expect(client.messages.create).toHaveBeenCalledTimes(1);
     db.close(); rmSync(tmp, { recursive: true, force: true });
   });
@@ -453,7 +453,7 @@ describe('analysePendingContracts', () => {
     const { db } = seedDbWithPdf(tmp);
     const client = { messages: { create: vi.fn(async () => { throw new Error('boom'); }) } };
     const n = await analysePendingContracts({ db, env: { ANTHROPIC_API_KEY: 'sk' }, client });
-    expect(n).toBe(0);
+    expect(n.analysed).toBe(0);
     expect(db.listPendingContractAttachments()).toHaveLength(1);
     db.close(); rmSync(tmp, { recursive: true, force: true });
   });
@@ -462,7 +462,7 @@ describe('analysePendingContracts', () => {
     const tmp = mkdtempSync(join(tmpdir(), 'ac-'));
     const { db } = seedDbWithPdf(tmp);
     const n = await analysePendingContracts({ db, env: {} });
-    expect(n).toBe(0);
+    expect(n.analysed).toBe(0);
     db.close(); rmSync(tmp, { recursive: true, force: true });
   });
 });
@@ -486,7 +486,7 @@ describe('analysePendingContracts onlyMessageId', () => {
 
       const client = fakeClientReturning({ ...GOOD, document_type: 'avtal', mentioned_agreements: [] });
       const done = await analysePendingContracts({ db, env: { ANTHROPIC_API_KEY: 'sk' }, client, onlyMessageId: mA });
-      expect(done).toBe(1);
+      expect(done.analysed).toBe(1);
       expect(client.messages.create).toHaveBeenCalledTimes(1);
     } finally {
       rmSync(tmp, { recursive: true, force: true });

@@ -779,6 +779,69 @@ async function digestUnmatched({ unmatched, ambiguous, fetchedById, convById, se
   }
 }
 
+// Parked-extraction digest (2026-08-16). An attachment that has burned through
+// MAX_ANALYSIS_ATTEMPTS leaves the retry pool — which silently loses a
+// delivered document unless someone is told. Unlike the unmatched-inbound
+// digest above, "already alerted" is persisted on the attachment row
+// (analysis_parked_alerted_at), so a daemon restart cannot re-digest the same
+// file, and clearing the column re-arms the alert for a re-park.
+//
+// The Slack post happens BEFORE the mark: if postAlert throws, nothing is
+// marked and the digest is retried next tick rather than lost.
+async function digestParkedAnalyses(deps) {
+  const { db, slackClient, slackOps, env, log } = deps;
+  const parked = db.listParkedAnalysesToAlert?.() ?? [];
+  if (parked.length === 0) return;
+  const lines = parked.map((a) => {
+    const reason = (a.last_analysis_error ?? 'okänt fel').replace(/^permanent:|^transient:/, '');
+    const permanent = String(a.last_analysis_error ?? '').startsWith('permanent:');
+    return `• *${a.kommun_namn}* — ${a.filename} (${a.mime_type ?? 'okänd typ'}) — `
+      + `${reason}${permanent ? '' : ` efter ${a.analysis_attempts} försök`}`;
+  });
+  log?.(`PARKED extraction: ${parked.length} attachment(s) left the analysis queue and need manual handling`);
+  if (slackOps?.postAlert && env.SLACK_CHANNEL_ID) {
+    try {
+      await slackOps.postAlert(slackClient, {
+        channel: env.SLACK_CHANNEL_ID,
+        text: `📄 *Avtalsanalys parkerad* (${parked.length}) — dessa dokument analyseras inte längre automatiskt:\n`
+          + `${lines.slice(0, 20).join('\n')}\n_Rensa \`analysis_attempts\` på raden (eller kör \`npm run analyse -- --force\`) för att köa om._`,
+      });
+    } catch (e) {
+      log?.(`postAlert failed for parked-analysis digest: ${e.message} — will retry next tick`);
+      return; // not marked → re-digested next tick
+    }
+  }
+  db.markParkedAnalysesAlerted?.(parked.map((a) => a.id));
+}
+
+// Systemic-failure guard: when EVERY attempt in a tick fails transiently (and
+// there were at least a few), the problem is ours, not the documents' — a bad
+// json_schema, a wrong model id, an expired key. That failure mode is invisible
+// today because each attachment just "stays pending" and the tick stays green.
+// Deliberately re-alerts every tick while the condition holds.
+const SYSTEMIC_FAILURE_MIN_ATTEMPTS = 3;
+
+async function alertSystemicAnalysisFailure(result, deps) {
+  const { slackClient, slackOps, env, log } = deps;
+  if (!result || typeof result !== 'object') return false; // legacy/fake numeric result
+  const { attempted = 0, analysed = 0, failed = 0, transient = 0 } = result;
+  if (attempted < SYSTEMIC_FAILURE_MIN_ATTEMPTS) return false;
+  if (analysed > 0 || failed !== attempted || transient !== attempted) return false;
+  log?.(`SYSTEMIC extraction failure: all ${attempted} analysis attempts failed transiently this tick`);
+  if (slackOps?.postAlert && env.SLACK_CHANNEL_ID) {
+    try {
+      await slackOps.postAlert(slackClient, {
+        channel: env.SLACK_CHANNEL_ID,
+        text: `🚨 *Avtalsextraktion misslyckas genomgående* — samtliga ${attempted} försök i denna tick`
+          + ` föll på övergående fel och inget dokument kunde läsas. Kontrollera API-nyckel, modell-id och schema.`,
+      });
+    } catch (e) {
+      log?.(`postAlert failed for systemic analysis failure: ${e.message}`);
+    }
+  }
+  return true;
+}
+
 export async function runTick(deps) {
   const { db, gmailClient, gmailOps, env, now } = deps;
 
@@ -887,9 +950,18 @@ export async function runTick(deps) {
   // Injectable for tests; failures must never break the tick.
   const analyseContracts = deps.analyseContracts ?? analysePendingContracts;
   try {
-    await analyseContracts({ db, env, log: deps.log, contractsDir: deps.contractsDir });
+    const analysisResult = await analyseContracts({ db, env, log: deps.log, contractsDir: deps.contractsDir });
+    // 3b. Extraction visibility — a document that stopped being retried, and a
+    // tick where nothing at all could be read, must both be loud. Best-effort:
+    // neither may break the tick.
+    await alertSystemicAnalysisFailure(analysisResult, deps);
   } catch (e) {
     deps.log?.(`contract analysis error: ${e.message}`);
+  }
+  try {
+    await digestParkedAnalyses(deps);
+  } catch (e) {
+    deps.log?.(`parked-analysis digest error: ${e.message}`);
   }
 
   // 4. Refresh arming (2026-07-09 design §3.2/§3.6) — after contracts are

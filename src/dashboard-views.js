@@ -17,6 +17,7 @@ import { GRADE_LEVELS, slugifyProductName } from './vendor-analytics.js';
 import { matchResellers, RESELLERS } from './resellers.js';
 import { canonicalVendorName } from './vendor-aliases.js';
 import { splitQuotedText } from './classifier.js';
+import { MAX_ANALYSIS_ATTEMPTS } from './storage.js';
 
 // Canonical reseller name → slug, for linking a vendor's framed ramavtal tag
 // to /ramavtal/:slug. Built once from the curated RESELLERS list.
@@ -1356,6 +1357,8 @@ function aggregateContracts(conversations, messagesByConv, attachmentsByMsg) {
           is_contract: att.contract_is_contract,
           document_type: att.contract_document_type,
           vendor_name: att.contract_vendor_name ?? null,
+          analysis_attempts: att.analysis_attempts ?? 0,
+          last_analysis_error: att.last_analysis_error ?? null,
         });
       }
     }
@@ -1612,7 +1615,7 @@ export function renderKommunDetail({ kommun, conversations, messagesByConv, atta
               <td><a href="/arenden/${c.conv_id}">#${c.conv_id}</a></td>
               <td>${escapeHtml(c.role)}</td>
               <td>${badgeHtml}</td>
-              <td><a href="/attachments/${c.id}" target="_blank" rel="noopener">📎 ${escapeHtml(c.filename)}</a>${isPdfAttachment(c) ? '' : ' <span class="muted">— sparad, ej avtalsanalyserad (ej PDF)</span>'}</td>
+              <td><a href="/attachments/${c.id}" target="_blank" rel="noopener">📎 ${escapeHtml(c.filename)}</a>${attachmentAnalysisNote(c)}</td>
               <td>${escapeHtml(fmtBytes(c.size_bytes))}</td>
               <td><a class="doc-open" href="/attachments/${c.id}" target="_blank" rel="noopener" title="Öppna i ny flik" aria-label="Öppna ${escapeHtml(c.filename)} i ny flik">${EXTLINK_ICON}</a></td>
             </tr>`;
@@ -1775,8 +1778,8 @@ export function threadMessage(m, attachments, sig, expanded) {
       const link = `<a class="msg-att" href="/attachments/${a.id}" target="_blank" rel="noopener">📎 ${escapeHtml(a.filename)}</a>`;
       // Stored non-PDFs (.xlsx/.docx/scans…) never reach the contract
       // analyser — say so, so a delivered document is never invisibly "just
-      // a file" the operator assumes was analysed.
-      return isPdfAttachment(a) ? link : `${link} <span class="muted">— sparad, ej avtalsanalyserad (ej PDF)</span>`;
+      // a file" the operator assumes was analysed. Same for a parked one.
+      return `${link}${attachmentAnalysisNote(a)}`;
     })
     .join('');
   // The mail carried more attachments than we stored → the ingest skipped
@@ -1810,6 +1813,23 @@ export function threadMessage(m, attachments, sig, expanded) {
 // the contract analyser consumes — mirrors listPendingContractAttachments.
 function isPdfAttachment(a) {
   return a.mime_type === 'application/pdf' || (a.filename ?? '').toLowerCase().endsWith('.pdf');
+}
+
+// Three distinct outcomes the operator must be able to tell apart:
+//   ''        — analysable and still queued/analysed ("will be read")
+//   parked    — the analyser gave up, with the reason ("needs manual handling")
+//   non-PDF   — this format never reaches the analyser at all
+// Parked wins: a file that failed is more urgent than one whose format we skip.
+export function attachmentAnalysisNote(a) {
+  const attempts = a.analysis_attempts ?? 0;
+  if (attempts >= MAX_ANALYSIS_ATTEMPTS) {
+    const raw = String(a.last_analysis_error ?? 'okänt fel');
+    const reason = raw.replace(/^permanent:|^transient:/, '');
+    const suffix = raw.startsWith('permanent:') ? '' : ` efter ${attempts} försök`;
+    return ` <span class="muted">— analys misslyckades permanent (${escapeHtml(reason)})${suffix}, kräver manuell hantering</span>`;
+  }
+  if (!isPdfAttachment(a)) return ' <span class="muted">— sparad, ej avtalsanalyserad (ej PDF)</span>';
+  return '';
 }
 
 // A status chip + manual toggle for one thread.

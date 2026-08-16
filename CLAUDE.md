@@ -86,6 +86,16 @@ Phase-1 pipeline: `scripts/01|02|03 → src/seed.js|crawl.js|verify.js → data/
   first-conv-wins.
 - **`received_at` is Gmail `internalDate`**, never processing time. The
   inbound fetch window derives from heartbeat `last_success_at` (30d floor).
+- **Extraction failures are bounded and loud.** A failed contract analysis
+  books an attempt on the attachment row (`analysis_attempts`,
+  `last_analysis_error` as `permanent:…`/`transient:…`). Permanent failures
+  (file missing, unreadable/zero-text, oversized) park on the first attempt;
+  transient ones retry to `MAX_ANALYSIS_ATTEMPTS` (storage.js). Parked
+  attachments leave `listPendingContractAttachments` — that is what stops the
+  15-minute Opus burn — and are digested to Slack ONCE, tracked durably via
+  `analysis_parked_alerted_at` (never a per-process Map). A tick where every
+  attempt (≥3) failed transiently raises a separate systemic alert. Nothing is
+  deleted: clearing `analysis_attempts` (or `--force`) re-queues.
 
 ## Conventions that aren't obvious from the code alone
 
