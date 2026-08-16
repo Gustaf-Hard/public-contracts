@@ -647,3 +647,20 @@ describe('fetch window derived from last_success_at (H3)', () => {
     expect(query).toMatch(/newer_than:56d/); // 54.5 days → ceil 55 + 1 margin
   });
 });
+
+describe('inbound Gmail query shape', () => {
+  // Gmail's `to:` matches the To header ONLY. A kommun handler who replies
+  // To: registrator with us in Cc — the normal shape once the registrator has
+  // forwarded internally — was never listed, so the reply was neither ingested
+  // nor digested as unmatched. It was invisible forever.
+  it('matches To, Cc and Delivered-To, with -from and newer_than outside the OR group', async () => {
+    seedConv();
+    const gmail = fakeGmail({ listResult: [] });
+    await runTick(deps({ gmail, now: new Date('2026-06-24T12:00:00Z') }));
+
+    expect(gmail.listInboundQuery.mock.calls[0][1]).toBe(
+      '(to:gustaf@mediagraf.se OR cc:gustaf@mediagraf.se OR deliveredto:gustaf@mediagraf.se)'
+      + ' -from:gustaf@mediagraf.se newer_than:30d'
+    );
+  });
+});

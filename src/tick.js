@@ -8,7 +8,7 @@ import { inferThreadStatus } from './threads.js';
 import { nextActionForClassification, staleAction } from './conversation.js';
 import { parseInboundMessage, sameEmailDomain, archiveThread } from './gmail.js';
 import { buildEscalationBlocks } from './slack.js';
-import { saveAttachment, extractPdfsFromZip, dedupeFilenames, isTrivialImage } from './attachments.js';
+import { saveAttachment, extractFilesFromZip, dedupeFilenames, isTrivialImage } from './attachments.js';
 import { extractSignature } from './extract-signature.js';
 import { analyseMessage, analysisToLegacyClassification, addDaysIso } from './analyse-message.js';
 import { analysePendingContracts } from './analyse-contract.js';
@@ -371,10 +371,14 @@ async function ingestMessage({ conv, item, deps }) {
   // stored regardless of MIME type — Boden delivered a sammanställning as
   // .xlsx and the old PDF/zip-only filter silently discarded it. Only
   // contract ANALYSIS stays PDF-gated (listPendingContractAttachments).
-  // Zips still expand into their inner PDFs; a zip with no inner PDFs is
-  // stored as-is so its contents are never lost. The single allowed skip is
-  // an image known to be tiny (signature logos — see isTrivialImage); the
-  // gap stays visible because attachment_count records what the mail carried.
+  // A zip expands into EVERY file it holds, not just its PDFs: the bundles
+  // kommuner send mix contracts with the sammanställning that lists them, and
+  // keeping only the PDFs discarded the rest along with the archive, so those
+  // files survived nowhere. An unreadable (or empty) archive is stored as-is
+  // so its bytes are never lost. The single allowed skip is an image known to
+  // be tiny (signature logos — see isTrivialImage), applied to inner files too
+  // since a signature logo is no more a document for being zipped; the gap
+  // stays visible because attachment_count records what the mail carried.
   const entries = [];
   for (const att of parsed.attachments) {
     const fn = att.filename?.toLowerCase() ?? '';
@@ -383,10 +387,11 @@ async function ingestMessage({ conv, item, deps }) {
     if (isTrivialImage(att)) continue;
     const buf = await gmailOps.fetchAttachment(gmailClient.gmail, item.id, att.attachment_id);
     if (isZip) {
-      const inner = extractPdfsFromZip(buf);
+      const inner = extractFilesFromZip(buf);
       if (inner.length > 0) {
         for (const e of inner) {
-          entries.push({ filename: e.filename, data: e.data, mime_type: 'application/pdf' });
+          if (isTrivialImage({ filename: e.filename, mime_type: e.mime_type, size_bytes: e.data.length })) continue;
+          entries.push({ filename: e.filename, data: e.data, mime_type: e.mime_type });
         }
       } else {
         entries.push({ filename: att.filename, data: buf, mime_type: att.mime_type });
@@ -709,7 +714,7 @@ async function dispatchEscalationForIngest(pending, deps) {
         status: 'superseded',
         resolved_text: 'voided: the kommun replied after this draft was written',
       });
-      deps.log?.(`VOIDED escalation ${stale.id} for ${conv.kommun_namn}/${conv.role} — kommun replied after the draft`);
+      deps.log?.(`VOIDED escalation ${stale.id} for ${updated.kommun_namn}/${updated.role} — kommun replied after the draft`);
     }
   }
 
@@ -798,9 +803,17 @@ export async function runTick(deps) {
   if (active.length) {
     const seenUnmatched = deps.seenUnmatched ?? new Map();
     const windowDays = deriveFetchWindowDays(db.getTickHealth?.({ now })?.last_success_at ?? null, now);
+    // `to:` alone matches the To header ONLY. The common shape after a
+    // registrator forwards internally is the handler replying To: registrator
+    // with us in Cc — that reply was never listed, so it was neither ingested
+    // nor surfaced in the unmatched digest. `deliveredto:` covers mail that
+    // reached us via an alias, where neither To nor Cc carries our address.
+    // The OR group must be parenthesized so `-from:` and `newer_than:` still
+    // apply to the whole query rather than binding to the last OR term.
+    const me = env.GMAIL_USER_EMAIL;
     const list = await gmailOps.listInboundQuery(
       gmailClient.gmail,
-      `to:${env.GMAIL_USER_EMAIL} -from:${env.GMAIL_USER_EMAIL} newer_than:${windowDays}d`
+      `(to:${me} OR cc:${me} OR deliveredto:${me}) -from:${me} newer_than:${windowDays}d`
     );
     // Pre-fetch each not-yet-recorded message exactly once, then match against
     // every conversation using the already-parsed content.
@@ -878,8 +891,31 @@ export async function runTick(deps) {
 
     // 2b. Drafting/escalation — after every inbound row is safely committed,
     // so the unbounded per-PDF analysis can't leave half-ingested messages.
+    //
+    // Every item is isolated. Because the rows are ALREADY committed, "retry
+    // next tick" does not apply here: the message will never be re-fetched, so
+    // an unhandled throw would permanently lose this draft AND every later one
+    // in the batch, plus tick steps 3 and 4. The failure is therefore contained
+    // and handed to a human — the alert must name the kommun and the Gmail
+    // message id, because nothing else will ever surface it.
     for (const pending of pendingEscalations) {
-      await dispatchEscalationForIngest(pending, deps);
+      try {
+        await dispatchEscalationForIngest(pending, deps);
+      } catch (e) {
+        const who = `${pending.updated?.kommun_namn ?? '?'}/${pending.updated?.role ?? '?'}`;
+        const gmailId = pending.parsed?.gmail_message_id ?? '?';
+        deps.log?.(`escalation dispatch FAILED for message ${gmailId} (${who}): ${e.message} — message is stored, draft lost, needs a human`);
+        if (deps.slackOps?.postAlert && env.SLACK_CHANNEL_ID) {
+          try {
+            await deps.slackOps.postAlert(deps.slackClient, {
+              channel: env.SLACK_CHANNEL_ID,
+              text: `⚠️ Kunde inte skapa utkast/eskalering för ${who} (meddelande \`${gmailId}\`): ${e.message}. Svaret ÄR sparat men görs inte om automatiskt — öppna ärendet och svara manuellt.`,
+            });
+          } catch (alertErr) {
+            deps.log?.(`postAlert failed for dispatch failure ${gmailId}: ${alertErr.message}`);
+          }
+        }
+      }
     }
   }
 
