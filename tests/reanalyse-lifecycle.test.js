@@ -243,7 +243,7 @@ describe('force re-analysis populates line items + coverage (backfill path)', ()
       },
     };
     const n = await analysePendingContracts({ db, env: { ANTHROPIC_API_KEY: 'sk' }, client, force: true });
-    expect(n).toBe(1);
+    expect(n.analysed).toBe(1);
     const counts = db.countProductIntelligence();
     expect(counts).toEqual({ line_items: 3, coverage: 1, contracts_with_line_items: 1, contracts_with_coverage: 1 });
     const cId = db.raw.prepare('SELECT id FROM contracts WHERE attachment_id = ?').get(attId).id;

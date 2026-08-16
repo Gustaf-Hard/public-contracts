@@ -71,13 +71,13 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const db = openDb(path);
   db.migrate();
   console.log(`before: ${formatIntelligenceCounts(db.countProductIntelligence())}`);
-  const n = await analysePendingContracts({
+  const res = await analysePendingContracts({
     db,
     force: true, // re-analyse every PDF, not only those without a contracts row
     onlyId,
     log: (msg) => console.log(msg),
   });
   console.log(`after:  ${formatIntelligenceCounts(db.countProductIntelligence())}`);
-  console.log(`Done. ${n} attachment(s) re-analysed for lifecycle/pricing/product-intelligence fields.`);
+  console.log(`Done. ${res.analysed} attachment(s) re-analysed for lifecycle/pricing/product-intelligence fields.`);
   db.close();
 }

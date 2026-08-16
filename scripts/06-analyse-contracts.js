@@ -17,11 +17,11 @@ const db = openDb(process.env.PILOT_DB_PATH ?? 'data/pilot.db');
 db.migrate();
 
 const onlyArg = arg('only');
-const n = await analysePendingContracts({
+const res = await analysePendingContracts({
   db,
   force: flag('force'),
   onlyId: onlyArg != null ? parseInt(onlyArg, 10) : null,
   log: (msg) => console.log(msg),
 });
-console.log(`Done. ${n} attachment(s) analysed.`);
+console.log(`Done. ${res.analysed} attachment(s) analysed, ${res.failed} failed (${res.parked.length} parked).`);
 db.close();

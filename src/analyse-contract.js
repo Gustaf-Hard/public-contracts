@@ -11,8 +11,12 @@ import { readFileSync, existsSync } from 'node:fs';
 import { isOfficeDoc, officeTextFromBuffer } from './office-text.js';
 import { resolve, isAbsolute, join } from 'node:path';
 import { GRADE_LEVELS, MUNICIPAL_GRADE_LEVELS, mapUnitToGradeLevels } from './vendor-analytics.js';
+import { MAX_ANALYSIS_ATTEMPTS } from './storage.js';
 
 const DEFAULT_MODEL = 'claude-opus-4-8';
+
+// Re-exported so callers/tests reason about the cap without importing storage.
+export { MAX_ANALYSIS_ATTEMPTS };
 
 const SYSTEM_PROMPT = `Du analyserar PDF:er som svenska kommuner lämnat ut efter en begäran om allmänna handlingar om digitala verktyg i utbildningsförvaltningen.
 
@@ -123,6 +127,50 @@ const CONTRACT_SCHEMA = {
   },
 };
 
+// ---- Failure classification (2026-08-16 extraction-digest work) ----
+//
+// Every analysis failure used to collapse to `null`, which the caller read as
+// "still pending" and retried every 15 minutes forever. A failure is now
+// labelled so the caller can decide between retrying and parking:
+//
+//   permanent — the document/API pairing will never succeed. Retrying only
+//               burns Opus calls: file gone from disk, unreadable or
+//               zero-text document, oversized beyond the API limit.
+//   transient — a retry is genuinely worth it: 5xx, timeout, rate limit,
+//               connection reset, JSON parse failure, schema rejection.
+//
+// Unknown errors default to TRANSIENT: the attempt cap bounds the cost anyway,
+// and the park digest surfaces them after 5 tries. The stored string is
+// "<class>:<reason>" so `last_analysis_error LIKE 'permanent:%'` is queryable.
+const PERMANENT_DOCUMENT_PATTERNS = [
+  /too large/i,
+  /exceeds? the maximum/i,
+  /maximum (allowed )?(size|number of pages)/i,
+  /request_too_large/i,
+  /too many pages/i,
+  /(could not|unable to|failed to) (be )?(process|read|parse|decode)(ed)?[^.]{0,30}(pdf|document|file)/i,
+  /(pdf|document|file)[^.]{0,30}(is )?(encrypted|password[- ]protected|corrupt(ed)?|malformed|invalid)/i,
+  /password[- ]protected/i,
+];
+
+export function classifyAnalysisFailure(e) {
+  const message = String(e?.message ?? e ?? 'unknown error');
+  const status = e?.status ?? e?.statusCode ?? e?.response?.status ?? null;
+  if (status === 413) return { permanent: true, reason: 'permanent:document_too_large', message };
+  if (PERMANENT_DOCUMENT_PATTERNS.some((re) => re.test(message))) {
+    return { permanent: true, reason: 'permanent:document_rejected', message };
+  }
+  if (status === 429) return { permanent: false, reason: 'transient:api_rate_limit', message };
+  if (typeof status === 'number' && status >= 500) return { permanent: false, reason: 'transient:api_5xx', message };
+  if (status === 408 || /timeout|timed out|ETIMEDOUT|ECONNRESET|ECONNREFUSED|ENOTFOUND|socket hang up/i.test(message)) {
+    return { permanent: false, reason: 'transient:api_timeout', message };
+  }
+  // 400s include json_schema rejections (the >16-union-param live failure) —
+  // systemic, fixable in our code, so worth retrying while we notice and fix.
+  if (status === 400 || status === 422) return { permanent: false, reason: 'transient:api_invalid_request', message };
+  return { permanent: false, reason: 'transient:api_error', message };
+}
+
 let cachedClient = null;
 function getClient(apiKey) {
   if (!apiKey) return null;
@@ -133,10 +181,15 @@ function getClient(apiKey) {
   return cachedClient;
 }
 
-export async function analyseContractPdf(pdfBuffer, ctx, { env = process.env, client = null } = {}) {
-  if (!pdfBuffer || pdfBuffer.length === 0) return null;
+// `onFailure({ permanent, reason, message })` is an optional observer — the
+// return contract stays `analysis | null` so no existing caller changes.
+export async function analyseContractPdf(pdfBuffer, ctx, { env = process.env, client = null, onFailure = null } = {}) {
+  if (!pdfBuffer || pdfBuffer.length === 0) {
+    onFailure?.({ permanent: true, reason: 'permanent:empty_file', message: 'stored file is empty' });
+    return null;
+  }
   const sdkClient = client ?? getClient(env.ANTHROPIC_API_KEY);
-  if (!sdkClient) return null;
+  if (!sdkClient) return null; // no API key configured — not a document failure
 
   const model = env.ANTHROPIC_CONTRACT_MODEL ?? DEFAULT_MODEL;
   try {
@@ -159,14 +212,19 @@ export async function analyseContractPdf(pdfBuffer, ctx, { env = process.env, cl
       output_config: { format: { type: 'json_schema', schema: CONTRACT_SCHEMA } },
     });
     const textBlock = (response.content ?? []).find((b) => b.type === 'text');
-    if (!textBlock?.text) return null;
+    if (!textBlock?.text) {
+      onFailure?.({ permanent: false, reason: 'transient:empty_response', message: 'no text block in response' });
+      return null;
+    }
     try {
       return JSON.parse(textBlock.text);
-    } catch {
+    } catch (e) {
+      onFailure?.({ permanent: false, reason: 'transient:json_parse_error', message: e.message });
       return null;
     }
   } catch (e) {
     console.warn(`[analyse-contract] LLM call failed for ${ctx.filename}: ${e.message}`);
+    onFailure?.(classifyAnalysisFailure(e));
     return null;
   }
 }
@@ -175,10 +233,13 @@ export async function analyseContractPdf(pdfBuffer, ctx, { env = process.env, cl
 // Same analysis for a document we can only read as text (xlsx/docx). The
 // prompt and schema are identical; only the content block differs, so a
 // spreadsheet of avtal is extracted exactly like a PDF of one.
-export async function analyseContractText(text, ctx, { env = process.env, client = null } = {}) {
-  if (!text || !text.trim()) return null;
+export async function analyseContractText(text, ctx, { env = process.env, client = null, onFailure = null } = {}) {
+  if (!text || !text.trim()) {
+    onFailure?.({ permanent: true, reason: 'permanent:no_readable_text', message: 'no extractable text' });
+    return null;
+  }
   const sdkClient = client ?? getClient(env.ANTHROPIC_API_KEY);
-  if (!sdkClient) return null;
+  if (!sdkClient) return null; // no API key configured — not a document failure
 
   const model = env.ANTHROPIC_CONTRACT_MODEL ?? DEFAULT_MODEL;
   try {
@@ -200,10 +261,19 @@ export async function analyseContractText(text, ctx, { env = process.env, client
       output_config: { format: { type: 'json_schema', schema: CONTRACT_SCHEMA } },
     });
     const textBlock = (response.content ?? []).find((b) => b.type === 'text');
-    if (!textBlock?.text) return null;
-    try { return JSON.parse(textBlock.text); } catch { return null; }
+    if (!textBlock?.text) {
+      onFailure?.({ permanent: false, reason: 'transient:empty_response', message: 'no text block in response' });
+      return null;
+    }
+    try {
+      return JSON.parse(textBlock.text);
+    } catch (e) {
+      onFailure?.({ permanent: false, reason: 'transient:json_parse_error', message: e.message });
+      return null;
+    }
   } catch (e) {
     console.warn(`[analyse-contract] LLM call failed for ${ctx.filename}: ${e.message}`);
+    onFailure?.(classifyAnalysisFailure(e));
     return null;
   }
 }
@@ -481,7 +551,11 @@ export function storeContractAnalysis(db, attachmentId, analysis, { model, log =
 
 // Analyse every PDF attachment that has no contracts row yet. Errors on one
 // PDF never block the others, and never throw to the caller (tick safety).
-// Returns the number of attachments successfully analysed+stored.
+// Returns a run result — { analysed, attempted, failed, transient, permanent,
+// parked[] } — not a bare count: the tick needs the failure breakdown to raise
+// the systemic-failure alert, and `parked` names the attachments that just left
+// the retry pool. `force: true` deliberately ignores the attempt cap, so it
+// doubles as the operator's no-SQL un-park path.
 
 // Where an attachment actually lives now.
 //
@@ -499,9 +573,18 @@ export function resolveAttachmentPath(savedPath, contractsDir) {
   return resolve(p);
 }
 
-export async function analysePendingContracts({ db, env = process.env, client = null, log = null, force = false, onlyId = null, onlyMessageId = null, contractsDir = null } = {}) {
+// Result of one run. `analysed` is the old numeric return value; the rest is
+// what the tick needs to spot a SYSTEMIC failure (every attempt in a tick
+// failing transiently — how a bad json_schema takes out all extraction while
+// the tick stays green).
+function emptyRunResult() {
+  return { analysed: 0, attempted: 0, failed: 0, transient: 0, permanent: 0, parked: [] };
+}
+
+export async function analysePendingContracts({ db, env = process.env, client = null, log = null, force = false, onlyId = null, onlyMessageId = null, contractsDir = null, now = null } = {}) {
   const docsDir = contractsDir ?? env.PILOT_CONTRACTS_DIR ?? 'data/contracts';
-  if (!client && !(env.ANTHROPIC_API_KEY && env.ANTHROPIC_API_KEY.trim())) return 0;
+  const result = emptyRunResult();
+  if (!client && !(env.ANTHROPIC_API_KEY && env.ANTHROPIC_API_KEY.trim())) return result;
 
   let pending = force
     ? db.raw.prepare(`
@@ -518,29 +601,71 @@ export async function analysePendingContracts({ db, env = process.env, client = 
   if (onlyMessageId != null) pending = pending.filter((a) => a.message_id === onlyMessageId);
 
   const model = env.ANTHROPIC_CONTRACT_MODEL ?? DEFAULT_MODEL;
-  let done = 0;
+  const stamp = now ?? new Date().toISOString();
+
+  // One failed attempt, booked against the attachment. A permanent failure
+  // parks on the spot; a transient one is retried until MAX_ANALYSIS_ATTEMPTS.
+  // Nothing is deleted — the stored file and any earlier extraction stay put.
+  const bookFailure = (att, { permanent, reason, message }) => {
+    result.failed += 1;
+    if (permanent) result.permanent += 1; else result.transient += 1;
+    const attempts = db.recordAnalysisFailure?.(att.id, { reason, permanent, now: stamp })
+      ?? (permanent ? MAX_ANALYSIS_ATTEMPTS : 1);
+    const parked = attempts >= MAX_ANALYSIS_ATTEMPTS;
+    if (parked) result.parked.push({ id: att.id, filename: att.filename, reason, attempts });
+    log?.(`contract-analysis FAILED ${att.filename} (${att.kommun_namn ?? 'okänd kommun'}): ${reason}`
+      + ` — ${message ?? ''} [försök ${attempts}/${MAX_ANALYSIS_ATTEMPTS}${parked ? ', PARKERAD' : ''}]`);
+  };
+
   for (const att of pending) {
+    result.attempted += 1;
     const fullPath = resolveAttachmentPath(att.saved_path, docsDir);
     if (!existsSync(fullPath)) {
-      log?.(`contract-analysis: file missing on disk, skipping ${att.filename}`);
+      // Used to be a bare log-and-skip, i.e. an eternal no-op re-check. A file
+      // that is not on disk will not appear by itself — park it and alert.
+      bookFailure(att, { permanent: true, reason: 'permanent:file_missing', message: fullPath });
       continue;
     }
-    const buf = readFileSync(fullPath);
+    let buf;
+    try {
+      buf = readFileSync(fullPath);
+    } catch (e) {
+      bookFailure(att, { permanent: true, reason: 'permanent:file_unreadable', message: e.message });
+      continue;
+    }
     const ctx = { kommun_namn: att.kommun_namn, filename: att.filename };
     let analysis;
+    let failure = null;
+    const onFailure = (f) => { failure = f; };
     if (isOfficeDoc(att.filename)) {
       // A kommun that answers with a spreadsheet of avtal must be read too,
       // not stored and ignored while the follow-up asks what they already sent.
-      const text = officeTextFromBuffer(buf, att.filename);
-      if (!text) { log?.(`contract-analysis: no readable text in ${att.filename}`); continue; }
-      analysis = await analyseContractText(text, ctx, { env, client });
+      let text = null;
+      try {
+        text = officeTextFromBuffer(buf, att.filename);
+      } catch (e) {
+        bookFailure(att, { permanent: true, reason: 'permanent:office_parse_error', message: e.message });
+        continue;
+      }
+      if (!text) {
+        bookFailure(att, { permanent: true, reason: 'permanent:no_readable_text', message: 'office document yielded no text' });
+        continue;
+      }
+      analysis = await analyseContractText(text, ctx, { env, client, onFailure });
     } else {
-      analysis = await analyseContractPdf(buf, ctx, { env, client });
+      analysis = await analyseContractPdf(buf, ctx, { env, client, onFailure });
     }
-    if (!analysis) continue; // stays pending; next run retries
+    if (!analysis) {
+      // A null with no classified failure means the client refused to run at
+      // all (no API key) — not the document's fault, so it is not an attempt.
+      if (failure) bookFailure(att, failure);
+      else result.attempted -= 1;
+      continue;
+    }
     storeContractAnalysis(db, att.id, analysis, { model, log });
+    db.clearAnalysisFailure?.(att.id);
     log?.(`CONTRACT analysed: ${att.filename} → ${analysis.is_contract ? (analysis.vendor_name ?? 'okänd leverantör') : 'ej avtal'}`);
-    done += 1;
+    result.analysed += 1;
   }
-  return done;
+  return result;
 }

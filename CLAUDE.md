@@ -95,6 +95,16 @@ Phase-1 pipeline: `scripts/01|02|03 → src/seed.js|crawl.js|verify.js → data/
   staleness nudge and send no `T_FOLLOWUP_NUDGE`/`T_FOLLOWUP_CLOSE` — the
   kommun may have replied into an inbox we never read. Replies to mail we HAVE
   seen (receipts, precision, bounce resends, refreshes) are unaffected.
+- **Extraction failures are bounded and loud.** A failed contract analysis
+  books an attempt on the attachment row (`analysis_attempts`,
+  `last_analysis_error` as `permanent:…`/`transient:…`). Permanent failures
+  (file missing, unreadable/zero-text, oversized) park on the first attempt;
+  transient ones retry to `MAX_ANALYSIS_ATTEMPTS` (storage.js). Parked
+  attachments leave `listPendingContractAttachments` — that is what stops the
+  15-minute Opus burn — and are digested to Slack ONCE, tracked durably via
+  `analysis_parked_alerted_at` (never a per-process Map). A tick where every
+  attempt (≥3) failed transiently raises a separate systemic alert. Nothing is
+  deleted: clearing `analysis_attempts` (or `--force`) re-queues.
 
 ## Conventions that aren't obvious from the code alone
 
