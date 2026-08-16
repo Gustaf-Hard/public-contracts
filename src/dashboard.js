@@ -1043,7 +1043,7 @@ export function createDashboardApp({
         decision: 'edit', slackClient,
       });
     } catch (e) {
-      if (e.code === 'ESCALATION_NOT_OPEN' || e.code === 'STALE_ESCALATION') {
+      if (e.code === 'ESCALATION_NOT_OPEN' || e.code === 'STALE_ESCALATION' || e.code === 'STALE_INGEST') {
         return res.status(409).send(escapeForError(e.message));
       }
       return res.status(500).send(`Send failed: ${escapeForError(e.message)}`);
@@ -1338,9 +1338,11 @@ export function createDashboardApp({
       });
     } catch (e) {
       // Claim/staleness violations are expected races, not server errors:
-      // a concurrent approve (here or via Slack) got there first, or a newer
-      // inbound arrived after the draft. Nothing was double-sent.
-      if (e.code === 'ESCALATION_NOT_OPEN' || e.code === 'STALE_ESCALATION') {
+      // a concurrent approve (here or via Slack) got there first, a newer
+      // inbound arrived after the draft, or ingest is down so a "we're still
+      // waiting" nudge cannot be trusted. Nothing was double-sent, and the
+      // escalation is still open.
+      if (e.code === 'ESCALATION_NOT_OPEN' || e.code === 'STALE_ESCALATION' || e.code === 'STALE_INGEST') {
         return res.status(409).send(escapeForError(e.message));
       }
       // A bounce resend with no corrected address: nothing was sent and the

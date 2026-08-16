@@ -968,6 +968,24 @@ export async function runDailyFollowup(deps) {
   // that don't inject it are unaffected; the daemon always injects the resolved
   // window via resolveVacation(overrides).
   const cfg = deps.vacationConfig ?? { enabled: false };
+
+  // Ingest gate: everything below is staleness drafting — "we have heard
+  // nothing for N days" — computed purely from the DB. When ingest is blind
+  // (dead Gmail token, daemon down) the DB is NOT the world: replies can be
+  // sitting unfetched in the inbox, and a nudge saying we are still waiting
+  // would be false. `stale` is getTickHealth's own notion, shared with the
+  // dashboard pill and the send-side STALE_INGEST guard. runTick (real
+  // inbound) and runRefreshScan (T_UPDATE) are untouched — neither claims to
+  // know that nothing arrived.
+  const health = db.getTickHealth?.({ now }) ?? null;
+  if (health?.stale) {
+    const since = health.ever
+      ? `senaste lyckade bearbetning ${health.last_success_at} (${health.stale_minutes} min sedan)`
+      : 'ingen lyckad bearbetning ännu';
+    log?.(`FOLLOWUP paused — inbound is not being processed: ${since}; the DB may not reflect replies already in the inbox`);
+    return;
+  }
+
   const todayIso = now.toISOString().slice(0, 10);
   let vacationPauseLogged = false;
   const all = db.listAllConversations();

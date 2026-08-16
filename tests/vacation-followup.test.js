@@ -32,7 +32,17 @@ function fakeSlackOps() {
   };
 }
 
+// The follow-up loop is gated on tick health (a blind ingest must not draft
+// "vi har inte hört av er"), so every vacation case starts from a daemon that
+// ticked cleanly just before the simulated `now`.
+function seedHealthyTick(now) {
+  db.recordHeartbeat({ kind: 'tick', error: null });
+  db.raw.prepare('UPDATE daemon_heartbeat SET last_success_at = ? WHERE id = 1')
+    .run(new Date(now.getTime() - 5 * 60000).toISOString());
+}
+
 function deps({ now, vacationConfig, slackOps = fakeSlackOps() } = {}) {
+  seedHealthyTick(now);
   return {
     db, gmailClient: { gmail: {} },
     gmailOps: { sendMessage: async () => ({ id: 'out', threadId: 'thr' }) },

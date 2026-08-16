@@ -86,6 +86,15 @@ Phase-1 pipeline: `scripts/01|02|03 → src/seed.js|crawl.js|verify.js → data/
   first-conv-wins.
 - **`received_at` is Gmail `internalDate`**, never processing time. The
   inbound fetch window derives from heartbeat `last_success_at` (30d floor).
+- **Never claim silence we haven't verified.** `last_success_at` is stamped by
+  a clean *tick* only (never the Gmail-free daily follow-up), and
+  `TICK_STALE_THRESHOLD_MIN` (storage.js) is the one definition of "ingest is
+  blind" shared by the dashboard pill/modal, the daemon's once-per-outage Slack
+  alert (`reportTickHealth`), the `runDailyFollowup` gate, and the
+  `STALE_INGEST` refusal in `sendApprovedReply`. While blind we draft no
+  staleness nudge and send no `T_FOLLOWUP_NUDGE`/`T_FOLLOWUP_CLOSE` — the
+  kommun may have replied into an inbox we never read. Replies to mail we HAVE
+  seen (receipts, precision, bounce resends, refreshes) are unaffected.
 
 ## Conventions that aren't obvious from the code alone
 

@@ -49,7 +49,18 @@ function fakeGmail(opts = {}) {
   };
 }
 
+// runDailyFollowup only drafts staleness nudges when ingest is healthy — a
+// blind daemon must not claim "we have heard nothing". Every case in this file
+// is about the staleness rules, so simulate a daemon that ticked cleanly five
+// minutes before the simulated `now`.
+function seedHealthyTick(now) {
+  db.recordHeartbeat({ kind: 'tick', error: null });
+  db.raw.prepare('UPDATE daemon_heartbeat SET last_success_at = ? WHERE id = 1')
+    .run(new Date(now.getTime() - 5 * 60000).toISOString());
+}
+
 function deps({ gmail = fakeGmail(), slackOps = fakeSlackOps(), now = new Date('2026-06-24T12:00:00Z'), analyseContracts } = {}) {
+  seedHealthyTick(now);
   return {
     db, gmailClient: { gmail: {} }, gmailOps: gmail, slackClient: {}, slackOps,
     env, contractsDir, now, analyseContracts,
