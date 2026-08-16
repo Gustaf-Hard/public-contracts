@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { zipSync, strToU8 } from 'fflate';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { openDb } from '../src/storage.js';
@@ -583,8 +583,8 @@ describe('runTick — thread status inference on ingest', () => {
   });
 });
 
-describe('runTick — zip attachments are expanded into inner PDFs', () => {
-  it('extracts PDF entries from a zipped inbound attachment and saves them', async () => {
+describe('runTick — zip attachments are expanded into their contents', () => {
+  it('extracts every entry from a zipped inbound attachment and saves them', async () => {
     const id = db.createConversation({
       kommun_kod: '1440', kommun_namn: 'Ale', role: 'central',
       contact_email: 'kansli@ale.se', scheduled_send_at: '2026-06-10T09:00:00Z',
@@ -593,7 +593,7 @@ describe('runTick — zip attachments are expanded into inner PDFs', () => {
 
     const zipBytes = Buffer.from(zipSync({
       'Avtal LexiFlow.pdf': strToU8('%PDF-1.4 lexiflow'),
-      'notes.txt': strToU8('skip me'),
+      'notes.txt': strToU8('keep me — the zip is the only copy'),
     }));
 
     const gmail = fakeGmail({
@@ -624,8 +624,12 @@ describe('runTick — zip attachments are expanded into inner PDFs', () => {
       env, contractsDir, now: new Date('2026-06-12T11:00:00Z'),
     });
 
-    const atts = db.raw.prepare('SELECT a.filename FROM attachments a JOIN messages m ON m.id=a.message_id WHERE m.conversation_id=?').all(id);
-    expect(atts.map((a) => a.filename)).toEqual(['Avtal LexiFlow.pdf']);
+    const atts = db.raw.prepare('SELECT a.filename, a.mime_type FROM attachments a JOIN messages m ON m.id=a.message_id WHERE m.conversation_id=? ORDER BY a.filename').all(id);
+    expect(atts.map((a) => a.filename)).toEqual(['Avtal LexiFlow.pdf', 'notes.txt']);
+    expect(atts[0].mime_type).toBe('application/pdf');
+    expect(atts[1].mime_type).toBe('text/plain');
+    // Only the PDF is a document the analyser can read.
+    expect(db.listPendingContractAttachments().map((a) => a.filename)).toEqual(['Avtal LexiFlow.pdf']);
   });
 });
 
@@ -681,7 +685,6 @@ describe('runTick — non-PDF attachments are stored, never silently dropped', (
     const rows = db.raw.prepare('SELECT a.* FROM attachments a JOIN messages m ON m.id=a.message_id WHERE m.conversation_id=?').all(id);
     expect(rows.map((a) => a.filename)).toEqual(['Sammanställning avtal.xlsx']);
     expect(rows[0].mime_type).toBe(xlsxMime);
-    const { existsSync, readFileSync } = await import('node:fs');
     expect(existsSync(rows[0].saved_path)).toBe(true);
     expect(readFileSync(rows[0].saved_path).toString()).toBe('PK-xlsx-bytes');
     // Stored — but the Opus contract analyser must never see it.
@@ -741,7 +744,7 @@ describe('runTick — non-PDF attachments are stored, never silently dropped', (
     expect(db.listPendingContractAttachments()).toEqual([]); // not a PDF → not analysed
   });
 
-  it('stores the zip itself when it expands to no inner PDFs (nothing is ever dropped)', async () => {
+  it('extracts a non-PDF entry from a zip rather than storing the archive opaquely', async () => {
     const id = convInState('2506', 'Arjeplog');
     const zipBytes = Buffer.from(zipSync({ 'sammanställning.xlsx': strToU8('PK-inner-xlsx') }));
     const msg = deliveryMsg([
@@ -752,8 +755,90 @@ describe('runTick — non-PDF attachments are stored, never silently dropped', (
     await runTick(makeDeps({ gmail }));
 
     const rows = db.raw.prepare('SELECT a.* FROM attachments a JOIN messages m ON m.id=a.message_id WHERE m.conversation_id=?').all(id);
-    expect(rows.map((a) => a.filename)).toEqual(['Handlingar.zip']);
+    expect(rows.map((a) => a.filename)).toEqual(['sammanställning.xlsx']);
+    // Inside a zip it is the same avtalslista as an unzipped one — analysable.
+    expect(db.listPendingContractAttachments().map((a) => a.filename)).toEqual(['sammanställning.xlsx']);
+  });
+
+  // The real data-loss path: a mixed zip used to yield ONLY its inner PDFs.
+  // Everything else — the sammanställning that lists the vendors we asked
+  // about — was discarded along with the archive itself, leaving zero trace.
+  it('stores BOTH the pdf and the xlsx from a mixed zip, skipping archive junk', async () => {
+    const id = convInState('1490', 'Borås');
+    const zipBytes = Buffer.from(zipSync({
+      'Avtal/': strToU8(''),
+      'Avtal/Avtal LexiFlow.pdf': strToU8('%PDF-1.4 lexiflow'),
+      'Sammanställning avtal.xlsx': strToU8('PK-inner-xlsx'),
+      '__MACOSX/._Sammanställning avtal.xlsx': strToU8('junk'),
+    }));
+    const msg = deliveryMsg([
+      { mimeType: 'application/zip', filename: 'Handlingar.zip', body: { attachmentId: 'a-zip', size: zipBytes.length } },
+    ]);
+    const gmail = gmailWith(msg, { 'a-zip': zipBytes });
+
+    await runTick(makeDeps({ gmail }));
+
+    const rows = db.raw.prepare('SELECT a.* FROM attachments a JOIN messages m ON m.id=a.message_id WHERE m.conversation_id=? ORDER BY a.filename').all(id);
+    expect(rows.map((a) => a.filename)).toEqual(['Avtal LexiFlow.pdf', 'Sammanställning avtal.xlsx']);
+    expect(rows[0].mime_type).toBe('application/pdf');
+    expect(rows[1].mime_type).toBe('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    expect(existsSync(rows[1].saved_path)).toBe(true);
+    expect(readFileSync(rows[1].saved_path).toString()).toBe('PK-inner-xlsx');
+    // Both are readable documents, so both must reach the analyser.
+    expect(db.listPendingContractAttachments().map((a) => a.filename))
+      .toEqual(['Avtal LexiFlow.pdf', 'Sammanställning avtal.xlsx']);
+  });
+
+  it('stores unsupported inner files as octet-stream rather than dropping them', async () => {
+    const id = convInState('2510', 'Jokkmokk');
+    const zipBytes = Buffer.from(zipSync({ 'anteckningar.qqq': strToU8('okänt format') }));
+    const msg = deliveryMsg([
+      { mimeType: 'application/zip', filename: 'Handlingar.zip', body: { attachmentId: 'a-zip', size: zipBytes.length } },
+    ]);
+    const gmail = gmailWith(msg, { 'a-zip': zipBytes });
+
+    await runTick(makeDeps({ gmail }));
+
+    const rows = db.raw.prepare('SELECT a.* FROM attachments a JOIN messages m ON m.id=a.message_id WHERE m.conversation_id=?').all(id);
+    expect(rows.map((a) => a.filename)).toEqual(['anteckningar.qqq']);
+    expect(rows[0].mime_type).toBe('application/octet-stream');
     expect(db.listPendingContractAttachments()).toEqual([]);
+  });
+
+  it('skips a tiny signature logo found INSIDE a zip, same as a top-level one', async () => {
+    const id = convInState('2523', 'Gällivare');
+    const zipBytes = Buffer.from(zipSync({
+      'Avtal.pdf': strToU8('%PDF-1.4'),
+      'image001.png': strToU8('tiny-logo'),
+    }));
+    const msg = deliveryMsg([
+      { mimeType: 'application/zip', filename: 'Handlingar.zip', body: { attachmentId: 'a-zip', size: zipBytes.length } },
+    ]);
+    const gmail = gmailWith(msg, { 'a-zip': zipBytes });
+
+    await runTick(makeDeps({ gmail }));
+
+    const rows = db.raw.prepare('SELECT a.* FROM attachments a JOIN messages m ON m.id=a.message_id WHERE m.conversation_id=?').all(id);
+    expect(rows.map((a) => a.filename)).toEqual(['Avtal.pdf']);
+    // attachment_count records what the MAIL carried (one zip), unchanged.
+    const m = db.raw.prepare('SELECT * FROM messages WHERE conversation_id=?').get(id);
+    expect(m.attachment_count).toBe(1);
+  });
+
+  it('stores a corrupt zip as-is — an unreadable archive is still evidence', async () => {
+    const id = convInState('2521', 'Pajala');
+    const zipBytes = Buffer.from('not a zip at all');
+    const msg = deliveryMsg([
+      { mimeType: 'application/zip', filename: 'Trasig.zip', body: { attachmentId: 'a-zip', size: zipBytes.length } },
+    ]);
+    const gmail = gmailWith(msg, { 'a-zip': zipBytes });
+
+    await runTick(makeDeps({ gmail }));
+
+    const rows = db.raw.prepare('SELECT a.* FROM attachments a JOIN messages m ON m.id=a.message_id WHERE m.conversation_id=?').all(id);
+    expect(rows.map((a) => a.filename)).toEqual(['Trasig.zip']);
+    expect(rows[0].mime_type).toBe('application/zip');
+    expect(readFileSync(rows[0].saved_path).toString()).toBe('not a zip at all');
   });
 });
 

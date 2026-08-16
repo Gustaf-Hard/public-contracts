@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { zipSync, strToU8 } from 'fflate';
-import { saveAttachment, safeFilename, extractPdfsFromZip, isTrivialImage, TINY_IMAGE_SKIP_BYTES } from '../src/attachments.js';
+import { saveAttachment, safeFilename, extractFilesFromZip, isTrivialImage, TINY_IMAGE_SKIP_BYTES } from '../src/attachments.js';
 
 describe('isTrivialImage', () => {
   it('flags a small inline-signature-sized image', () => {
@@ -32,27 +32,48 @@ describe('isTrivialImage', () => {
   });
 });
 
-describe('extractPdfsFromZip', () => {
-  it('returns only PDF entries, basenamed, with their bytes', () => {
+describe('extractFilesFromZip', () => {
+  it('returns EVERY regular entry, basenamed, with their bytes', () => {
     const zip = zipSync({
       'Avtal.pdf': strToU8('%PDF-1.4 first'),
       'läs-mig.txt': strToU8('inte ett avtal'),
       'bilagor/Pris.pdf': strToU8('%PDF-1.4 nested'),
     });
-    const pdfs = extractPdfsFromZip(Buffer.from(zip));
-    expect(pdfs.map((p) => p.filename).sort()).toEqual(['Avtal.pdf', 'Pris.pdf']);
-    const avtal = pdfs.find((p) => p.filename === 'Avtal.pdf');
+    const files = extractFilesFromZip(Buffer.from(zip));
+    expect(files.map((p) => p.filename).sort()).toEqual(['Avtal.pdf', 'Pris.pdf', 'läs-mig.txt']);
+    const avtal = files.find((p) => p.filename === 'Avtal.pdf');
     expect(avtal.data.toString()).toBe('%PDF-1.4 first');
   });
 
-  it('skips directory entries and is case-insensitive on .pdf', () => {
-    const zip = zipSync({ 'DIR/': strToU8(''), 'X.PDF': strToU8('%PDF-1.4') });
-    const pdfs = extractPdfsFromZip(Buffer.from(zip));
-    expect(pdfs.map((p) => p.filename)).toEqual(['X.PDF']);
+  it('assigns real mime types to pdf/xlsx/docx and octet-stream to the rest', () => {
+    const zip = zipSync({
+      'Avtal.pdf': strToU8('%PDF'),
+      'Sammanställning.xlsx': strToU8('PK-xlsx'),
+      'Följebrev.docx': strToU8('PK-docx'),
+      'anteckningar.qqq': strToU8('okänt'),
+    });
+    const byName = Object.fromEntries(extractFilesFromZip(Buffer.from(zip)).map((f) => [f.filename, f.mime_type]));
+    expect(byName['Avtal.pdf']).toBe('application/pdf');
+    expect(byName['Sammanställning.xlsx']).toBe('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    expect(byName['Följebrev.docx']).toBe('application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    expect(byName['anteckningar.qqq']).toBe('application/octet-stream');
+  });
+
+  it('skips directory entries and macOS archive junk', () => {
+    const zip = zipSync({
+      'DIR/': strToU8(''),
+      'X.PDF': strToU8('%PDF-1.4'),
+      '__MACOSX/._X.PDF': strToU8('junk'),
+      '.DS_Store': strToU8('junk'),
+      'bilagor/.DS_Store': strToU8('junk'),
+    });
+    const files = extractFilesFromZip(Buffer.from(zip));
+    expect(files.map((p) => p.filename)).toEqual(['X.PDF']);
+    expect(files[0].mime_type).toBe('application/pdf'); // extension match is case-insensitive
   });
 
   it('returns [] on a corrupt / non-zip buffer', () => {
-    expect(extractPdfsFromZip(Buffer.from('not a zip at all'))).toEqual([]);
+    expect(extractFilesFromZip(Buffer.from('not a zip at all'))).toEqual([]);
   });
 });
 

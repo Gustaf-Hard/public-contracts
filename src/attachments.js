@@ -2,12 +2,41 @@ import { writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { unzipSync } from 'fflate';
 
-// Extract PDF entries from a zip archive buffer. Kommuner sometimes deliver
-// contracts as a zipped bundle; we pull each .pdf out so it can be saved and
-// analysed like any other attachment. Directory entries and non-PDFs are
-// skipped; inner directory components are stripped from the name. Returns []
-// on a corrupt / non-zip buffer (never throws — tick safety).
-export function extractPdfsFromZip(buffer) {
+// Extensions we can give a real content type. Everything else is stored as
+// octet-stream: unknown ≠ discardable, and the filename still carries the type.
+// pdf/xlsx/docx matter beyond labelling — storage.js listPendingContractAttachments
+// gates contract ANALYSIS on exactly these.
+const ZIP_ENTRY_MIME = {
+  pdf: 'application/pdf',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  xls: 'application/vnd.ms-excel',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  doc: 'application/msword',
+  csv: 'text/csv',
+  txt: 'text/plain',
+  rtf: 'application/rtf',
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+  zip: 'application/zip',
+};
+
+// Archive bookkeeping, never delivered content: the AppleDouble sidecars macOS
+// adds when zipping, and Finder's folder-view database.
+function isArchiveJunk(name) {
+  return name.startsWith('__MACOSX/')
+    || name.split('/').pop() === '.DS_Store';
+}
+
+// Expand a zip archive buffer into EVERY regular file it holds. Kommuner deliver
+// bundles that mix contracts with the sammanställning listing them; pulling out
+// only the PDFs discarded the rest AND the archive, so those files existed
+// nowhere afterwards. Directory markers and macOS archive junk are skipped;
+// inner directory components are stripped from the name (dedupeFilenames keeps
+// two same-named entries from colliding). Returns [] on a corrupt / non-zip
+// buffer — the caller then stores the archive as-is (never throws, tick safety).
+export function extractFilesFromZip(buffer) {
   let files;
   try {
     files = unzipSync(new Uint8Array(buffer));
@@ -17,9 +46,14 @@ export function extractPdfsFromZip(buffer) {
   const out = [];
   for (const [name, data] of Object.entries(files)) {
     if (name.endsWith('/')) continue; // directory marker
-    if (!name.toLowerCase().endsWith('.pdf')) continue;
+    if (isArchiveJunk(name)) continue;
     const base = name.split('/').pop();
-    out.push({ filename: base, data: Buffer.from(data) });
+    const ext = base.includes('.') ? base.split('.').pop().toLowerCase() : '';
+    out.push({
+      filename: base,
+      data: Buffer.from(data),
+      mime_type: ZIP_ENTRY_MIME[ext] ?? 'application/octet-stream',
+    });
   }
   return out;
 }
