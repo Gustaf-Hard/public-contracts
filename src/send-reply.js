@@ -27,6 +27,10 @@ function errWithCode(message, code) {
   return e;
 }
 
+// Drafts whose entire content is "we have heard nothing from you" — the only
+// ones whose truth depends on our having actually read the inbox.
+const STALENESS_NUDGE_TEMPLATES = new Set(['T_FOLLOWUP_NUDGE', 'T_FOLLOWUP_CLOSE']);
+
 // The non-terminal waiting states a conversation can sanely resume into after a
 // free-form / soft escalation resolves. NEEDS_HUMAN and the terminal/quiescent
 // states are NOT sane resume targets.
@@ -151,6 +155,30 @@ export async function sendApprovedReply({ db, gmail, env, conv, esc, finalBody, 
       throw errWithCode(
         `Escalation ${esc.id} is stale: a newer inbound arrived after the draft was created. Re-review (Edit) or skip.`,
         'STALE_ESCALATION'
+      );
+    }
+  }
+
+  // Blind-ingest guard — same shape as the staleness guard above (checked
+  // before the claim, so a refused send leaves the escalation OPEN for the
+  // operator to retry once ingest is back), and complementary to it: that one
+  // sees newer inbound that IS in the DB, this one covers inbound that was
+  // never fetched. A nudge is the one draft that asserts a negative ("vi har
+  // inte hört av er"), so approving it while the daemon is blind can tell a
+  // kommun we are still waiting for a reply already sitting in the inbox.
+  // Deliberately narrow: receipts, precision answers, bounce resends and
+  // refreshes all answer or open something we HAVE seen, and blocking those
+  // during an outage would just stall real work. Applies to edits too — the
+  // operator cannot see the unfetched reply either.
+  if (STALENESS_NUDGE_TEMPLATES.has(esc.draft_template)) {
+    const health = db.getTickHealth?.() ?? null;
+    if (health?.stale) {
+      const since = health.ever
+        ? `sedan ${String(health.last_success_at).slice(0, 16).replace('T', ' ')} (${health.stale_minutes} min)`
+        : 'sedan start (ingen lyckad bearbetning ännu)';
+      throw errWithCode(
+        `Escalation ${esc.id} is a staleness reminder, but inbound mail has not been processed ${since} — ${conv.kommun_namn} may already have replied without us seeing it. Restore ingest (Gmail sign-in) and let a tick run before sending.`,
+        'STALE_INGEST'
       );
     }
   }

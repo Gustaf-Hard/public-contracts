@@ -105,6 +105,9 @@ describe('graduation ledger repairs (M3, schema-free parts)', () => {
     });
     const esc = db.raw.prepare('SELECT * FROM escalations WHERE id=?').get(escId);
     const conv = db.getConversation(convId);
+    // A nudge is refused while ingest is blind (STALE_INGEST) — this case is
+    // about the decision ledger, so record a clean tick first.
+    db.recordHeartbeat({ kind: 'tick', error: null });
     await sendApprovedReply({
       db, gmail: {}, env: { GMAIL_USER_EMAIL: 'me@x.se', GMAIL_FROM_NAME: 'Me' },
       conv, esc, finalBody: 'b', decision: 'edit',

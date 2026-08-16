@@ -14,6 +14,13 @@ import { splitHandoffContacts } from './handoff.js';
 // resolved_edit, resolved_skip, resolved_closed, superseded) is terminal.
 export const ACTIVE_ESCALATION_STATUSES = Object.freeze(['open', 'sending', 'send_failed', 'send_unconfirmed']);
 
+// THE definition of "ingest is blind": no successful tick within this many
+// minutes (60 = four missed 15-minute ticks). One number, one meaning — the
+// dashboard health pill/modal, the daemon's Slack outage alert, the follow-up
+// staleness gate and the nudge send-guard all read it through getTickHealth so
+// they can never disagree about whether we are seeing the inbox.
+export const TICK_STALE_THRESHOLD_MIN = 60;
+
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS conversations (
   id INTEGER PRIMARY KEY,
@@ -236,6 +243,12 @@ export function openDb(path) {
     const hbCols = db.prepare("PRAGMA table_info(daemon_heartbeat)").all().map((r) => r.name);
     if (!hbCols.includes('last_success_at')) {
       db.exec('ALTER TABLE daemon_heartbeat ADD COLUMN last_success_at TEXT');
+    }
+    // Set when the ingest-outage Slack alert has already been posted for the
+    // CURRENT outage, cleared on the next successful tick. Persisted (not
+    // in-memory) so a daemon restart mid-outage doesn't re-alert.
+    if (!hbCols.includes('outage_alerted_at')) {
+      db.exec('ALTER TABLE daemon_heartbeat ADD COLUMN outage_alerted_at TEXT');
     }
     const escCols = db.prepare("PRAGMA table_info(escalations)").all().map((r) => r.name);
     if (!escCols.includes('watchlist_vendors')) {
@@ -610,9 +623,14 @@ export function openDb(path) {
 
   function recordHeartbeat({ kind = 'tick', error = null } = {}) {
     const col = kind === 'followup' ? 'last_followup_at' : 'last_tick_at';
-    // A clean tick (no error) also stamps last_success_at — that's what the
-    // health check keys off, so "up but failing on Gmail" reads as unhealthy.
-    const successSet = error == null
+    // ONLY a clean TICK stamps last_success_at. It is the "we have actually
+    // looked at the inbox" clock: getTickHealth, the dashboard pill/modal and
+    // deriveFetchWindowDays all key off it, so "up but failing on Gmail" must
+    // read as unhealthy. The daily follow-up touches no Gmail, so letting its
+    // successes stamp the same column kept the clock fresh straight through a
+    // dead-token outage — masking the health pill and shrinking the catch-up
+    // fetch window that is supposed to cover the whole outage.
+    const successSet = kind === 'tick' && error == null
       ? ", last_success_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')"
       : '';
     db.prepare(`
@@ -643,22 +661,43 @@ export function openDb(path) {
 
   // Pipeline health from the heartbeat row. `stale` is true when no successful
   // tick has ever happened, or the last one is older than thresholdMin.
-  function getTickHealth({ now = new Date(), thresholdMin = 60 } = {}) {
+  // `stale_minutes` is how long we have been blind (null when never healthy),
+  // so callers can say "since when" without re-deriving the arithmetic.
+  function getTickHealth({ now = new Date(), thresholdMin = TICK_STALE_THRESHOLD_MIN } = {}) {
     const hb = db.prepare('SELECT * FROM daemon_heartbeat WHERE id = 1').get() ?? null;
     const lastSuccess = hb?.last_success_at ?? null;
     let stale = true;
+    let staleMinutes = null;
     if (lastSuccess) {
       const ageMin = (now.getTime() - new Date(lastSuccess).getTime()) / 60000;
       stale = ageMin > thresholdMin;
+      staleMinutes = Math.max(0, Math.round(ageMin));
     }
     return {
       last_tick_at: hb?.last_tick_at ?? null,
       last_success_at: lastSuccess,
       last_error: hb?.last_error ?? null,
       tick_count: hb?.tick_count ?? 0,
+      outage_alerted_at: hb?.outage_alerted_at ?? null,
       stale,
+      stale_minutes: staleMinutes,
       ever: !!lastSuccess,
     };
+  }
+
+  // Outage-alert bookkeeping (one Slack alert per outage, not one per tick).
+  // Kept in the heartbeat row rather than daemon memory so a restart mid-outage
+  // does not re-alert.
+  function markOutageAlerted() {
+    db.prepare(`
+      UPDATE daemon_heartbeat
+      SET outage_alerted_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+      WHERE id = 1
+    `).run();
+  }
+
+  function clearOutageAlert() {
+    db.prepare('UPDATE daemon_heartbeat SET outage_alerted_at = NULL WHERE id = 1').run();
   }
 
   function close() {
@@ -1208,6 +1247,8 @@ export function openDb(path) {
     recordHeartbeat,
     getHeartbeat,
     getTickHealth,
+    markOutageAlerted,
+    clearOutageAlert,
     getFirstOutboundDate,
     close,
     upsertVendor,

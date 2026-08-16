@@ -1,7 +1,7 @@
 import express from 'express';
 import cron from 'node-cron';
 import { runTick, runDailyFollowup, runRefreshScan } from './tick.js';
-import { openDb } from './storage.js';
+import { openDb, TICK_STALE_THRESHOLD_MIN } from './storage.js';
 import { buildOAuthClient, loadStoredToken, saveToken, makeGmail, makeReloadingClient, sendMessage as gmailSend, listInboundQuery, getMessage as gmailGet, fetchAttachment } from './gmail.js';
 // gmailSend stays imported because runTick's gmailOps below uses it.
 import { makeSlackClient, verifySlackSignature, parseInteractivityPayload, postEscalation, postAlert, openEditModal, updateEscalationResolved } from './slack.js';
@@ -49,6 +49,62 @@ export function makeExclusive(fn, { log = null, name = 'task', mutex = null } = 
       running = false;
     }
   };
+}
+
+// How long ingest may be down before Slack hears about it. Four missed
+// 15-minute ticks — long enough that a single transient Gmail hiccup stays
+// quiet, short enough that a dead OAuth token (which happens roughly weekly)
+// is known within the hour instead of whenever someone opens the dashboard.
+// Same number the dashboard health pill and the follow-up gate use.
+export const TICK_OUTAGE_ALERT_MIN = TICK_STALE_THRESHOLD_MIN;
+
+// 'YYYY-MM-DDTHH:MM:...' → 'YYYY-MM-DD HH:MM' for operator-facing text.
+function stamp(iso) {
+  return String(iso ?? '').slice(0, 16).replace('T', ' ');
+}
+
+// Tell the operator in Slack when inbound mail stops being processed, and when
+// it starts again. Called after every tick's heartbeat is recorded, with the
+// health read BEFORE that heartbeat (so `last_success_at` still points at the
+// last good tick, i.e. the start of the outage).
+//
+// Alert exactly ONCE per outage: the "already alerted" flag lives in the
+// heartbeat row, so 15-minute ticks don't spam the channel and a daemon
+// restarted mid-outage doesn't re-alert. Entirely best-effort — Slack being
+// down must never break the tick loop, so everything is wrapped.
+export async function reportTickHealth({ db, slackClient, slackOps, env, now = new Date(), error = null, healthBefore = null, log = null }) {
+  const h = healthBefore ?? db.getTickHealth({ now, thresholdMin: TICK_OUTAGE_ALERT_MIN });
+  if (!slackOps?.postAlert || !env?.SLACK_CHANNEL_ID) return null;
+  try {
+    if (error == null) {
+      if (!h.outage_alerted_at) return null;
+      // Clear the flag BEFORE posting, unconditionally: a flag left set by a
+      // failed Slack call would silence the NEXT outage, which is far worse
+      // than losing one recovery message.
+      db.clearOutageAlert();
+      await slackOps.postAlert(slackClient, {
+        channel: env.SLACK_CHANNEL_ID,
+        text: `✅ *Inkommande mejl bearbetas igen.* Avbrottet varade ${stamp(h.last_success_at)} → ${stamp(now.toISOString())}. Svar som kom in under tiden hämtas ikapp nu.`,
+      });
+      log?.(`INGEST RECOVERED after outage ${h.last_success_at} → ${now.toISOString()}`);
+      return 'recovered';
+    }
+    if (!h.stale || h.outage_alerted_at) return null;
+    const since = h.ever
+      ? `sedan ${stamp(h.last_success_at)} (${h.stale_minutes} min)`
+      : 'aldrig — ingen lyckad bearbetning sedan starten';
+    await slackOps.postAlert(slackClient, {
+      channel: env.SLACK_CHANNEL_ID,
+      text: `🔴 *Inkommande mejl bearbetas inte* ${since}.\nSenaste fel: \`${error}\`\nSvar och avtal ligger ohämtade i inkorgen och statusarna i dashboarden är inaktuella. Vanligaste orsaken är att Gmail-behörigheten gått ut — logga ut och in igen i dashboarden.`,
+    });
+    // Mark only after a successful post, so a Slack failure retries next tick.
+    db.markOutageAlerted();
+    log?.(`INGEST OUTAGE alerted (${since})`);
+    return 'alerted';
+  } catch (e) {
+    log?.(`tick health alert failed: ${e.message}`);
+    return null;
+  }
 }
 
 // Best-effort chat.update — a Slack failure must never break the DB flow.
@@ -238,7 +294,13 @@ export async function startDaemon({ env = process.env, log = console.log } = {})
       err = e.message;
       log(`tick error: ${e.message}`);
     }
+    // Read health BEFORE stamping this tick — on the recovery path the pre-tick
+    // last_success_at is where the outage started.
+    const healthBefore = db.getTickHealth({ now, thresholdMin: TICK_OUTAGE_ALERT_MIN });
     db.recordHeartbeat({ kind: 'tick', error: err });
+    await reportTickHealth({
+      db, slackClient: slack, slackOps, env, now, error: err, healthBefore, log,
+    });
   }, { log, name: 'tick', mutex: escalationMutex });
 
   const followupOnce = makeExclusive(async () => {
