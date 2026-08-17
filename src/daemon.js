@@ -2,7 +2,7 @@ import express from 'express';
 import cron from 'node-cron';
 import { runTick, runDailyFollowup, runRefreshScan, followupCatchUpDue, followupHourFromCron, localDateStr } from './tick.js';
 import { openDb, TICK_STALE_THRESHOLD_MIN } from './storage.js';
-import { buildOAuthClient, loadStoredToken, saveToken, makeGmail, makeReloadingClient, sendMessage as gmailSend, listInboundQuery, getMessage as gmailGet, fetchAttachment } from './gmail.js';
+import { buildOAuthClient, loadStoredToken, saveToken, makeGmail, makeReloadingClient, sendMessage as gmailSend, listInboundQuery, getMessage as gmailGet, fetchAttachment, archiveThread } from './gmail.js';
 // gmailSend stays imported because runTick's gmailOps below uses it.
 import { makeSlackClient, verifySlackSignature, parseInteractivityPayload, postEscalation, postAlert, openEditModal, updateEscalationResolved } from './slack.js';
 import { loadOverrides, getEffectiveNow, resolveVacation } from './pilot-config.js';
@@ -305,6 +305,9 @@ export async function startDaemon({ env = process.env, log = console.log } = {})
     listInboundQuery,
     getMessage: gmailGet,
     fetchAttachment,
+    // Injected explicitly (rather than relying on sendApprovedReply's default
+    // import) so the auto-send call site in tick.js passes a real function.
+    archiveThread,
   };
   const slackOps = { postEscalation, postAlert, updateEscalationResolved };
 

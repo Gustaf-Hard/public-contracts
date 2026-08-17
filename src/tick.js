@@ -1444,10 +1444,21 @@ export async function runDailyFollowup(deps) {
         } catch (e) {
           // A refusal before the claim (STALE_*) left the escalation OPEN in
           // the operator's normal queue; a Gmail failure parked it
-          // send_failed. Either way: no retry here — the next daily run skips
-          // this conversation entirely (hasActiveEscalation) — and the rest
-          // of today's conversations still run.
-          log?.(`AUTO-SEND did not go out for ${conv.kommun_namn}/${conv.role} (${e.code ?? 'SEND_ERROR'}): ${e.message}`);
+          // send_failed. But sendApprovedReply can also throw AFTER Gmail
+          // accepted the mail (post-send bookkeeping), leaving the escalation
+          // claimed as `sending` — so read the status back and say only what
+          // it actually proves, rather than asserting "did not go out" over a
+          // mail that already left. Log-only: no retry, no status mutation —
+          // the next daily run skips this conversation entirely
+          // (hasActiveEscalation), recoverStuckSends owns the `sending` case,
+          // and the rest of today's conversations still run.
+          const after = db.raw.prepare('SELECT status FROM escalations WHERE id = ?').get(escId)?.status ?? null;
+          const outcome = after === 'open'
+            ? 'refused before the send claim, did not go out'
+            : after === 'send_failed'
+              ? 'Gmail rejected it, did not go out'
+              : `outcome UNCERTAIN (escalation status ${after ?? 'unknown'}) — the mail may have been sent; recoverStuckSends will escalate it to a human`;
+          log?.(`AUTO-SEND ${outcome} for ${conv.kommun_namn}/${conv.role} (${e.code ?? 'SEND_ERROR'}): ${e.message}`);
         }
       }
     }

@@ -64,6 +64,12 @@ function deps({ gmail = fakeGmail(), slackOps = fakeSlackOps(), now = new Date('
   return {
     db, gmailClient: { gmail: {} }, gmailOps: gmail, slackClient: {}, slackOps,
     env, contractsDir, now, analyseContracts,
+    // Hermetic auto-send kill switch: point the loader at a path that does not
+    // exist inside this test's temp dir so it returns [] (fully manual). Left
+    // undefined, loadAutoSendTemplates falls back to the CWD-relative
+    // committed data/pilot-overrides.json — this suite would start auto-sending
+    // into its fakes the day that file gains the key.
+    overridesPath: join(tmp, 'no-overrides.json'),
   };
 }
 

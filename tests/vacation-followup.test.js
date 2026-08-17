@@ -47,6 +47,11 @@ function deps({ now, vacationConfig, slackOps = fakeSlackOps() } = {}) {
     db, gmailClient: { gmail: {} },
     gmailOps: { sendMessage: async () => ({ id: 'out', threadId: 'thr' }) },
     slackClient: {}, slackOps, env, contractsDir, now, vacationConfig,
+    // Hermetic auto-send kill switch: a path that does not exist inside this
+    // test's temp dir makes loadAutoSendTemplates return [] (fully manual).
+    // Left undefined it would read the CWD-relative committed
+    // data/pilot-overrides.json.
+    overridesPath: join(tmp, 'no-overrides.json'),
   };
 }
 

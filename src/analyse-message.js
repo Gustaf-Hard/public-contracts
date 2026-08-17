@@ -86,7 +86,7 @@ ISO-datum (YYYY-MM-DD) när boten ska kolla tillbaka om inget hörs av kommunen.
 - För "delay_promise": använd kommunens utlovade datum + 3 dagars grace (om de säger 10 dagar, sätt follow_up_at = idag + 13 dagar).
 - För "auto_reply": återkomstdatumet + 3 dagar när det anges; saknas datum, lämna null (systemet sätter 14 dagars grace från mottagandet).
 - För "handoff_internal": en intern vidarebefordran tar tid. Sätt promised_response_date till angivet svarsdatum när det finns; systemet väntar minst 21 dagar oavsett (golvet sätts i koden), så lämna gärna follow_up_at null om inget datum angetts.
-- För "auto_ack": null (vi väntar utan timer; om inget hörs på 7 dagar tar standard-staleness över).
+- För "auto_ack": null (vi väntar utan timer; om inget hörs på 9-15 dagar tar standard-staleness över).
 - För "clarification" / "delivery" / "delay_promise": konversationen rör sig vidare, sätt rimlig grace (5-7 dagar).
 - För terminalstaten "dead_end" / "fee_demand" / "handoff" / "unknown": null.
 
