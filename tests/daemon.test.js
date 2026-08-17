@@ -409,3 +409,40 @@ describe('makeExclusive — tick overlap latch (C3)', () => {
     expect(fn).toHaveBeenCalledTimes(2);
   });
 });
+
+// reportRefusedSend fails CLOSED: only a row VERIFIED still 'open' may be
+// announced as "Inget skickades". If the re-read finds nothing (row gone, DB
+// error), the send may in fact have gone out — a missed notice is recoverable
+// from the dashboard; a false "nothing was sent" is a lie to the operator.
+describe('createInteractivityHandler — refusal notice fails closed on an unverifiable row', () => {
+  it('posts nothing when the escalation row cannot be re-read after the failure', async () => {
+    const convId = db.createConversation({
+      kommun_kod: '1', kommun_namn: 'Arboga', role: 'central',
+      contact_email: 'registrator@arboga.se', scheduled_send_at: '2026-05-01T00:00:00Z',
+    });
+    db.updateConversationState(convId, 'SENT', { gmail_thread_id: 'thr-1' });
+    const escId = db.recordEscalation({
+      conversation_id: convId, message_id: null, reason: 'stale',
+      draft_template: 'T_FOLLOWUP_NUDGE', draft_subject: 'Påminnelse', draft_body: 'Hej igen',
+      slack_ts: 'ts-1',
+    });
+
+    const posts = [];
+    const handler = createInteractivityHandler({
+      db, slack: fakeSlack(), gmail: {}, env, log: () => {},
+      sendApprovedReplyImpl: async () => {
+        // The row vanishes mid-flight (e.g. superseded+purged, or the re-read
+        // hits a DB error) — its status can no longer be verified as 'open'.
+        db.raw.prepare('DELETE FROM escalations WHERE id = ?').run(escId);
+        throw Object.assign(new Error('boom after the row is gone'), { code: 'STALE_INGEST' });
+      },
+      postAlertImpl: async (s, args) => { posts.push(args); return { ts: 'a' }; },
+    });
+
+    const { req, res } = slackRequest(approvePayload(escId));
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(posts).toHaveLength(0); // no unverifiable "Inget skickades" claim
+  });
+});

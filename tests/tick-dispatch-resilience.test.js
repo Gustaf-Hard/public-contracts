@@ -227,3 +227,65 @@ describe('runTick — one failing dispatch never takes the batch down', () => {
     expect(analyseContracts).toHaveBeenCalled();
   });
 });
+
+// retryUnpostedEscalations restores buttons for Slack-outage orphans — but the
+// live DB also carries open/slack_ts-NULL rows from OTHER producers (dashboard
+// replies refused before the claim, escalations minted before SLACK_CHANNEL_ID
+// existed). Those must NOT resurface in Slack with live Approve buttons.
+describe('retryUnpostedEscalations — bounds', () => {
+  function mkDeps(slackOps) {
+    return {
+      db, gmailClient: { gmail: {} }, gmailOps: fakeGmail({ listResult: [] }),
+      slackClient: {}, slackOps, env, contractsDir, now: new Date(),
+      analyseContracts: vi.fn(async () => {}), log: () => {},
+    };
+  }
+
+  it('does not re-post an escalation older than the age bound', async () => {
+    const id = seedConv();
+    const escId = db.recordEscalation({
+      conversation_id: id, reason: 'old draft', draft_template: 'T_FOLLOWUP_NUDGE',
+      draft_subject: 'Påminnelse', draft_body: 'Har ni hunnit titta på detta?',
+    });
+    db.raw.prepare("UPDATE escalations SET created_at = datetime('now', '-30 days') WHERE id = ?").run(escId);
+
+    const slackOps = fakeSlackOps();
+    await runTick(mkDeps(slackOps));
+
+    expect(slackOps.posts).toHaveLength(0);
+    const esc = db.raw.prepare('SELECT slack_ts, status FROM escalations WHERE id = ?').get(escId);
+    expect(esc.slack_ts).toBeNull(); // stays dashboard-only
+    expect(esc.status).toBe('open');
+  });
+
+  it('a recent orphan IS re-posted (the age bound does not block outage healing)', async () => {
+    const id = seedConv();
+    const escId = db.recordEscalation({
+      conversation_id: id, reason: 'slack was down', draft_template: 'T_RECEIPT',
+      draft_subject: 'Re: Svar', draft_body: 'Tack för handlingarna.',
+    });
+
+    const slackOps = fakeSlackOps();
+    await runTick(mkDeps(slackOps));
+
+    expect(slackOps.posts).toHaveLength(1);
+    expect(db.raw.prepare('SELECT slack_ts FROM escalations WHERE id = ?').get(escId).slack_ts).toBe('s-1');
+  });
+
+  it('the per-tick cap bounds Slack API calls, not successes — a ts-less response cannot flood', async () => {
+    for (let i = 0; i < 8; i += 1) {
+      const id = seedConv({ kod: String(1500 + i), namn: `K${i}`, email: `k${i}@k${i}.se`, thread: `thr-${i}` });
+      db.recordEscalation({
+        conversation_id: id, reason: 'orphan', draft_template: 'T_RECEIPT',
+        draft_subject: 'Re: Svar', draft_body: 'Tack.',
+      });
+    }
+
+    // Resolves without a ts (never happens with @slack/web-api, but the cap
+    // must bound calls even then — slack_ts stays NULL so it retries forever).
+    const slackOps = fakeSlackOps({ postEscalation: vi.fn(async () => ({})) });
+    await runTick(mkDeps(slackOps));
+
+    expect(slackOps.postEscalation).toHaveBeenCalledTimes(5);
+  });
+});

@@ -987,6 +987,10 @@ describe('runTick — contract-aware delivery draft', () => {
     const esc = db.raw.prepare('SELECT * FROM escalations WHERE conversation_id = ?').get(convId);
     expect(esc.draft_template).toBe('T_RECEIPT');
     expect(esc.draft_body).not.toMatch(/faktiska avtalshandlingarna/);
+    // The suppression is operator-visible in the escalation reason, not just a
+    // log line — a parked document freezes the missing-claim until un-parked,
+    // and Slack's reason field is the one place the operator would learn why.
+    expect(esc.reason).toContain('saknas-påstående undertryckt');
   });
 
   it('flags watchlist vendors but still drafts a reply when a delivery names one', async () => {

@@ -672,6 +672,11 @@ async function dispatchEscalationForIngest(pending, deps) {
       if (choice.suppressed && facts.has_missing) {
         deps.log?.(`SUPPRESSED T_REQUEST_MISSING for ${updated.kommun_namn}/${updated.role}: `
           + `${unread} levererat dokument är ännu inte läst — vi kan inte påstå att avtal saknas`);
+        // The suppression must reach the OPERATOR, not just the log: a parked
+        // document freezes this conversation's missing-claim until un-parked,
+        // and the escalation reason is the one surface they see in Slack.
+        const suppressedNote = `⏳ ${unread} dokument olästa — saknas-påstående undertryckt`;
+        reasonPrefix = reasonPrefix ? `${reasonPrefix} | ${suppressedNote}` : suppressedNote;
       }
       if (choice.template === 'T_REQUEST_MISSING') {
         draftTemplate = 'T_REQUEST_MISSING';
@@ -795,14 +800,32 @@ async function dispatchEscalationForIngest(pending, deps) {
 // drains gradually instead of flooding the channel, and abandoned on the first
 // failure — if Slack is still down, the remaining rows wait for a later tick.
 const UNPOSTED_ESCALATION_RETRIES_PER_TICK = 5;
+// Only rows young enough to plausibly be Slack-outage orphans are re-posted.
+// The live DB carries OTHER producers of open/slack_ts-NULL rows — a
+// dashboard-composed reply refused before the claim, escalations minted before
+// SLACK_CHANNEL_ID existed — and resurrecting a months-old draft with live
+// Approve buttons is exactly the stale-send surface this repo works to close.
+// Older rows stay dashboard-only.
+const UNPOSTED_ESCALATION_MAX_AGE_DAYS = 7;
 
 async function retryUnpostedEscalations(deps) {
   const { db, slackClient, slackOps, env, log } = deps;
   if (!slackOps?.postEscalation || !env.SLACK_CHANNEL_ID) return 0;
+  const nowMs = (deps.now ?? new Date()).getTime();
+  let attempts = 0;
   let healed = 0;
   for (const esc of db.listEscalationsByStatus('open')) {
     if (esc.slack_ts) continue;
-    if (healed >= UNPOSTED_ESCALATION_RETRIES_PER_TICK) break;
+    // The cap bounds Slack API CALLS per tick, not successes — a post that
+    // resolves without a ts must not turn the drain into an unbounded flood.
+    if (attempts >= UNPOSTED_ESCALATION_RETRIES_PER_TICK) break;
+    // created_at is SQLite datetime('now') ("YYYY-MM-DD HH:MM:SS", UTC);
+    // normalise to ISO before parsing. An unparseable value is retried (the
+    // fail direction that restores buttons rather than hiding a draft).
+    const createdRaw = String(esc.created_at ?? '');
+    const createdMs = Date.parse(createdRaw.includes('T') ? createdRaw : `${createdRaw.replace(' ', 'T')}Z`);
+    if (Number.isFinite(createdMs)
+      && nowMs - createdMs > UNPOSTED_ESCALATION_MAX_AGE_DAYS * 24 * 60 * 60 * 1000) continue;
     const conv = db.getConversation(esc.conversation_id);
     if (!conv) continue;
     const trigger = esc.message_id ? db.getMessageById(esc.message_id) : null;
@@ -821,6 +844,7 @@ async function retryUnpostedEscalations(deps) {
       watchlist_vendors: watchlistVendors,
     });
     try {
+      attempts += 1;
       const posted = await slackOps.postEscalation(slackClient, {
         channel: env.SLACK_CHANNEL_ID,
         blocks,
@@ -1382,7 +1406,7 @@ export async function runDailyFollowup(deps) {
   // counts — the decision was made and it was "nudge nobody"). Only a run that
   // returned early at the ingest gate leaves the date unstamped, which is what
   // the catch-up in the daemon looks for.
-  db.markFollowupCompleted?.(localDateStr(now));
+  db.markFollowupCompleted(localDateStr(now));
 }
 
 function daysBetween(then, now) {

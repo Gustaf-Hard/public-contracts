@@ -140,8 +140,12 @@ async function reportRefusedSend({ db, slack, env, escId, kommunNamn, error, pos
   let current = null;
   try {
     current = db.raw.prepare('SELECT * FROM escalations WHERE id = ?').get(escId);
-  } catch { /* fall through — a read failure must not swallow the notice */ }
-  if (current && current.status !== 'open') return false;
+  } catch { /* current stays null */ }
+  // Fail closed: only a row VERIFIED still 'open' may be announced as "Inget
+  // skickades". If the re-read failed, the send may in fact have gone out
+  // (row 'sending'/'send_failed') — a missed notice is recoverable from the
+  // dashboard queue; a false "nothing was sent" is a lie to the operator.
+  if (!current || current.status !== 'open') return false;
   if (!postAlertImpl || !env?.SLACK_CHANNEL_ID) return false;
   try {
     await postAlertImpl(slack, {
@@ -393,7 +397,7 @@ export async function startDaemon({ env = process.env, log = console.log } = {})
     if (!res?.ok) return res;
     const now = getEffectiveNow({ env, overrides });
     if (!followupCatchUpDue({
-      now, completedDate: db.getFollowupCompletedDate?.() ?? null, hour: followupHour,
+      now, completedDate: db.getFollowupCompletedDate() ?? null, hour: followupHour,
     })) return res;
     log(`FOLLOWUP catch-up: no completed daily run for ${localDateStr(now)} — running it now after a healthy tick`);
     await followupOnce();
