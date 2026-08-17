@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { openDb } from '../src/storage.js';
 import { runTick, runDailyFollowup, followupCatchUpDue, followupHourFromCron, localDateStr } from '../src/tick.js';
-import { effectiveFollowUp } from '../src/conversation.js';
+import { effectiveFollowUp, nudgeJitterDays } from '../src/conversation.js';
 import { stripQuotedText, isCloserText } from '../src/classifier.js';
 import { storeContractAnalysis } from '../src/analyse-contract.js';
 import * as analyseMod from '../src/analyse-message.js';
@@ -125,6 +125,49 @@ describe('runDailyFollowup — staleness drafting (M1: previously untested)', ()
     }
     expect(db.listOpenEscalationsForConversation(id)).toHaveLength(1);
     expect(db.raw.prepare('SELECT COUNT(*) n FROM escalations').get().n).toBe(1);
+  });
+});
+
+// The staleness rule is jittered per conversation (2026-08-17 auto-send
+// design), but that only helps if runDailyFollowup actually FEEDS the
+// conversation's id to staleAction. Every other seed in this file sits past the
+// 15-day ceiling, where wired and unwired behave identically — these two cases
+// live inside the 9–15-day window, where they diverge: drop the
+// `nudgeJitterDays(conv.id)` argument in tick.js and both fail.
+describe('runDailyFollowup feeds each conversation its own jitter', () => {
+  const stateChangedAt = '2026-06-15T00:00:00Z';
+  // Noon-ish offset so daysBetween's floor lands on exactly `n`.
+  const dayN = (n) => new Date(Date.parse(stateChangedAt) + n * 86400000 + 9 * 3600000);
+
+  it('at exactly 9 stale days only the zero-jitter conversations are nudged', async () => {
+    const ids = ['central', 'utbildning', 'teknik', 'kultur', 'social', 'miljo']
+      .map((role) => seedConv({ role, stateChangedAt }));
+    const jitters = ids.map(nudgeJitterDays);
+    // Guard: without a spread of jitters this case could pass unwired.
+    expect(jitters).toContain(0);
+    expect(jitters.some((j) => j > 0)).toBe(true);
+
+    await runDailyFollowup(deps({ now: dayN(9) }));
+
+    for (const id of ids) {
+      // 9 days is the base threshold: the jittered ones are not due yet.
+      expect(db.listOpenEscalationsForConversation(id)).toHaveLength(nudgeJitterDays(id) === 0 ? 1 : 0);
+    }
+  });
+
+  it('a jittered conversation waits until 9 + its own jitter, then nudges', async () => {
+    seedConv({ role: 'central', stateChangedAt });          // takes the id whose jitter is 0
+    const id = seedConv({ role: 'utbildning', stateChangedAt });
+    const jitter = nudgeJitterDays(id);
+    expect(jitter).toBeGreaterThan(0);                       // else this case proves nothing
+
+    await runDailyFollowup(deps({ now: dayN(9 + jitter - 1) }));
+    expect(db.listOpenEscalationsForConversation(id)).toHaveLength(0);
+
+    await runDailyFollowup(deps({ now: dayN(9 + jitter) }));
+    const escs = db.listOpenEscalationsForConversation(id);
+    expect(escs).toHaveLength(1);
+    expect(escs[0].draft_template).toBe('T_FOLLOWUP_NUDGE');
   });
 });
 
