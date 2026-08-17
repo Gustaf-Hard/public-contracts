@@ -83,8 +83,8 @@ function seedConv({ state = 'SENT', stateChangedAt = null, followupCount = 0, fo
 }
 
 describe('runDailyFollowup — staleness drafting (M1: previously untested)', () => {
-  it('drafts T_FOLLOWUP_NUDGE for a SENT conversation stale ≥7 days', async () => {
-    const id = seedConv({ stateChangedAt: '2026-06-14T00:00:00Z' }); // 10 days
+  it('drafts T_FOLLOWUP_NUDGE for a SENT conversation stale past the 9–15-day jittered threshold', async () => {
+    const id = seedConv({ stateChangedAt: '2026-06-01T00:00:00Z' }); // 23 days — past the jitter ceiling
     const slackOps = fakeSlackOps();
     await runDailyFollowup(deps({ slackOps }));
     const escs = db.listOpenEscalationsForConversation(id);
@@ -116,7 +116,7 @@ describe('runDailyFollowup — staleness drafting (M1: previously untested)', ()
   });
 
   it('never mints a duplicate draft while one is already open (H1) — day after day', async () => {
-    const id = seedConv({ stateChangedAt: '2026-06-10T00:00:00Z' });
+    const id = seedConv({ stateChangedAt: '2026-06-01T00:00:00Z' });
     await runDailyFollowup(deps({ now: new Date('2026-06-24T09:00:00Z') }));
     expect(db.listOpenEscalationsForConversation(id)).toHaveLength(1);
     // The next three daily runs go by unapproved — still exactly one.
@@ -133,7 +133,7 @@ describe('active (non-terminal) escalations gate new drafts (hardening findings 
     // A Gmail error after Gmail MAY have accepted parks the escalation as
     // send_failed. Until a human verifies in Sent, a fresh nudge draft could
     // double-message the kommun.
-    const id = seedConv({ stateChangedAt: '2026-06-10T00:00:00Z' }); // stale ≥7d
+    const id = seedConv({ stateChangedAt: '2026-06-01T00:00:00Z' }); // stale past the jitter ceiling
     const escId = db.recordEscalation({
       conversation_id: id, message_id: null, reason: 'r',
       draft_template: 'T_RECEIPT', draft_subject: 's', draft_body: 'b',
@@ -147,7 +147,7 @@ describe('active (non-terminal) escalations gate new drafts (hardening findings 
   });
 
   it('an in-flight sending escalation defers the daily follow-up and is never superseded', async () => {
-    const id = seedConv({ stateChangedAt: '2026-06-10T00:00:00Z' });
+    const id = seedConv({ stateChangedAt: '2026-06-01T00:00:00Z' });
     const escId = db.recordEscalation({
       conversation_id: id, message_id: null, reason: 'r',
       draft_template: 'T_FOLLOWUP_NUDGE', draft_subject: 's', draft_body: 'b',
@@ -501,7 +501,7 @@ describe('daily follow-up catch-up after a blind 09:00', () => {
   }
 
   it('does not mark the day complete when the ingest gate skips it', async () => {
-    seedConv({ stateChangedAt: '2026-06-14T00:00:00Z' });
+    seedConv({ stateChangedAt: '2026-06-01T00:00:00Z' });
     const nine = new Date('2026-06-24T09:00:00');
     await runDailyFollowup(blindDeps(nine));
     expect(db.listOpenEscalations()).toHaveLength(0);
@@ -510,7 +510,7 @@ describe('daily follow-up catch-up after a blind 09:00', () => {
   });
 
   it('a healthy tick later the same day runs it — once', async () => {
-    const id = seedConv({ stateChangedAt: '2026-06-14T00:00:00Z' });
+    const id = seedConv({ stateChangedAt: '2026-06-01T00:00:00Z' });
     await runDailyFollowup(blindDeps(new Date('2026-06-24T09:00:00')));
 
     // 10:15, ingest recovered.
@@ -526,7 +526,7 @@ describe('daily follow-up catch-up after a blind 09:00', () => {
   });
 
   it('a still-blind daemon at the later tick is still skipped — the gate stays authoritative', async () => {
-    seedConv({ stateChangedAt: '2026-06-14T00:00:00Z' });
+    seedConv({ stateChangedAt: '2026-06-01T00:00:00Z' });
     await runDailyFollowup(blindDeps(new Date('2026-06-24T09:00:00')));
     const later = new Date('2026-06-24T10:15:00');
     await runDailyFollowup(blindDeps(later));
@@ -551,7 +551,7 @@ describe('daily follow-up catch-up after a blind 09:00', () => {
   });
 
   it('a vacation-paused run still counts as completed — the decision WAS made', async () => {
-    seedConv({ stateChangedAt: '2026-06-14T00:00:00Z' });
+    seedConv({ stateChangedAt: '2026-06-01T00:00:00Z' });
     const now = new Date('2026-06-24T09:00:00');
     await runDailyFollowup({
       ...deps({ now }),

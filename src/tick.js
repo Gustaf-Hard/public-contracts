@@ -5,7 +5,7 @@ import { crosscheckLabels } from './vendor-kb.js';
 import { buildCoverageFacts } from './coverage.js';
 import { classify, isCloserText } from './classifier.js';
 import { inferThreadStatus } from './threads.js';
-import { nextActionForClassification, staleAction } from './conversation.js';
+import { nextActionForClassification, staleAction, nudgeJitterDays } from './conversation.js';
 import { parseInboundMessage, sameEmailDomain, archiveThread } from './gmail.js';
 import { buildEscalationBlocks } from './slack.js';
 import { saveAttachment, extractFilesFromZip, dedupeFilenames, isTrivialImage } from './attachments.js';
@@ -1373,6 +1373,7 @@ export async function runDailyFollowup(deps) {
     const action = staleAction(conv.state, days, conv.followup_count, {
       today: todayIso,
       follow_up_at: conv.follow_up_at ?? null,
+      nudgeJitterDays: nudgeJitterDays(conv.id),
     });
     if (action === 'none') continue;
 
