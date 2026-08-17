@@ -131,7 +131,10 @@ Phase-1 pipeline: `scripts/01|02|03 → src/seed.js|crawl.js|verify.js → data/
   `T_FOLLOWUP_NUDGE` may go out unattended, and only when EVERY inbound in the
   conversation is classified in the LAZY set (`auto_ack`, `auto_reply`,
   `delay_promise`, `handoff_internal`; zero inbound qualifies; NULL/`unknown`
-  never do) AND `auto_send_templates` in `data/pilot-overrides.json` lists it —
+  never do) **and carries no attachments** (an attachment is substance
+  everywhere else — `inferThreadStatus`, the analysis queue — so a
+  misclassified ack holding the delivered avtal falls back to the operator)
+  AND `auto_send_templates` in `data/pilot-overrides.json` lists it —
   the file is re-read at the start of every `runDailyFollowup`, so pulling the
   key stops the next run without a restart. The send rides `sendApprovedReply`
   with decision `auto_send` (the ledger's machine-vs-operator marker); the

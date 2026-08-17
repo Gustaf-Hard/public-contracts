@@ -244,7 +244,7 @@ describe('nudgeJitterDays + jittered STALE_RULES (2026-08-17 auto-send design)',
 });
 
 describe('isLazyConversation — auto-send eligibility rule 2 (fail closed)', () => {
-  const inbound = (classification) => ({ direction: 'inbound', classification });
+  const inbound = (classification, attachment_count = 0) => ({ direction: 'inbound', classification, attachment_count });
   const outbound = () => ({ direction: 'outbound', classification: null });
 
   it('zero inbound qualifies (outbound rows are ignored)', () => {
@@ -263,5 +263,23 @@ describe('isLazyConversation — auto-send eligibility rule 2 (fail closed)', ()
     for (const c of ['delivery', 'clarification', 'dead_end', 'bounce', 'unknown', null]) {
       expect(isLazyConversation([inbound('auto_ack'), inbound(c)])).toBe(false);
     }
+  });
+
+  // An attachment IS substance everywhere else in the system (inferThreadStatus
+  // makes any-attachment threads primary; every attachment is queued for
+  // contract analysis regardless of classification). A misclassified auto_ack
+  // carrying the delivered avtal must therefore never earn an unattended
+  // "jag vill följa upp".
+  it('a LAZY-classified inbound carrying an attachment disqualifies', () => {
+    for (const c of ['auto_ack', 'auto_reply', 'delay_promise', 'handoff_internal']) {
+      expect(isLazyConversation([inbound(c, 1)])).toBe(false);
+      expect(isLazyConversation([inbound('auto_ack'), inbound(c, 3)])).toBe(false);
+    }
+  });
+
+  it('attachment_count 0 or absent still qualifies', () => {
+    expect(isLazyConversation([inbound('auto_ack', 0)])).toBe(true);
+    expect(isLazyConversation([{ direction: 'inbound', classification: 'auto_ack' }])).toBe(true);
+    expect(isLazyConversation([{ direction: 'inbound', classification: 'auto_ack', attachment_count: null }])).toBe(true);
   });
 });

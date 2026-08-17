@@ -204,8 +204,17 @@ export const AUTO_SEND_LAZY_CLASSIFICATIONS = new Set([
 ]);
 
 // messages: rows from db.listMessages(convId). Outbound rows are ignored.
+// An inbound row qualifies only if it is BOTH classified in the LAZY set AND
+// carries zero attachments. The rest of the system already treats any
+// attachment as substance — inferThreadStatus (threads.js) makes an
+// any-attachment thread primary, and every attachment is queued for contract
+// analysis whatever the classification — so a misclassified auto_ack/
+// delay_promise carrying the delivered avtal must not earn an unattended
+// "jag vill följa upp" while that file sits unread on our own disk. Fail
+// closed: a mere signature-logo attachment costs us one manual approval.
 export function isLazyConversation(messages) {
   return (messages ?? [])
     .filter((m) => m.direction === 'inbound')
-    .every((m) => AUTO_SEND_LAZY_CLASSIFICATIONS.has(m.classification));
+    .every((m) => AUTO_SEND_LAZY_CLASSIFICATIONS.has(m.classification)
+      && (m.attachment_count ?? 0) === 0);
 }

@@ -110,7 +110,7 @@ function seedConv({ state = 'SENT', stateChangedAt = '2026-07-25T00:00:00Z', fol
 }
 
 let inboundSeq = 0;
-function seedInbound(convId, { classification = null, receivedAt = '2026-07-26T10:00:00Z' } = {}) {
+function seedInbound(convId, { classification = null, receivedAt = '2026-07-26T10:00:00Z', attachmentCount = 0 } = {}) {
   inboundSeq += 1;
   db.recordMessage({
     conversation_id: convId,
@@ -123,7 +123,7 @@ function seedInbound(convId, { classification = null, receivedAt = '2026-07-26T1
     classification,
     classification_confidence: classification ? 0.9 : null,
     received_at: receivedAt,
-    attachment_count: 0,
+    attachment_count: attachmentCount,
     gmail_thread_id: 'thr-a',
   });
 }
@@ -215,6 +215,22 @@ describe('runDailyFollowup auto-sends eligible T_FOLLOWUP_NUDGE', () => {
 
     expect(gmail.sendMessage).toHaveBeenCalledTimes(1);
     expect(db.listDecisions()[0]?.decision).toBe('auto_send');
+  });
+
+  it('a lazy-classified inbound carrying an attachment → escalation stays open, nothing sent', async () => {
+    // The classifier said auto_ack, but the mail came with a file. Every other
+    // part of the system treats an attachment as substance (thread status,
+    // contract-analysis queue) — so a possible delivered avtal sitting unread
+    // on our disk falls back to the operator instead of an unattended nudge.
+    writeSwitch({ auto_send_templates: ['T_FOLLOWUP_NUDGE'] });
+    const id = seedConv({});
+    seedInbound(id, { classification: 'auto_ack', attachmentCount: 1 });
+    const gmail = fakeGmail();
+    await runDailyFollowup(deps({ gmail }));
+
+    expect(gmail.sendMessage).not.toHaveBeenCalled();
+    expect(db.listDecisions()).toHaveLength(0);
+    expect(db.listOpenEscalationsForConversation(id)).toHaveLength(1);
   });
 
   it('any substantive or unclassified inbound → escalation stays open, nothing sent', async () => {
