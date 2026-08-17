@@ -61,3 +61,20 @@ export function getEffectiveNow({ env = process.env, overrides, baseNow = new Da
   if (!Number.isFinite(days) || days === 0) return baseNow;
   return new Date(baseNow.getTime() + days * 24 * 60 * 60 * 1000);
 }
+
+// Auto-send kill switch (2026-08-17 design): the draft templates the daily
+// follow-up may send WITHOUT operator approval. Read fresh from disk at the
+// start of every runDailyFollowup — a stale in-memory copy must not keep
+// sending after the operator pulls the switch, so the daemon's startup-loaded
+// overrides object is deliberately not consulted for this key. Unlike
+// loadOverrides this NEVER throws: absent file, absent key, empty array and
+// malformed JSON all mean [] — fully manual, the shipped default.
+export function loadAutoSendTemplates(path = 'data/pilot-overrides.json') {
+  try {
+    const parsed = JSON.parse(readFileSync(path, 'utf8'));
+    const list = parsed?.auto_send_templates;
+    return Array.isArray(list) ? list.filter((t) => typeof t === 'string') : [];
+  } catch {
+    return [];
+  }
+}

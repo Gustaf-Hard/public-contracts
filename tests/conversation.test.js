@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { nextActionForClassification, staleAction, effectiveFollowUp } from '../src/conversation.js';
+import { nextActionForClassification, staleAction, effectiveFollowUp, nudgeJitterDays, isLazyConversation } from '../src/conversation.js';
 
 describe('nextActionForClassification', () => {
   it('SENT + auto_ack → ACK_RECEIVED, no outbound', () => {
@@ -96,17 +96,17 @@ describe('nextActionForClassification', () => {
 });
 
 describe('staleAction', () => {
-  it('SENT for ≥7 days → send_followup_nudge (1st)', () => {
-    expect(staleAction('SENT', 7, 0)).toBe('send_followup_nudge');
+  it('SENT for ≥9 days → send_followup_nudge (1st) (base, jitter 0)', () => {
+    expect(staleAction('SENT', 9, 0)).toBe('send_followup_nudge');
   });
 
-  it('SENT for 6 days → none', () => {
-    expect(staleAction('SENT', 6, 0)).toBe('none');
+  it('SENT for 8 days → none (base, jitter 0)', () => {
+    expect(staleAction('SENT', 8, 0)).toBe('none');
   });
 
-  it('ACK_RECEIVED for ≥14 days → send_followup_nudge', () => {
-    expect(staleAction('ACK_RECEIVED', 14, 0)).toBe('send_followup_nudge');
-    expect(staleAction('ACK_RECEIVED', 13, 0)).toBe('none');
+  it('ACK_RECEIVED for ≥9 days → send_followup_nudge (base, jitter 0)', () => {
+    expect(staleAction('ACK_RECEIVED', 9, 0)).toBe('send_followup_nudge');
+    expect(staleAction('ACK_RECEIVED', 8, 0)).toBe('none');
   });
 
   it('AWAITING_PRECISION for ≥10 days → send_followup_nudge', () => {
@@ -153,9 +153,10 @@ describe('effectiveFollowUp', () => {
   });
 
   it('derives our_followup date from STALE_RULES when no follow_up_at is set', () => {
-    // SENT rule = 7 days; state_changed 2026-05-24 → derived = 2026-05-31
+    // SENT rule = 9 days; state_changed 2026-05-24 → derived = 2026-06-02
+    // (no `id` on the object → jitter 0)
     const r = effectiveFollowUp({ state: 'SENT', state_changed_at: '2026-05-24T10:00:00Z', follow_up_at: null });
-    expect(r).toEqual({ date: '2026-05-31', source: 'our_followup' });
+    expect(r).toEqual({ date: '2026-06-02', source: 'our_followup' });
   });
 
   it('returns nulls for terminal states', () => {
@@ -168,34 +169,117 @@ describe('effectiveFollowUp', () => {
     expect(effectiveFollowUp({ state: 'INITIAL', state_changed_at: '2026-05-24T10:00:00Z' })).toEqual({ date: null, source: null });
   });
 
-  it('uses ACK_RECEIVED 14-day rule', () => {
+  it('uses ACK_RECEIVED 9-day base rule', () => {
     const r = effectiveFollowUp({ state: 'ACK_RECEIVED', state_changed_at: '2026-05-24T10:00:00Z', follow_up_at: null });
-    expect(r).toEqual({ date: '2026-06-07', source: 'our_followup' });
+    expect(r).toEqual({ date: '2026-06-02', source: 'our_followup' });
   });
 
   describe('vacation-window push (cfg param)', () => {
     const cfg = { enabled: true, start: '06-15', end: '07-30' };
 
     it('pushes an our_followup date that lands inside the window to the day after it ends', () => {
-      // SENT 7-day rule; state_changed 2026-06-20 → derived 2026-06-27 (inside).
+      // SENT 9-day rule; state_changed 2026-06-20 → derived 2026-06-29 (inside).
       const r = effectiveFollowUp({ state: 'SENT', state_changed_at: '2026-06-20T10:00:00Z', follow_up_at: null }, cfg);
       expect(r).toEqual({ date: '2026-07-31', source: 'our_followup' });
     });
 
     it('leaves an our_followup date outside the window unchanged', () => {
       const r = effectiveFollowUp({ state: 'SENT', state_changed_at: '2026-05-24T10:00:00Z', follow_up_at: null }, cfg);
-      expect(r).toEqual({ date: '2026-05-31', source: 'our_followup' });
+      expect(r).toEqual({ date: '2026-06-02', source: 'our_followup' });
     });
 
     it('with no cfg (default disabled) never pushes — existing callers unaffected', () => {
       const r = effectiveFollowUp({ state: 'SENT', state_changed_at: '2026-06-20T10:00:00Z', follow_up_at: null });
-      expect(r).toEqual({ date: '2026-06-27', source: 'our_followup' });
+      expect(r).toEqual({ date: '2026-06-29', source: 'our_followup' });
     });
 
     it('enabled:false cfg never pushes', () => {
       const off = { enabled: false, start: '06-15', end: '07-30' };
       const r = effectiveFollowUp({ state: 'SENT', state_changed_at: '2026-06-20T10:00:00Z', follow_up_at: null }, off);
-      expect(r).toEqual({ date: '2026-06-27', source: 'our_followup' });
+      expect(r).toEqual({ date: '2026-06-29', source: 'our_followup' });
     });
+  });
+});
+
+describe('nudgeJitterDays + jittered STALE_RULES (2026-08-17 auto-send design)', () => {
+  it('is deterministic and within [0, 6] for arbitrary ids', () => {
+    for (const id of [1, 2, 3, 17, 291, 1000, 123456]) {
+      const j = nudgeJitterDays(id);
+      expect(j).toBe(nudgeJitterDays(id));
+      expect(j).toBeGreaterThanOrEqual(0);
+      expect(j).toBeLessThanOrEqual(6);
+    }
+  });
+
+  it('varies across conversations — reminders must not land like clockwork', () => {
+    const values = new Set(Array.from({ length: 50 }, (_, i) => nudgeJitterDays(i + 1)));
+    expect(values.size).toBeGreaterThan(1);
+  });
+
+  it('SENT threshold is 9 + jitter days', () => {
+    expect(staleAction('SENT', 8, 0, { nudgeJitterDays: 0 })).toBe('none');
+    expect(staleAction('SENT', 9, 0, { nudgeJitterDays: 0 })).toBe('send_followup_nudge');
+    expect(staleAction('SENT', 14, 0, { nudgeJitterDays: 6 })).toBe('none');
+    expect(staleAction('SENT', 15, 0, { nudgeJitterDays: 6 })).toBe('send_followup_nudge');
+  });
+
+  it('ACK_RECEIVED uses the same jittered 9-day base', () => {
+    expect(staleAction('ACK_RECEIVED', 8, 0, { nudgeJitterDays: 0 })).toBe('none');
+    expect(staleAction('ACK_RECEIVED', 9, 0, { nudgeJitterDays: 0 })).toBe('send_followup_nudge');
+    expect(staleAction('ACK_RECEIVED', 11, 0, { nudgeJitterDays: 3 })).toBe('none');
+    expect(staleAction('ACK_RECEIVED', 12, 0, { nudgeJitterDays: 3 })).toBe('send_followup_nudge');
+  });
+
+  it('AWAITING_PRECISION stays fixed at 10 — jitter never applies', () => {
+    expect(staleAction('AWAITING_PRECISION', 10, 0, { nudgeJitterDays: 6 })).toBe('send_followup_nudge');
+    expect(staleAction('AWAITING_PRECISION', 9, 0, { nudgeJitterDays: 0 })).toBe('none');
+  });
+
+  it('effectiveFollowUp reflects the per-conversation jittered date', () => {
+    const j = nudgeJitterDays(42);
+    const r = effectiveFollowUp({ id: 42, state: 'SENT', state_changed_at: '2026-05-24T10:00:00Z', follow_up_at: null });
+    const expected = new Date(Date.parse('2026-05-24T10:00:00Z') + (9 + j) * 86400000).toISOString().slice(0, 10);
+    expect(r).toEqual({ date: expected, source: 'our_followup' });
+  });
+});
+
+describe('isLazyConversation — auto-send eligibility rule 2 (fail closed)', () => {
+  const inbound = (classification, attachment_count = 0) => ({ direction: 'inbound', classification, attachment_count });
+  const outbound = () => ({ direction: 'outbound', classification: null });
+
+  it('zero inbound qualifies (outbound rows are ignored)', () => {
+    expect(isLazyConversation([])).toBe(true);
+    expect(isLazyConversation([outbound()])).toBe(true);
+  });
+
+  it('every LAZY classification qualifies', () => {
+    expect(isLazyConversation([
+      outbound(), inbound('auto_ack'), inbound('auto_reply'),
+      inbound('delay_promise'), inbound('handoff_internal'),
+    ])).toBe(true);
+  });
+
+  it('any substantive or unclassified inbound disqualifies', () => {
+    for (const c of ['delivery', 'clarification', 'dead_end', 'bounce', 'unknown', null]) {
+      expect(isLazyConversation([inbound('auto_ack'), inbound(c)])).toBe(false);
+    }
+  });
+
+  // An attachment IS substance everywhere else in the system (inferThreadStatus
+  // makes any-attachment threads primary; every attachment is queued for
+  // contract analysis regardless of classification). A misclassified auto_ack
+  // carrying the delivered avtal must therefore never earn an unattended
+  // "jag vill följa upp".
+  it('a LAZY-classified inbound carrying an attachment disqualifies', () => {
+    for (const c of ['auto_ack', 'auto_reply', 'delay_promise', 'handoff_internal']) {
+      expect(isLazyConversation([inbound(c, 1)])).toBe(false);
+      expect(isLazyConversation([inbound('auto_ack'), inbound(c, 3)])).toBe(false);
+    }
+  });
+
+  it('attachment_count 0 or absent still qualifies', () => {
+    expect(isLazyConversation([inbound('auto_ack', 0)])).toBe(true);
+    expect(isLazyConversation([{ direction: 'inbound', classification: 'auto_ack' }])).toBe(true);
+    expect(isLazyConversation([{ direction: 'inbound', classification: 'auto_ack', attachment_count: null }])).toBe(true);
   });
 });

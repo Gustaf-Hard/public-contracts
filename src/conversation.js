@@ -94,9 +94,25 @@ export function nextActionForClassification(state, classification, opts = {}) {
   return { nextState: state, action: 'none' };
 }
 
+// Per-conversation deterministic jitter for the nudge threshold (2026-08-17
+// auto-send design): 0–6 extra days derived from the conversation id, so
+// reminders land 9–15 days out rather than firing on the same day-count like
+// clockwork across kommuner. A pure integer hash, NOT Math.random — stable
+// across ticks and in tests.
+export function nudgeJitterDays(convId) {
+  let h = (convId >>> 0) ^ 0x9e3779b9;
+  h = Math.imul(h ^ (h >>> 16), 0x45d9f3bd) >>> 0;
+  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35) >>> 0;
+  return ((h ^ (h >>> 16)) >>> 0) % 7;
+}
+
 export const STALE_RULES = {
-  SENT: { days: 7, action: 'send_followup_nudge' },
-  ACK_RECEIVED: { days: 14, action: 'send_followup_nudge' },
+  // `jitter: true` marks the thresholds that take the per-conversation 0–6-day
+  // jitter (9–15 effective days). AWAITING_PRECISION shares the nudge ACTION
+  // but keeps its fixed 10 days by design (2026-08-17 spec, Timing), so the
+  // flag lives on the rule, not on the action.
+  SENT: { days: 9, action: 'send_followup_nudge', jitter: true },
+  ACK_RECEIVED: { days: 9, action: 'send_followup_nudge', jitter: true },
   AWAITING_PRECISION: { days: 10, action: 'send_followup_nudge' },
   DELIVERING: { days: 14, action: 'send_followup_close' },
   // An unanswered checklist must not strand: nudge, and the nudge cap then
@@ -142,7 +158,8 @@ export function effectiveFollowUp(conv, cfg = { enabled: false }) {
   if (!rule || !conv.state_changed_at) return none;
   const t = new Date(conv.state_changed_at).getTime();
   if (Number.isNaN(t)) return none;
-  const date = new Date(t + rule.days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const jitter = rule.jitter && Number.isInteger(conv.id) ? nudgeJitterDays(conv.id) : 0;
+  const date = new Date(t + (rule.days + jitter) * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   return { date: pushPastVacation(date, cfg), source: 'our_followup' };
 }
 
@@ -159,7 +176,7 @@ function pushPastVacation(iso, cfg) {
 // staleAction optionally honors a per-conversation `follow_up_at` override
 // set by the LLM analyser. When a kommun says "we need 10 days", we record
 // `follow_up_at = today + 10 + 3 grace`, and this function returns 'none'
-// until that date is reached — overriding the default 7/10/14-day rules.
+// until that date is reached — overriding the default 9/10/14-day rules.
 export function staleAction(state, daysInState, followupCount, opts = {}) {
   if (TERMINAL.has(state) || QUIESCENT_STATES.has(state)) return 'none';
   const rule = STALE_RULES[state];
@@ -170,7 +187,34 @@ export function staleAction(state, daysInState, followupCount, opts = {}) {
     return 'none';
   }
 
-  if (daysInState < rule.days) return 'none';
+  const jitter = rule.jitter ? (opts.nudgeJitterDays ?? 0) : 0;
+  if (daysInState < rule.days + jitter) return 'none';
   if (followupCount >= MAX_NUDGES && rule.action === 'send_followup_nudge') return 'escalate';
   return rule.action;
+}
+
+// The inbound classifications that mean "the kommun has not substantively
+// responded" (2026-08-17 auto-send design). A conversation whose EVERY inbound
+// is in this set — zero inbound also qualifies — is "lazy": a follow-up nudge
+// cannot contradict anything a human told us. delivery / clarification /
+// dead_end / bounce / unknown and NULL classification are all
+// substantive-or-unclassifiable → fail closed, the operator decides.
+export const AUTO_SEND_LAZY_CLASSIFICATIONS = new Set([
+  'auto_ack', 'auto_reply', 'delay_promise', 'handoff_internal',
+]);
+
+// messages: rows from db.listMessages(convId). Outbound rows are ignored.
+// An inbound row qualifies only if it is BOTH classified in the LAZY set AND
+// carries zero attachments. The rest of the system already treats any
+// attachment as substance — inferThreadStatus (threads.js) makes an
+// any-attachment thread primary, and every attachment is queued for contract
+// analysis whatever the classification — so a misclassified auto_ack/
+// delay_promise carrying the delivered avtal must not earn an unattended
+// "jag vill följa upp" while that file sits unread on our own disk. Fail
+// closed: a mere signature-logo attachment costs us one manual approval.
+export function isLazyConversation(messages) {
+  return (messages ?? [])
+    .filter((m) => m.direction === 'inbound')
+    .every((m) => AUTO_SEND_LAZY_CLASSIFICATIONS.has(m.classification)
+      && (m.attachment_count ?? 0) === 0);
 }

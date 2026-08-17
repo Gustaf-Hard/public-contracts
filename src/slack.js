@@ -59,16 +59,25 @@ export async function postAlert(slack, { channel, text, thread_ts = null }) {
 // Called after any resolution (send, edit, skip, supersede, failure) so a stale
 // Approve button can never be clicked again. The atomic DB claim is the real
 // double-send guard; this is defense-in-depth + operator UX.
-export async function updateEscalationResolved(slack, { channel, ts, kommun_namn, status, detail }) {
-  const statusText = {
-    resolved_send: '✅ Skickat (godkänt oförändrat)',
-    resolved_edit: '✅ Skickat (redigerat)',
-    resolved_skip: '⏭️ Skippad',
-    resolved_closed: '🗄️ Ärendet stängt',
-    superseded: '↪️ Ersatt av nyare eskalering',
-    send_failed: '❌ Sändning misslyckades',
-    send_unconfirmed: '⚠️ Sändning obekräftad — kontrollera Skickat i Gmail',
-  }[status] ?? status;
+// `decision` is presentation-only (2026-08-17 auto-send design): an unattended
+// T_FOLLOWUP_NUDGE is STORED as resolved_send like any approved send — the
+// decisions ledger is what permanently distinguishes machine from operator, and
+// adding a status string would need a migration for a label. But rendering it as
+// "godkänt oförändrat" tells the channel a colleague approved a send no human
+// ever saw, so the ONE operator-facing artifact gets an honest label instead.
+// Absent/unknown decision keeps every existing caller's wording untouched.
+export async function updateEscalationResolved(slack, { channel, ts, kommun_namn, status, detail, decision = null }) {
+  const statusText = (decision === 'auto_send' && status === 'resolved_send')
+    ? '🤖 Auto-skickat (ingen operatör)'
+    : {
+      resolved_send: '✅ Skickat (godkänt oförändrat)',
+      resolved_edit: '✅ Skickat (redigerat)',
+      resolved_skip: '⏭️ Skippad',
+      resolved_closed: '🗄️ Ärendet stängt',
+      superseded: '↪️ Ersatt av nyare eskalering',
+      send_failed: '❌ Sändning misslyckades',
+      send_unconfirmed: '⚠️ Sändning obekräftad — kontrollera Skickat i Gmail',
+    }[status] ?? status;
   const lines = [`*Eskalering: ${kommun_namn}* — ${statusText}`];
   if (detail) lines.push(detail);
   await slack.chat.update({

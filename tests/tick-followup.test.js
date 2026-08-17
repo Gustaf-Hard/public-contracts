@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { openDb } from '../src/storage.js';
 import { runTick, runDailyFollowup, followupCatchUpDue, followupHourFromCron, localDateStr } from '../src/tick.js';
-import { effectiveFollowUp } from '../src/conversation.js';
+import { effectiveFollowUp, nudgeJitterDays } from '../src/conversation.js';
 import { stripQuotedText, isCloserText } from '../src/classifier.js';
 import { storeContractAnalysis } from '../src/analyse-contract.js';
 import * as analyseMod from '../src/analyse-message.js';
@@ -64,6 +64,12 @@ function deps({ gmail = fakeGmail(), slackOps = fakeSlackOps(), now = new Date('
   return {
     db, gmailClient: { gmail: {} }, gmailOps: gmail, slackClient: {}, slackOps,
     env, contractsDir, now, analyseContracts,
+    // Hermetic auto-send kill switch: point the loader at a path that does not
+    // exist inside this test's temp dir so it returns [] (fully manual). Left
+    // undefined, loadAutoSendTemplates falls back to the CWD-relative
+    // committed data/pilot-overrides.json — this suite would start auto-sending
+    // into its fakes the day that file gains the key.
+    overridesPath: join(tmp, 'no-overrides.json'),
   };
 }
 
@@ -83,8 +89,8 @@ function seedConv({ state = 'SENT', stateChangedAt = null, followupCount = 0, fo
 }
 
 describe('runDailyFollowup — staleness drafting (M1: previously untested)', () => {
-  it('drafts T_FOLLOWUP_NUDGE for a SENT conversation stale ≥7 days', async () => {
-    const id = seedConv({ stateChangedAt: '2026-06-14T00:00:00Z' }); // 10 days
+  it('drafts T_FOLLOWUP_NUDGE for a SENT conversation stale past the 9–15-day jittered threshold', async () => {
+    const id = seedConv({ stateChangedAt: '2026-06-01T00:00:00Z' }); // 23 days — past the jitter ceiling
     const slackOps = fakeSlackOps();
     await runDailyFollowup(deps({ slackOps }));
     const escs = db.listOpenEscalationsForConversation(id);
@@ -116,7 +122,7 @@ describe('runDailyFollowup — staleness drafting (M1: previously untested)', ()
   });
 
   it('never mints a duplicate draft while one is already open (H1) — day after day', async () => {
-    const id = seedConv({ stateChangedAt: '2026-06-10T00:00:00Z' });
+    const id = seedConv({ stateChangedAt: '2026-06-01T00:00:00Z' });
     await runDailyFollowup(deps({ now: new Date('2026-06-24T09:00:00Z') }));
     expect(db.listOpenEscalationsForConversation(id)).toHaveLength(1);
     // The next three daily runs go by unapproved — still exactly one.
@@ -128,12 +134,55 @@ describe('runDailyFollowup — staleness drafting (M1: previously untested)', ()
   });
 });
 
+// The staleness rule is jittered per conversation (2026-08-17 auto-send
+// design), but that only helps if runDailyFollowup actually FEEDS the
+// conversation's id to staleAction. Every other seed in this file sits past the
+// 15-day ceiling, where wired and unwired behave identically — these two cases
+// live inside the 9–15-day window, where they diverge: drop the
+// `nudgeJitterDays(conv.id)` argument in tick.js and both fail.
+describe('runDailyFollowup feeds each conversation its own jitter', () => {
+  const stateChangedAt = '2026-06-15T00:00:00Z';
+  // Noon-ish offset so daysBetween's floor lands on exactly `n`.
+  const dayN = (n) => new Date(Date.parse(stateChangedAt) + n * 86400000 + 9 * 3600000);
+
+  it('at exactly 9 stale days only the zero-jitter conversations are nudged', async () => {
+    const ids = ['central', 'utbildning', 'teknik', 'kultur', 'social', 'miljo']
+      .map((role) => seedConv({ role, stateChangedAt }));
+    const jitters = ids.map(nudgeJitterDays);
+    // Guard: without a spread of jitters this case could pass unwired.
+    expect(jitters).toContain(0);
+    expect(jitters.some((j) => j > 0)).toBe(true);
+
+    await runDailyFollowup(deps({ now: dayN(9) }));
+
+    for (const id of ids) {
+      // 9 days is the base threshold: the jittered ones are not due yet.
+      expect(db.listOpenEscalationsForConversation(id)).toHaveLength(nudgeJitterDays(id) === 0 ? 1 : 0);
+    }
+  });
+
+  it('a jittered conversation waits until 9 + its own jitter, then nudges', async () => {
+    seedConv({ role: 'central', stateChangedAt });          // takes the id whose jitter is 0
+    const id = seedConv({ role: 'utbildning', stateChangedAt });
+    const jitter = nudgeJitterDays(id);
+    expect(jitter).toBeGreaterThan(0);                       // else this case proves nothing
+
+    await runDailyFollowup(deps({ now: dayN(9 + jitter - 1) }));
+    expect(db.listOpenEscalationsForConversation(id)).toHaveLength(0);
+
+    await runDailyFollowup(deps({ now: dayN(9 + jitter) }));
+    const escs = db.listOpenEscalationsForConversation(id);
+    expect(escs).toHaveLength(1);
+    expect(escs[0].draft_template).toBe('T_FOLLOWUP_NUDGE');
+  });
+});
+
 describe('active (non-terminal) escalations gate new drafts (hardening findings 2/3)', () => {
   it('a send_failed escalation blocks the daily follow-up from minting a new draft', async () => {
     // A Gmail error after Gmail MAY have accepted parks the escalation as
     // send_failed. Until a human verifies in Sent, a fresh nudge draft could
     // double-message the kommun.
-    const id = seedConv({ stateChangedAt: '2026-06-10T00:00:00Z' }); // stale ≥7d
+    const id = seedConv({ stateChangedAt: '2026-06-01T00:00:00Z' }); // stale past the jitter ceiling
     const escId = db.recordEscalation({
       conversation_id: id, message_id: null, reason: 'r',
       draft_template: 'T_RECEIPT', draft_subject: 's', draft_body: 'b',
@@ -147,7 +196,7 @@ describe('active (non-terminal) escalations gate new drafts (hardening findings 
   });
 
   it('an in-flight sending escalation defers the daily follow-up and is never superseded', async () => {
-    const id = seedConv({ stateChangedAt: '2026-06-10T00:00:00Z' });
+    const id = seedConv({ stateChangedAt: '2026-06-01T00:00:00Z' });
     const escId = db.recordEscalation({
       conversation_id: id, message_id: null, reason: 'r',
       draft_template: 'T_FOLLOWUP_NUDGE', draft_subject: 's', draft_body: 'b',
@@ -501,7 +550,7 @@ describe('daily follow-up catch-up after a blind 09:00', () => {
   }
 
   it('does not mark the day complete when the ingest gate skips it', async () => {
-    seedConv({ stateChangedAt: '2026-06-14T00:00:00Z' });
+    seedConv({ stateChangedAt: '2026-06-01T00:00:00Z' });
     const nine = new Date('2026-06-24T09:00:00');
     await runDailyFollowup(blindDeps(nine));
     expect(db.listOpenEscalations()).toHaveLength(0);
@@ -510,7 +559,7 @@ describe('daily follow-up catch-up after a blind 09:00', () => {
   });
 
   it('a healthy tick later the same day runs it — once', async () => {
-    const id = seedConv({ stateChangedAt: '2026-06-14T00:00:00Z' });
+    const id = seedConv({ stateChangedAt: '2026-06-01T00:00:00Z' });
     await runDailyFollowup(blindDeps(new Date('2026-06-24T09:00:00')));
 
     // 10:15, ingest recovered.
@@ -526,7 +575,7 @@ describe('daily follow-up catch-up after a blind 09:00', () => {
   });
 
   it('a still-blind daemon at the later tick is still skipped — the gate stays authoritative', async () => {
-    seedConv({ stateChangedAt: '2026-06-14T00:00:00Z' });
+    seedConv({ stateChangedAt: '2026-06-01T00:00:00Z' });
     await runDailyFollowup(blindDeps(new Date('2026-06-24T09:00:00')));
     const later = new Date('2026-06-24T10:15:00');
     await runDailyFollowup(blindDeps(later));
@@ -551,7 +600,7 @@ describe('daily follow-up catch-up after a blind 09:00', () => {
   });
 
   it('a vacation-paused run still counts as completed — the decision WAS made', async () => {
-    seedConv({ stateChangedAt: '2026-06-14T00:00:00Z' });
+    seedConv({ stateChangedAt: '2026-06-01T00:00:00Z' });
     const now = new Date('2026-06-24T09:00:00');
     await runDailyFollowup({
       ...deps({ now }),

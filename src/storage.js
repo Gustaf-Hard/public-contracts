@@ -562,6 +562,28 @@ export function openDb(path) {
     `).all();
   }
 
+  // Auto-send visibility (2026-08-17 design): the dashboard's "Auto-skickade"
+  // feed — the most recent machine sends, joined to their conversation.
+  // decided_at is normalized to ISO (T/Z) so the views' time formatting never
+  // has to guess at SQLite's space-separated datetime.
+  function listAutoSendDecisions(limit = 20) {
+    return db.prepare(`
+      SELECT
+        d.id AS decision_id,
+        strftime('%Y-%m-%dT%H:%M:%SZ', d.decided_at) AS decided_at,
+        d.draft_template,
+        conv.id AS conversation_id,
+        conv.kommun_namn,
+        conv.role,
+        conv.followup_count
+      FROM decisions d
+      JOIN conversations conv ON conv.id = d.conversation_id
+      WHERE d.decision = 'auto_send'
+      ORDER BY d.decided_at DESC, d.id DESC
+      LIMIT ?
+    `).all(limit);
+  }
+
   function listOpenEscalations() {
     return db.prepare("SELECT * FROM escalations WHERE status = 'open' ORDER BY id").all();
   }
@@ -1410,6 +1432,7 @@ export function openDb(path) {
     recordDecision,
     listDecisions,
     listEditDecisions,
+    listAutoSendDecisions,
     recordHeartbeat,
     markFollowupCompleted,
     getFollowupCompletedDate,

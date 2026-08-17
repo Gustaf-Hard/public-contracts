@@ -75,11 +75,11 @@ export function saneRestoreState(previousState, conv, db) {
 
 // Best-effort: replace the escalation's Slack message with a resolved,
 // button-less version. Never lets a Slack failure break the send path.
-async function stripSlackButtons({ slackClient, env, esc, kommun_namn, status, detail, log }) {
+async function stripSlackButtons({ slackClient, env, esc, kommun_namn, status, detail, decision = null, log }) {
   if (!slackClient || !esc.slack_ts || !env?.SLACK_CHANNEL_ID) return;
   try {
     await updateEscalationResolved(slackClient, {
-      channel: env.SLACK_CHANNEL_ID, ts: esc.slack_ts, kommun_namn, status, detail,
+      channel: env.SLACK_CHANNEL_ID, ts: esc.slack_ts, kommun_namn, status, detail, decision,
     });
   } catch (e) {
     log?.(`slack chat.update failed for escalation ${esc.id}: ${e.message}`);
@@ -113,6 +113,11 @@ async function archiveThreadBestEffort({ archiveThreadImpl, gmail, threadId, log
 //  - An unmodified approve is blocked when a newer inbound arrived after the
 //    draft was created (STALE_ESCALATION): the world moved, re-review. An
 //    explicit edit passes — the human wrote with current context.
+//  - An 'auto_send' (2026-08-17 design) is held to the SAME bar as an
+//    unmodified approve: the machine never writes with current context. The
+//    daily-run escalation mutex means no tick can ingest between drafting and
+//    auto-sending in the same run, but this guard must not rely on that
+//    reasoning holding forever.
 //  - If Gmail throws after the claim, the escalation is parked as
 //    'send_failed' (never back to 'open') so nothing auto-retries an
 //    ambiguous send; the operator verifies in Gmail Sent first.
@@ -148,7 +153,7 @@ export async function sendApprovedReply({ db, gmail, env, conv, esc, finalBody, 
   // never arrived). Every other draft (including proactive follow-ups) keeps the
   // guard: a newer inbound arriving mid-conversation must still force a re-review.
   const isRefreshEsc = esc.draft_template === 'T_UPDATE' || conv.state === 'REFRESH_DUE';
-  if (decision === 'approve_unmodified' && !isRefreshEsc && !isBounceResend) {
+  if ((decision === 'approve_unmodified' || decision === 'auto_send') && !isRefreshEsc && !isBounceResend) {
     const escCreated = parseDbTime(esc.created_at);
     // Precision matters here (hardening finding 6):
     //  - Exclude the inbound the draft answers (esc.message_id) — it is by
@@ -303,7 +308,9 @@ export async function sendApprovedReply({ db, gmail, env, conv, esc, finalBody, 
     status: resolvedStatus,
     resolved_text: finalBody,
   });
-  await stripSlackButtons({ slackClient, env, esc, kommun_namn: conv.kommun_namn, status: resolvedStatus, log });
+  // Pass the decision so an unattended send is not labelled as operator-approved
+  // (2026-08-17 design). Presentation only — resolvedStatus is what is stored.
+  await stripSlackButtons({ slackClient, env, esc, kommun_namn: conv.kommun_namn, status: resolvedStatus, decision, log });
   // Keep the inbox clean: archive the thread we replied into. The refresh path
   // opens a brand-new thread (no inbound, nothing in the inbox), so archiving it
   // is a harmless no-op there; every other reply archives the inbound thread.

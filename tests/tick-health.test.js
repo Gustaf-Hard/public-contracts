@@ -224,7 +224,7 @@ describe('runDailyFollowup is gated on tick health', () => {
       gmail_thread_id: 'thr-a', last_outbound_at: '2026-06-10T10:00:00Z',
     });
     db.raw.prepare('UPDATE conversations SET state_changed_at = ? WHERE id = ?')
-      .run('2026-08-01T00:00:00Z', id); // 15 days stale at T0
+      .run('2026-07-25T00:00:00Z', id); // 22 days stale at T0 — past the 9–15-day jittered nudge threshold
     return id;
   }
 

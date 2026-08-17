@@ -47,6 +47,11 @@ function deps({ now, vacationConfig, slackOps = fakeSlackOps() } = {}) {
     db, gmailClient: { gmail: {} },
     gmailOps: { sendMessage: async () => ({ id: 'out', threadId: 'thr' }) },
     slackClient: {}, slackOps, env, contractsDir, now, vacationConfig,
+    // Hermetic auto-send kill switch: a path that does not exist inside this
+    // test's temp dir makes loadAutoSendTemplates return [] (fully manual).
+    // Left undefined it would read the CWD-relative committed
+    // data/pilot-overrides.json.
+    overridesPath: join(tmp, 'no-overrides.json'),
   };
 }
 
@@ -86,8 +91,9 @@ describe('runDailyFollowup — vacation gate', () => {
   });
 
   it('just outside (1 Aug): summer days are discounted, so a mid-June conv is not stale yet', async () => {
-    // SENT threshold is 7 days. Quiet since 10 Jun; on 1 Aug the raw age is 52
-    // days but 46 of them are vacation → discounted age 6 < 7 → NO nudge.
+    // SENT threshold is 9 days (+0–6 jitter). Quiet since 10 Jun; on 1 Aug the
+    // raw age is 52 days but 46 of them are vacation → discounted age 6 < 9 →
+    // NO nudge.
     const id = seedConv({ stateChangedAt: '2026-06-10T00:00:00Z' });
     await runDailyFollowup(deps({
       now: new Date('2026-08-01T09:00:00Z'),
@@ -109,7 +115,8 @@ describe('runDailyFollowup — vacation gate', () => {
 
   it('just outside with enough real (non-summer) age still nudges, and the reason shows the discounted count', async () => {
     // Quiet since 20 May; on 1 Aug raw age is 73 days, vacation days 46,
-    // discounted 27 (>= 7) → a nudge fires, and the reason reflects 27, not 73.
+    // discounted 27 (past the 15-day jitter ceiling) → a nudge fires, and the
+    // reason reflects 27, not 73.
     const id = seedConv({ stateChangedAt: '2026-05-20T00:00:00Z' });
     await runDailyFollowup(deps({
       now: new Date('2026-08-01T09:00:00Z'),
