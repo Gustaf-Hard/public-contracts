@@ -236,12 +236,26 @@ async function escalateWithDraft({ conv, parsedInbound, messageId = null, classi
       gmail_thread_id: conv.gmail_thread_id ?? '(no thread)',
       watchlist_vendors: watchlistVendors,
     });
-    const posted = await slackOps.postEscalation(slackClient, {
-      channel: env.SLACK_CHANNEL_ID,
-      blocks,
-      fallbackText: `Eskalering: ${conv.kommun_namn} (${draftTemplate})`,
-    });
-    db.raw.prepare('UPDATE escalations SET slack_ts = ? WHERE id = ?').run(posted.ts, escId);
+    // The ONLY unguarded Slack call used to live here — and it sits AFTER
+    // recordEscalation, so a Slack outage threw with the row already written:
+    // the escalation existed, open, with no slack_ts and no buttons, while the
+    // caller's alert told the operator to "svara manuellt" — which
+    // hasActiveEscalation then blocked. The draft is safe and approvable in the
+    // dashboard, so a failed post is logged, not thrown; retryUnpostedEscalations
+    // re-posts it on a later tick and the buttons come back by themselves.
+    try {
+      const posted = await slackOps.postEscalation(slackClient, {
+        channel: env.SLACK_CHANNEL_ID,
+        blocks,
+        fallbackText: `Eskalering: ${conv.kommun_namn} (${draftTemplate})`,
+      });
+      if (posted?.ts) {
+        db.raw.prepare('UPDATE escalations SET slack_ts = ? WHERE id = ?').run(posted.ts, escId);
+      }
+    } catch (e) {
+      log?.(`postEscalation failed for escalation ${escId} (${conv.kommun_namn}): ${e.message}`
+        + ' — draft is saved and approvable in the dashboard; Slack buttons will be retried next tick');
+    }
   }
   log?.(`ESCALATED (${draftTemplate}) → ${conv.kommun_namn}/${conv.role}: ${reason}`);
   return escId;
@@ -376,9 +390,13 @@ async function ingestMessage({ conv, item, deps }) {
   // keeping only the PDFs discarded the rest along with the archive, so those
   // files survived nowhere. An unreadable (or empty) archive is stored as-is
   // so its bytes are never lost. The single allowed skip is an image known to
-  // be tiny (signature logos — see isTrivialImage), applied to inner files too
-  // since a signature logo is no more a document for being zipped; the gap
-  // stays visible because attachment_count records what the mail carried.
+  // be tiny (a signature logo — see isTrivialImage), and ONLY at the top level,
+  // where the gap stays visible: attachment_count records what the mail carried,
+  // so the dashboard can show "1 bilaga hoppades över". Inside a zip the same
+  // skip is pure data loss — the expanded archive is not stored, the zip counts
+  // as ONE attachment, and a skipped 8 kB scanned page would then exist nowhere
+  // and be invisible. Signature logos rarely travel inside archives; storing a
+  // few is harmless, destroying a scan is not. So: never skip an inner entry.
   const entries = [];
   for (const att of parsed.attachments) {
     const fn = att.filename?.toLowerCase() ?? '';
@@ -390,7 +408,6 @@ async function ingestMessage({ conv, item, deps }) {
       const inner = extractFilesFromZip(buf);
       if (inner.length > 0) {
         for (const e of inner) {
-          if (isTrivialImage({ filename: e.filename, mime_type: e.mime_type, size_bytes: e.data.length })) continue;
           entries.push({ filename: e.filename, data: e.data, mime_type: e.mime_type });
         }
       } else {
@@ -565,6 +582,28 @@ async function dispatchEscalationForIngest(pending, deps) {
   const { db, env } = deps;
   const { updated, previousState, parsed, analysis, classification, transition, messageId, thread } = pending;
 
+  // Every inline analysis records which attachments it ATTEMPTED into the
+  // per-tick set, so step 3 does not spend a second attempt on the same
+  // document in the same tick (the 5-attempt budget was being burned at double
+  // speed, so a provider wobble parked documents in ~45 minutes).
+  const attemptedIds = deps.attemptedAttachmentIds ?? null;
+  const runInlineAnalysis = async (opts) => {
+    const analyseContracts = deps.analyseContracts ?? analysePendingContracts;
+    const r = await analyseContracts({ db, env, log: deps.log, contractsDir: deps.contractsDir, ...opts });
+    if (attemptedIds && Array.isArray(r?.attempted_ids)) {
+      for (const id of r.attempted_ids) attemptedIds.add(id);
+    }
+    return r;
+  };
+
+  // Evidence gate for the missing-contracts claim: documents this conversation
+  // has stored but not extracted (queued or parked). Read AFTER the inline
+  // analysis, so a document read in this very tick no longer counts. Called
+  // unconditionally — a db that cannot answer throws into the caller's catch,
+  // which falls back to the neutral receipt (under-claim) and logs. It must
+  // never silently answer "0 unread" and let the claim through.
+  const unreadDocuments = () => db.countUnreadAnalysableAttachments(updated.id);
+
   // Outbound: never auto-sent in v1. Draft a template and escalate to Slack.
   // If the LLM produced a draft_reply, prefer it over the canned template.
   let draftTemplate = null;
@@ -613,9 +652,8 @@ async function dispatchEscalationForIngest(pending, deps) {
   // Contract-aware delivery: a "delivery" reply must reflect what the
   // attachments actually contain.
   if (draftTemplate === 'T_RECEIPT') {
-    const analyseContracts = deps.analyseContracts ?? analysePendingContracts;
     try {
-      await analyseContracts({ db, env, log: deps.log, onlyMessageId: messageId, contractsDir: deps.contractsDir });
+      await runInlineAnalysis({ onlyMessageId: messageId });
       const { all } = computeReceivedMissing(db.listContractInfoForMessage(messageId));
       watchlistVendors = matchWatchlist(all);
       // Coverage spans the CONVERSATION, not just this message: scoped to one
@@ -629,7 +667,13 @@ async function dispatchEscalationForIngest(pending, deps) {
       // blank pages the operator filled in by hand. Every one of these is
       // escalated for human approval regardless, and the ⚠️ BEVAKAD LEVERANTÖR
       // flag stays on the reason, so the signal survives without the blank.
-      if (chooseDeliveryReply({ facts }).template === 'T_REQUEST_MISSING') {
+      const unread = unreadDocuments();
+      const choice = chooseDeliveryReply({ facts, unread_documents: unread });
+      if (choice.suppressed && facts.has_missing) {
+        deps.log?.(`SUPPRESSED T_REQUEST_MISSING for ${updated.kommun_namn}/${updated.role}: `
+          + `${unread} levererat dokument är ännu inte läst — vi kan inte påstå att avtal saknas`);
+      }
+      if (choice.template === 'T_REQUEST_MISSING') {
         draftTemplate = 'T_REQUEST_MISSING';
         llmDraft = null; // the PDF-blind LLM draft must not win here
         templateCtx = { facts };
@@ -642,9 +686,8 @@ async function dispatchEscalationForIngest(pending, deps) {
     // Analyse this message's attachments FIRST: the closing delivery usually
     // carries the last contracts, and asking about something they just sent is
     // the one thing this mail must not do.
-    const analyseContracts = deps.analyseContracts ?? analysePendingContracts;
     try {
-      await analyseContracts({ db, env, log: deps.log, onlyMessageId: messageId, contractsDir: deps.contractsDir });
+      await runInlineAnalysis({ onlyMessageId: messageId });
     } catch (e) {
       deps.log?.(`crosscheck contract analysis error: ${e.message}`);
     }
@@ -665,16 +708,15 @@ async function dispatchEscalationForIngest(pending, deps) {
     // Watchlist on later deliveries (review M5): once receipt_sent=1 a delivery
     // draws no receipt draft, but a watchlisted vendor arriving in a second
     // batch must still surface to a human rather than be analysed silently.
-    const analyseContracts = deps.analyseContracts ?? analysePendingContracts;
     try {
-      await analyseContracts({ db, env, log: deps.log, onlyMessageId: messageId, contractsDir: deps.contractsDir });
+      await runInlineAnalysis({ onlyMessageId: messageId });
       const { all } = computeReceivedMissing(db.listContractInfoForMessage(messageId));
       watchlistVendors = matchWatchlist(all);
       if (watchlistVendors.length > 0) {
         // Escalate, but with whatever reply the analysis produced. Blank only
         // when there is genuinely nothing to propose.
         const facts = buildCoverageFacts(db.listContractInfoForConversation(updated.id));
-        if (chooseDeliveryReply({ facts }).template === 'T_REQUEST_MISSING') {
+        if (chooseDeliveryReply({ facts, unread_documents: unreadDocuments() }).template === 'T_REQUEST_MISSING') {
           draftTemplate = 'T_REQUEST_MISSING';
           llmDraft = null;
           templateCtx = { facts };
@@ -742,6 +784,60 @@ async function dispatchEscalationForIngest(pending, deps) {
   }
 }
 
+// Self-heal escalations that were never announced in Slack (D6). An open
+// escalation with slack_ts NULL is a draft a human can approve in the dashboard
+// but will never see a button for — the state a Slack outage leaves behind, and
+// the state every escalation created while Slack was misconfigured is in.
+// Re-posting is idempotent-by-construction: the row is only ever posted while
+// slack_ts is NULL, and the ts is written the moment the post succeeds.
+//
+// Bounded per tick so a backlog (or a first run after Slack is configured)
+// drains gradually instead of flooding the channel, and abandoned on the first
+// failure — if Slack is still down, the remaining rows wait for a later tick.
+const UNPOSTED_ESCALATION_RETRIES_PER_TICK = 5;
+
+async function retryUnpostedEscalations(deps) {
+  const { db, slackClient, slackOps, env, log } = deps;
+  if (!slackOps?.postEscalation || !env.SLACK_CHANNEL_ID) return 0;
+  let healed = 0;
+  for (const esc of db.listEscalationsByStatus('open')) {
+    if (esc.slack_ts) continue;
+    if (healed >= UNPOSTED_ESCALATION_RETRIES_PER_TICK) break;
+    const conv = db.getConversation(esc.conversation_id);
+    if (!conv) continue;
+    const trigger = esc.message_id ? db.getMessageById(esc.message_id) : null;
+    let watchlistVendors = [];
+    try {
+      const parsedVendors = esc.watchlist_vendors ? JSON.parse(esc.watchlist_vendors) : [];
+      if (Array.isArray(parsedVendors)) watchlistVendors = parsedVendors;
+    } catch { /* a malformed column must not block the re-post */ }
+    const blocks = buildEscalationBlocks({
+      escalation_id: esc.id,
+      kommun_namn: conv.kommun_namn,
+      from_email: trigger?.from_email ?? '(no inbound — proactive draft)',
+      reply_text: trigger?.body_text ?? '(no inbound)',
+      draft_reply: `Subject: ${esc.draft_subject ?? ''}\n\n${esc.draft_body ?? ''}`,
+      gmail_thread_id: conv.gmail_thread_id ?? '(no thread)',
+      watchlist_vendors: watchlistVendors,
+    });
+    try {
+      const posted = await slackOps.postEscalation(slackClient, {
+        channel: env.SLACK_CHANNEL_ID,
+        blocks,
+        fallbackText: `Eskalering: ${conv.kommun_namn} (${esc.draft_template})`,
+      });
+      if (!posted?.ts) continue;
+      db.raw.prepare('UPDATE escalations SET slack_ts = ? WHERE id = ?').run(posted.ts, esc.id);
+      healed += 1;
+      log?.(`RE-POSTED escalation ${esc.id} (${conv.kommun_namn}/${conv.role}) — Slack buttons restored`);
+    } catch (e) {
+      log?.(`postEscalation retry failed for escalation ${esc.id}: ${e.message} — will retry next tick`);
+      break;
+    }
+  }
+  return healed;
+}
+
 // Surface unmatched and domain-ambiguous inbound (review H5/H2) as a Slack
 // digest instead of silently re-fetching it forever. `seenUnmatched` is a
 // per-process Map (gmail_message_id → cached {threadId, from} match inputs)
@@ -751,37 +847,52 @@ async function dispatchEscalationForIngest(pending, deps) {
 // sibling conversation resolves the ambiguity — the message is ingested on
 // the next tick, not lost until a restart. Durable tracking would need a
 // schema change, so a restart re-checks (and re-alerts) once.
+//
+// Ordering is post-BEFORE-cache, and only the messages that actually FIT in the
+// posted message are cached (see DIGEST_MAX_LINES). Marking everything while
+// truncating the text silences the overflow forever; caching before the post
+// means one Slack hiccup silences the whole batch for the process lifetime.
+// An uncached message is simply re-fetched and re-digested next tick.
 async function digestUnmatched({ unmatched, ambiguous, fetchedById, convById, seenUnmatched, deps }) {
   const { slackClient, slackOps, env, log } = deps;
-  const lines = [];
+  const items = [];
   for (const id of unmatched) {
     if (seenUnmatched.has(id)) continue; // already digested on an earlier tick
     const f = fetchedById.get(id);
-    seenUnmatched.set(id, { threadId: f.full.threadId, from: f.parsed.from });
     const atts = f.parsed.attachments.length ? ` (${f.parsed.attachments.length} bilagor)` : '';
-    lines.push(`• *${f.parsed.from}* — ${f.parsed.subject || '(ämne saknas)'}${atts}`);
+    items.push({
+      id, threadId: f.full.threadId, from: f.parsed.from,
+      line: `• *${f.parsed.from}* — ${f.parsed.subject || '(ämne saknas)'}${atts}`,
+    });
   }
   for (const a of ambiguous) {
     if (seenUnmatched.has(a.messageId)) continue;
     const f = fetchedById.get(a.messageId);
-    seenUnmatched.set(a.messageId, { threadId: f.full.threadId, from: f.parsed.from });
     const kommuner = a.convIds
       .map((cid) => { const c = convById.get(cid); return c ? `${c.kommun_namn}/${c.role}` : `conv ${cid}`; })
       .join(', ');
-    lines.push(`• *${f.parsed.from}* — ${f.parsed.subject || '(ämne saknas)'} — TVETYDIG: matchar ${kommuner}, associera manuellt`);
+    items.push({
+      id: a.messageId, threadId: f.full.threadId, from: f.parsed.from,
+      line: `• *${f.parsed.from}* — ${f.parsed.subject || '(ämne saknas)'} — TVETYDIG: matchar ${kommuner}, associera manuellt`,
+    });
   }
-  if (lines.length === 0) return;
-  log?.(`UNMATCHED inbound: ${lines.length} new message(s) matched no (or several) conversations`);
-  if (slackOps?.postAlert && env.SLACK_CHANNEL_ID) {
-    try {
-      await slackOps.postAlert(slackClient, {
-        channel: env.SLACK_CHANNEL_ID,
-        text: `📥 *Omatchade inkommande* (${lines.length}) — ej registrerade, kräver manuell hantering:\n${lines.slice(0, 20).join('\n')}`,
-      });
-    } catch (e) {
-      log?.(`postAlert failed for unmatched digest: ${e.message}`);
-    }
+  if (items.length === 0) return;
+  log?.(`UNMATCHED inbound: ${items.length} new message(s) matched no (or several) conversations`);
+  if (!slackOps?.postAlert || !env.SLACK_CHANNEL_ID) return; // nothing posted → nothing digested
+  const included = items.slice(0, DIGEST_MAX_LINES);
+  const rest = items.length - included.length;
+  try {
+    await slackOps.postAlert(slackClient, {
+      channel: env.SLACK_CHANNEL_ID,
+      text: `📥 *Omatchade inkommande* (${items.length}) — ej registrerade, kräver manuell hantering:\n`
+        + included.map((i) => i.line).join('\n')
+        + (rest > 0 ? `\n_…och ${rest} till, som listas nästa tick._` : ''),
+    });
+  } catch (e) {
+    log?.(`postAlert failed for unmatched digest: ${e.message} — will retry next tick`);
+    return; // not cached → re-digested next tick
   }
+  for (const i of included) seenUnmatched.set(i.id, { threadId: i.threadId, from: i.from });
 }
 
 // Parked-extraction digest (2026-08-16). An attachment that has burned through
@@ -791,32 +902,42 @@ async function digestUnmatched({ unmatched, ambiguous, fetchedById, convById, se
 // (analysis_parked_alerted_at), so a daemon restart cannot re-digest the same
 // file, and clearing the column re-arms the alert for a re-park.
 //
-// The Slack post happens BEFORE the mark: if postAlert throws, nothing is
-// marked and the digest is retried next tick rather than lost.
+// The Slack post happens BEFORE the mark, and ONLY the attachments actually
+// named in the posted message are marked: the mark is durable (it survives
+// restarts by design), so marking a row the operator was never shown loses the
+// alert permanently. That happened two ways — a missing Slack config skipped
+// the post but marked everything anyway, and the 20-line truncation marked the
+// overflow it never printed. The digest is now self-draining: 20 per tick until
+// the backlog is gone.
+const DIGEST_MAX_LINES = 20;
+
 async function digestParkedAnalyses(deps) {
   const { db, slackClient, slackOps, env, log } = deps;
   const parked = db.listParkedAnalysesToAlert?.() ?? [];
   if (parked.length === 0) return;
-  const lines = parked.map((a) => {
+  log?.(`PARKED extraction: ${parked.length} attachment(s) left the analysis queue and need manual handling`);
+  if (!slackOps?.postAlert || !env.SLACK_CHANNEL_ID) return; // nothing posted → nothing alerted
+  const included = parked.slice(0, DIGEST_MAX_LINES);
+  const rest = parked.length - included.length;
+  const lines = included.map((a) => {
     const reason = (a.last_analysis_error ?? 'okänt fel').replace(/^permanent:|^transient:/, '');
     const permanent = String(a.last_analysis_error ?? '').startsWith('permanent:');
     return `• *${a.kommun_namn}* — ${a.filename} (${a.mime_type ?? 'okänd typ'}) — `
       + `${reason}${permanent ? '' : ` efter ${a.analysis_attempts} försök`}`;
   });
-  log?.(`PARKED extraction: ${parked.length} attachment(s) left the analysis queue and need manual handling`);
-  if (slackOps?.postAlert && env.SLACK_CHANNEL_ID) {
-    try {
-      await slackOps.postAlert(slackClient, {
-        channel: env.SLACK_CHANNEL_ID,
-        text: `📄 *Avtalsanalys parkerad* (${parked.length}) — dessa dokument analyseras inte längre automatiskt:\n`
-          + `${lines.slice(0, 20).join('\n')}\n_Rensa \`analysis_attempts\` på raden (eller kör \`npm run analyse -- --force\`) för att köa om._`,
-      });
-    } catch (e) {
-      log?.(`postAlert failed for parked-analysis digest: ${e.message} — will retry next tick`);
-      return; // not marked → re-digested next tick
-    }
+  try {
+    await slackOps.postAlert(slackClient, {
+      channel: env.SLACK_CHANNEL_ID,
+      text: `📄 *Avtalsanalys parkerad* (${parked.length}) — dessa dokument analyseras inte längre automatiskt:\n`
+        + `${lines.join('\n')}`
+        + (rest > 0 ? `\n_…och ${rest} till, som listas nästa tick._` : '')
+        + `\n_Rensa \`analysis_attempts\` på raden (eller kör \`npm run analyse -- --force\`) för att köa om._`,
+    });
+  } catch (e) {
+    log?.(`postAlert failed for parked-analysis digest: ${e.message} — will retry next tick`);
+    return; // not marked → re-digested next tick
   }
-  db.markParkedAnalysesAlerted?.(parked.map((a) => a.id));
+  db.markParkedAnalysesAlerted?.(included.map((a) => a.id));
 }
 
 // Systemic-failure guard: when EVERY attempt in a tick fails transiently (and
@@ -829,16 +950,26 @@ const SYSTEMIC_FAILURE_MIN_ATTEMPTS = 3;
 async function alertSystemicAnalysisFailure(result, deps) {
   const { slackClient, slackOps, env, log } = deps;
   if (!result || typeof result !== 'object') return false; // legacy/fake numeric result
-  const { attempted = 0, analysed = 0, failed = 0, transient = 0 } = result;
+  const { attempted = 0, analysed = 0, failed = 0, transient = 0, backoff = 0 } = result;
   if (attempted < SYSTEMIC_FAILURE_MIN_ATTEMPTS) return false;
-  if (analysed > 0 || failed !== attempted || transient !== attempted) return false;
-  log?.(`SYSTEMIC extraction failure: all ${attempted} analysis attempts failed transiently this tick`);
+  // Backoff failures (429/529) count as failures here even though they book no
+  // attempt: a provider storm is precisely when extraction is dead and the
+  // channel must hear about it. Silencing the alert during a storm was the
+  // failure mode — the queue stopped moving and the tick stayed green.
+  if (analysed > 0 || failed !== attempted || transient + backoff !== attempted) return false;
+  const throttled = backoff === attempted;
+  log?.(`SYSTEMIC extraction failure: all ${attempted} analysis attempts failed this tick`
+    + `${throttled ? ' (provider throttling — no attempts booked, nothing parked)' : ' transiently'}`);
   if (slackOps?.postAlert && env.SLACK_CHANNEL_ID) {
     try {
       await slackOps.postAlert(slackClient, {
         channel: env.SLACK_CHANNEL_ID,
-        text: `🚨 *Avtalsextraktion misslyckas genomgående* — samtliga ${attempted} försök i denna tick`
-          + ` föll på övergående fel och inget dokument kunde läsas. Kontrollera API-nyckel, modell-id och schema.`,
+        text: throttled
+          ? `🚨 *Avtalsextraktion står stilla* — samtliga ${attempted} försök i denna tick avvisades av`
+            + ` Anthropic (429/överbelastning). Inga försök har bokförts och inget dokument har parkerats;`
+            + ` kön fortsätter automatiskt när API:et svarar igen.`
+          : `🚨 *Avtalsextraktion misslyckas genomgående* — samtliga ${attempted} försök i denna tick`
+            + ` föll på övergående fel och inget dokument kunde läsas. Kontrollera API-nyckel, modell-id och schema.`,
       });
     } catch (e) {
       log?.(`postAlert failed for systemic analysis failure: ${e.message}`);
@@ -847,8 +978,38 @@ async function alertSystemicAnalysisFailure(result, deps) {
   return true;
 }
 
+// The contracts volume is gone (or PILOT_CONTRACTS_DIR is wrong): every pending
+// attachment vanished from disk at once. analysePendingContracts deliberately
+// books NO failures in that case — nothing is parked — so this alert is the
+// only thing that makes it visible.
+async function alertContractsDirUnavailable(result, deps) {
+  const { slackClient, slackOps, env, log, contractsDir } = deps;
+  if (!result || typeof result !== 'object' || result.env_fault !== 'contracts_dir_unavailable') return false;
+  const n = result.missing_all ?? result.attempted ?? 0;
+  log?.(`CONTRACTS DIR unavailable: ${n} pending attachment(s) missing on disk — no attempts booked`);
+  if (slackOps?.postAlert && env.SLACK_CHANNEL_ID) {
+    try {
+      await slackOps.postAlert(slackClient, {
+        channel: env.SLACK_CHANNEL_ID,
+        text: `🚨 *Avtalsfilerna går inte att läsa* — samtliga ${n} dokument i analyskön saknas på disk`
+          + `${contractsDir ? ` (\`${contractsDir}\`)` : ''}. Troligen är volymen inte monterad eller`
+          + ` PILOT_CONTRACTS_DIR fel. Inga försök har bokförts och inget har parkerats — kön återupptas`
+          + ` när filerna finns på plats.`,
+      });
+    } catch (e) {
+      log?.(`postAlert failed for contracts-dir fault: ${e.message}`);
+    }
+  }
+  return true;
+}
+
 export async function runTick(deps) {
   const { db, gmailClient, gmailOps, env, now } = deps;
+
+  // Attachment ids the inline per-message analysis has already ATTEMPTED in
+  // this tick. Step 3 skips them so no document is charged two of its five
+  // attempts by a single tick.
+  const attemptedAttachmentIds = new Set();
 
   // 0. Crash recovery — surface any send that was claimed but never finalized
   // before dispatching anything new.
@@ -963,16 +1124,31 @@ export async function runTick(deps) {
     // message id, because nothing else will ever surface it.
     for (const pending of pendingEscalations) {
       try {
-        await dispatchEscalationForIngest(pending, deps);
+        await dispatchEscalationForIngest(pending, { ...deps, attemptedAttachmentIds });
       } catch (e) {
         const who = `${pending.updated?.kommun_namn ?? '?'}/${pending.updated?.role ?? '?'}`;
         const gmailId = pending.parsed?.gmail_message_id ?? '?';
-        deps.log?.(`escalation dispatch FAILED for message ${gmailId} (${who}): ${e.message} — message is stored, draft lost, needs a human`);
+        // Say what actually happened, not what we assume. The dispatch can
+        // throw AFTER the escalation row is written, and telling the operator
+        // to "svara manuellt" is then wrong twice over: the draft is not lost,
+        // and the manual reply they were sent to write is blocked by
+        // hasActiveEscalation. So check the DB before claiming anything.
+        let openEsc = null;
+        try {
+          openEsc = db.listOpenEscalationsForConversation(pending.updated?.id)[0] ?? null;
+        } catch { /* fall back to the conservative wording below */ }
+        deps.log?.(`escalation dispatch FAILED for message ${gmailId} (${who}): ${e.message}`
+          + ` — message is stored, ${openEsc ? 'draft saved (approvable in the dashboard)' : 'draft lost'}, needs a human`);
         if (deps.slackOps?.postAlert && env.SLACK_CHANNEL_ID) {
           try {
             await deps.slackOps.postAlert(deps.slackClient, {
               channel: env.SLACK_CHANNEL_ID,
-              text: `⚠️ Kunde inte skapa utkast/eskalering för ${who} (meddelande \`${gmailId}\`): ${e.message}. Svaret ÄR sparat men görs inte om automatiskt — öppna ärendet och svara manuellt.`,
+              text: openEsc
+                ? `⚠️ Fel när eskaleringen för ${who} skulle slutföras (meddelande \`${gmailId}\`): ${e.message}.`
+                  + ` Svaret ÄR sparat och utkastet (eskalering ${openEsc.id}) går att godkänna i dashboarden.`
+                  + `${openEsc.slack_ts ? '' : ' Slack-knapparna postas om automatiskt nästa tick.'}`
+                : `⚠️ Kunde inte skapa utkast/eskalering för ${who} (meddelande \`${gmailId}\`): ${e.message}.`
+                  + ` Svaret ÄR sparat men inget utkast finns — öppna ärendet och svara manuellt.`,
             });
           } catch (alertErr) {
             deps.log?.(`postAlert failed for dispatch failure ${gmailId}: ${alertErr.message}`);
@@ -982,15 +1158,28 @@ export async function runTick(deps) {
     }
   }
 
+  // 2c. Restore Slack buttons for any open escalation that was never posted
+  // (Slack outage during escalateWithDraft). Runs regardless of inbound, and
+  // never breaks the tick.
+  try {
+    await retryUnpostedEscalations(deps);
+  } catch (e) {
+    deps.log?.(`unposted-escalation retry error: ${e.message}`);
+  }
+
   // 3. Contract analysis — any saved PDFs that haven't been analysed yet.
   // Injectable for tests; failures must never break the tick.
   const analyseContracts = deps.analyseContracts ?? analysePendingContracts;
   try {
-    const analysisResult = await analyseContracts({ db, env, log: deps.log, contractsDir: deps.contractsDir });
-    // 3b. Extraction visibility — a document that stopped being retried, and a
-    // tick where nothing at all could be read, must both be loud. Best-effort:
-    // neither may break the tick.
+    const analysisResult = await analyseContracts({
+      db, env, log: deps.log, contractsDir: deps.contractsDir,
+      skipAttachmentIds: attemptedAttachmentIds,
+    });
+    // 3b. Extraction visibility — a document that stopped being retried, a tick
+    // where nothing at all could be read, and a contracts volume that has gone
+    // away must all be loud. Best-effort: none may break the tick.
     await alertSystemicAnalysisFailure(analysisResult, deps);
+    await alertContractsDirUnavailable(analysisResult, deps);
   } catch (e) {
     deps.log?.(`contract analysis error: ${e.message}`);
   }
@@ -1067,6 +1256,36 @@ export async function archiveTrackedThreads(db, { archiveThreadImpl = archiveThr
   return count;
 }
 
+// Local calendar date of a Date. The follow-up cron boundary is LOCAL time
+// ('0 9 * * *'), so "has today's run happened" must be asked in local time —
+// a UTC date flips on the wrong side of midnight for half the year.
+export function localDateStr(d) {
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+// Hour-of-day the daily follow-up cron fires ('0 9 * * *' → 9). Anything we
+// cannot read confidently falls back to 9, the documented default.
+export function followupHourFromCron(expr) {
+  const fields = String(expr ?? '').trim().split(/\s+/);
+  const hour = fields.length >= 5 ? parseInt(fields[1], 10) : NaN;
+  return Number.isInteger(hour) && hour >= 0 && hour <= 23 ? hour : 9;
+}
+
+// Should a healthy tick run the daily follow-up itself?
+//
+// The 09:00 cron fires once. If ingest happened to be blind at that minute —
+// a 61-minute gap straddling 09:00 is enough — runDailyFollowup returns early
+// (correctly: it must not claim silence it has not verified) and a whole day of
+// nudges, closes and nudge-cap escalations is silently skipped. So every
+// successful tick past the cron hour asks whether today's run ever COMPLETED,
+// and re-invokes it if not. The gates inside runDailyFollowup stay
+// authoritative: a still-blind daemon skips again and simply asks again later.
+export function followupCatchUpDue({ now, completedDate, hour = 9 }) {
+  if (completedDate === localDateStr(now)) return false;
+  return now.getHours() >= hour;
+}
+
 export async function runDailyFollowup(deps) {
   const { db, now, log } = deps;
   // Vacation window (2026-07-17): during the Swedish summer the proactive
@@ -1091,7 +1310,7 @@ export async function runDailyFollowup(deps) {
       ? `senaste lyckade bearbetning ${health.last_success_at} (${health.stale_minutes} min sedan)`
       : 'ingen lyckad bearbetning ännu';
     log?.(`FOLLOWUP paused — inbound is not being processed: ${since}; the DB may not reflect replies already in the inbox`);
-    return;
+    return; // deliberately NOT marked complete — a later healthy tick retries it
   }
 
   const todayIso = now.toISOString().slice(0, 10);
@@ -1158,6 +1377,12 @@ export async function runDailyFollowup(deps) {
       log?.(`FOLLOWUP drafted (${draftTemplate}) → ${conv.kommun_namn}/${conv.role}`);
     }
   }
+
+  // Reached the end: today's staleness pass really happened (a vacation pause
+  // counts — the decision was made and it was "nudge nobody"). Only a run that
+  // returned early at the ingest gate leaves the date unstamped, which is what
+  // the catch-up in the daemon looks for.
+  db.markFollowupCompleted?.(localDateStr(now));
 }
 
 function daysBetween(then, now) {

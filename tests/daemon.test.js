@@ -8,7 +8,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { openDb } from '../src/storage.js';
-import { createInteractivityHandler, makeExclusive, makeMutex } from '../src/daemon.js';
+import { createInteractivityHandler, makeExclusive, makeMutex, reportTickHealth } from '../src/daemon.js';
 import { sendApprovedReply } from '../src/send-reply.js';
 
 const SIGNING_SECRET = 'test-secret';
@@ -232,6 +232,116 @@ describe('createInteractivityHandler — approve path', () => {
     expect(slack.chat.update).toHaveBeenCalledTimes(1);
     expect(slack.chat.update.mock.calls[0][0].text).toContain('Skickat');
     expect(slack.chat.update.mock.calls[0][0].text).not.toContain('Skippad');
+  });
+});
+
+// A send REFUSED before the atomic claim (STALE_INGEST, STALE_ESCALATION, a
+// bounce resend with no address) leaves the escalation open and its buttons
+// live — correct, but the operator used to see NOTHING: Approve looked like a
+// dead button and the edit modal just closed, exactly like a successful send.
+describe('createInteractivityHandler — a refused send is visible in Slack', () => {
+  function nudgeSeed() {
+    const convId = db.createConversation({
+      kommun_kod: '1', kommun_namn: 'Arboga', role: 'central',
+      contact_email: 'registrator@arboga.se', scheduled_send_at: '2026-05-01T00:00:00Z',
+    });
+    db.updateConversationState(convId, 'SENT', { gmail_thread_id: 'thr-1' });
+    const escId = db.recordEscalation({
+      conversation_id: convId, message_id: null, reason: 'stale',
+      draft_template: 'T_FOLLOWUP_NUDGE', draft_subject: 'Påminnelse', draft_body: 'Hej igen',
+      slack_ts: 'ts-1',
+    });
+    return { convId, escId };
+  }
+
+  const staleIngestError = () => Object.assign(
+    new Error('Escalation 1 asserts that something has not arrived, but inbound mail has not been processed sedan 2026-08-15 09:00 (900 min)'),
+    { code: 'STALE_INGEST' },
+  );
+
+  it('approve: posts a threaded refusal notice and leaves the escalation open', async () => {
+    const { escId } = nudgeSeed();
+    const slack = fakeSlack();
+    const posts = [];
+    const handler = createInteractivityHandler({
+      db, slack, gmail: {}, env, log: () => {},
+      sendApprovedReplyImpl: async () => { throw staleIngestError(); },
+      postAlertImpl: async (s, args) => { posts.push(args); return { ts: 'a' }; },
+    });
+
+    const { req, res } = slackRequest(approvePayload(escId));
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(posts).toHaveLength(1);
+    expect(posts[0].text).toContain('Inget skickades');
+    expect(posts[0].text).toContain('Arboga');
+    expect(posts[0].text).toContain('inbound mail has not been processed');
+    expect(posts[0].thread_ts).toBe('ts-1'); // threaded under the escalation
+    // Still approvable once ingest recovers — the buttons are untouched.
+    expect(db.raw.prepare('SELECT status FROM escalations WHERE id=?').get(escId).status).toBe('open');
+    expect(slack.chat.update).not.toHaveBeenCalled();
+  });
+
+  it('edit modal: the refusal is announced instead of the modal closing as if it sent', async () => {
+    const { escId } = nudgeSeed();
+    const posts = [];
+    const handler = createInteractivityHandler({
+      db, slack: fakeSlack(), gmail: {}, env, log: () => {},
+      sendApprovedReplyImpl: async () => { throw staleIngestError(); },
+      postAlertImpl: async (s, args) => { posts.push(args); return { ts: 'a' }; },
+    });
+
+    const { req, res } = slackRequest({
+      type: 'view_submission',
+      user: { id: 'U1' },
+      view: {
+        callback_id: 'esc_edit_modal',
+        private_metadata: String(escId),
+        state: { values: { reply_input: { reply_text: { value: 'Min egen text' } } } },
+      },
+    });
+    await handler(req, res);
+
+    expect(posts).toHaveLength(1);
+    expect(posts[0].text).toContain('Inget skickades');
+    expect(db.raw.prepare('SELECT status FROM escalations WHERE id=?').get(escId).status).toBe('open');
+  });
+
+  it('does not re-announce a failure that already parked the escalation (Gmail threw after the claim)', async () => {
+    const { escId } = nudgeSeed();
+    const posts = [];
+    const handler = createInteractivityHandler({
+      db, slack: fakeSlack(), gmail: {}, env, log: () => {},
+      sendApprovedReplyImpl: async () => {
+        db.resolveEscalation(escId, { status: 'send_failed', resolved_text: 'gmail 500' });
+        throw new Error('gmail 500');
+      },
+      postAlertImpl: async (s, args) => { posts.push(args); return { ts: 'a' }; },
+    });
+    const { req, res } = slackRequest(approvePayload(escId));
+    await handler(req, res);
+    // sendApprovedReply already rewrote the Slack message for a parked row.
+    expect(posts).toHaveLength(0);
+  });
+});
+
+describe('reportTickHealth — the recovery message never renders a blank start time', () => {
+  it('names an unknown outage start instead of leaving a gap', async () => {
+    db.markOutageAlerted();
+    const alerts = [];
+    const res = await reportTickHealth({
+      db,
+      slackClient: {},
+      slackOps: { postAlert: async (s, { text }) => { alerts.push(text); return { ts: 'a' }; } },
+      env,
+      now: new Date('2026-08-16T09:00:00Z'),
+      error: null,
+      log: () => {},
+    });
+    expect(res).toBe('recovered');
+    expect(alerts[0]).not.toMatch(/varade\s+→/);
+    expect(alerts[0]).toContain('okänd start');
   });
 });
 

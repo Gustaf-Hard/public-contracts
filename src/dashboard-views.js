@@ -365,8 +365,9 @@ const baseCss = `
   .pill-reseller { background: var(--bg-elev-2); color: var(--fg-muted); border-color: var(--border); }
   .cov-toggle { margin-left: 8px; font-size: 12px; white-space: nowrap; }
   .heartbeat { font-size: 11px; padding: 3px 9px; border-radius: 999px; border: 1px solid; font-weight: 500; }
+  /* Two states only — see renderHeartbeatPill: green (ingest is current) or
+     red (ingest is blind). No amber class: there is no "somewhat reading". */
   .heartbeat-live  { background: #22c55e1a; color: var(--good); border-color: #22c55e66; }
-  .heartbeat-stale { background: #f59e0b1a; color: var(--warn); border-color: #f59e0b66; }
   .heartbeat-off   { background: #ef44441a; color: var(--bad);  border-color: #ef444466; }
   .pill-list { display: flex; flex-wrap: wrap; gap: 4px; }
   .muted { color: var(--fg-muted); }
@@ -790,8 +791,6 @@ const baseCss = `
 </style>
 `;
 
-// Render the daemon-heartbeat pill for the header. Thresholds: live <= 20 min,
-// stale 20-60 min, off > 60 min or no tick recorded yet.
 // Human "X min/h/dagar sedan" for an ISO timestamp.
 function agoLabel(iso) {
   if (!iso) return '—';
@@ -804,8 +803,13 @@ function agoLabel(iso) {
   return `${Math.floor(h / 24)} dagar sedan`;
 }
 
-// The pill keys off the last *successful* tick — so a daemon that's up but
-// failing (e.g. invalid_grant) reads red, not green.
+// The daemon-heartbeat pill for the header. TWO states, deliberately: it keys
+// off getTickHealth's single `stale` flag (TICK_STALE_THRESHOLD_MIN), so a
+// daemon that is up but failing — invalid_grant is the usual case — reads red,
+// not green. There is no amber middle state: either we are reading the inbox or
+// we are not, and an amber pill would invite treating "blind" as "probably
+// fine". (The comment here used to describe three thresholds that never
+// existed in the code.)
 function renderHeartbeatPill(h) {
   if (!h || !h.ever) {
     return `<span class="heartbeat heartbeat-off" title="Ingen lyckad bearbetning ännu.">🔴 daemon AV</span>`;
@@ -1359,6 +1363,7 @@ function aggregateContracts(conversations, messagesByConv, attachmentsByMsg) {
           vendor_name: att.contract_vendor_name ?? null,
           analysis_attempts: att.analysis_attempts ?? 0,
           last_analysis_error: att.last_analysis_error ?? null,
+          analysed: att.analysed,
         });
       }
     }
@@ -1809,17 +1814,31 @@ export function threadMessage(m, attachments, sig, expanded) {
   </div>`;
 }
 
-// PDFs (and zip-expanded inner PDFs, saved as PDFs) are the only attachments
-// the contract analyser consumes — mirrors listPendingContractAttachments.
+// Literally a PDF — used for the red "PDF" chip on a thread row, which is a
+// statement about the FORMAT, not about whether we can read it.
 function isPdfAttachment(a) {
   return a.mime_type === 'application/pdf' || (a.filename ?? '').toLowerCase().endsWith('.pdf');
 }
 
-// Three distinct outcomes the operator must be able to tell apart:
-//   ''        — analysable and still queued/analysed ("will be read")
-//   parked    — the analyser gave up, with the reason ("needs manual handling")
-//   non-PDF   — this format never reaches the analyser at all
+// The REAL analyser gate (storage.js listPendingContractAttachments): PDFs plus
+// the office formats src/office-text.js reads. It has not been PDF-only since
+// the xlsx/docx work — labelling a delivered "Avtalslista.xlsx" as "ej PDF"
+// told the operator it would never be read when in fact it is.
+function isAnalysableAttachment(a) {
+  const fn = (a.filename ?? '').toLowerCase();
+  return a.mime_type === 'application/pdf'
+    || fn.endsWith('.pdf') || fn.endsWith('.xlsx') || fn.endsWith('.docx');
+}
+
+// Four distinct outcomes the operator must be able to tell apart:
+//   parked      — the analyser gave up, with the reason ("needs manual handling")
+//   not readable— this format never reaches the analyser at all
+//   queued      — analysable, no extraction yet ("väntar på analys")
+//   ''          — analysable and already extracted (the badge says the rest)
 // Parked wins: a file that failed is more urgent than one whose format we skip.
+// "Queued" is claimed ONLY when the caller's query actually told us whether an
+// extraction exists (`analysed`); without that column we say nothing rather
+// than guess — an already-read contract labelled "väntar" is a false status.
 export function attachmentAnalysisNote(a) {
   const attempts = a.analysis_attempts ?? 0;
   if (attempts >= MAX_ANALYSIS_ATTEMPTS) {
@@ -1828,7 +1847,12 @@ export function attachmentAnalysisNote(a) {
     const suffix = raw.startsWith('permanent:') ? '' : ` efter ${attempts} försök`;
     return ` <span class="muted">— analys misslyckades permanent (${escapeHtml(reason)})${suffix}, kräver manuell hantering</span>`;
   }
-  if (!isPdfAttachment(a)) return ' <span class="muted">— sparad, ej avtalsanalyserad (ej PDF)</span>';
+  if (!isAnalysableAttachment(a)) {
+    return ' <span class="muted">— sparad, formatet avtalsanalyseras inte</span>';
+  }
+  if (a.analysed === 0 || a.analysed === false) {
+    return ' <span class="muted">— sparad, väntar på avtalsanalys</span>';
+  }
   return '';
 }
 

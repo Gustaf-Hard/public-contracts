@@ -6,7 +6,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { openDb } from '../src/storage.js';
-import { runTick, runDailyFollowup } from '../src/tick.js';
+import { runTick, runDailyFollowup, followupCatchUpDue, followupHourFromCron, localDateStr } from '../src/tick.js';
 import { effectiveFollowUp } from '../src/conversation.js';
 import { stripQuotedText, isCloserText } from '../src/classifier.js';
 import { storeContractAnalysis } from '../src/analyse-contract.js';
@@ -482,5 +482,82 @@ describe('clarification while DELIVERING gets a draft (L4)', () => {
     expect(escs).toHaveLength(1);
     expect(escs[0].draft_template).toBe('T_PRECISION');
     expect(escs[0].draft_body).toMatch(/2024–2026/); // LLM contextual draft preferred
+  });
+});
+
+// D1 — a follow-up SKIPPED because ingest was blind at 09:00 must not cost a
+// whole day of nudges. The gate itself is right (we must not claim silence we
+// have not verified) but the cron fires once: a 61-minute gap straddling 09:00
+// silenced nudges, closes and nudge-cap escalations until the next morning.
+describe('daily follow-up catch-up after a blind 09:00', () => {
+  function blindDeps(now, minutesAgo = 90) {
+    db.recordHeartbeat({ kind: 'tick', error: 'invalid_grant' });
+    db.raw.prepare('UPDATE daemon_heartbeat SET last_success_at = ? WHERE id = 1')
+      .run(new Date(now.getTime() - minutesAgo * 60000).toISOString());
+    return {
+      db, gmailClient: { gmail: {} }, gmailOps: fakeGmail(), slackClient: {},
+      slackOps: fakeSlackOps(), env, contractsDir, now,
+    };
+  }
+
+  it('does not mark the day complete when the ingest gate skips it', async () => {
+    seedConv({ stateChangedAt: '2026-06-14T00:00:00Z' });
+    const nine = new Date('2026-06-24T09:00:00');
+    await runDailyFollowup(blindDeps(nine));
+    expect(db.listOpenEscalations()).toHaveLength(0);
+    expect(db.getFollowupCompletedDate()).toBeNull();
+    expect(followupCatchUpDue({ now: nine, completedDate: null })).toBe(true);
+  });
+
+  it('a healthy tick later the same day runs it — once', async () => {
+    const id = seedConv({ stateChangedAt: '2026-06-14T00:00:00Z' });
+    await runDailyFollowup(blindDeps(new Date('2026-06-24T09:00:00')));
+
+    // 10:15, ingest recovered.
+    const later = new Date('2026-06-24T10:15:00');
+    expect(followupCatchUpDue({ now: later, completedDate: db.getFollowupCompletedDate() })).toBe(true);
+    await runDailyFollowup(deps({ now: later }));
+    expect(db.listOpenEscalationsForConversation(id)).toHaveLength(1);
+    expect(db.getFollowupCompletedDate()).toBe(localDateStr(later));
+
+    // Already completed → no second run for the rest of the day.
+    const evening = new Date('2026-06-24T18:00:00');
+    expect(followupCatchUpDue({ now: evening, completedDate: db.getFollowupCompletedDate() })).toBe(false);
+  });
+
+  it('a still-blind daemon at the later tick is still skipped — the gate stays authoritative', async () => {
+    seedConv({ stateChangedAt: '2026-06-14T00:00:00Z' });
+    await runDailyFollowup(blindDeps(new Date('2026-06-24T09:00:00')));
+    const later = new Date('2026-06-24T10:15:00');
+    await runDailyFollowup(blindDeps(later));
+    expect(db.listOpenEscalations()).toHaveLength(0);
+    expect(db.getFollowupCompletedDate()).toBeNull();
+    // …and it keeps asking, so the day is caught up the moment ingest returns.
+    expect(followupCatchUpDue({ now: later, completedDate: null })).toBe(true);
+  });
+
+  it('never runs before the cron hour, and a completed yesterday does not count as today', () => {
+    expect(followupCatchUpDue({ now: new Date('2026-06-24T07:30:00'), completedDate: '2026-06-23' })).toBe(false);
+    const nine = new Date('2026-06-24T09:00:00');
+    expect(followupCatchUpDue({ now: nine, completedDate: '2026-06-23' })).toBe(true);
+    expect(followupCatchUpDue({ now: nine, completedDate: '2026-06-24' })).toBe(false);
+  });
+
+  it('reads the boundary hour off the configured cron, falling back to 09', () => {
+    expect(followupHourFromCron('0 9 * * *')).toBe(9);
+    expect(followupHourFromCron('30 6 * * *')).toBe(6);
+    expect(followupHourFromCron(undefined)).toBe(9);
+    expect(followupHourFromCron('nonsense')).toBe(9);
+  });
+
+  it('a vacation-paused run still counts as completed — the decision WAS made', async () => {
+    seedConv({ stateChangedAt: '2026-06-14T00:00:00Z' });
+    const now = new Date('2026-06-24T09:00:00');
+    await runDailyFollowup({
+      ...deps({ now }),
+      vacationConfig: { enabled: true, start: '06-20', end: '08-01' },
+    });
+    expect(db.listOpenEscalations()).toHaveLength(0);
+    expect(db.getFollowupCompletedDate()).toBe(localDateStr(now));
   });
 });

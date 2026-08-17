@@ -371,6 +371,95 @@ describe('getTickHealth', () => {
     const future = new Date(Date.now() + 2 * 60 * 60 * 1000); // +2h
     expect(db.getTickHealth({ now: future, thresholdMin: 60 }).stale).toBe(true);
   });
+
+  // The 09:00 follow-up touches no Gmail, so its success proves nothing about
+  // ingest — but it used to write last_error = NULL unconditionally, erasing
+  // the invalid_grant diagnosis the dashboard health modal keys on.
+  it('a clean follow-up never erases the tick error it knows nothing about', () => {
+    db.recordHeartbeat({ kind: 'tick', error: 'invalid_grant' });
+    db.recordHeartbeat({ kind: 'followup', error: null });
+    expect(db.getTickHealth().last_error).toBe('invalid_grant');
+  });
+
+  it('a FAILING follow-up still records its own error, and a clean tick still clears', () => {
+    db.recordHeartbeat({ kind: 'followup', error: 'followup crashed' });
+    expect(db.getTickHealth().last_error).toBe('followup crashed');
+    db.recordHeartbeat({ kind: 'tick', error: null });
+    expect(db.getTickHealth().last_error).toBeNull();
+  });
+});
+
+describe('follow-up completion bookkeeping (catch-up after a blind 09:00)', () => {
+  it('starts unset and round-trips a local date', () => {
+    expect(db.getFollowupCompletedDate()).toBeNull();
+    db.markFollowupCompleted('2026-08-16');
+    expect(db.getFollowupCompletedDate()).toBe('2026-08-16');
+    db.markFollowupCompleted('2026-08-17');
+    expect(db.getFollowupCompletedDate()).toBe('2026-08-17');
+  });
+});
+
+describe('upsertThread — last_inbound_at only moves forward', () => {
+  // Messages do not arrive in delivery order: a post-outage backfill (or the
+  // widened Cc-only inbound query surfacing old mail for the first time)
+  // ingests an OLDER internalDate later. A plain COALESCE overwrite rewound the
+  // thread clock and corrupted thread ordering.
+  it('keeps the newer timestamp when an older message is ingested afterwards', () => {
+    const convId = db.createConversation({
+      kommun_kod: '1440', kommun_namn: 'Ale', role: 'central',
+      contact_email: 'k@ale.se', scheduled_send_at: '2026-06-01T00:00:00Z',
+    });
+    db.upsertThread({ conversation_id: convId, gmail_thread_id: 'thr-a', last_inbound_at: '2026-06-20T10:00:00.000Z' });
+    const older = db.upsertThread({ conversation_id: convId, gmail_thread_id: 'thr-a', last_inbound_at: '2026-06-02T08:00:00.000Z' });
+    expect(older.last_inbound_at).toBe('2026-06-20T10:00:00.000Z');
+  });
+
+  it('still advances on a genuinely newer message, and fills in from null', () => {
+    const convId = db.createConversation({
+      kommun_kod: '1441', kommun_namn: 'Alingsås', role: 'central',
+      contact_email: 'k@alingsas.se', scheduled_send_at: '2026-06-01T00:00:00Z',
+    });
+    db.upsertThread({ conversation_id: convId, gmail_thread_id: 'thr-b' });
+    expect(db.getThread(convId, 'thr-b').last_inbound_at).toBeNull();
+    db.upsertThread({ conversation_id: convId, gmail_thread_id: 'thr-b', last_inbound_at: '2026-06-02T08:00:00.000Z' });
+    expect(db.getThread(convId, 'thr-b').last_inbound_at).toBe('2026-06-02T08:00:00.000Z');
+    db.upsertThread({ conversation_id: convId, gmail_thread_id: 'thr-b', last_inbound_at: '2026-06-21T09:00:00.000Z' });
+    expect(db.getThread(convId, 'thr-b').last_inbound_at).toBe('2026-06-21T09:00:00.000Z');
+    // A null carries no information and must not wipe the stamp.
+    db.upsertThread({ conversation_id: convId, gmail_thread_id: 'thr-b', counterparty_name: 'Reg' });
+    expect(db.getThread(convId, 'thr-b').last_inbound_at).toBe('2026-06-21T09:00:00.000Z');
+  });
+});
+
+describe('countUnreadAnalysableAttachments', () => {
+  function seedAttachment(convId, { filename, mime_type = null, analysed = false, attempts = 0 }) {
+    const mid = db.recordMessage({
+      conversation_id: convId, gmail_message_id: `g-${filename}`, direction: 'inbound',
+      from_email: 'k@x.se', to_email: 'g@m.se', subject: 's', body_text: 'b',
+      classification: 'delivery', classification_confidence: 1,
+      received_at: '2026-06-20T10:00:00Z', attachment_count: 1,
+    });
+    const aid = db.recordAttachment({ message_id: mid, filename, saved_path: `/tmp/${filename}`, mime_type, size_bytes: 10 });
+    if (attempts) db.recordAnalysisFailure(aid, { reason: 'transient:api_5xx' });
+    if (analysed) db.recordContract({ attachment_id: aid, is_contract: 1, summary: 's' });
+    return aid;
+  }
+
+  it('counts pending AND parked analysable documents, ignores extracted and non-analysable ones', () => {
+    const convId = db.createConversation({
+      kommun_kod: '1440', kommun_namn: 'Ale', role: 'central',
+      contact_email: 'k@ale.se', scheduled_send_at: '2026-06-01T00:00:00Z',
+    });
+    expect(db.countUnreadAnalysableAttachments(convId)).toBe(0);
+    seedAttachment(convId, { filename: 'Läst.pdf', mime_type: 'application/pdf', analysed: true });
+    expect(db.countUnreadAnalysableAttachments(convId)).toBe(0);
+    seedAttachment(convId, { filename: 'Kö.pdf', mime_type: 'application/pdf' });
+    seedAttachment(convId, { filename: 'Lista.xlsx' });
+    seedAttachment(convId, { filename: 'Brev.docx' });
+    // A logo is not a document we would ever extract — it is not "unread".
+    seedAttachment(convId, { filename: 'logo.png', mime_type: 'image/png' });
+    expect(db.countUnreadAnalysableAttachments(convId)).toBe(3);
+  });
 });
 
 describe('listContractInfoForMessage', () => {

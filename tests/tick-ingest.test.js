@@ -173,6 +173,54 @@ describe('runTick — unmatched inbound is surfaced once (H5, L5)', () => {
     expect(slackOps.alerts).toHaveLength(1);
     spy.mockRestore();
   });
+
+  // The cache used to be written while BUILDING the digest, so a Slack hiccup
+  // silenced the whole batch for the process lifetime — the message was never
+  // surfaced anywhere and never re-digested.
+  it('caches nothing when the Slack post fails, so the batch is digested on a later tick', async () => {
+    const spy = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue(null);
+    seedConv();
+    const seenUnmatched = new Map();
+    const gmail = fakeGmail({
+      listResult: [{ id: 'um-9' }],
+      getResult: { 'um-9': mkMsg('um-9', 'thr-x', 'Okänd <reg@kommunalforbund.se>', 'Svar på er begäran') },
+    });
+
+    const down = fakeSlackOps();
+    down.postAlert = vi.fn(async () => { throw new Error('slack down'); });
+    await runTick(deps({ gmail, slackOps: down, seenUnmatched }));
+    expect(seenUnmatched.size).toBe(0);
+
+    const up = fakeSlackOps();
+    await runTick(deps({ gmail, slackOps: up, seenUnmatched }));
+    expect(up.alerts).toHaveLength(1);
+    expect(up.alerts[0]).toMatch(/kommunalforbund/);
+    expect(seenUnmatched.has('um-9')).toBe(true);
+    spy.mockRestore();
+  });
+
+  it('caches only the messages the posted digest actually listed, and drains the rest next tick', async () => {
+    const spy = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue(null);
+    seedConv();
+    const seenUnmatched = new Map();
+    const ids = Array.from({ length: 23 }, (_, i) => `um-${i}`);
+    const getResult = Object.fromEntries(ids.map((id) => [
+      id, mkMsg(id, `thr-${id}`, `Okänd <${id}@kommunalforbund.se>`, 'Svar'),
+    ]));
+    const gmail = fakeGmail({ listResult: ids.map((id) => ({ id })), getResult });
+    const slackOps = fakeSlackOps();
+
+    await runTick(deps({ gmail, slackOps, seenUnmatched }));
+    expect(slackOps.alerts).toHaveLength(1);
+    expect(seenUnmatched.size).toBe(20);
+    expect(slackOps.alerts[0]).toContain('och 3 till');
+
+    await runTick(deps({ gmail, slackOps, seenUnmatched }));
+    expect(slackOps.alerts).toHaveLength(2);
+    expect(slackOps.alerts[1]).toContain('um-22@kommunalforbund.se');
+    expect(seenUnmatched.size).toBe(23);
+    spy.mockRestore();
+  });
 });
 
 describe('runTick — previously-unmatched inbound is re-matched every tick (finding 4)', () => {

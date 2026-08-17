@@ -318,9 +318,45 @@ describe('approving a staleness nudge while ingest is blind (STALE_INGEST)', () 
     ).rejects.toMatchObject({ code: 'STALE_INGEST' });
   });
 
+  // T_REQUEST_MISSING is a conversation-wide negative too — "vi saknar
+  // fortfarande avtal med X" is falsified by an unfetched mail carrying exactly
+  // that avtal, and accusing a kommun of withholding what they already sent is
+  // worse than waiting for a tick.
+  it('blocks T_REQUEST_MISSING: it claims something has NOT arrived', async () => {
+    blind();
+    const { conv, esc } = seedEscalation('T_REQUEST_MISSING');
+    const send = vi.fn();
+    await expect(
+      sendApprovedReply({ db, gmail: {}, env, conv, esc, finalBody: 'vi saknar avtal med X', decision: 'approve_unmodified', gmailSendImpl: send })
+    ).rejects.toMatchObject({ code: 'STALE_INGEST' });
+    expect(send).not.toHaveBeenCalled();
+    expect(db.raw.prepare('SELECT status FROM escalations WHERE id = ?').get(esc.id).status).toBe('open');
+  });
+
+  it('sends T_REQUEST_MISSING normally once a tick has succeeded', async () => {
+    const { conv, esc } = seedEscalation('T_REQUEST_MISSING');
+    db.recordHeartbeat({ kind: 'tick', error: null });
+    const send = vi.fn(async () => ({ id: 'out-rm', threadId: 'thr-a' }));
+    await sendApprovedReply({ db, gmail: {}, env, conv, esc, finalBody: 'vi saknar avtal med X', decision: 'approve_unmodified', gmailSendImpl: send });
+    expect(send).toHaveBeenCalledOnce();
+  });
+
+  // A guard that opts itself out on a db object without the method is worse
+  // than no guard: the send looks verified when nothing was checked.
+  it('fails loudly rather than skipping the check when the db cannot answer', async () => {
+    blind();
+    const { conv, esc } = seedEscalation('T_FOLLOWUP_NUDGE');
+    const crippled = { ...db, getTickHealth: undefined };
+    const send = vi.fn();
+    await expect(
+      sendApprovedReply({ db: crippled, gmail: {}, env, conv, esc, finalBody: 'x', decision: 'approve_unmodified', gmailSendImpl: send })
+    ).rejects.toThrow(TypeError);
+    expect(send).not.toHaveBeenCalled();
+  });
+
   it('does NOT block other templates — they answer mail we HAVE seen', async () => {
     blind();
-    for (const tpl of ['T_RECEIPT', 'T_PRECISION', 'free_form', 'T_RESEND_BAD_ADDRESS', 'T_UPDATE']) {
+    for (const tpl of ['T_RECEIPT', 'T_PRECISION', 'T_CROSSCHECK', 'free_form', 'T_RESEND_BAD_ADDRESS', 'T_UPDATE']) {
       const { conv, esc } = seedEscalation(tpl);
       const send = vi.fn(async () => ({ id: `out-${tpl}`, threadId: 'thr-a' }));
       await sendApprovedReply({

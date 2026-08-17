@@ -87,24 +87,43 @@ Phase-1 pipeline: `scripts/01|02|03 → src/seed.js|crawl.js|verify.js → data/
 - **`received_at` is Gmail `internalDate`**, never processing time. The
   inbound fetch window derives from heartbeat `last_success_at` (30d floor).
 - **Never claim silence we haven't verified.** `last_success_at` is stamped by
-  a clean *tick* only (never the Gmail-free daily follow-up), and
-  `TICK_STALE_THRESHOLD_MIN` (storage.js) is the one definition of "ingest is
-  blind" shared by the dashboard pill/modal, the daemon's once-per-outage Slack
-  alert (`reportTickHealth`), the `runDailyFollowup` gate, and the
-  `STALE_INGEST` refusal in `sendApprovedReply`. While blind we draft no
-  staleness nudge and send no `T_FOLLOWUP_NUDGE`/`T_FOLLOWUP_CLOSE` — the
-  kommun may have replied into an inbox we never read. Replies to mail we HAVE
-  seen (receipts, precision, bounce resends, refreshes) are unaffected.
+  a clean *tick* only (never the Gmail-free daily follow-up, which also never
+  nulls a tick's `last_error`), and `TICK_STALE_THRESHOLD_MIN` (storage.js) is
+  the one definition of "ingest is blind" shared by the dashboard pill/modal,
+  the daemon's once-per-outage Slack alert (`reportTickHealth`), the
+  `runDailyFollowup` gate, and the `STALE_INGEST` refusal in
+  `sendApprovedReply`. While blind we draft no staleness nudge and send nothing
+  from `STALE_SENSITIVE_TEMPLATES` (send-reply.js): `T_FOLLOWUP_NUDGE`,
+  `T_FOLLOWUP_CLOSE` *and* `T_REQUEST_MISSING` — each asserts a
+  conversation-wide negative ("vi har inte hört av er", "vi saknar fortfarande
+  avtal med X") that an unfetched mail can falsify. The guard calls
+  `db.getTickHealth()` unconditionally: a safety check must not opt itself out
+  on a db object that lacks the method. Replies to mail we HAVE seen
+  (T_RECEIPT, T_PRECISION, T_CROSSCHECK, bounce resends, T_UPDATE) are
+  unaffected. A follow-up skipped by the gate is not marked complete, and the
+  next healthy tick past the cron hour re-runs it (`followupCatchUpDue`).
 - **Extraction failures are bounded and loud.** A failed contract analysis
   books an attempt on the attachment row (`analysis_attempts`,
-  `last_analysis_error` as `permanent:…`/`transient:…`). Permanent failures
-  (file missing, unreadable/zero-text, oversized) park on the first attempt;
-  transient ones retry to `MAX_ANALYSIS_ATTEMPTS` (storage.js). Parked
-  attachments leave `listPendingContractAttachments` — that is what stops the
-  15-minute Opus burn — and are digested to Slack ONCE, tracked durably via
-  `analysis_parked_alerted_at` (never a per-process Map). A tick where every
-  attempt (≥3) failed transiently raises a separate systemic alert. Nothing is
-  deleted: clearing `analysis_attempts` (or `--force`) re-queues.
+  `last_analysis_error` as `permanent:…`/`transient:…`/`backoff:…`). Permanent
+  failures (unreadable/zero-text, oversized) park on the first attempt;
+  transient ones retry to `MAX_ANALYSIS_ATTEMPTS` (storage.js); **`backoff:`
+  failures (HTTP 429/529) book NO attempt** — a routine provider incident must
+  not park the entire pending queue — and explicit status always beats
+  message-pattern matching in `classifyAnalysisFailure`. One tick attempts an
+  attachment at most once (the inline per-message analysis passes its
+  `attempted_ids` to step 3 as `skipAttachmentIds`). A run where EVERY
+  attachment (≥3) is missing on disk is an environment fault, not a corpus of
+  broken files: nothing is booked, nothing parks, and Slack is told the
+  contracts volume looks unavailable. Parked attachments leave
+  `listPendingContractAttachments` — that is what stops the 15-minute Opus burn
+  — and are digested to Slack ONCE, tracked durably via
+  `analysis_parked_alerted_at` (never a per-process Map), marked only after a
+  successful post and only for the rows the post actually named. A tick where
+  every attempt (≥3) failed transiently or on backoff raises a separate
+  systemic alert. Unread (pending OR parked) analysable attachments suppress
+  the `T_REQUEST_MISSING` claim — we cannot say an avtal is missing while it
+  sits unread on our own disk. Nothing is deleted: clearing
+  `analysis_attempts` (or `--force`) re-queues.
 
 ## Conventions that aren't obvious from the code alone
 

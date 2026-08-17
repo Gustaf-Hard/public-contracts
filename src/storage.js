@@ -279,6 +279,14 @@ export function openDb(path) {
     if (!hbCols.includes('outage_alerted_at')) {
       db.exec('ALTER TABLE daemon_heartbeat ADD COLUMN outage_alerted_at TEXT');
     }
+    // Local date (YYYY-MM-DD) of the last daily follow-up that actually RAN TO
+    // COMPLETION. "Ran" is not enough: runDailyFollowup returns early while
+    // ingest is blind, and a 61-minute gap straddling the 09:00 cron used to
+    // silence a whole day of nudges/closes. The catch-up in the daemon reads
+    // this to re-invoke the follow-up after the first healthy tick past 09:00.
+    if (!hbCols.includes('last_followup_completed_date')) {
+      db.exec('ALTER TABLE daemon_heartbeat ADD COLUMN last_followup_completed_date TEXT');
+    }
     const escCols = db.prepare("PRAGMA table_info(escalations)").all().map((r) => r.name);
     if (!escCols.includes('watchlist_vendors')) {
       db.exec('ALTER TABLE escalations ADD COLUMN watchlist_vendors TEXT');
@@ -444,13 +452,24 @@ export function openDb(path) {
       'SELECT * FROM threads WHERE conversation_id = ? AND gmail_thread_id = ?'
     ).get(conversation_id, gmail_thread_id);
     if (existing) {
+      // last_inbound_at only ever moves FORWARD. Messages do not arrive in
+      // delivery order: a backfill after an outage (or the widened Cc-only
+      // inbound query surfacing old mail for the first time) ingests an older
+      // internalDate later, and a plain COALESCE overwrite would rewind the
+      // thread's clock — corrupting thread ordering and the "senaste svar"
+      // the operator reads. ISO-8601 strings compare correctly as text.
       db.prepare(`
         UPDATE threads SET
           counterparty_email = COALESCE(?, counterparty_email),
           counterparty_name  = COALESCE(?, counterparty_name),
-          last_inbound_at    = COALESCE(?, last_inbound_at)
+          last_inbound_at    = CASE
+            WHEN ? IS NULL THEN last_inbound_at
+            WHEN last_inbound_at IS NULL THEN ?
+            WHEN ? > last_inbound_at THEN ?
+            ELSE last_inbound_at END
         WHERE id = ?
-      `).run(counterparty_email, counterparty_name, last_inbound_at, existing.id);
+      `).run(counterparty_email, counterparty_name,
+        last_inbound_at, last_inbound_at, last_inbound_at, last_inbound_at, existing.id);
       return db.prepare('SELECT * FROM threads WHERE id = ?').get(existing.id);
     }
     const r = db.prepare(`
@@ -678,13 +697,39 @@ export function openDb(path) {
     const successSet = kind === 'tick' && error == null
       ? ", last_success_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')"
       : '';
+    // last_error is the INGEST diagnosis the dashboard health modal reads (it
+    // keys on `invalid_grant` to tell the operator to sign in again). The 09:00
+    // follow-up touches no Gmail, so its success says nothing about ingest —
+    // yet writing NULL unconditionally erased the tick's diagnosis every
+    // morning, leaving a dead token showing no reason at all. A follow-up now
+    // writes last_error only when IT failed (that crash must stay visible); a
+    // clean tick still clears the column, which is the one thing that proves
+    // ingest works.
+    const params = [];
+    let errorSet = '';
+    if (kind !== 'followup' || error != null) {
+      errorSet = ', last_error = ?';
+      params.push(error);
+    }
     db.prepare(`
       UPDATE daemon_heartbeat
       SET ${col} = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
-          tick_count = tick_count + 1,
-          last_error = ?${successSet}
+          tick_count = tick_count + 1${errorSet}${successSet}
       WHERE id = 1
-    `).run(error);
+    `).run(...params);
+  }
+
+  // Daily-follow-up completion bookkeeping (catch-up after a blind 09:00).
+  // Stamped with the LOCAL date the follow-up completed — the cron boundary is
+  // local time, so a UTC date would flip the wrong side of midnight.
+  function markFollowupCompleted(dateStr) {
+    db.prepare('UPDATE daemon_heartbeat SET last_followup_completed_date = ? WHERE id = 1')
+      .run(dateStr);
+  }
+
+  function getFollowupCompletedDate() {
+    return db.prepare('SELECT last_followup_completed_date AS d FROM daemon_heartbeat WHERE id = 1')
+      .get()?.d ?? null;
   }
 
   // Date (YYYY-MM-DD) of the FIRST message we sent this kommun — the referent
@@ -984,6 +1029,25 @@ export function openDb(path) {
       WHERE m.conversation_id = ?
       ORDER BY a.id
     `).all(conversationId);
+  }
+
+  // Documents this conversation HAS but has not read yet: an analysable-typed
+  // attachment (the same pdf/xlsx/docx gate listPendingContractAttachments
+  // uses) with no contracts row. Deliberately counts BOTH pending and parked
+  // attachments — the point is not "will we read it", it is "we have not read
+  // it", and a parked file is even less evidence of a missing contract than a
+  // queued one. Grounds the evidence gate in chooseDeliveryReply.
+  function countUnreadAnalysableAttachments(conversationId) {
+    return db.prepare(`
+      SELECT COUNT(*) AS n
+      FROM attachments a
+      JOIN messages m ON m.id = a.message_id
+      LEFT JOIN contracts c ON c.attachment_id = a.id
+      WHERE m.conversation_id = ?
+        AND c.id IS NULL
+        AND (a.mime_type = 'application/pdf' OR lower(a.filename) LIKE '%.pdf'
+             OR lower(a.filename) LIKE '%.xlsx' OR lower(a.filename) LIKE '%.docx')
+    `).get(conversationId)?.n ?? 0;
   }
 
   // --- Collection velocity (read-only; no schema change) ---
@@ -1347,6 +1411,8 @@ export function openDb(path) {
     listDecisions,
     listEditDecisions,
     recordHeartbeat,
+    markFollowupCompleted,
+    getFollowupCompletedDate,
     getHeartbeat,
     getTickHealth,
     markOutageAlerted,
@@ -1371,6 +1437,7 @@ export function openDb(path) {
     markParkedAnalysesAlerted,
     listContractInfoForMessage,
     listContractInfoForConversation,
+    countUnreadAnalysableAttachments,
     listContractDeliveryEvents,
     listCaseTimings,
     countFilesByDocumentType,

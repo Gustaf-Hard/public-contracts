@@ -116,15 +116,18 @@ describe('runTick — one failing dispatch never takes the batch down', () => {
     const ale = seedConv({ kod: '1440', namn: 'Ale', email: 'kansli@ale.se', thread: 'thr-ale' });
     const boden = seedConv({ kod: '2582', namn: 'Boden', email: 'kommun@boden.se', thread: 'thr-boden' });
 
-    // Slack is down for the first escalation only (a 500, or a bug in the
-    // draft path) — the second must be unaffected.
-    const slackOps = fakeSlackOps();
-    slackOps.postEscalation = vi.fn(async function (slack, { fallbackText }) {
-      if (fallbackText.includes('Ale')) throw new Error('slack 500');
-      this.posts.push(fallbackText);
-      return { ts: `s-${this.posts.length}`, channel: 'C1' };
-    });
+    // A genuine dispatch failure: the escalation row itself cannot be written
+    // for Ale. NOTHING is saved for that draft, so the alert must say exactly
+    // that and send the operator to answer manually.
+    const failingDb = {
+      ...db,
+      recordEscalation: (e) => {
+        if (e.conversation_id === ale) throw new Error('db write blew up');
+        return db.recordEscalation(e);
+      },
+    };
 
+    const slackOps = fakeSlackOps();
     const gmail = fakeGmail({
       listResult: [{ id: 'm-ale' }, { id: 'm-boden' }],
       getResult: {
@@ -135,7 +138,7 @@ describe('runTick — one failing dispatch never takes the batch down', () => {
     const analyseContracts = vi.fn(async () => {});
 
     await runTick({
-      db, gmailClient: { gmail: {} }, gmailOps: gmail, slackClient: {}, slackOps,
+      db: failingDb, gmailClient: { gmail: {} }, gmailOps: gmail, slackClient: {}, slackOps,
       env, contractsDir, now: new Date('2026-06-24T12:00:00Z'),
       analyseContracts, log: () => {},
     });
@@ -145,13 +148,60 @@ describe('runTick — one failing dispatch never takes the batch down', () => {
     expect(db.raw.prepare('SELECT COUNT(*) n FROM messages WHERE direction=?').get('inbound').n).toBe(2);
     // The second conversation still got its draft + Slack post.
     expect(db.listOpenEscalationsForConversation(boden)).toHaveLength(1);
-    expect(slackOps.posts.some((t) => t.includes('Boden'))).toBe(true);
+    expect(slackOps.posts).toHaveLength(1);
     // The operator is told WHICH message dropped — it will never be retried.
     const alert = slackOps.alerts.find((t) => t.includes('m-ale'));
     expect(alert).toBeDefined();
     expect(alert).toContain('Ale');
+    // No escalation row exists, so the alert must NOT promise a saved draft.
+    expect(db.listOpenEscalationsForConversation(ale)).toHaveLength(0);
+    expect(alert).toContain('inget utkast finns');
     // Step 3 still ran.
     expect(analyseContracts).toHaveBeenCalled();
+  });
+
+  // D6: postEscalation used to be the only unguarded Slack call, and it sits
+  // AFTER recordEscalation. A Slack outage therefore threw with the row already
+  // written — and the alert then told the operator the draft was lost and to
+  // answer manually, which hasActiveEscalation blocks.
+  it('keeps the draft when Slack is down: escalation stays open with no slack_ts, and no "answer manually" alert', async () => {
+    const spy = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue(null);
+    const ale = seedConv({ kod: '1440', namn: 'Ale', email: 'kansli@ale.se', thread: 'thr-ale' });
+
+    const slackOps = fakeSlackOps();
+    slackOps.postEscalation = vi.fn(async () => { throw new Error('slack 500'); });
+
+    const gmail = fakeGmail({
+      listResult: [{ id: 'm-ale' }],
+      getResult: { 'm-ale': mkMsg('m-ale', 'thr-ale', 'K <kansli@ale.se>', 'Hej, kan du ringa mig?') },
+    });
+    const analyseContracts = vi.fn(async () => {});
+    const deps = {
+      db, gmailClient: { gmail: {} }, gmailOps: gmail, slackClient: {}, slackOps,
+      env, contractsDir, now: new Date('2026-06-24T12:00:00Z'),
+      analyseContracts, log: () => {},
+    };
+
+    await runTick(deps);
+
+    const open = db.listOpenEscalationsForConversation(ale);
+    expect(open).toHaveLength(1);
+    expect(open[0].slack_ts).toBeNull();
+    // Nothing claiming the draft is lost.
+    expect(slackOps.alerts.some((t) => t.includes('svara manuellt'))).toBe(false);
+    expect(analyseContracts).toHaveBeenCalled();
+
+    // Next tick with Slack healthy: the buttons come back, on the SAME
+    // escalation — no duplicate is created.
+    const healthy = fakeSlackOps();
+    await runTick({ ...deps, slackOps: healthy, gmailOps: fakeGmail({ listResult: [] }) });
+    spy.mockRestore();
+
+    const after = db.listOpenEscalationsForConversation(ale);
+    expect(after).toHaveLength(1);
+    expect(after[0].id).toBe(open[0].id);
+    expect(after[0].slack_ts).toBe('s-1');
+    expect(healthy.posts).toHaveLength(1);
   });
 
   it('a postAlert that itself fails still does not break the tick', async () => {

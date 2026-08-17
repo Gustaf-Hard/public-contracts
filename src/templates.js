@@ -186,7 +186,16 @@ function listSv(items) {
 // `facts` (src/coverage.js, conversation-wide) when the caller has them: a doc
 // merely mentioned in an earlier message may since have been delivered, and
 // only the conversation-wide view knows that.
-export function chooseDeliveryReply({ received = [], missing = [], facts = null } = {}) {
+//
+// `unread_documents` is the count of analysable documents this conversation has
+// STORED but not yet extracted (pending in the queue, or parked after failed
+// attempts). Coverage is built from `contracts` rows, so an unread file is
+// indistinguishable there from a document that was never sent — and
+// T_REQUEST_MISSING would then tell a kommun "vi saknar fortfarande avtal med
+// X" while X's contract sits unread on our own disk. Under-claim instead: fall
+// back to the neutral receipt, exactly like the other coverage gates.
+export function chooseDeliveryReply({ received = [], missing = [], facts = null, unread_documents = 0 } = {}) {
+  if (unread_documents > 0) return { template: 'T_RECEIPT', suppressed: 'unread_documents' };
   const hasMissing = facts ? Boolean(facts.has_missing) : missing.length > 0;
   return { template: hasMissing ? 'T_REQUEST_MISSING' : 'T_RECEIPT' };
 }

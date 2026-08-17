@@ -140,7 +140,7 @@ describe('dashboard / kommun detail', () => {
     expect(res.text).not.toContain('auto_ack');
   });
 
-  it('marks a stored non-PDF attachment as "sparad, ej avtalsanalyserad" and surfaces a skipped-count note', async () => {
+  it('marks a stored, not-yet-extracted .xlsx as waiting for analysis and surfaces a skipped-count note', async () => {
     const cid = db.createConversation({
       kommun_kod: '2418', kommun_namn: 'Malå', role: 'central',
       contact_email: 'kommun@mala.se', scheduled_send_at: '2026-05-24T10:00:00Z',
@@ -161,11 +161,14 @@ describe('dashboard / kommun detail', () => {
     });
     const res = await get(appWithFakes(), '/kommun/2418');
     expect(res.text).toContain('Sammanställning avtal.xlsx');
-    expect(res.text).toContain('sparad, ej avtalsanalyserad (ej PDF)');
+    // .xlsx IS analysed (src/office-text.js) — labelling it "ej PDF" told the
+    // operator it would never be read.
+    expect(res.text).toContain('sparad, väntar på avtalsanalys');
+    expect(res.text).not.toContain('ej PDF');
     expect(res.text).toContain('1 bilaga hoppades över (liten bild)');
   });
 
-  it('does not annotate PDF attachments and shows no skipped note when all attachments are stored', async () => {
+  it('annotates an un-extracted PDF as waiting and shows no skipped note when all attachments are stored', async () => {
     const cid = db.createConversation({
       kommun_kod: '2418', kommun_namn: 'Malå', role: 'utbildning',
       contact_email: 'bun@mala.se', scheduled_send_at: '2026-05-24T10:00:00Z',
@@ -184,7 +187,8 @@ describe('dashboard / kommun detail', () => {
     });
     const res = await get(appWithFakes(), '/kommun/2418');
     expect(res.text).toContain('Avtal.pdf');
-    expect(res.text).not.toContain('ej avtalsanalyserad');
+    expect(res.text).toContain('sparad, väntar på avtalsanalys');
+    expect(res.text).not.toContain('formatet avtalsanalyseras inte');
     expect(res.text).not.toContain('hoppades över');
   });
 
