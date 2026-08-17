@@ -2253,13 +2253,32 @@ export function renderPipeline({ pipeline, heartbeat = null, partial = false, es
   return layout({ title: 'Pipeline', body, currentPath: '/pipeline', heartbeat, partial, escalationCount });
 }
 
-export function renderArenden({ cases = [], selected = null, selectedId = null, gmailReady = false, heartbeat = null, partial = false, escalationCount = 0 }) {
+export function renderArenden({ cases = [], selected = null, selectedId = null, gmailReady = false, heartbeat = null, partial = false, escalationCount = 0, autoSends = [] }) {
+  // "Auto-skickade" (2026-08-17 design): the FYI surface for unattended sends.
+  // Slack is not configured on the box, so this section IS the notification —
+  // rendered only when at least one auto_send decision exists.
+  const autoSection = autoSends.length === 0 ? '' : `
+    <section class="auto-sends">
+      <h2>Auto-skickade</h2>
+      <table>
+        <thead><tr><th>Skickat</th><th>Kommun</th><th>Roll</th><th>Mall</th><th>Påminnelse</th></tr></thead>
+        <tbody>
+          ${autoSends.map((d) => `<tr>
+            <td><span title="${escapeHtml(d.decided_at)}">${escapeHtml(fmtAgo(d.decided_at))}</span></td>
+            <td><a href="/arenden/${d.conversation_id}" data-pane-link>${escapeHtml(d.kommun_namn)}</a></td>
+            <td>${escapeHtml(d.role)}</td>
+            <td>${escapeHtml(d.draft_template ?? '')}</td>
+            <td>${d.followup_count} av 2</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </section>`;
   const body = `
     <div class="page-head"><h1>Ärenden</h1></div>
     <div class="master-detail">
       <aside class="md-list">${renderCaseList(cases, selectedId)}</aside>
       <div class="md-detail">${renderCaseDetailPane(selected, gmailReady)}</div>
-    </div>`;
+    </div>${autoSection}`;
   return layout({ title: 'Ärenden', body, currentPath: '/arenden', heartbeat, partial, escalationCount });
 }
 

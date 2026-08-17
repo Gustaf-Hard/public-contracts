@@ -9,6 +9,7 @@ import { join } from 'node:path';
 import { openDb } from '../src/storage.js';
 import { runDailyFollowup } from '../src/tick.js';
 import { sendApprovedReply } from '../src/send-reply.js';
+import { renderArenden } from '../src/dashboard-views.js';
 
 let tmp, db, contractsDir, overridesPath;
 beforeEach(() => {
@@ -360,5 +361,52 @@ describe('Slack tells the truth about who sent an auto-sent nudge', () => {
 
     expect(slackClient.updates[0].text).toContain('godkänt oförändrat');
     expect(slackClient.updates[0].text).not.toContain('Auto-skickat');
+  });
+});
+
+describe('dashboard visibility — Auto-skickade', () => {
+  function seedDecision(convId, decision, decidedAt) {
+    const escId = seedNudgeEscalation(convId);
+    db.resolveEscalation(escId, { status: 'resolved_send', resolved_text: 'b' });
+    const decId = db.recordDecision({
+      escalation_id: escId, conversation_id: convId, conversation_state: 'SENT',
+      classifier_class: 'followup_stale', draft_template: 'T_FOLLOWUP_NUDGE',
+      draft_body: 'b', decision, final_body: 'b',
+    });
+    db.raw.prepare('UPDATE decisions SET decided_at = ? WHERE id = ?').run(decidedAt, decId);
+    return decId;
+  }
+
+  it('listAutoSendDecisions: only auto_send rows, newest first, with the join fields the view needs', () => {
+    const a = seedConv({});
+    const b = seedConv({ kommun: ['1480', 'Göteborg'], email: 'stad@goteborg.se' });
+    seedDecision(a, 'approve_unmodified', '2026-08-15 09:00:00');
+    seedDecision(a, 'auto_send', '2026-08-16 09:00:00');
+    seedDecision(b, 'auto_send', '2026-08-17 09:00:00');
+
+    const rows = db.listAutoSendDecisions(20);
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({
+      kommun_namn: 'Göteborg', role: 'central', conversation_id: b,
+      draft_template: 'T_FOLLOWUP_NUDGE',
+    });
+    expect(rows[0].decided_at).toBe('2026-08-17T09:00:00Z');
+    expect(rows[1].kommun_namn).toBe('Ale');
+    expect(typeof rows[0].followup_count).toBe('number');
+    expect(db.listAutoSendDecisions(1)).toHaveLength(1);
+  });
+
+  it('renderArenden shows the section only when rows exist', () => {
+    expect(renderArenden({ cases: [] })).not.toContain('Auto-skickade');
+    const html = renderArenden({
+      cases: [],
+      autoSends: [{
+        decision_id: 1, decided_at: '2026-08-17T09:00:00Z', draft_template: 'T_FOLLOWUP_NUDGE',
+        conversation_id: 3, kommun_namn: 'Ale', role: 'central', followup_count: 1,
+      }],
+    });
+    expect(html).toContain('Auto-skickade');
+    expect(html).toContain('/arenden/3');
+    expect(html).toContain('Ale');
   });
 });

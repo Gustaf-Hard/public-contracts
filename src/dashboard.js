@@ -948,6 +948,7 @@ export function createDashboardApp({
       selected: null,
       gmailReady: !!currentGmail(),
       heartbeat: hb(), partial: isPartial(req), escalationCount: escCount(),
+      autoSends: db.listAutoSendDecisions(20),
     }));
   });
 
