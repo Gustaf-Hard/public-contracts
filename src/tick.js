@@ -5,7 +5,9 @@ import { crosscheckLabels } from './vendor-kb.js';
 import { buildCoverageFacts } from './coverage.js';
 import { classify, isCloserText } from './classifier.js';
 import { inferThreadStatus } from './threads.js';
-import { nextActionForClassification, staleAction, nudgeJitterDays } from './conversation.js';
+import { nextActionForClassification, staleAction, nudgeJitterDays, isLazyConversation } from './conversation.js';
+import { loadAutoSendTemplates } from './pilot-config.js';
+import { sendApprovedReply } from './send-reply.js';
 import { parseInboundMessage, sameEmailDomain, archiveThread } from './gmail.js';
 import { buildEscalationBlocks } from './slack.js';
 import { saveAttachment, extractFilesFromZip, dedupeFilenames, isTrivialImage } from './attachments.js';
@@ -1337,6 +1339,12 @@ export async function runDailyFollowup(deps) {
     return; // deliberately NOT marked complete — a later healthy tick retries it
   }
 
+  // Kill switch (2026-08-17 design) — read fresh from disk EVERY run so the
+  // operator pulling the switch takes effect on the next daily run without a
+  // daemon restart. The daemon's startup-loaded overrides object is
+  // deliberately not consulted for this key.
+  const autoSendTemplates = loadAutoSendTemplates(deps.overridesPath);
+
   const todayIso = now.toISOString().slice(0, 10);
   let vacationPauseLogged = false;
   const all = db.listAllConversations();
@@ -1387,7 +1395,7 @@ export async function runDailyFollowup(deps) {
     }
 
     if (draftTemplate) {
-      await escalateWithDraft({
+      const escId = await escalateWithDraft({
         conv,
         parsedInbound: null,
         // Follow-up drafts get a synthetic classifier class so their decisions
@@ -1400,6 +1408,48 @@ export async function runDailyFollowup(deps) {
         deps: { ...deps, sentDate: db.getFirstOutboundDate?.(conv.id) ?? null },
       });
       log?.(`FOLLOWUP drafted (${draftTemplate}) → ${conv.kommun_namn}/${conv.role}`);
+
+      // Auto-send (2026-08-17 design): T_FOLLOWUP_NUDGE — and ONLY it — may go
+      // out unattended, and only to a kommun that has never substantively
+      // responded (every inbound in the LAZY set; NULL classification fails
+      // closed). escalateWithDraft ran FIRST so a crash between drafting and
+      // sending leaves an open escalation a human can act on — never a lost
+      // intention, never an untracked send. The send itself rides the proven
+      // approved-send rails (atomic claim, STALE_* guards, send_failed
+      // parking); decision 'auto_send' is how the ledger permanently tells
+      // machine sends from operator sends.
+      if (
+        escId != null
+        && draftTemplate === 'T_FOLLOWUP_NUDGE'
+        && autoSendTemplates.includes('T_FOLLOWUP_NUDGE')
+        && isLazyConversation(db.listMessages(conv.id))
+      ) {
+        const esc = db.raw.prepare('SELECT * FROM escalations WHERE id = ?').get(escId);
+        try {
+          await sendApprovedReply({
+            db,
+            gmail: deps.gmailClient?.gmail,
+            env: deps.env,
+            conv,
+            esc,
+            finalBody: esc.draft_body,
+            finalSubject: esc.draft_subject,
+            decision: 'auto_send',
+            gmailSendImpl: deps.gmailOps.sendMessage,
+            archiveThreadImpl: deps.gmailOps.archiveThread,
+            slackClient: deps.slackClient ?? null,
+            log,
+          });
+          log?.(`AUTO-SENT T_FOLLOWUP_NUDGE → ${conv.kommun_namn}/${conv.role} (escalation ${escId})`);
+        } catch (e) {
+          // A refusal before the claim (STALE_*) left the escalation OPEN in
+          // the operator's normal queue; a Gmail failure parked it
+          // send_failed. Either way: no retry here — the next daily run skips
+          // this conversation entirely (hasActiveEscalation) — and the rest
+          // of today's conversations still run.
+          log?.(`AUTO-SEND did not go out for ${conv.kommun_namn}/${conv.role} (${e.code ?? 'SEND_ERROR'}): ${e.message}`);
+        }
+      }
     }
   }
 

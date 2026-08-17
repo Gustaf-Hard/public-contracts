@@ -364,6 +364,7 @@ export async function startDaemon({ env = process.env, log = console.log } = {})
         slackClient: slack, slackOps,
         env, contractsDir: CONTRACTS_DIR, now, log,
         vacationConfig: resolveVacation(overrides),
+        overridesPath: env.PILOT_OVERRIDES_PATH ?? 'data/pilot-overrides.json',
       });
       // Perpetual contract refresh (2026-07-09 design §3.3) — same daily
       // cadence, same escalation mutex, so refresh and follow-up drafts can

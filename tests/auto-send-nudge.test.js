@@ -169,3 +169,145 @@ describe("sendApprovedReply guards apply to decision 'auto_send'", () => {
     expect(db.listDecisions()).toHaveLength(0);
   });
 });
+
+describe('runDailyFollowup auto-sends eligible T_FOLLOWUP_NUDGE', () => {
+  it('eligible (SENT, zero inbound, switch on): exactly one send, resolved_send, decision auto_send, followup_count 1', async () => {
+    writeSwitch({ auto_send_templates: ['T_FOLLOWUP_NUDGE'] });
+    const id = seedConv({});
+    const gmail = fakeGmail();
+    await runDailyFollowup(deps({ gmail }));
+
+    expect(gmail.sendMessage).toHaveBeenCalledTimes(1);
+    expect(gmail.sent[0].to).toBe('kansli@ale.se');
+    const esc = db.raw.prepare('SELECT * FROM escalations WHERE conversation_id = ?').get(id);
+    expect(esc.status).toBe('resolved_send');
+    expect(esc.draft_template).toBe('T_FOLLOWUP_NUDGE');
+    expect(gmail.sent[0].body).toBe(esc.draft_body);           // draft exactly as escalated
+    expect(gmail.sent[0].subject).toBe(esc.draft_subject);
+    const decisions = db.listDecisions();
+    expect(decisions).toHaveLength(1);
+    expect(decisions[0]).toMatchObject({
+      decision: 'auto_send', draft_template: 'T_FOLLOWUP_NUDGE', conversation_id: id,
+    });
+    const conv = db.getConversation(id);
+    expect(conv.followup_count).toBe(1);
+    expect(conv.state).toBe('SENT');
+  });
+
+  it('lazy-only inbound (auto_ack + delay_promise past its follow_up_at) auto-sends', async () => {
+    writeSwitch({ auto_send_templates: ['T_FOLLOWUP_NUDGE'] });
+    const id = seedConv({ state: 'ACK_RECEIVED', followUpAt: '2026-08-10' });
+    seedInbound(id, { classification: 'auto_ack' });
+    seedInbound(id, { classification: 'delay_promise', receivedAt: '2026-07-27T10:00:00Z' });
+    const gmail = fakeGmail();
+    await runDailyFollowup(deps({ gmail }));
+
+    expect(gmail.sendMessage).toHaveBeenCalledTimes(1);
+    expect(db.listDecisions()[0]?.decision).toBe('auto_send');
+  });
+
+  it('any substantive or unclassified inbound → escalation stays open, nothing sent', async () => {
+    writeSwitch({ auto_send_templates: ['T_FOLLOWUP_NUDGE'] });
+    const cases = [
+      ['0180', 'Stockholm', 'delivery'],
+      ['1480', 'Göteborg', 'unknown'],
+      ['1280', 'Malmö', null],
+    ];
+    for (const [kod, namn, classification] of cases) {
+      const id = seedConv({ kommun: [kod, namn], email: `kansli@${kod}.se` });
+      seedInbound(id, { classification });
+    }
+    const gmail = fakeGmail();
+    await runDailyFollowup(deps({ gmail }));
+
+    expect(gmail.sendMessage).not.toHaveBeenCalled();
+    expect(db.listDecisions()).toHaveLength(0);
+    expect(db.listOpenEscalations()).toHaveLength(cases.length); // drafted, awaiting the operator
+  });
+
+  it('kill switch absent, empty, or malformed → fully manual', async () => {
+    const id = seedConv({});
+    for (const content of [null, '{}', '{"auto_send_templates":[]}', '{broken']) {
+      if (content !== null) writeSwitch(content);
+      else rmSync(overridesPath, { force: true });
+      const gmail = fakeGmail();
+      await runDailyFollowup(deps({ gmail }));
+      expect(gmail.sendMessage).not.toHaveBeenCalled();
+      // The first pass drafts the escalation and leaves it open; later passes
+      // are blocked by hasActiveEscalation — which is itself the contract.
+    }
+    expect(db.listOpenEscalationsForConversation(id)).toHaveLength(1);
+    expect(db.listDecisions()).toHaveLength(0);
+  });
+
+  it('switch edited between two runs takes effect without restart — and an open refusal is never retried', async () => {
+    // Day 1, switch OFF: conv A drafts a manual escalation.
+    rmSync(overridesPath, { force: true });
+    const a = seedConv({});
+    const gmail1 = fakeGmail();
+    await runDailyFollowup(deps({ gmail: gmail1 }));
+    expect(gmail1.sendMessage).not.toHaveBeenCalled();
+    expect(db.listOpenEscalationsForConversation(a)).toHaveLength(1);
+
+    // Day 2, operator flips the switch ON. Conv B is due; conv A still holds
+    // its open escalation → hasActiveEscalation skips it entirely.
+    writeSwitch({ auto_send_templates: ['T_FOLLOWUP_NUDGE'] });
+    const b = seedConv({ kommun: ['1480', 'Göteborg'], email: 'stad@goteborg.se' });
+    const gmail2 = fakeGmail();
+    await runDailyFollowup(deps({ gmail: gmail2, now: new Date('2026-08-18T09:00:00Z') }));
+
+    expect(gmail2.sendMessage).toHaveBeenCalledTimes(1);
+    expect(gmail2.sent[0].to).toBe('stad@goteborg.se');
+    expect(db.listOpenEscalationsForConversation(a)).toHaveLength(1); // untouched
+    expect(db.listDecisions().map((d) => d.conversation_id)).toEqual([b]);
+  });
+
+  it('a Gmail failure parks send_failed, books no decision, and the next daily run does not re-attempt', async () => {
+    writeSwitch({ auto_send_templates: ['T_FOLLOWUP_NUDGE'] });
+    const id = seedConv({});
+    const gmail = fakeGmail({ sendError: 'socket hang up' });
+    await runDailyFollowup(deps({ gmail }));
+
+    const esc = db.raw.prepare('SELECT * FROM escalations WHERE conversation_id = ?').get(id);
+    expect(esc.status).toBe('send_failed');
+    expect(db.listDecisions()).toHaveLength(0);
+    expect(gmail.sendMessage).toHaveBeenCalledTimes(1);
+
+    const gmail2 = fakeGmail();
+    await runDailyFollowup(deps({ gmail: gmail2, now: new Date('2026-08-18T09:00:00Z') }));
+    expect(gmail2.sendMessage).not.toHaveBeenCalled();
+    expect(db.raw.prepare('SELECT COUNT(*) n FROM escalations').get().n).toBe(1);
+  });
+
+  it('nudge cap: followup_count = 2 → free_form escalation to a human, never auto-sent', async () => {
+    writeSwitch({ auto_send_templates: ['T_FOLLOWUP_NUDGE'] });
+    const id = seedConv({ followupCount: 2 });
+    const gmail = fakeGmail();
+    await runDailyFollowup(deps({ gmail }));
+
+    expect(gmail.sendMessage).not.toHaveBeenCalled();
+    const escs = db.listOpenEscalationsForConversation(id);
+    expect(escs).toHaveLength(1);
+    expect(escs[0].draft_template).toBe('free_form');
+    expect(db.listDecisions()).toHaveLength(0);
+  });
+
+  it('a mid-run failure does not stop the remaining conversations', async () => {
+    writeSwitch({ auto_send_templates: ['T_FOLLOWUP_NUDGE'] });
+    seedConv({});                                                       // will fail to send
+    const b = seedConv({ kommun: ['1480', 'Göteborg'], email: 'stad@goteborg.se' });
+    let calls = 0;
+    const gmail = fakeGmail();
+    gmail.sendMessage.mockImplementation(async (gmailClient, args) => {
+      calls += 1;
+      if (calls === 1) throw new Error('boom');
+      gmail.sent.push(args);
+      return { id: `out-${calls}`, threadId: 'thr-a' };
+    });
+    await runDailyFollowup(deps({ gmail }));
+
+    expect(calls).toBe(2);                                              // second conv still processed
+    expect(db.listDecisions().map((d) => d.conversation_id)).toEqual([b]);
+    expect(db.getFollowupCompletedDate()).not.toBeNull();               // the run completed
+  });
+});
