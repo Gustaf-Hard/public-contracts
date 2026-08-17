@@ -16,8 +16,11 @@ Two layers, both live:
    fallback offline), extracts delivered contract PDFs (Claude Opus),
    advances a per-conversation FSM in **SQLite** (`data/pilot.db`,
    better-sqlite3, WAL), and escalates every outbound reply to a human via
-   **Slack buttons** and a local **Express dashboard**. No outbound (except
-   the scheduled T-INITIAL) is ever sent without human approval in v1.
+   **Slack buttons** and a local **Express dashboard**. No outbound is sent
+   without human approval, with two exceptions: the scheduled T-INITIAL,
+   and — behind the `auto_send_templates` kill switch in
+   `data/pilot-overrides.json` — `T_FOLLOWUP_NUDGE` to kommuner whose every
+   inbound is a lazy ack (2026-08-17 auto-send design).
 
 Node.js ESM (Node 20+). Design history lives in `docs/superpowers/specs/` —
 read `2026-07-05-autopilot-readiness-review.md` for the current safety
@@ -124,6 +127,19 @@ Phase-1 pipeline: `scripts/01|02|03 → src/seed.js|crawl.js|verify.js → data/
   the `T_REQUEST_MISSING` claim — we cannot say an avtal is missing while it
   sits unread on our own disk. Nothing is deleted: clearing
   `analysis_attempts` (or `--force`) re-queues.
+- **Auto-send is one template, fail-closed, kill-switched.** Only
+  `T_FOLLOWUP_NUDGE` may go out unattended, and only when EVERY inbound in the
+  conversation is classified in the LAZY set (`auto_ack`, `auto_reply`,
+  `delay_promise`, `handoff_internal`; zero inbound qualifies; NULL/`unknown`
+  never do) AND `auto_send_templates` in `data/pilot-overrides.json` lists it —
+  the file is re-read at the start of every `runDailyFollowup`, so pulling the
+  key stops the next run without a restart. The send rides `sendApprovedReply`
+  with decision `auto_send` (the ledger's machine-vs-operator marker); the
+  `STALE_ESCALATION` guard applies to `auto_send` exactly as to
+  `approve_unmodified`. A refusal leaves the escalation open for the operator, a
+  Gmail failure parks it `send_failed` — the automation NEVER retries either.
+  Nudge thresholds are 9 + `nudgeJitterDays(conv.id)` (0–6, pure hash) days for
+  SENT/ACK_RECEIVED so reminders don't fire like clockwork.
 
 ## Conventions that aren't obvious from the code alone
 
@@ -180,6 +196,7 @@ permissive to paper over the change.
 - Next-action/staleness rules: `docs/superpowers/specs/2026-06-23-trustworthy-next-action-design.md`
 - Threads & recipient routing: `docs/superpowers/specs/2026-07-03-conversation-threads-and-recipients-design.md`
 - Perpetual contract refresh (lifecycle, T_UPDATE, refresh scan): `docs/superpowers/specs/2026-07-09-perpetual-contract-refresh-design.md`; live activation: `docs/superpowers/runbooks/2026-07-09-refresh-activation.md`
+- Auto-send follow-up nudges (first unattended send): `docs/superpowers/specs/2026-08-17-auto-send-followup-nudge-design.md`
 - Vendor data center (/leverantorer pricing, analytics, explorer): `docs/superpowers/specs/2026-07-09-vendor-data-center-design.md` — pure analytics in `src/vendor-analytics.js`, shared client/server explorer logic in `public/explorer-core.js`
 - Collection schema/roles: `docs/superpowers/specs/2026-05-16-municipality-email-collection-design.md`
 - User-facing usage/outputs: `README.md`
