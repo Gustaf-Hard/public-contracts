@@ -3,6 +3,7 @@ import {
   buildEscalationBlocks,
   verifySlackSignature,
   parseInteractivityPayload,
+  updateEscalationResolved,
 } from '../src/slack.js';
 import crypto from 'node:crypto';
 
@@ -80,5 +81,64 @@ describe('parseInteractivityPayload', () => {
     expect(parsed.escalation_id).toBe('42');
     expect(parsed.trigger_id).toBe('trig-1');
     expect(parsed.message_ts).toBe('1234.5678');
+  });
+});
+
+// An unattended send and an operator-approved send share the STORED status
+// (resolved_send). The Slack message is the only artifact an operator scrolling
+// the channel sees, so it must not attribute a machine send to a colleague.
+describe('updateEscalationResolved labels agency honestly', () => {
+  function fakeSlack() {
+    const calls = [];
+    return { calls, chat: { update: async (args) => { calls.push(args); } } };
+  }
+
+  it("decision 'auto_send' renders an unattended label, not 'godkänt oförändrat'", async () => {
+    const slack = fakeSlack();
+    await updateEscalationResolved(slack, {
+      channel: 'C1', ts: 's-1', kommun_namn: 'Ale',
+      status: 'resolved_send', decision: 'auto_send',
+    });
+    const text = slack.calls[0].text;
+    expect(text).toContain('Auto-skickat');
+    expect(text).not.toContain('godkänt');
+    expect(slack.calls[0].blocks[0].text.text).toContain('Auto-skickat');
+  });
+
+  it('operator decisions keep their existing labels', async () => {
+    const cases = [
+      ['resolved_send', 'approve_unmodified', '✅ Skickat (godkänt oförändrat)'],
+      ['resolved_edit', 'edit', '✅ Skickat (redigerat)'],
+      ['resolved_skip', 'skip', '⏭️ Skippad'],
+    ];
+    for (const [status, decision, expected] of cases) {
+      const slack = fakeSlack();
+      await updateEscalationResolved(slack, { channel: 'C1', ts: 's-1', kommun_namn: 'Ale', status, decision });
+      expect(slack.calls[0].text).toBe(`Eskalering: Ale — ${expected}`);
+    }
+  });
+
+  it('an omitted decision is unchanged for every status (existing callers)', async () => {
+    const cases = [
+      ['resolved_send', '✅ Skickat (godkänt oförändrat)'],
+      ['superseded', '↪️ Ersatt av nyare eskalering'],
+      ['send_failed', '❌ Sändning misslyckades'],
+      ['send_unconfirmed', '⚠️ Sändning obekräftad — kontrollera Skickat i Gmail'],
+      ['resolved_closed', '🗄️ Ärendet stängt'],
+    ];
+    for (const [status, expected] of cases) {
+      const slack = fakeSlack();
+      await updateEscalationResolved(slack, { channel: 'C1', ts: 's-1', kommun_namn: 'Ale', status });
+      expect(slack.calls[0].text).toBe(`Eskalering: Ale — ${expected}`);
+    }
+  });
+
+  it("auto_send does not hijack a non-send status (a parked auto-send still reads as failed)", async () => {
+    const slack = fakeSlack();
+    await updateEscalationResolved(slack, {
+      channel: 'C1', ts: 's-1', kommun_namn: 'Ale',
+      status: 'send_failed', decision: 'auto_send', detail: 'socket hang up',
+    });
+    expect(slack.calls[0].text).toContain('Sändning misslyckades');
   });
 });

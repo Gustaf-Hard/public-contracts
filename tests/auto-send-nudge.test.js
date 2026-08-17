@@ -75,10 +75,20 @@ function seedHealthyTick(now = new Date()) {
     .run(new Date(latest - 5 * 60000).toISOString());
 }
 
-function deps({ gmail = fakeGmail(), slackOps = fakeSlackOps(), now = new Date('2026-08-17T09:00:00Z') } = {}) {
+// sendApprovedReply strips the Slack buttons via the REAL updateEscalationResolved
+// imported from slack.js, not via slackOps — so the only way to see what the
+// channel is told about an auto-send is a slackClient with a chat.update spy.
+// Default `{}` keeps every other test on the previous behaviour (chat.update is
+// undefined, stripSlackButtons swallows the TypeError).
+function fakeSlackClient() {
+  const updates = [];
+  return { updates, chat: { update: async (args) => { updates.push(args); } } };
+}
+
+function deps({ gmail = fakeGmail(), slackOps = fakeSlackOps(), slackClient = {}, now = new Date('2026-08-17T09:00:00Z') } = {}) {
   seedHealthyTick(now);
   return {
-    db, gmailClient: { gmail: {} }, gmailOps: gmail, slackClient: {}, slackOps,
+    db, gmailClient: { gmail: {} }, gmailOps: gmail, slackClient, slackOps,
     env, contractsDir, now, overridesPath,
   };
 }
@@ -309,5 +319,46 @@ describe('runDailyFollowup auto-sends eligible T_FOLLOWUP_NUDGE', () => {
     expect(calls).toBe(2);                                              // second conv still processed
     expect(db.listDecisions().map((d) => d.conversation_id)).toEqual([b]);
     expect(db.getFollowupCompletedDate()).not.toBeNull();               // the run completed
+  });
+});
+
+// The DB ledger tells machine sends from operator sends via decision='auto_send'.
+// Slack is the only artifact an operator actually reads, so it must say the same
+// thing — labelling an unattended send "godkänt oförändrat" would have a
+// colleague scrolling the channel conclude a human approved it.
+describe('Slack tells the truth about who sent an auto-sent nudge', () => {
+  it('the resolved Slack message reads as unattended, never as operator-approved', async () => {
+    writeSwitch({ auto_send_templates: ['T_FOLLOWUP_NUDGE'] });
+    const id = seedConv({});
+    const slackClient = fakeSlackClient();
+    await runDailyFollowup(deps({ gmail: fakeGmail(), slackClient }));
+
+    expect(db.listDecisions()[0]?.decision).toBe('auto_send');
+    expect(db.raw.prepare('SELECT status FROM escalations WHERE conversation_id = ?').get(id).status)
+      .toBe('resolved_send');                    // stored status unchanged: no new state string
+
+    expect(slackClient.updates).toHaveLength(1);
+    expect(slackClient.updates[0].text).toContain('Auto-skickat');
+    expect(slackClient.updates[0].text).not.toContain('godkänt oförändrat');
+  });
+
+  it('an operator approving the same draft still reads as approved', async () => {
+    const id = seedConv({});
+    const escId = seedNudgeEscalation(id);
+    db.raw.prepare('UPDATE escalations SET slack_ts = ? WHERE id = ?').run('s-1', escId);
+    seedHealthyTick(new Date('2026-08-17T09:00:00Z'));
+
+    const esc = db.raw.prepare('SELECT * FROM escalations WHERE id = ?').get(escId);
+    const gmail = fakeGmail();
+    const slackClient = fakeSlackClient();
+    await sendApprovedReply({
+      db, gmail: {}, env, conv: db.getConversation(id), esc,
+      finalBody: esc.draft_body, finalSubject: esc.draft_subject,
+      decision: 'approve_unmodified', gmailSendImpl: gmail.sendMessage,
+      archiveThreadImpl: gmail.archiveThread, slackClient,
+    });
+
+    expect(slackClient.updates[0].text).toContain('godkänt oförändrat');
+    expect(slackClient.updates[0].text).not.toContain('Auto-skickat');
   });
 });

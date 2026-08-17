@@ -75,11 +75,11 @@ export function saneRestoreState(previousState, conv, db) {
 
 // Best-effort: replace the escalation's Slack message with a resolved,
 // button-less version. Never lets a Slack failure break the send path.
-async function stripSlackButtons({ slackClient, env, esc, kommun_namn, status, detail, log }) {
+async function stripSlackButtons({ slackClient, env, esc, kommun_namn, status, detail, decision = null, log }) {
   if (!slackClient || !esc.slack_ts || !env?.SLACK_CHANNEL_ID) return;
   try {
     await updateEscalationResolved(slackClient, {
-      channel: env.SLACK_CHANNEL_ID, ts: esc.slack_ts, kommun_namn, status, detail,
+      channel: env.SLACK_CHANNEL_ID, ts: esc.slack_ts, kommun_namn, status, detail, decision,
     });
   } catch (e) {
     log?.(`slack chat.update failed for escalation ${esc.id}: ${e.message}`);
@@ -308,7 +308,9 @@ export async function sendApprovedReply({ db, gmail, env, conv, esc, finalBody, 
     status: resolvedStatus,
     resolved_text: finalBody,
   });
-  await stripSlackButtons({ slackClient, env, esc, kommun_namn: conv.kommun_namn, status: resolvedStatus, log });
+  // Pass the decision so an unattended send is not labelled as operator-approved
+  // (2026-08-17 design). Presentation only — resolvedStatus is what is stored.
+  await stripSlackButtons({ slackClient, env, esc, kommun_namn: conv.kommun_namn, status: resolvedStatus, decision, log });
   // Keep the inbox clean: archive the thread we replied into. The refresh path
   // opens a brand-new thread (no inbound, nothing in the inbox), so archiving it
   // is a harmless no-op there; every other reply archives the inbound thread.
