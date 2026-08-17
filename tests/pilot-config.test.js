@@ -1,9 +1,13 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   resolveActiveKommuner,
   isClockSkewAllowed,
   getEffectiveNow,
   isRefreshAllowed,
+  loadAutoSendTemplates,
 } from '../src/pilot-config.js';
 
 const overrides = {
@@ -110,5 +114,37 @@ describe('isRefreshAllowed (perpetual-refresh pilot gating)', () => {
     expect(isRefreshAllowed({}, '1489')).toBe(false);
     expect(isRefreshAllowed({ refresh_pilot_kommun_kods: [] }, '1489')).toBe(false);
     expect(isRefreshAllowed(null, '1489')).toBe(false);
+  });
+});
+
+describe('loadAutoSendTemplates (auto-send kill switch, 2026-08-17 design)', () => {
+  let tmp;
+  beforeEach(() => { tmp = mkdtempSync(join(tmpdir(), 'overrides-')); });
+  afterEach(() => { rmSync(tmp, { recursive: true, force: true }); });
+  const write = (content) => {
+    const p = join(tmp, 'overrides.json');
+    writeFileSync(p, content);
+    return p;
+  };
+
+  it('returns the declared templates', () => {
+    expect(loadAutoSendTemplates(write('{"auto_send_templates":["T_FOLLOWUP_NUDGE"]}')))
+      .toEqual(['T_FOLLOWUP_NUDGE']);
+  });
+
+  it('missing file → [] (never throws — broken config fails toward manual)', () => {
+    expect(loadAutoSendTemplates(join(tmp, 'nope.json'))).toEqual([]);
+  });
+
+  it('absent key / empty array / malformed JSON / non-array value → []', () => {
+    expect(loadAutoSendTemplates(write('{}'))).toEqual([]);
+    expect(loadAutoSendTemplates(write('{"auto_send_templates":[]}'))).toEqual([]);
+    expect(loadAutoSendTemplates(write('{oops'))).toEqual([]);
+    expect(loadAutoSendTemplates(write('{"auto_send_templates":"T_FOLLOWUP_NUDGE"}'))).toEqual([]);
+  });
+
+  it('non-string entries are dropped', () => {
+    expect(loadAutoSendTemplates(write('{"auto_send_templates":[1,"T_FOLLOWUP_NUDGE",null]}')))
+      .toEqual(['T_FOLLOWUP_NUDGE']);
   });
 });
