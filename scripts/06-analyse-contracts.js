@@ -23,5 +23,10 @@ const res = await analysePendingContracts({
   onlyId: onlyArg != null ? parseInt(onlyArg, 10) : null,
   log: (msg) => console.log(msg),
 });
-console.log(`Done. ${res.analysed} attachment(s) analysed, ${res.failed} failed (${res.parked.length} parked).`);
+console.log(`Done. ${res.analysed} attachment(s) analysed, ${res.failed} failed (${res.parked.length} parked`
+  + `${res.backoff ? `, ${res.backoff} deferred by rate limiting — no attempt booked` : ''}).`);
+if (res.env_fault === 'contracts_dir_unavailable') {
+  console.log(`WARNING: all ${res.missing_all} pending attachments are missing on disk — nothing was booked or parked.`
+    + ' Check that the contracts volume is mounted and PILOT_CONTRACTS_DIR points at it.');
+}
 db.close();

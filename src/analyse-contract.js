@@ -136,8 +136,16 @@ const CONTRACT_SCHEMA = {
 //   permanent — the document/API pairing will never succeed. Retrying only
 //               burns Opus calls: file gone from disk, unreadable or
 //               zero-text document, oversized beyond the API limit.
-//   transient — a retry is genuinely worth it: 5xx, timeout, rate limit,
-//               connection reset, JSON parse failure, schema rejection.
+//   transient — a retry is genuinely worth it, and the document may well be
+//               the cause: 5xx-other, timeout, connection reset, JSON parse
+//               failure, schema rejection.
+//   backoff   — the provider is refusing traffic, not this document: HTTP 429
+//               and 529/overloaded. Retried like transient but it books NO
+//               attempt, because counting it would park the ENTIRE pending
+//               queue during a routine hour-long Anthropic incident — five
+//               ticks of 429 and every document is permanently out of the
+//               retry pool. Call volume is already bounded by the 15-minute
+//               tick cadence, so an uncounted retry costs nothing.
 //
 // Unknown errors default to TRANSIENT: the attempt cap bounds the cost anyway,
 // and the park digest surfaces them after 5 tries. The stored string is
@@ -156,12 +164,21 @@ const PERMANENT_DOCUMENT_PATTERNS = [
 export function classifyAnalysisFailure(e) {
   const message = String(e?.message ?? e ?? 'unknown error');
   const status = e?.status ?? e?.statusCode ?? e?.response?.status ?? null;
+  // An EXPLICIT transport status wins over prose matching. A 429 body that
+  // happens to contain "exceeds the maximum" (of your rate limit) is a rate
+  // limit, not a broken document — matching the prose first parked perfectly
+  // readable contracts on attempt one.
+  if (status === 429) return { permanent: false, backoff: true, reason: 'backoff:api_rate_limit', message };
+  if (status === 529) return { permanent: false, backoff: true, reason: 'backoff:api_overloaded', message };
   if (status === 413) return { permanent: true, reason: 'permanent:document_too_large', message };
+  if (typeof status === 'number' && status >= 500) return { permanent: false, reason: 'transient:api_5xx', message };
+  // Provider-side refusal reported without a status (SDK error types).
+  if (status == null && /\b(overloaded_error|rate_limit_error)\b/.test(message)) {
+    return { permanent: false, backoff: true, reason: 'backoff:api_overloaded', message };
+  }
   if (PERMANENT_DOCUMENT_PATTERNS.some((re) => re.test(message))) {
     return { permanent: true, reason: 'permanent:document_rejected', message };
   }
-  if (status === 429) return { permanent: false, reason: 'transient:api_rate_limit', message };
-  if (typeof status === 'number' && status >= 500) return { permanent: false, reason: 'transient:api_5xx', message };
   if (status === 408 || /timeout|timed out|ETIMEDOUT|ECONNRESET|ECONNREFUSED|ENOTFOUND|socket hang up/i.test(message)) {
     return { permanent: false, reason: 'transient:api_timeout', message };
   }
@@ -577,11 +594,25 @@ export function resolveAttachmentPath(savedPath, contractsDir) {
 // what the tick needs to spot a SYSTEMIC failure (every attempt in a tick
 // failing transiently — how a bad json_schema takes out all extraction while
 // the tick stays green).
+// `backoff` counts provider-refusal failures (429/529) — failures for alerting
+// purposes, but they book no attempt. `attempted_ids` lets ONE tick avoid
+// attempting the same attachment twice (the inline per-message analysis and
+// step 3 used to each spend an attempt on the same document). `env_fault` is
+// set when the whole run failed for a reason outside any document — today only
+// "every file is missing from disk", i.e. an unmounted contracts volume.
 function emptyRunResult() {
-  return { analysed: 0, attempted: 0, failed: 0, transient: 0, permanent: 0, parked: [] };
+  return {
+    analysed: 0, attempted: 0, failed: 0, transient: 0, permanent: 0, backoff: 0,
+    parked: [], attempted_ids: [], env_fault: null, missing_all: 0,
+  };
 }
 
-export async function analysePendingContracts({ db, env = process.env, client = null, log = null, force = false, onlyId = null, onlyMessageId = null, contractsDir = null, now = null } = {}) {
+// Below this count, "every file is missing" is too small a sample to blame the
+// environment: a single-attachment run where that one file really is gone must
+// still park it.
+export const MIN_ENV_FAULT_MISSING = 3;
+
+export async function analysePendingContracts({ db, env = process.env, client = null, log = null, force = false, onlyId = null, onlyMessageId = null, contractsDir = null, now = null, skipAttachmentIds = null } = {}) {
   const docsDir = contractsDir ?? env.PILOT_CONTRACTS_DIR ?? 'data/contracts';
   const result = emptyRunResult();
   if (!client && !(env.ANTHROPIC_API_KEY && env.ANTHROPIC_API_KEY.trim())) return result;
@@ -599,6 +630,14 @@ export async function analysePendingContracts({ db, env = process.env, client = 
     : db.listPendingContractAttachments();
   if (onlyId != null) pending = pending.filter((a) => a.id === onlyId);
   if (onlyMessageId != null) pending = pending.filter((a) => a.message_id === onlyMessageId);
+  // Never spend two attempts on one attachment within a single tick: the
+  // per-message inline analysis (dispatchEscalationForIngest) already tried
+  // these, so step 3 re-trying them halved the effective retry budget — five
+  // attempts survived barely 45 minutes of provider degradation instead of
+  // ~75 minutes of ticks.
+  if (skipAttachmentIds && typeof skipAttachmentIds.has === 'function') {
+    pending = pending.filter((a) => !skipAttachmentIds.has(a.id));
+  }
 
   const model = env.ANTHROPIC_CONTRACT_MODEL ?? DEFAULT_MODEL;
   const stamp = now ?? new Date().toISOString();
@@ -606,8 +645,17 @@ export async function analysePendingContracts({ db, env = process.env, client = 
   // One failed attempt, booked against the attachment. A permanent failure
   // parks on the spot; a transient one is retried until MAX_ANALYSIS_ATTEMPTS.
   // Nothing is deleted — the stored file and any earlier extraction stay put.
-  const bookFailure = (att, { permanent, reason, message }) => {
+  const bookFailure = (att, { permanent, backoff, reason, message }) => {
     result.failed += 1;
+    if (backoff) {
+      // The provider refused traffic; the document is untouched and unproven.
+      // Counted as a failure (the systemic alert must keep firing during a
+      // storm) but NOT as an attempt — see the classification comment above.
+      result.backoff += 1;
+      log?.(`contract-analysis DEFERRED ${att.filename} (${att.kommun_namn ?? 'okänd kommun'}): ${reason}`
+        + ` — ${message ?? ''} [inget försök bokfört, återförsök nästa tick]`);
+      return;
+    }
     if (permanent) result.permanent += 1; else result.transient += 1;
     const attempts = db.recordAnalysisFailure?.(att.id, { reason, permanent, now: stamp })
       ?? (permanent ? MAX_ANALYSIS_ATTEMPTS : 1);
@@ -617,13 +665,17 @@ export async function analysePendingContracts({ db, env = process.env, client = 
       + ` — ${message ?? ''} [försök ${attempts}/${MAX_ANALYSIS_ATTEMPTS}${parked ? ', PARKERAD' : ''}]`);
   };
 
+  // Missing-on-disk attachments are decided at the END of the run, not on the
+  // spot (see MIN_ENV_FAULT_MISSING below): one missing file is that file's
+  // problem, but EVERY file missing is the volume's.
+  const missing = [];
+
   for (const att of pending) {
     result.attempted += 1;
+    result.attempted_ids.push(att.id);
     const fullPath = resolveAttachmentPath(att.saved_path, docsDir);
     if (!existsSync(fullPath)) {
-      // Used to be a bare log-and-skip, i.e. an eternal no-op re-check. A file
-      // that is not on disk will not appear by itself — park it and alert.
-      bookFailure(att, { permanent: true, reason: 'permanent:file_missing', message: fullPath });
+      missing.push({ att, fullPath });
       continue;
     }
     let buf;
@@ -666,6 +718,26 @@ export async function analysePendingContracts({ db, env = process.env, client = 
     db.clearAnalysisFailure?.(att.id);
     log?.(`CONTRACT analysed: ${att.filename} → ${analysis.is_contract ? (analysis.vendor_name ?? 'okänd leverantör') : 'ej avtal'}`);
     result.analysed += 1;
+  }
+
+  // A file that is not on disk will not appear by itself, so a lone one is
+  // parked permanently (it was a silent, eternal no-op re-check before).
+  //
+  // But when EVERY attachment in the run is missing, the cause is almost
+  // certainly the environment, not the documents: an unmounted contracts
+  // volume or a wrong PILOT_CONTRACTS_DIR makes existsSync false for all of
+  // them, and parking on the spot would permanently retire the whole corpus in
+  // one tick — files that are perfectly intact on the volume that comes back.
+  // Book nothing, flag the run, and let the caller alert a human.
+  if (missing.length >= MIN_ENV_FAULT_MISSING && missing.length === result.attempted) {
+    result.env_fault = 'contracts_dir_unavailable';
+    result.missing_all = missing.length;
+    log?.(`contract-analysis ENVIRONMENT FAULT: all ${missing.length} pending attachments are missing on disk`
+      + ` (${docsDir}) — no attempts booked, nothing parked. Is the contracts volume mounted?`);
+  } else {
+    for (const { att, fullPath } of missing) {
+      bookFailure(att, { permanent: true, reason: 'permanent:file_missing', message: fullPath });
+    }
   }
   return result;
 }

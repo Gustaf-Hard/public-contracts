@@ -42,12 +42,15 @@ export async function postEscalation(slack, { channel, blocks, fallbackText }) {
 
 // Post a plain (button-less) alert to the escalation channel. Used for
 // operational warnings: unmatched inbound digests, send-unconfirmed
-// escalations, etc.
-export async function postAlert(slack, { channel, text }) {
+// escalations, refused sends, etc. `thread_ts` posts it as a reply UNDER an
+// existing escalation message, which is how a refusal stays attached to the
+// buttons it refused without disturbing them.
+export async function postAlert(slack, { channel, text, thread_ts = null }) {
   const res = await slack.chat.postMessage({
     channel,
     text,
     blocks: [{ type: 'section', text: { type: 'mrkdwn', text } }],
+    ...(thread_ts ? { thread_ts } : {}),
   });
   return { ts: res.ts, channel: res.channel };
 }

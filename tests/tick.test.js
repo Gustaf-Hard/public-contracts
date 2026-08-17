@@ -805,7 +805,12 @@ describe('runTick — non-PDF attachments are stored, never silently dropped', (
     expect(db.listPendingContractAttachments()).toEqual([]);
   });
 
-  it('skips a tiny signature logo found INSIDE a zip, same as a top-level one', async () => {
+  // The tiny-image skip is a TOP-LEVEL noise filter only. Inside a zip it was
+  // pure data loss: the archive itself is not stored once it expands, and the
+  // zip counts as ONE attachment, so a skipped inner file existed nowhere AND
+  // could not show up in the dashboard's (attachment_count - stored) gap
+  // indicator. A small scanned page inside a bundle was destroyed silently.
+  it('stores every file extracted from a zip, including a small image', async () => {
     const id = convInState('2523', 'Gällivare');
     const zipBytes = Buffer.from(zipSync({
       'Avtal.pdf': strToU8('%PDF-1.4'),
@@ -819,10 +824,25 @@ describe('runTick — non-PDF attachments are stored, never silently dropped', (
     await runTick(makeDeps({ gmail }));
 
     const rows = db.raw.prepare('SELECT a.* FROM attachments a JOIN messages m ON m.id=a.message_id WHERE m.conversation_id=?').all(id);
-    expect(rows.map((a) => a.filename)).toEqual(['Avtal.pdf']);
+    expect(rows.map((a) => a.filename).sort()).toEqual(['Avtal.pdf', 'image001.png']);
     // attachment_count records what the MAIL carried (one zip), unchanged.
     const m = db.raw.prepare('SELECT * FROM messages WHERE conversation_id=?').get(id);
     expect(m.attachment_count).toBe(1);
+  });
+
+  it('stores a zip whose ONLY entry is a small image — the attachment must not vanish entirely', async () => {
+    const id = convInState('2524', 'Kiruna');
+    const zipBytes = Buffer.from(zipSync({ 'scan-sida-1.png': strToU8('small-scan') }));
+    const msg = deliveryMsg([
+      { mimeType: 'application/zip', filename: 'Skanning.zip', body: { attachmentId: 'a-zip', size: zipBytes.length } },
+    ]);
+    const gmail = gmailWith(msg, { 'a-zip': zipBytes });
+
+    await runTick(makeDeps({ gmail }));
+
+    const rows = db.raw.prepare('SELECT a.* FROM attachments a JOIN messages m ON m.id=a.message_id WHERE m.conversation_id=?').all(id);
+    expect(rows.map((a) => a.filename)).toEqual(['scan-sida-1.png']);
+    expect(readFileSync(rows[0].saved_path).toString()).toBe('small-scan');
   });
 
   it('stores a corrupt zip as-is — an unreadable archive is still evidence', async () => {
@@ -914,6 +934,59 @@ describe('runTick — contract-aware delivery draft', () => {
     // what they sent, and naming a possibly-wrong extraction narrows the reply.
     expect(esc.draft_body).not.toMatch(/Quiculum/);
     expect(esc.draft_body).not.toMatch(/Tack så mycket för avtalen!/); // LLM draft overridden
+  });
+
+  // Coverage facts are built from `contracts` rows, so a stored-but-unread
+  // document is indistinguishable from one that was never sent. Claiming "vi
+  // saknar fortfarande avtal med X" while X's contract sits unread on our own
+  // disk is the exact over-claim the coverage gates exist to prevent.
+  it('suppresses the missing-contracts claim while a delivered document is still unread', async () => {
+    const convId = db.createConversation({ kommun_kod: '2', kommun_namn: 'Arvidsjaur', role: 'central', contact_email: 'kommun@arvidsjaur.se', scheduled_send_at: '2026-05-01T00:00:00Z' });
+    db.updateConversationState(convId, 'SENT', { gmail_thread_id: 'thr-q', last_outbound_at: '2026-05-01T00:00:00Z' });
+
+    const spy = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue({
+      intent: 'delivery', confidence: 0.9, summary: 'Svar bifogat.',
+      suggested_action: 'send_receipt', draft_reply: 'Tack för handlingarna!', follow_up_at: null,
+      extracted: {},
+    });
+
+    const msg = {
+      id: 'in-2', threadId: 'thr-q',
+      payload: { headers: [
+        { name: 'From', value: 'Reg <reg@arvidsjaur.se>' },
+        { name: 'To', value: 'me@x.se' }, { name: 'Subject', value: 'Svar' },
+      ], mimeType: 'multipart/mixed', parts: [
+        { mimeType: 'text/plain', body: { data: b64('Bifogat finner du handlingarna.') } },
+        { mimeType: 'application/pdf', filename: 'Foljebrev.pdf', body: { attachmentId: 'att-1', size: 100 } },
+        { mimeType: 'application/pdf', filename: 'Avtal-Quiculum.pdf', body: { attachmentId: 'att-2', size: 100 } },
+      ] },
+    };
+
+    // The analyser reads the följebrev (which names Quiculum as undocumented)
+    // but NOT the second PDF — it is queued, or parked after failed attempts.
+    const analyseOnlyFoljebrev = async ({ db: d, onlyMessageId }) => {
+      const atts = d.raw.prepare('SELECT id, filename FROM attachments WHERE message_id = ? ORDER BY id').all(onlyMessageId);
+      const first = atts.find((a) => a.filename.startsWith('Foljebrev'));
+      if (first) {
+        storeContractAnalysis(d, first.id, {
+          is_contract: false, document_type: 'följebrev_sammanställning', vendor_name: null,
+          products: [], summary: 'följebrev', confidence: 0.9,
+          mentioned_agreements: [{ vendor: 'Quiculum', product: null, doc_attached: false }],
+        }, { model: 'test' });
+      }
+      return { analysed: 1, attempted: 1, failed: 0, transient: 0, permanent: 0, backoff: 0, parked: [], attempted_ids: [] };
+    };
+
+    await runTick(makeDeps({
+      gmail: fakeGmail({ listResult: [{ id: 'in-2' }], getResult: { 'in-2': msg } }),
+      analyseContracts: analyseOnlyFoljebrev,
+    }));
+    spy.mockRestore();
+
+    expect(db.countUnreadAnalysableAttachments(convId)).toBe(1);
+    const esc = db.raw.prepare('SELECT * FROM escalations WHERE conversation_id = ?').get(convId);
+    expect(esc.draft_template).toBe('T_RECEIPT');
+    expect(esc.draft_body).not.toMatch(/faktiska avtalshandlingarna/);
   });
 
   it('flags watchlist vendors but still drafts a reply when a delivery names one', async () => {

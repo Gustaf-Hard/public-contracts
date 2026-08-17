@@ -24,9 +24,18 @@ const ZIP_ENTRY_MIME = {
 
 // Archive bookkeeping, never delivered content: the AppleDouble sidecars macOS
 // adds when zipping, and Finder's folder-view database.
+//
+// Matched at ANY depth, not just the archive root. A root-only
+// `startsWith('__MACOSX/')` missed `bilagor/__MACOSX/._avtal.pdf`, and a bare
+// `._avtal.pdf` sidecar (macOS emits them next to the real file too) was stored
+// as a PDF: it then entered the analysis queue and burned five Opus attempts
+// before parking as noise. AppleDouble sidecars carry resource forks, never
+// document bytes — the real file is always beside them and IS kept.
 function isArchiveJunk(name) {
-  return name.startsWith('__MACOSX/')
-    || name.split('/').pop() === '.DS_Store';
+  const segments = String(name ?? '').split('/');
+  if (segments.some((s) => s === '__MACOSX')) return true;
+  const base = segments[segments.length - 1];
+  return base === '.DS_Store' || base.startsWith('._');
 }
 
 // Expand a zip archive buffer into EVERY regular file it holds. Kommuner deliver

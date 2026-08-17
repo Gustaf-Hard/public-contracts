@@ -508,7 +508,10 @@ function loadCaseDetail(db, convId, kommunFor = () => null) {
   const attachmentsByMsg = {};
   const signatures = {};
   for (const m of messages) {
-    const atts = db.raw.prepare('SELECT * FROM attachments WHERE message_id = ?').all(m.id);
+    const atts = db.raw.prepare(`
+      SELECT a.*, EXISTS(SELECT 1 FROM contracts c WHERE c.attachment_id = a.id) AS analysed
+      FROM attachments a WHERE a.message_id = ?
+    `).all(m.id);
     if (atts.length) attachmentsByMsg[m.id] = atts;
     if (m.signature_extracted) {
       const sig = parseSignatureJson(m.signature_extracted);
@@ -764,7 +767,8 @@ export function createDashboardApp({
           // document_type (2026-07-15 contract-validation).
           const atts = db.raw.prepare(`
             SELECT a.*, c.is_contract AS contract_is_contract, c.document_type AS contract_document_type,
-                   v.name AS contract_vendor_name
+                   v.name AS contract_vendor_name,
+                   (c.id IS NOT NULL) AS analysed
             FROM attachments a
             LEFT JOIN contracts c ON c.attachment_id = a.id
             LEFT JOIN vendors v ON v.id = c.vendor_id
@@ -856,7 +860,10 @@ export function createDashboardApp({
     const attachmentsByMsg = {};
     const signatures = {};
     for (const m of messages) {
-      const atts = db.raw.prepare('SELECT * FROM attachments WHERE message_id = ?').all(m.id);
+      const atts = db.raw.prepare(`
+        SELECT a.*, EXISTS(SELECT 1 FROM contracts c WHERE c.attachment_id = a.id) AS analysed
+        FROM attachments a WHERE a.message_id = ?
+      `).all(m.id);
       if (atts.length) attachmentsByMsg[m.id] = atts;
       if (m.signature_extracted) {
         const sig = parseSignatureJson(m.signature_extracted);

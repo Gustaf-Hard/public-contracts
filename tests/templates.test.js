@@ -203,6 +203,16 @@ describe('chooseDeliveryReply', () => {
     expect(chooseDeliveryReply({ received: [], missing: ['Quiculum'] }).template).toBe('T_REQUEST_MISSING');
     expect(chooseDeliveryReply({ received: ['Skolon'], missing: ['Quiculum'] }).template).toBe('T_REQUEST_MISSING');
   });
+
+  // We cannot say an avtal is missing while a delivered document sits unread on
+  // our own disk — coverage is built from extracted contracts only.
+  it('falls back to the receipt while any delivered document is still unread', () => {
+    expect(chooseDeliveryReply({ missing: ['Quiculum'], unread_documents: 1 }))
+      .toMatchObject({ template: 'T_RECEIPT', suppressed: 'unread_documents' });
+    expect(chooseDeliveryReply({ facts: { has_missing: true }, unread_documents: 2 }).template).toBe('T_RECEIPT');
+    // …and the claim returns once everything has been read.
+    expect(chooseDeliveryReply({ facts: { has_missing: true }, unread_documents: 0 }).template).toBe('T_REQUEST_MISSING');
+  });
 });
 
 describe('T_REQUEST_MISSING', () => {

@@ -27,9 +27,22 @@ function errWithCode(message, code) {
   return e;
 }
 
-// Drafts whose entire content is "we have heard nothing from you" — the only
-// ones whose truth depends on our having actually read the inbox.
-const STALENESS_NUDGE_TEMPLATES = new Set(['T_FOLLOWUP_NUDGE', 'T_FOLLOWUP_CLOSE']);
+// Drafts that assert a CONVERSATION-WIDE NEGATIVE — something we claim has not
+// arrived. Their truth depends on our having actually read the inbox, so they
+// are the drafts the blind-ingest guard blocks.
+//
+//   T_FOLLOWUP_NUDGE / T_FOLLOWUP_CLOSE — "vi har inte hört av er".
+//   T_REQUEST_MISSING — "vi saknar fortfarande avtal med X". Same harm class:
+//     an unfetched mail carrying exactly that avtal makes the claim false, and
+//     telling a kommun they withheld something they already sent is worse than
+//     waiting for a tick.
+//
+// Everything else answers or opens something we HAVE seen: T_RECEIPT and
+// T_PRECISION reply to a specific mail, T_CROSSCHECK asks a question about a
+// specific delivery, a bounce resend answers a mail that never arrived, and
+// T_UPDATE opens a fresh round. Blocking those during an outage stalls real
+// work without protecting anyone.
+const STALE_SENSITIVE_TEMPLATES = new Set(['T_FOLLOWUP_NUDGE', 'T_FOLLOWUP_CLOSE', 'T_REQUEST_MISSING']);
 
 // The non-terminal waiting states a conversation can sanely resume into after a
 // free-form / soft escalation resolves. NEEDS_HUMAN and the terminal/quiescent
@@ -163,21 +176,25 @@ export async function sendApprovedReply({ db, gmail, env, conv, esc, finalBody, 
   // before the claim, so a refused send leaves the escalation OPEN for the
   // operator to retry once ingest is back), and complementary to it: that one
   // sees newer inbound that IS in the DB, this one covers inbound that was
-  // never fetched. A nudge is the one draft that asserts a negative ("vi har
-  // inte hört av er"), so approving it while the daemon is blind can tell a
-  // kommun we are still waiting for a reply already sitting in the inbox.
-  // Deliberately narrow: receipts, precision answers, bounce resends and
-  // refreshes all answer or open something we HAVE seen, and blocking those
-  // during an outage would just stall real work. Applies to edits too — the
+  // never fetched. These drafts assert a negative about the whole conversation
+  // (see STALE_SENSITIVE_TEMPLATES), so approving one while the daemon is blind
+  // can tell a kommun we are still waiting for a reply — or still missing an
+  // avtal — that is already sitting in the inbox. Applies to edits too: the
   // operator cannot see the unfetched reply either.
-  if (STALENESS_NUDGE_TEMPLATES.has(esc.draft_template)) {
-    const health = db.getTickHealth?.() ?? null;
+  //
+  // getTickHealth is called UNCONDITIONALLY. It used to be `db.getTickHealth?.()`,
+  // which let any db object lacking the method silently opt out of a safety
+  // check — a guard that disables itself is worse than no guard, because the
+  // send looks verified. A malformed db must fail loudly here, exactly like
+  // claimEscalationForSending below.
+  if (STALE_SENSITIVE_TEMPLATES.has(esc.draft_template)) {
+    const health = db.getTickHealth();
     if (health?.stale) {
       const since = health.ever
         ? `sedan ${String(health.last_success_at).slice(0, 16).replace('T', ' ')} (${health.stale_minutes} min)`
         : 'sedan start (ingen lyckad bearbetning ännu)';
       throw errWithCode(
-        `Escalation ${esc.id} is a staleness reminder, but inbound mail has not been processed ${since} — ${conv.kommun_namn} may already have replied without us seeing it. Restore ingest (Gmail sign-in) and let a tick run before sending.`,
+        `Escalation ${esc.id} asserts that something has not arrived, but inbound mail has not been processed ${since} — ${conv.kommun_namn} may already have replied without us seeing it. Restore ingest (Gmail sign-in) and let a tick run before sending.`,
         'STALE_INGEST'
       );
     }

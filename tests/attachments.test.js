@@ -72,6 +72,28 @@ describe('extractFilesFromZip', () => {
     expect(files[0].mime_type).toBe('application/pdf'); // extension match is case-insensitive
   });
 
+  // The junk filter used to be root-anchored (`startsWith('__MACOSX/')`), so a
+  // nested __MACOSX folder slipped through and — worse — a bare AppleDouble
+  // sidecar was stored as a PDF. It then entered the analysis queue and burned
+  // five Opus attempts before parking as noise.
+  it('skips AppleDouble sidecars and __MACOSX at ANY depth, keeping the real files', () => {
+    const zip = zipSync({
+      'bilagor/__MACOSX/._Avtal.pdf': strToU8('resource fork'),
+      'bilagor/Avtal.pdf': strToU8('%PDF-1.4 real'),
+      '._Sammanställning.xlsx': strToU8('resource fork'),
+      'Sammanställning.xlsx': strToU8('PK real'),
+      'djupt/i/trädet/._Bilaga.pdf': strToU8('resource fork'),
+    });
+    const files = extractFilesFromZip(Buffer.from(zip));
+    expect(files.map((f) => f.filename).sort()).toEqual(['Avtal.pdf', 'Sammanställning.xlsx']);
+    expect(files.find((f) => f.filename === 'Avtal.pdf').data.toString()).toBe('%PDF-1.4 real');
+  });
+
+  it('does not mistake a leading dot for an AppleDouble sidecar', () => {
+    const zip = zipSync({ '.hidden-avtal.pdf': strToU8('%PDF-1.4') });
+    expect(extractFilesFromZip(Buffer.from(zip)).map((f) => f.filename)).toEqual(['.hidden-avtal.pdf']);
+  });
+
   it('returns [] on a corrupt / non-zip buffer', () => {
     expect(extractFilesFromZip(Buffer.from('not a zip at all'))).toEqual([]);
   });

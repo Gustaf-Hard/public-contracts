@@ -16,6 +16,7 @@ import { openDb, MAX_ANALYSIS_ATTEMPTS } from '../src/storage.js';
 import { analysePendingContracts, classifyAnalysisFailure } from '../src/analyse-contract.js';
 import { runTick } from '../src/tick.js';
 import { attachmentAnalysisNote } from '../src/dashboard-views.js';
+import * as analyseMod from '../src/analyse-message.js';
 
 let tmp, dbPath, db, contractsDir;
 beforeEach(() => {
@@ -67,13 +68,33 @@ function attRow(handle, id) {
 // ---------------------------------------------------------------------------
 
 describe('classifyAnalysisFailure', () => {
-  it('treats 5xx, rate limits and timeouts as transient', () => {
+  it('treats 5xx and timeouts as transient', () => {
     expect(classifyAnalysisFailure(Object.assign(new Error('bad gateway'), { status: 502 })))
       .toMatchObject({ permanent: false, reason: 'transient:api_5xx' });
-    expect(classifyAnalysisFailure(Object.assign(new Error('slow down'), { status: 429 })))
-      .toMatchObject({ permanent: false, reason: 'transient:api_rate_limit' });
     expect(classifyAnalysisFailure(new Error('socket hang up')))
       .toMatchObject({ permanent: false, reason: 'transient:api_timeout' });
+  });
+
+  // A rate limit / overload is the PROVIDER refusing traffic, not this
+  // document failing. It is retried, but it must never spend one of the five
+  // attempts — otherwise an hour of 429s parks the whole corpus.
+  it('classifies 429 and 529/overloaded as backoff, not transient', () => {
+    expect(classifyAnalysisFailure(Object.assign(new Error('slow down'), { status: 429 })))
+      .toMatchObject({ permanent: false, backoff: true, reason: 'backoff:api_rate_limit' });
+    expect(classifyAnalysisFailure(Object.assign(new Error('overloaded'), { status: 529 })))
+      .toMatchObject({ permanent: false, backoff: true, reason: 'backoff:api_overloaded' });
+    expect(classifyAnalysisFailure(new Error('{"type":"overloaded_error"}')))
+      .toMatchObject({ permanent: false, backoff: true, reason: 'backoff:api_overloaded' });
+  });
+
+  // Ordering bug: PERMANENT_DOCUMENT_PATTERNS used to be tested BEFORE the
+  // status, so a 429 whose body happened to say "exceeds the maximum" parked a
+  // perfectly readable contract on attempt one.
+  it('lets an explicit status win over prose in the error message', () => {
+    const e = Object.assign(new Error('rate limit exceeds the maximum for your tier'), { status: 429 });
+    expect(classifyAnalysisFailure(e)).toMatchObject({ backoff: true, reason: 'backoff:api_rate_limit' });
+    const e5 = Object.assign(new Error('upstream could not process the pdf document'), { status: 503 });
+    expect(classifyAnalysisFailure(e5)).toMatchObject({ permanent: false, reason: 'transient:api_5xx' });
   });
 
   it('treats a json_schema rejection (400) as transient — it is our bug to fix, not the document\'s', () => {
@@ -198,6 +219,149 @@ describe('permanent failures park on the first attempt', () => {
   });
 });
 
+// A routine hour-long Anthropic incident used to park the ENTIRE pending queue
+// — five ticks of 429 and every document left the retry pool permanently, while
+// the systemic alert went quiet exactly then.
+describe('provider backoff (429 / overloaded) never spends an attempt', () => {
+  it('survives a long 429 storm with nothing parked, and keeps alerting each tick', async () => {
+    const atts = [0, 1, 2, 3].map((i) => seedAttachment(db, { filename: `A${i}.pdf`, kod: `200${i}` }).attId);
+    const client = throwingClient(Object.assign(new Error('rate limit'), { status: 429 }));
+
+    // Far more ticks than the attempt budget.
+    let last;
+    for (let i = 0; i < MAX_ANALYSIS_ATTEMPTS * 3; i += 1) {
+      last = await analysePendingContracts({ db, env, client, contractsDir });
+    }
+    for (const id of atts) {
+      expect(attRow(db, id).analysis_attempts).toBe(0);
+      expect(attRow(db, id).last_analysis_error).toBeNull();
+    }
+    expect(db.listPendingContractAttachments()).toHaveLength(4);
+    expect(last).toMatchObject({ attempted: 4, failed: 4, backoff: 4, transient: 0, permanent: 0 });
+    expect(last.parked).toEqual([]);
+
+    // The tick must still shout: extraction IS dead while this lasts.
+    const slackOps = fakeSlackOps();
+    await runTick(tickDeps(db, { slackOps, analyseContracts: async () => last }));
+    await runTick(tickDeps(db, { slackOps, analyseContracts: async () => last }));
+    expect(slackOps.alerts).toHaveLength(2);
+    expect(slackOps.alerts[0]).toContain('står stilla');
+    expect(slackOps.alerts[0]).toContain('inget dokument har parkerats');
+  });
+
+  it('a 529/overloaded is backoff too, and a real 5xx still counts', async () => {
+    const { attId: a } = seedAttachment(db, { filename: 'A.pdf', kod: '3001' });
+    await analysePendingContracts({
+      db, env, contractsDir,
+      client: throwingClient(Object.assign(new Error('overloaded'), { status: 529 })),
+    });
+    expect(attRow(db, a).analysis_attempts).toBe(0);
+
+    await analysePendingContracts({
+      db, env, contractsDir,
+      client: throwingClient(Object.assign(new Error('bad gateway'), { status: 502 })),
+    });
+    expect(attRow(db, a).analysis_attempts).toBe(1);
+  });
+});
+
+// One tick used to charge a freshly-delivered document TWO of its five
+// attempts: the inline per-message analysis (the T_RECEIPT path) and step 3
+// each ran it. The retry budget then survived ~45 minutes of provider
+// degradation instead of ~75.
+describe('one tick attempts an attachment at most once', () => {
+  function b64(s) {
+    return Buffer.from(s).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+
+  it('books exactly one attempt for a document delivered and failing on the same tick', async () => {
+    const spy = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue(null);
+    const convId = db.createConversation({
+      kommun_kod: '2582', kommun_namn: 'Boden', role: 'central',
+      contact_email: 'kommun@boden.se', scheduled_send_at: '2026-06-10T09:00:00Z',
+    });
+    db.updateConversationState(convId, 'SENT', { gmail_thread_id: 'thr-att', last_outbound_at: '2026-06-10T10:00:00Z' });
+
+    const msg = {
+      id: 'att-msg-1', threadId: 'thr-att',
+      payload: {
+        headers: [
+          { name: 'From', value: 'Upphandling <upphandling@boden.se>' },
+          { name: 'To', value: 'gustaf@mediagraf.se' },
+          { name: 'Subject', value: 'Svar på begäran' },
+        ],
+        mimeType: 'multipart/mixed',
+        parts: [
+          { mimeType: 'text/plain', body: { data: b64('Bifogar avtalet.') } },
+          { mimeType: 'application/pdf', filename: 'Avtal.pdf', body: { attachmentId: 'a-pdf', size: 42 } },
+        ],
+      },
+    };
+
+    const client = throwingClient(Object.assign(new Error('bad gateway'), { status: 502 }));
+    const deps = tickDeps(db, { slackOps: fakeSlackOps() });
+    deps.gmailOps.listInboundQuery = vi.fn(async () => [{ id: msg.id }]);
+    deps.gmailOps.getMessage = vi.fn(async () => msg);
+    deps.gmailOps.fetchAttachment = vi.fn(async () => Buffer.from('%PDF-1.4 real bytes'));
+    // The REAL analyser, with a fake Anthropic client — so attempt booking and
+    // the per-tick skip set are exercised, not stubbed out.
+    deps.analyseContracts = (opts) => analysePendingContracts({ ...opts, client });
+
+    await runTick(deps);
+    spy.mockRestore();
+
+    const att = db.raw.prepare('SELECT * FROM attachments ORDER BY id').all();
+    expect(att).toHaveLength(1);
+    expect(att[0].analysis_attempts).toBe(1);
+    expect(client.messages.create).toHaveBeenCalledTimes(1);
+  });
+});
+
+// The contracts volume is unmounted (or PILOT_CONTRACTS_DIR is wrong): every
+// pending attachment is missing at once. Parking them all in a single tick
+// would permanently retire an intact corpus.
+describe('all files missing on disk is an environment fault, not a corpus of dead documents', () => {
+  it('books nothing, parks nothing and flags the run when ALL (≥3) are missing', async () => {
+    const seeded = [0, 1, 2].map((i) => seedAttachment(db, { filename: `M${i}.pdf`, kod: `400${i}` }));
+    for (const s of seeded) unlinkSync(s.savedPath);
+
+    const r = await analysePendingContracts({ db, env, client: okClient(), contractsDir });
+    expect(r.env_fault).toBe('contracts_dir_unavailable');
+    expect(r).toMatchObject({ failed: 0, permanent: 0, parked: [] });
+    for (const s of seeded) {
+      expect(attRow(db, s.attId).analysis_attempts).toBe(0);
+      expect(attRow(db, s.attId).last_analysis_error).toBeNull();
+    }
+    expect(db.listPendingContractAttachments()).toHaveLength(3);
+
+    // And a human is told, loudly.
+    const slackOps = fakeSlackOps();
+    await runTick(tickDeps(db, { slackOps, analyseContracts: async () => r }));
+    expect(slackOps.alerts.some((t) => t.includes('går inte att läsa'))).toBe(true);
+  });
+
+  it('a lone missing file among readable ones still parks permanently', async () => {
+    const gone = seedAttachment(db, { filename: 'Borta.pdf', kod: '4010' });
+    seedAttachment(db, { filename: 'Finns.pdf', kod: '4011' });
+    seedAttachment(db, { filename: 'Finns2.pdf', kod: '4012' });
+    unlinkSync(gone.savedPath);
+
+    const r = await analysePendingContracts({ db, env, client: okClient(), contractsDir });
+    expect(r.env_fault).toBeNull();
+    expect(attRow(db, gone.attId).last_analysis_error).toBe('permanent:file_missing');
+    expect(attRow(db, gone.attId).analysis_attempts).toBe(MAX_ANALYSIS_ATTEMPTS);
+    expect(r.analysed).toBe(2);
+  });
+
+  it('a single missing file in a one-document run still parks (too small to blame the volume)', async () => {
+    const gone = seedAttachment(db, { filename: 'Ensam.pdf', kod: '4020' });
+    unlinkSync(gone.savedPath);
+    const r = await analysePendingContracts({ db, env, client: okClient(), contractsDir });
+    expect(r.env_fault).toBeNull();
+    expect(attRow(db, gone.attId).last_analysis_error).toBe('permanent:file_missing');
+  });
+});
+
 describe('un-parking', () => {
   it('clearing analysis_attempts makes the attachment eligible again', async () => {
     const { attId } = seedAttachment(db);
@@ -233,12 +397,15 @@ function fakeSlackOps() {
   };
 }
 
+let outboundSeq = 0;
 function tickDeps(handle, { slackOps, analyseContracts } = {}) {
   return {
     db: handle,
     gmailClient: { gmail: {} },
     gmailOps: {
-      sendMessage: vi.fn(async () => ({ id: 'out-x', threadId: 'thr-x' })),
+      // Unique ids: several seeded conversations dispatch their T-INITIAL in
+      // the same tick, and gmail_message_id is UNIQUE.
+      sendMessage: vi.fn(async () => ({ id: `out-${++outboundSeq}`, threadId: `thr-${outboundSeq}` })),
       listInboundQuery: vi.fn(async () => []),
       getMessage: vi.fn(async () => null),
       fetchAttachment: vi.fn(async () => Buffer.from('%PDF-1.4')),
@@ -307,6 +474,54 @@ describe('parked-analysis digest', () => {
     await runTick(tickDeps(db, { slackOps }));
     expect(slackOps.alerts).toHaveLength(0);
   });
+
+  // The mark is DURABLE. Marking a row nobody was shown loses the alert
+  // forever — and that happened two ways: no Slack config skipped the post but
+  // marked anyway, and the 20-line truncation marked the overflow it never
+  // printed.
+  it('marks nothing when Slack is not configured — the digest is not silently consumed', async () => {
+    const { attId } = seedAttachment(db, { filename: 'Trasig.pdf' });
+    db.recordAnalysisFailure(attId, { reason: 'permanent:file_missing', permanent: true });
+
+    // No postAlert at all (Slack ops absent).
+    await runTick(tickDeps(db, { slackOps: { postEscalation: vi.fn() } }));
+    expect(attRow(db, attId).analysis_parked_alerted_at).toBeNull();
+
+    // No channel configured.
+    const ops = fakeSlackOps();
+    await runTick({ ...tickDeps(db, { slackOps: ops }), env: { ...env, SLACK_CHANNEL_ID: undefined } });
+    expect(ops.alerts).toHaveLength(0);
+    expect(attRow(db, attId).analysis_parked_alerted_at).toBeNull();
+
+    // Slack back: now it is digested and marked.
+    const ok = fakeSlackOps();
+    await runTick(tickDeps(db, { slackOps: ok }));
+    expect(ok.alerts).toHaveLength(1);
+    expect(attRow(db, attId).analysis_parked_alerted_at).toBeTruthy();
+  });
+
+  it('marks only the attachments the posted digest actually named, and drains the rest next tick', async () => {
+    const ids = [];
+    for (let i = 0; i < 23; i += 1) {
+      const { attId } = seedAttachment(db, { filename: `Doc${i}.pdf`, kod: String(1000 + i) });
+      db.recordAnalysisFailure(attId, { reason: 'permanent:file_missing', permanent: true });
+      ids.push(attId);
+    }
+    const slackOps = fakeSlackOps();
+    await runTick(tickDeps(db, { slackOps }));
+    expect(slackOps.alerts).toHaveLength(1);
+    const marked = ids.filter((id) => attRow(db, id).analysis_parked_alerted_at);
+    expect(marked).toHaveLength(20);
+    // Only listed files are marked; the message says the rest follow.
+    expect(slackOps.alerts[0]).toContain('Doc0.pdf');
+    expect(slackOps.alerts[0]).not.toContain('Doc22.pdf');
+    expect(slackOps.alerts[0]).toContain('och 3 till');
+
+    await runTick(tickDeps(db, { slackOps }));
+    expect(slackOps.alerts).toHaveLength(2);
+    expect(slackOps.alerts[1]).toContain('Doc22.pdf');
+    expect(ids.every((id) => attRow(db, id).analysis_parked_alerted_at)).toBe(true);
+  });
 });
 
 describe('systemic-failure alert', () => {
@@ -360,10 +575,22 @@ describe('systemic-failure alert', () => {
 });
 
 describe('dashboard attachment note', () => {
-  it('distinguishes will-be-read, parked and never-analysed formats', () => {
-    expect(attachmentAnalysisNote({ filename: 'Avtal.pdf', mime_type: 'application/pdf', analysis_attempts: 1 })).toBe('');
+  it('distinguishes read, queued, parked and never-analysable formats', () => {
+    // Already extracted → the badge carries the information, no note.
+    expect(attachmentAnalysisNote({ filename: 'Avtal.pdf', mime_type: 'application/pdf', analysis_attempts: 1, analysed: 1 })).toBe('');
+    // Analysable but not extracted yet → say so honestly.
+    expect(attachmentAnalysisNote({ filename: 'Avtal.pdf', mime_type: 'application/pdf', analysis_attempts: 1, analysed: 0 }))
+      .toContain('väntar på avtalsanalys');
+    // xlsx/docx ARE analysed (src/office-text.js) — they must never be
+    // labelled as a format we skip.
+    expect(attachmentAnalysisNote({ filename: 'Avtalslista.xlsx', analysed: 0 }))
+      .toContain('väntar på avtalsanalys');
+    expect(attachmentAnalysisNote({ filename: 'Avtalslista.xlsx', analysed: 1 })).toBe('');
+    // Genuinely outside the analyser.
     expect(attachmentAnalysisNote({ filename: 'Skanning.jpg', mime_type: 'image/jpeg', analysis_attempts: 0 }))
-      .toContain('ej avtalsanalyserad (ej PDF)');
+      .toContain('formatet avtalsanalyseras inte');
+    // No `analysed` column in the caller's query → claim nothing.
+    expect(attachmentAnalysisNote({ filename: 'Avtal.pdf', mime_type: 'application/pdf' })).toBe('');
     const parked = attachmentAnalysisNote({
       filename: 'Krypterat.pdf', mime_type: 'application/pdf',
       analysis_attempts: MAX_ANALYSIS_ATTEMPTS, last_analysis_error: 'permanent:document_rejected',

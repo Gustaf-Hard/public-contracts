@@ -1,6 +1,6 @@
 import express from 'express';
 import cron from 'node-cron';
-import { runTick, runDailyFollowup, runRefreshScan } from './tick.js';
+import { runTick, runDailyFollowup, runRefreshScan, followupCatchUpDue, followupHourFromCron, localDateStr } from './tick.js';
 import { openDb, TICK_STALE_THRESHOLD_MIN } from './storage.js';
 import { buildOAuthClient, loadStoredToken, saveToken, makeGmail, makeReloadingClient, sendMessage as gmailSend, listInboundQuery, getMessage as gmailGet, fetchAttachment } from './gmail.js';
 // gmailSend stays imported because runTick's gmailOps below uses it.
@@ -59,8 +59,12 @@ export function makeExclusive(fn, { log = null, name = 'task', mutex = null } = 
 export const TICK_OUTAGE_ALERT_MIN = TICK_STALE_THRESHOLD_MIN;
 
 // 'YYYY-MM-DDTHH:MM:...' → 'YYYY-MM-DD HH:MM' for operator-facing text.
-function stamp(iso) {
-  return String(iso ?? '').slice(0, 16).replace('T', ' ');
+// A null timestamp is named, never rendered as a blank gap: the recovery
+// message otherwise read "Avbrottet varade  → 2026-08-16 09:00", which looks
+// like a truncation bug rather than "we have never had a successful tick".
+function stamp(iso, fallback = 'okänd start') {
+  const s = String(iso ?? '').slice(0, 16).replace('T', ' ');
+  return s || fallback;
 }
 
 // Tell the operator in Slack when inbound mail stops being processed, and when
@@ -119,6 +123,40 @@ async function stripButtons(slack, env, esc, kommunNamn, status, log) {
   }
 }
 
+// A refused send must be VISIBLE in Slack. sendApprovedReply refuses some
+// clicks BEFORE the atomic claim — STALE_INGEST (ingest is blind, so "vi har
+// inte hört av er" may be false), STALE_ESCALATION (newer inbound), a bounce
+// resend with no corrected address. The escalation stays open and its buttons
+// stay live, which is correct — but the operator saw nothing at all: Approve
+// looked like a dead button, and the edit modal simply closed as if the reply
+// had gone out. The refusal is posted as a threaded reply under the escalation
+// so the buttons keep working once the cause is fixed.
+//
+// Trigger is a state check, not a code list: after the failure the escalation
+// row is re-read, and only a row still 'open' means nothing happened. A Gmail
+// failure parks the row (send_failed) and sendApprovedReply already rewrote its
+// Slack message, so it is not re-announced here.
+async function reportRefusedSend({ db, slack, env, escId, kommunNamn, error, postAlertImpl, log }) {
+  let current = null;
+  try {
+    current = db.raw.prepare('SELECT * FROM escalations WHERE id = ?').get(escId);
+  } catch { /* fall through — a read failure must not swallow the notice */ }
+  if (current && current.status !== 'open') return false;
+  if (!postAlertImpl || !env?.SLACK_CHANNEL_ID) return false;
+  try {
+    await postAlertImpl(slack, {
+      channel: env.SLACK_CHANNEL_ID,
+      thread_ts: current?.slack_ts ?? null,
+      text: `⛔️ *Inget skickades till ${kommunNamn ?? 'okänd kommun'}* (eskalering ${escId}).\n`
+        + `${error.message}\n_Eskaleringen är kvar och knapparna fungerar — klicka igen när orsaken är åtgärdad._`,
+    });
+    return true;
+  } catch (e) {
+    log?.(`refusal notice failed for escalation ${escId}: ${e.message}`);
+    return false;
+  }
+}
+
 // Slack interactivity handler, extracted from startDaemon so the approve path
 // is testable offline. Verifies the request signature, ACKS within Slack's
 // 3-second interactivity deadline, and only then performs the work (hardening
@@ -129,7 +167,7 @@ async function stripButtons(slack, env, esc, kommunNamn, status, log) {
 // handler — fails the claim and no-ops, which is exactly what the
 // ack-after-work ordering (review L1) used to protect against before the
 // claim existed. The buttons are healed afterwards via chat.update.
-export function createInteractivityHandler({ db, slack, gmail, env, log = console.log, sendApprovedReplyImpl = sendApprovedReply, openEditModalImpl = openEditModal }) {
+export function createInteractivityHandler({ db, slack, gmail, env, log = console.log, sendApprovedReplyImpl = sendApprovedReply, openEditModalImpl = openEditModal, postAlertImpl = postAlert }) {
   return async (req, res) => {
     const body = req.body.toString('utf8');
     const ts = req.header('X-Slack-Request-Timestamp');
@@ -163,6 +201,9 @@ export function createInteractivityHandler({ db, slack, gmail, env, log = consol
               log(`approve ignored: escalation ${escId} already ${current.status}`);
             } else {
               log(`approve failed for escalation ${escId}: ${e.message}`);
+              await reportRefusedSend({
+                db, slack, env, escId, kommunNamn: conv?.kommun_namn, error: e, postAlertImpl, log,
+              });
             }
           }
         } else if (parsed.action_id === 'esc_edit') {
@@ -200,6 +241,12 @@ export function createInteractivityHandler({ db, slack, gmail, env, log = consol
           });
         } catch (e) {
           log(`edit-send failed for escalation ${escId}: ${e.message}`);
+          // The modal has already closed by the time this runs (Slack closes it
+          // on a 200 ack), so without this the operator's edited reply simply
+          // vanished — looking exactly like a successful send.
+          await reportRefusedSend({
+            db, slack, env, escId, kommunNamn: conv?.kommun_namn, error: e, postAlertImpl, log,
+          });
         }
       }
     } catch (e) {
@@ -301,6 +348,7 @@ export async function startDaemon({ env = process.env, log = console.log } = {})
     await reportTickHealth({
       db, slackClient: slack, slackOps, env, now, error: err, healthBefore, log,
     });
+    return { ok: err == null };
   }, { log, name: 'tick', mutex: escalationMutex });
 
   const followupOnce = makeExclusive(async () => {
@@ -329,12 +377,35 @@ export async function startDaemon({ env = process.env, log = console.log } = {})
     db.recordHeartbeat({ kind: 'followup', error: err });
   }, { log, name: 'followup', mutex: escalationMutex });
 
-  cron.schedule(env.PILOT_TICK_CRON ?? '*/15 * * * *', tickOnce);
-  cron.schedule(env.PILOT_FOLLOWUP_CRON ?? '0 9 * * *', followupOnce);
-  log(`Cron scheduled: tick=${env.PILOT_TICK_CRON}, followup=${env.PILOT_FOLLOWUP_CRON}`);
+  const followupCron = env.PILOT_FOLLOWUP_CRON ?? '0 9 * * *';
+  const followupHour = followupHourFromCron(followupCron);
+
+  // The daily follow-up fires ONCE, at 09:00. If ingest was blind at that
+  // minute the run bails out (correctly — it must not assert silence it has not
+  // verified) and the whole day's nudges/closes/nudge-cap escalations are lost.
+  // So after every SUCCESSFUL tick past the cron hour, re-invoke it if today's
+  // run never completed. Deliberately OUTSIDE the mutex-wrapped tick body:
+  // followupOnce takes the same mutex, and calling it from inside would
+  // deadlock. The gates inside runDailyFollowup remain authoritative — a still
+  // blind daemon just skips again.
+  const tickThenFollowupCatchUp = async () => {
+    const res = await tickOnce();
+    if (!res?.ok) return res;
+    const now = getEffectiveNow({ env, overrides });
+    if (!followupCatchUpDue({
+      now, completedDate: db.getFollowupCompletedDate?.() ?? null, hour: followupHour,
+    })) return res;
+    log(`FOLLOWUP catch-up: no completed daily run for ${localDateStr(now)} — running it now after a healthy tick`);
+    await followupOnce();
+    return res;
+  };
+
+  cron.schedule(env.PILOT_TICK_CRON ?? '*/15 * * * *', tickThenFollowupCatchUp);
+  cron.schedule(followupCron, followupOnce);
+  log(`Cron scheduled: tick=${env.PILOT_TICK_CRON}, followup=${followupCron}`);
 
   // Run one tick immediately on startup
-  await tickOnce();
+  await tickThenFollowupCatchUp();
 
   // Slack interactivity webhook
   const app = express();
