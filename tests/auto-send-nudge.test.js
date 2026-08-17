@@ -55,10 +55,24 @@ function fakeGmail({ sendError = null } = {}) {
   };
 }
 
-function seedHealthyTick(now) {
+// Seeds a heartbeat that reads healthy to BOTH clocks in play, which is the
+// only way this helper earns its name:
+//  - runDailyFollowup's gate calls getTickHealth({ now }) with the injected
+//    fake clock (tick.js:1331);
+//  - sendApprovedReply's STALE_INGEST guard calls getTickHealth() with NO
+//    arguments (send-reply.js:196), so it defaults to the REAL clock
+//    (storage.js:756).
+// Stamping only against the fake clock (2026-08-17T09:00:00Z) went permanently
+// stale the moment real wall-clock passed 09:55Z that day, which would refuse
+// every T_FOLLOWUP_NUDGE auto-send as STALE_INGEST. Stamping 5 minutes before
+// whichever clock is LATER is healthy for both: the later clock sees a 5-minute
+// age, the earlier one sees a negative age, and `stale` is `ageMin >
+// thresholdMin`, so a negative age is never stale.
+function seedHealthyTick(now = new Date()) {
+  const latest = Math.max(Date.now(), now.getTime());
   db.recordHeartbeat({ kind: 'tick', error: null });
   db.raw.prepare('UPDATE daemon_heartbeat SET last_success_at = ? WHERE id = 1')
-    .run(new Date(now.getTime() - 5 * 60000).toISOString());
+    .run(new Date(latest - 5 * 60000).toISOString());
 }
 
 function deps({ gmail = fakeGmail(), slackOps = fakeSlackOps(), now = new Date('2026-08-17T09:00:00Z') } = {}) {
