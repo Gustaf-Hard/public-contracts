@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { nextActionForClassification, staleAction, effectiveFollowUp, nudgeJitterDays } from '../src/conversation.js';
+import { nextActionForClassification, staleAction, effectiveFollowUp, nudgeJitterDays, isLazyConversation } from '../src/conversation.js';
 
 describe('nextActionForClassification', () => {
   it('SENT + auto_ack → ACK_RECEIVED, no outbound', () => {
@@ -240,5 +240,28 @@ describe('nudgeJitterDays + jittered STALE_RULES (2026-08-17 auto-send design)',
     const r = effectiveFollowUp({ id: 42, state: 'SENT', state_changed_at: '2026-05-24T10:00:00Z', follow_up_at: null });
     const expected = new Date(Date.parse('2026-05-24T10:00:00Z') + (9 + j) * 86400000).toISOString().slice(0, 10);
     expect(r).toEqual({ date: expected, source: 'our_followup' });
+  });
+});
+
+describe('isLazyConversation — auto-send eligibility rule 2 (fail closed)', () => {
+  const inbound = (classification) => ({ direction: 'inbound', classification });
+  const outbound = () => ({ direction: 'outbound', classification: null });
+
+  it('zero inbound qualifies (outbound rows are ignored)', () => {
+    expect(isLazyConversation([])).toBe(true);
+    expect(isLazyConversation([outbound()])).toBe(true);
+  });
+
+  it('every LAZY classification qualifies', () => {
+    expect(isLazyConversation([
+      outbound(), inbound('auto_ack'), inbound('auto_reply'),
+      inbound('delay_promise'), inbound('handoff_internal'),
+    ])).toBe(true);
+  });
+
+  it('any substantive or unclassified inbound disqualifies', () => {
+    for (const c of ['delivery', 'clarification', 'dead_end', 'bounce', 'unknown', null]) {
+      expect(isLazyConversation([inbound('auto_ack'), inbound(c)])).toBe(false);
+    }
   });
 });

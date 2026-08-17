@@ -192,3 +192,20 @@ export function staleAction(state, daysInState, followupCount, opts = {}) {
   if (followupCount >= MAX_NUDGES && rule.action === 'send_followup_nudge') return 'escalate';
   return rule.action;
 }
+
+// The inbound classifications that mean "the kommun has not substantively
+// responded" (2026-08-17 auto-send design). A conversation whose EVERY inbound
+// is in this set — zero inbound also qualifies — is "lazy": a follow-up nudge
+// cannot contradict anything a human told us. delivery / clarification /
+// dead_end / bounce / unknown and NULL classification are all
+// substantive-or-unclassifiable → fail closed, the operator decides.
+export const AUTO_SEND_LAZY_CLASSIFICATIONS = new Set([
+  'auto_ack', 'auto_reply', 'delay_promise', 'handoff_internal',
+]);
+
+// messages: rows from db.listMessages(convId). Outbound rows are ignored.
+export function isLazyConversation(messages) {
+  return (messages ?? [])
+    .filter((m) => m.direction === 'inbound')
+    .every((m) => AUTO_SEND_LAZY_CLASSIFICATIONS.has(m.classification));
+}
