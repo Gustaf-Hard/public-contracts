@@ -113,6 +113,11 @@ async function archiveThreadBestEffort({ archiveThreadImpl, gmail, threadId, log
 //  - An unmodified approve is blocked when a newer inbound arrived after the
 //    draft was created (STALE_ESCALATION): the world moved, re-review. An
 //    explicit edit passes — the human wrote with current context.
+//  - An 'auto_send' (2026-08-17 design) is held to the SAME bar as an
+//    unmodified approve: the machine never writes with current context. The
+//    daily-run escalation mutex means no tick can ingest between drafting and
+//    auto-sending in the same run, but this guard must not rely on that
+//    reasoning holding forever.
 //  - If Gmail throws after the claim, the escalation is parked as
 //    'send_failed' (never back to 'open') so nothing auto-retries an
 //    ambiguous send; the operator verifies in Gmail Sent first.
@@ -148,7 +153,7 @@ export async function sendApprovedReply({ db, gmail, env, conv, esc, finalBody, 
   // never arrived). Every other draft (including proactive follow-ups) keeps the
   // guard: a newer inbound arriving mid-conversation must still force a re-review.
   const isRefreshEsc = esc.draft_template === 'T_UPDATE' || conv.state === 'REFRESH_DUE';
-  if (decision === 'approve_unmodified' && !isRefreshEsc && !isBounceResend) {
+  if ((decision === 'approve_unmodified' || decision === 'auto_send') && !isRefreshEsc && !isBounceResend) {
     const escCreated = parseDbTime(esc.created_at);
     // Precision matters here (hardening finding 6):
     //  - Exclude the inbound the draft answers (esc.message_id) — it is by
