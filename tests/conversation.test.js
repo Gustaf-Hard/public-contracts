@@ -265,12 +265,15 @@ describe('isLazyConversation — auto-send eligibility rule 2 (fail closed)', ()
     }
   });
 
-  // An attachment IS substance everywhere else in the system (inferThreadStatus
-  // makes any-attachment threads primary; every attachment is queued for
-  // contract analysis regardless of classification). A misclassified auto_ack
-  // carrying the delivered avtal must therefore never earn an unattended
-  // "jag vill följa upp".
-  it('a LAZY-classified inbound carrying an attachment disqualifies', () => {
+  // NOT the live contract — these rows come from the local `inbound()` helper,
+  // which never sets stored_attachment_count, so they exercise the FALLBACK arm
+  // of (stored ?? raw ?? 0). The live `listMessages` always supplies the
+  // computed column; see the stored/not-stored tests below for that path. This
+  // case pins the fail-closed default: any caller that hands us a row without
+  // the computed column keeps the OLD, stricter raw-count rule, so a
+  // misclassified auto_ack carrying the delivered avtal can never earn an
+  // unattended "jag vill följa upp" through a code path that forgot the column.
+  it('raw attachment_count disqualifies when stored_attachment_count is absent — the fail-closed fallback', () => {
     for (const c of ['auto_ack', 'auto_reply', 'delay_promise', 'handoff_internal']) {
       expect(isLazyConversation([inbound(c, 1)])).toBe(false);
       expect(isLazyConversation([inbound('auto_ack'), inbound(c, 3)])).toBe(false);

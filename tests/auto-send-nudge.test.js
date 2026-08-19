@@ -244,7 +244,11 @@ describe('runDailyFollowup auto-sends eligible T_FOLLOWUP_NUDGE', () => {
 
     expect(gmail.sendMessage).not.toHaveBeenCalled();
     expect(db.listDecisions()).toHaveLength(0);
-    expect(db.listOpenEscalationsForConversation(id)).toHaveLength(1);
+    const escs = db.listOpenEscalationsForConversation(id);
+    expect(escs).toHaveLength(1);
+    // The nudge was still DRAFTED and handed to the operator — the guard held
+    // back the send, it did not swap the conversation onto another template.
+    expect(escs[0].draft_template).toBe('T_FOLLOWUP_NUDGE');
 
     const row = db.listMessages(id).find((m) => m.id === msgId);
     expect(row.attachment_count).toBe(1);         // what the mail carried
