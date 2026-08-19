@@ -282,4 +282,49 @@ describe('isLazyConversation — auto-send eligibility rule 2 (fail closed)', ()
     expect(isLazyConversation([{ direction: 'inbound', classification: 'auto_ack' }])).toBe(true);
     expect(isLazyConversation([{ direction: 'inbound', classification: 'auto_ack', attachment_count: null }])).toBe(true);
   });
+
+  // The count that matters is what the ingest STORED, not what the mail
+  // carried. attachment_count deliberately records the carried total so the
+  // dashboard can say "1 bilaga hoppades över" — but the ingest already judged
+  // a tiny signature logo trivial (isTrivialImage) and stored nothing. Live
+  // false negative: Båstad conv 37, two auto_ack mails whose only "attachment"
+  // was the sender's logo, held back from auto-send for nothing.
+  it('a carried-but-not-stored attachment (signature logo) still qualifies', () => {
+    for (const c of ['auto_ack', 'auto_reply', 'delay_promise', 'handoff_internal']) {
+      expect(isLazyConversation([
+        { direction: 'inbound', classification: c, attachment_count: 1, stored_attachment_count: 0 },
+      ])).toBe(true);
+    }
+    expect(isLazyConversation([
+      { direction: 'inbound', classification: 'auto_ack', attachment_count: 2, stored_attachment_count: 0 },
+      { direction: 'inbound', classification: 'auto_ack', attachment_count: 1, stored_attachment_count: 0 },
+    ])).toBe(true);
+  });
+
+  it('a STORED attachment disqualifies whatever the classification', () => {
+    for (const c of ['auto_ack', 'auto_reply', 'delay_promise', 'handoff_internal']) {
+      expect(isLazyConversation([
+        { direction: 'inbound', classification: c, attachment_count: 1, stored_attachment_count: 1 },
+      ])).toBe(false);
+    }
+    // Stored files with no carried count recorded still disqualify.
+    expect(isLazyConversation([
+      { direction: 'inbound', classification: 'auto_ack' },
+      { direction: 'inbound', classification: 'auto_ack', attachment_count: 0, stored_attachment_count: 2 },
+    ])).toBe(false);
+  });
+
+  // The fallback chain IS the safety property: a row from a caller that does
+  // not supply the computed column keeps the OLD, stricter raw-count rule.
+  it('a row without stored_attachment_count falls back to the raw count (fail closed)', () => {
+    expect(isLazyConversation([
+      { direction: 'inbound', classification: 'auto_ack', attachment_count: 1 },
+    ])).toBe(false);
+    expect(isLazyConversation([
+      { direction: 'inbound', classification: 'auto_ack', attachment_count: 1, stored_attachment_count: null },
+    ])).toBe(false);
+    expect(isLazyConversation([
+      { direction: 'inbound', classification: 'auto_ack', attachment_count: 1, stored_attachment_count: undefined },
+    ])).toBe(false);
+  });
 });

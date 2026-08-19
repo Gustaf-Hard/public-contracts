@@ -109,10 +109,13 @@ function seedConv({ state = 'SENT', stateChangedAt = '2026-07-25T00:00:00Z', fol
   return id;
 }
 
+// attachmentCount is what the mail CARRIED; storedAttachments is what the
+// ingest actually kept (isTrivialImage skips signature logos), i.e. rows in the
+// attachments table. The two differ in exactly the case this fix is about.
 let inboundSeq = 0;
-function seedInbound(convId, { classification = null, receivedAt = '2026-07-26T10:00:00Z', attachmentCount = 0 } = {}) {
+function seedInbound(convId, { classification = null, receivedAt = '2026-07-26T10:00:00Z', attachmentCount = 0, storedAttachments = 0 } = {}) {
   inboundSeq += 1;
-  db.recordMessage({
+  const messageId = db.recordMessage({
     conversation_id: convId,
     gmail_message_id: `in-${inboundSeq}`,
     direction: 'inbound',
@@ -126,6 +129,16 @@ function seedInbound(convId, { classification = null, receivedAt = '2026-07-26T1
     attachment_count: attachmentCount,
     gmail_thread_id: 'thr-a',
   });
+  for (let i = 0; i < storedAttachments; i += 1) {
+    db.recordAttachment({
+      message_id: messageId,
+      filename: `avtal-${inboundSeq}-${i + 1}.pdf`,
+      saved_path: join(contractsDir, `avtal-${inboundSeq}-${i + 1}.pdf`),
+      mime_type: 'application/pdf',
+      size_bytes: 12345,
+    });
+  }
+  return messageId;
 }
 
 function seedNudgeEscalation(convId) {
@@ -217,20 +230,48 @@ describe('runDailyFollowup auto-sends eligible T_FOLLOWUP_NUDGE', () => {
     expect(db.listDecisions()[0]?.decision).toBe('auto_send');
   });
 
-  it('a lazy-classified inbound carrying an attachment → escalation stays open, nothing sent', async () => {
-    // The classifier said auto_ack, but the mail came with a file. Every other
-    // part of the system treats an attachment as substance (thread status,
-    // contract-analysis queue) — so a possible delivered avtal sitting unread
-    // on our disk falls back to the operator instead of an unattended nudge.
+  it('a lazy-classified inbound with a STORED attachment → escalation stays open, nothing sent', async () => {
+    // The classifier said auto_ack, but the mail came with a file the ingest
+    // kept. Every other part of the system treats a stored attachment as
+    // substance (thread status, contract-analysis queue) — so a possible
+    // delivered avtal sitting unread on our disk falls back to the operator
+    // instead of an unattended nudge.
     writeSwitch({ auto_send_templates: ['T_FOLLOWUP_NUDGE'] });
     const id = seedConv({});
-    seedInbound(id, { classification: 'auto_ack', attachmentCount: 1 });
+    const msgId = seedInbound(id, { classification: 'auto_ack', attachmentCount: 1, storedAttachments: 1 });
     const gmail = fakeGmail();
     await runDailyFollowup(deps({ gmail }));
 
     expect(gmail.sendMessage).not.toHaveBeenCalled();
     expect(db.listDecisions()).toHaveLength(0);
     expect(db.listOpenEscalationsForConversation(id)).toHaveLength(1);
+
+    const row = db.listMessages(id).find((m) => m.id === msgId);
+    expect(row.attachment_count).toBe(1);         // what the mail carried
+    expect(row.stored_attachment_count).toBe(1);  // what the ingest kept
+  });
+
+  // Live false negative (Båstad, conv 37): both inbounds were auto_ack whose
+  // only "attachments" were the sender's signature logos. The ingest already
+  // judged them trivial (isTrivialImage) and stored NOTHING; attachment_count
+  // keeps recording what the mail carried so the dashboard stays honest. The
+  // auto-send guard must inherit the ingest's judgment, not double-count logos.
+  it('a lazy inbound carrying only ingest-skipped attachments (nothing stored) auto-sends', async () => {
+    writeSwitch({ auto_send_templates: ['T_FOLLOWUP_NUDGE'] });
+    const id = seedConv({});
+    const msgId = seedInbound(id, { classification: 'auto_ack', attachmentCount: 1, storedAttachments: 0 });
+    const gmail = fakeGmail();
+    await runDailyFollowup(deps({ gmail }));
+
+    expect(gmail.sendMessage).toHaveBeenCalledTimes(1);
+    expect(db.listDecisions()[0]?.decision).toBe('auto_send');
+    expect(db.raw.prepare('SELECT status FROM escalations WHERE conversation_id = ?').get(id).status)
+      .toBe('resolved_send');
+
+    // The dashboard-honesty semantic is untouched: the carried count still says 1.
+    const row = db.listMessages(id).find((m) => m.id === msgId);
+    expect(row.attachment_count).toBe(1);
+    expect(row.stored_attachment_count).toBe(0);
   });
 
   it('any substantive or unclassified inbound → escalation stays open, nothing sent', async () => {

@@ -435,8 +435,22 @@ export function openDb(path) {
     return Number(r.lastInsertRowid);
   }
 
+  // stored_attachment_count is a COMPUTED column (no schema change): how many
+  // attachment rows the ingest actually kept for this message. It differs from
+  // the stored attachment_count column, which records what the mail CARRIED —
+  // including the signature logos isTrivialImage deliberately skipped, so the
+  // dashboard can say "1 bilaga hoppades över". Callers that need "is there a
+  // real file here" (isLazyConversation) must use the computed one; callers
+  // reporting what arrived keep using attachment_count. Purely additive: same
+  // rows, one extra field.
   function listMessages(conversationId) {
-    return db.prepare('SELECT * FROM messages WHERE conversation_id = ? ORDER BY received_at, id').all(conversationId);
+    return db.prepare(`
+      SELECT m.*,
+             (SELECT COUNT(*) FROM attachments a WHERE a.message_id = m.id) AS stored_attachment_count
+      FROM messages m
+      WHERE m.conversation_id = ?
+      ORDER BY m.received_at, m.id
+    `).all(conversationId);
   }
 
   function hasGmailMessageId(gmailMessageId) {

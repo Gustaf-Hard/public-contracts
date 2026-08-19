@@ -205,16 +205,28 @@ export const AUTO_SEND_LAZY_CLASSIFICATIONS = new Set([
 
 // messages: rows from db.listMessages(convId). Outbound rows are ignored.
 // An inbound row qualifies only if it is BOTH classified in the LAZY set AND
-// carries zero attachments. The rest of the system already treats any
-// attachment as substance — inferThreadStatus (threads.js) makes an
-// any-attachment thread primary, and every attachment is queued for contract
-// analysis whatever the classification — so a misclassified auto_ack/
-// delay_promise carrying the delivered avtal must not earn an unattended
-// "jag vill följa upp" while that file sits unread on our own disk. Fail
-// closed: a mere signature-logo attachment costs us one manual approval.
+// the ingest STORED zero attachments for it. The rest of the system already
+// treats a stored attachment as substance — inferThreadStatus (threads.js)
+// makes an any-attachment thread primary, and every stored attachment is
+// queued for contract analysis whatever the classification — so a
+// misclassified auto_ack/delay_promise carrying the delivered avtal must not
+// earn an unattended "jag vill följa upp" while that file sits unread on our
+// own disk. A stored file therefore always costs a manual approval.
+//
+// The count is `stored_attachment_count` (rows in `attachments`), NOT the
+// message's `attachment_count`: the latter records what the mail CARRIED,
+// including the tiny signature logos ingest skipped as trivial
+// (isTrivialImage, tick.js), so the dashboard can show "1 bilaga hoppades
+// över". Inheriting the ingest's own substantive/trivial judgment instead of
+// double-counting logos is what stops a lazy conversation being held back for
+// a sender's letterhead (live: Båstad conv 37).
+//
+// The `??` chain is the safety property, not tidiness: a row that lacks the
+// computed column falls back to the OLD, stricter raw count (fail closed), and
+// a row lacking both counts as 0.
 export function isLazyConversation(messages) {
   return (messages ?? [])
     .filter((m) => m.direction === 'inbound')
     .every((m) => AUTO_SEND_LAZY_CLASSIFICATIONS.has(m.classification)
-      && (m.attachment_count ?? 0) === 0);
+      && (m.stored_attachment_count ?? m.attachment_count ?? 0) === 0);
 }

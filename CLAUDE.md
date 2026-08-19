@@ -131,9 +131,12 @@ Phase-1 pipeline: `scripts/01|02|03 → src/seed.js|crawl.js|verify.js → data/
   `T_FOLLOWUP_NUDGE` may go out unattended, and only when EVERY inbound in the
   conversation is classified in the LAZY set (`auto_ack`, `auto_reply`,
   `delay_promise`, `handoff_internal`; zero inbound qualifies; NULL/`unknown`
-  never do) **and carries no attachments** (an attachment is substance
-  everywhere else — `inferThreadStatus`, the analysis queue — so a
-  misclassified ack holding the delivered avtal falls back to the operator)
+  never do) **and has no *stored* attachments** (`stored_attachment_count`, the
+  computed column `listMessages` adds — a stored attachment is substance
+  everywhere else, `inferThreadStatus`, the analysis queue, so a misclassified
+  ack holding the delivered avtal falls back to the operator; an
+  ingest-skipped signature logo is not, and the raw `attachment_count` the
+  dashboard reports still counts what the mail carried)
   AND `auto_send_templates` in `data/pilot-overrides.json` lists it —
   the file is re-read at the start of every `runDailyFollowup`, so pulling the
   key stops the next run without a restart. The send rides `sendApprovedReply`
