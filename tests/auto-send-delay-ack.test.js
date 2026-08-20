@@ -47,6 +47,9 @@ describe('isAutoSendableDelayAck', () => {
   it('rejects low/NULL confidence and non-delay class (fail closed)', () => {
     expect(check({ e: esc({ classifier_confidence: 0.65 }) }).reason).toBe('confidence');
     expect(check({ e: esc({ classifier_confidence: null }) }).reason).toBe('confidence');
+    // NaN is typeof 'number' and every comparison with it is false, so a bare
+    // `< MIN` test would wave it through as eligible.
+    expect(check({ e: esc({ classifier_confidence: NaN }) }).reason).toBe('confidence');
     expect(check({ e: esc({ classifier_class: null }) }).reason).toBe('class');
     expect(check({ e: esc({ classifier_confidence: DELAY_ACK_AUTO_MIN_CONFIDENCE }) }).ok).toBe(true); // >= is inclusive
   });
@@ -83,6 +86,14 @@ describe('isAutoSendableDelayAck', () => {
   it('caps lifetime auto-sends per conversation at 2', () => {
     expect(check({ autoSentCount: 1 }).ok).toBe(true);
     expect(check({ autoSentCount: 2 }).reason).toBe('auto_send_cap');
+  });
+
+  it('treats an absent or non-numeric auto-send count as the cap (fail closed)', () => {
+    // A caller that forgot the count, or a db seam that returned undefined/NaN,
+    // must NOT read as "cap not reached" — an unbounded mail loop is the exact
+    // risk the cap exists for.
+    expect(isAutoSendableDelayAck({ esc: esc(), messages: [inbound()], now: NOW }).reason).toBe('auto_send_cap');
+    expect(check({ autoSentCount: NaN }).reason).toBe('auto_send_cap');
   });
 });
 

@@ -296,7 +296,10 @@ export function isAutoSendableDelayAck({ esc, messages, autoSentCount, now }) {
   const no = (reason) => ({ ok: false, reason });
   if (!esc || esc.draft_template !== 'T_DELAY_ACK' || esc.status !== 'open') return no('not_delay_ack');
   if (esc.classifier_class !== 'delay_promise') return no('class');
-  if (typeof esc.classifier_confidence !== 'number'
+  // Number.isFinite, not typeof: NaN is typeof 'number' and every comparison
+  // against it is false, so `< MIN` alone would wave a NaN confidence through
+  // as eligible — precisely the shape that must never auto-send.
+  if (!Number.isFinite(esc.classifier_confidence)
     || esc.classifier_confidence < DELAY_ACK_AUTO_MIN_CONFIDENCE) return no('confidence');
 
   const createdMs = dbTimeMs(esc.created_at);
@@ -325,6 +328,11 @@ export function isAutoSendableDelayAck({ esc, messages, autoSentCount, now }) {
   const gate = delayAckBodyGate(trigger.body_text);
   if (!gate.ok) return no(gate.reason);
 
-  if ((autoSentCount ?? 0) >= DELAY_ACK_AUTO_MAX_PER_CONV) return no('auto_send_cap');
+  // An absent/undefined/NaN count is NOT "zero sent so far": a caller that
+  // forgot the argument, or a db seam that returned nothing, would otherwise
+  // read as "cap not reached" and unbound the very mail loop the cap exists
+  // to bound. No number, no auto-send.
+  if (!Number.isFinite(autoSentCount)
+    || autoSentCount >= DELAY_ACK_AUTO_MAX_PER_CONV) return no('auto_send_cap');
   return { ok: true, reason: null };
 }
