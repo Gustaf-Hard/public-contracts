@@ -1422,7 +1422,8 @@ export async function runDailyFollowup(deps) {
       // An unanswered clarification must never draw an unattended nudge
       // (2026-08-20). The GUARANTEE is the ledger check inside
       // isLazyConversation: `listOperatorDecisionTimes` returns every send a
-      // PERSON made (decision <> 'auto_send'), so a clarification counts as
+      // PERSON made (decision IN ('approve_unmodified', 'edit') — an unsent
+      // 'skip'/'closed' answers nothing), so a clarification counts as
       // answered only when a human replied after it. Outbound message rows
       // would NOT do — a delay_promise arriving in AWAITING_PRECISION flips the
       // conversation to ACK_RECEIVED and supersedes the operator's open

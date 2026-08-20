@@ -234,8 +234,10 @@ export const AUTO_SEND_LAZY_CLASSIFICATIONS = new Set([
 //
 // "Answered" is grounded in the decisions LEDGER, not in outbound message rows.
 // `opts.operatorSendTimes` is `db.listOperatorDecisionTimes(convId)`: the
-// `decided_at` of every send that was NOT `decision = 'auto_send'`, i.e. every
-// send a person made. Outbound rows cannot carry this rule, because a machine
+// `decided_at` of every decision on the send-shaped allowlist
+// (`approve_unmodified`, `edit`), i.e. every send a person made — `skip` and
+// `closed` resolve an escalation with nothing sent and must never count as an
+// answer. Outbound rows cannot carry this rule, because a machine
 // send produces a row indistinguishable from a human one — and there is a live
 // path that manufactures exactly that: a `delay_promise` arriving in
 // AWAITING_PRECISION moves the conversation to ACK_RECEIVED and supersedes the

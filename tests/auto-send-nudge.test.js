@@ -691,4 +691,38 @@ describe('dashboard visibility — Auto-skickade', () => {
     expect(html).toContain('/arenden/3');
     expect(html).toContain('Ale');
   });
+
+  // 2026-08-20: the feed carries the trigger, so automating delay acks does not
+  // mean the operator stops seeing what we answered. "N av 2" is a nudge-only
+  // count — no other template may borrow it.
+  it('renders — for non-nudge templates and shows the escaped trigger snippet', () => {
+    const html = renderArenden({
+      cases: [],
+      autoSends: [{
+        decision_id: 1, decided_at: '2026-08-20T09:00:00Z', draft_template: 'T_DELAY_ACK',
+        conversation_id: 5, kommun_namn: 'Ale', role: 'central', followup_count: 0,
+        trigger_from: 'upphandling@ale.se', trigger_snippet: 'Vi återkommer <snart>.',
+      }],
+    });
+    expect(html).toContain('T_DELAY_ACK');
+    expect(html).not.toContain('0 av 2');
+    expect(html).toContain('Vi återkommer &lt;snart&gt;.');
+    expect(html).toContain('upphandling@ale.se');
+  });
+
+  // A proactive nudge has no trigger message (message_id NULL), so the query
+  // returns NULLs — the extra row must not render at all.
+  it('omits the trigger row when the decision has no trigger message', () => {
+    const html = renderArenden({
+      cases: [],
+      autoSends: [{
+        decision_id: 2, decided_at: '2026-08-20T09:00:00Z', draft_template: 'T_FOLLOWUP_NUDGE',
+        conversation_id: 6, kommun_namn: 'Ale', role: 'central', followup_count: 1,
+        trigger_from: null, trigger_snippet: null,
+      }],
+    });
+    expect(html).toContain('1 av 2');
+    expect(html).not.toContain('auto-send-trigger');
+    expect(html).not.toContain('svar på');
+  });
 });
