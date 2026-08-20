@@ -1419,21 +1419,26 @@ export async function runDailyFollowup(deps) {
       // parking); decision 'auto_send' is how the ledger permanently tells
       // machine sends from operator sends.
       //
-      // AWAITING_PRECISION is excluded (2026-08-20): the state means WE still
-      // owe the kommun the precision answer they asked for — a conversation
-      // leaves the state as soon as we reply (live: Jönköping went back to
-      // ACK_RECEIVED). isLazyConversation stays message-pure and counts a
-      // clarification as answered when any outbound is strictly later, but an
-      // auto-sent T_DELAY_ACK is exactly such an outbound, so the timestamp
-      // rule ALONE could mark an operator-unanswered question as answered. The
-      // state is the robust signal, immune to machine-sent mail: a nudge
-      // drafted in AWAITING_PRECISION always goes to the operator.
+      // An unanswered clarification must never draw an unattended nudge
+      // (2026-08-20). The GUARANTEE is the ledger check inside
+      // isLazyConversation: `listOperatorDecisionTimes` returns every send a
+      // PERSON made (decision <> 'auto_send'), so a clarification counts as
+      // answered only when a human replied after it. Outbound message rows
+      // would NOT do — a delay_promise arriving in AWAITING_PRECISION flips the
+      // conversation to ACK_RECEIVED and supersedes the operator's open
+      // precision draft, the delay-ack sweep auto-sends, and that machine
+      // outbound would pose as our answer. Leaving AWAITING_PRECISION therefore
+      // does not imply we replied. The state check below is kept only as a
+      // cheap backstop for the direct case (a conversation still sitting on the
+      // unanswered question); it is not what makes this safe.
       if (
         escId != null
         && draftTemplate === 'T_FOLLOWUP_NUDGE'
         && autoSendTemplates.includes('T_FOLLOWUP_NUDGE')
         && conv.state !== 'AWAITING_PRECISION'
-        && isLazyConversation(db.listMessages(conv.id))
+        && isLazyConversation(db.listMessages(conv.id), {
+          operatorSendTimes: db.listOperatorDecisionTimes(conv.id),
+        })
       ) {
         const esc = db.raw.prepare('SELECT * FROM escalations WHERE id = ?').get(escId);
         try {

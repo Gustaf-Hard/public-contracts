@@ -259,6 +259,9 @@ describe('isLazyConversation — auto-send eligibility rule 2 (fail closed)', ()
     ])).toBe(true);
   });
 
+  // The 'clarification' case here passes no operatorSendTimes, so it pins the
+  // FAIL-CLOSED arm (2026-08-20): without the decisions ledger a clarification
+  // is always unanswered. The answered arm lives in tests/auto-send-nudge.test.js.
   it('any substantive or unclassified inbound disqualifies', () => {
     for (const c of ['delivery', 'clarification', 'dead_end', 'bounce', 'unknown', null]) {
       expect(isLazyConversation([inbound('auto_ack'), inbound(c)])).toBe(false);

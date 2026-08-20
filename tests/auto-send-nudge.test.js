@@ -164,6 +164,28 @@ function seedOutbound(convId, { sentAt = '2026-07-11T10:00:00Z' } = {}) {
   });
 }
 
+// A resolved escalation plus its ledger row. `decision` is the ONLY place the
+// schema records machine ('auto_send') vs operator (edit, approve_unmodified,
+// …) — which is why the answered-clarification rule reads decisions, not
+// outbound rows. Foreign keys are ON, so the decision needs a real escalation
+// to point at; it is marked resolved so it never gates runDailyFollowup.
+function seedDecision(convId, { decision = 'edit', decidedAt = '2026-07-11 10:00:00', template = 'T_PRECISION', state = 'AWAITING_PRECISION' } = {}) {
+  const escId = db.recordEscalation({
+    conversation_id: convId, message_id: null, reason: 'seeded ledger row',
+    draft_template: template, draft_subject: 'Ang. er fråga', draft_body: 'Hej, här är förtydligandet.',
+    classifier_class: 'clarification', previous_state: state,
+  });
+  db.raw.prepare(`
+    INSERT INTO decisions (
+      escalation_id, conversation_id, conversation_state, classifier_class,
+      classifier_confidence, draft_template, draft_body, decision, final_body, decided_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(escId, convId, state, 'clarification', 0.9, template,
+    'Hej, här är förtydligandet.', decision, 'Hej, här är förtydligandet.', decidedAt);
+  db.raw.prepare("UPDATE escalations SET status = 'resolved_send' WHERE id = ?").run(escId);
+  return escId;
+}
+
 function seedNudgeEscalation(convId) {
   return db.recordEscalation({
     conversation_id: convId, message_id: null, reason: 'stale SENT',
@@ -217,9 +239,14 @@ describe("sendApprovedReply guards apply to decision 'auto_send'", () => {
   });
 });
 
+// "Answered" is a claim about a HUMAN having replied, so it is read from the
+// decisions ledger (operatorSendTimes), never from outbound message rows — a
+// machine send produces an identical row. Every case here passes the times
+// explicitly; the omitted-argument arm is the fail-closed default.
 describe('isLazyConversation with answered clarifications (2026-08-20)', () => {
   const IN = (classification, received_at, extra = {}) => ({ direction: 'inbound', classification, received_at, stored_attachment_count: 0, attachment_count: 0, ...extra });
   const OUT = (received_at) => ({ direction: 'outbound', classification: null, received_at, attachment_count: 0 });
+  const OPERATOR = (...times) => ({ operatorSendTimes: times });
 
   it('answered clarification qualifies (Jönköping shape)', () => {
     expect(isLazyConversation([
@@ -227,34 +254,55 @@ describe('isLazyConversation with answered clarifications (2026-08-20)', () => {
       IN('clarification', '2026-07-06T10:00:00Z'),
       OUT('2026-07-11T10:00:00Z'),
       IN('delay_promise', '2026-07-15T10:00:00Z'),
-    ])).toBe(true);
+    ], OPERATOR('2026-07-11 10:00:00'))).toBe(true);   // SQLite datetime('now') shape
   });
 
-  it('unanswered clarification does not (no outbound after it)', () => {
+  it('unanswered clarification does not (no operator send after it)', () => {
     expect(isLazyConversation([
       OUT('2026-07-05T09:00:00Z'),
       IN('clarification', '2026-07-06T10:00:00Z'),
-    ])).toBe(false);
-    expect(isLazyConversation([IN('clarification', '2026-07-06T10:00:00Z')])).toBe(false);
+    ], OPERATOR('2026-07-05 09:00:00'))).toBe(false);
+    expect(isLazyConversation([IN('clarification', '2026-07-06T10:00:00Z')], OPERATOR())).toBe(false);
   });
 
-  it('clarification at the same timestamp as the outbound is unanswered (strict after)', () => {
+  // The leak the reviewer traced, at predicate level: the delay-ack sweep sent
+  // the only outbound after the question, so the ledger holds no operator send
+  // and the clarification is still unanswered.
+  it('a MACHINE send after the clarification does not answer it (outbound row, no operator time)', () => {
+    const msgs = [
+      IN('clarification', '2026-07-06T10:00:00Z'),
+      OUT('2026-07-11T10:00:00Z'),                     // auto-sent T_DELAY_ACK
+      IN('delay_promise', '2026-07-15T10:00:00Z'),
+    ];
+    expect(isLazyConversation(msgs, OPERATOR())).toBe(false);
+    expect(isLazyConversation(msgs, { operatorSendTimes: null })).toBe(false);
+  });
+
+  it('omitted operatorSendTimes → fail closed, pre-widening strictness', () => {
+    expect(isLazyConversation([
+      IN('clarification', '2026-07-06T10:00:00Z'),
+      OUT('2026-07-11T10:00:00Z'),
+    ])).toBe(false);
+  });
+
+  it('clarification at the same timestamp as the operator send is unanswered (strict after)', () => {
     expect(isLazyConversation([
       IN('clarification', '2026-07-06T10:00:00Z'),
       OUT('2026-07-06T10:00:00Z'),
-    ])).toBe(false);
+    ], OPERATOR('2026-07-06T10:00:00Z'))).toBe(false);
   });
 
   it('a stored attachment on ANY inbound still disqualifies, clarification answered or not', () => {
     expect(isLazyConversation([
       IN('clarification', '2026-07-06T10:00:00Z', { stored_attachment_count: 1 }),
       OUT('2026-07-11T10:00:00Z'),
-    ])).toBe(false);
+    ], OPERATOR('2026-07-11T10:00:00Z'))).toBe(false);
   });
 
   it('delivery / unknown / NULL still disqualify conversation-wide', () => {
-    expect(isLazyConversation([IN('delivery', '2026-07-06T10:00:00Z'), OUT('2026-07-11T10:00:00Z')])).toBe(false);
-    expect(isLazyConversation([IN(null, '2026-07-06T10:00:00Z')])).toBe(false);
+    expect(isLazyConversation([IN('delivery', '2026-07-06T10:00:00Z'), OUT('2026-07-11T10:00:00Z')],
+      OPERATOR('2026-07-11T10:00:00Z'))).toBe(false);
+    expect(isLazyConversation([IN(null, '2026-07-06T10:00:00Z')], OPERATOR('2026-07-11T10:00:00Z'))).toBe(false);
   });
 });
 
@@ -294,59 +342,87 @@ describe('runDailyFollowup auto-sends eligible T_FOLLOWUP_NUDGE', () => {
     expect(db.listDecisions()[0]?.decision).toBe('auto_send');
   });
 
-  // Live shape (Jönköping conv 23): the kommun asked a question, we answered
-  // it, and everything since is lazy. End to end through runDailyFollowup, so
-  // the widening is proven on real DB rows and not only on the pure predicate.
-  it('an ANSWERED clarification (kommun asked, we replied, then only lazy mail) auto-sends', async () => {
+  // Live shape (Jönköping conv 23): the kommun asked a question, an OPERATOR
+  // answered it, and everything since is lazy. End to end through
+  // runDailyFollowup, so the widening is proven on real DB rows — including the
+  // ledger row that makes the reply a human one.
+  it('an ANSWERED clarification (operator replied, then only lazy mail) auto-sends', async () => {
     writeSwitch({ auto_send_templates: ['T_FOLLOWUP_NUDGE'] });
     const id = seedConv({ state: 'ACK_RECEIVED', stateChangedAt: '2026-07-18T00:00:00Z', followUpAt: '2026-08-10' });
     seedInbound(id, { classification: 'auto_ack', receivedAt: '2026-07-05T10:00:00Z' });
     seedInbound(id, { classification: 'clarification', receivedAt: '2026-07-06T10:00:00Z' });
     seedOutbound(id, { sentAt: '2026-07-11T10:00:00Z' });
+    seedDecision(id, { decision: 'edit', decidedAt: '2026-07-11 10:00:00' });   // the operator sent it
     seedInbound(id, { classification: 'delay_promise', receivedAt: '2026-07-15T10:00:00Z' });
     const gmail = fakeGmail();
     await runDailyFollowup(deps({ gmail }));
 
     expect(gmail.sendMessage).toHaveBeenCalledTimes(1);
-    expect(db.listDecisions()[0]?.decision).toBe('auto_send');
+    expect(db.listDecisions().at(-1)?.decision).toBe('auto_send');
   });
 
-  it('an UNANSWERED clarification (it arrived after our last reply) stays manual', async () => {
+  it('an UNANSWERED clarification (it arrived after the operator reply) stays manual', async () => {
     writeSwitch({ auto_send_templates: ['T_FOLLOWUP_NUDGE'] });
     const id = seedConv({ state: 'ACK_RECEIVED', stateChangedAt: '2026-07-18T00:00:00Z', followUpAt: '2026-08-10' });
     seedInbound(id, { classification: 'auto_ack', receivedAt: '2026-07-05T10:00:00Z' });
     seedOutbound(id, { sentAt: '2026-07-11T10:00:00Z' });
+    seedDecision(id, { decision: 'edit', decidedAt: '2026-07-11 10:00:00' });
     seedInbound(id, { classification: 'clarification', receivedAt: '2026-07-12T10:00:00Z' });
     const gmail = fakeGmail();
     await runDailyFollowup(deps({ gmail }));
 
     expect(gmail.sendMessage).not.toHaveBeenCalled();
-    expect(db.listDecisions()).toHaveLength(0);
+    expect(db.listDecisions().some((d) => d.decision === 'auto_send')).toBe(false);
     const escs = db.listOpenEscalationsForConversation(id);
     expect(escs).toHaveLength(1);
     expect(escs[0].draft_template).toBe('T_FOLLOWUP_NUDGE');
   });
 
-  // The state guard, not the timestamps (2026-08-20 ruling). AWAITING_PRECISION
-  // means WE still owe the precision answer; a conversation leaves the state as
-  // soon as we reply. Here the only outbound after the clarification is the
-  // machine-ack shape (an auto-sent T_DELAY_ACK), which satisfies
-  // isLazyConversation's "answered" test on timestamps alone — the state guard
-  // is what keeps the nudge with the operator.
-  it('AWAITING_PRECISION never auto-sends, even with an outbound after the clarification', async () => {
+  // The leak chain the review traced, end to end. A delay_promise arriving in
+  // AWAITING_PRECISION transitions the conversation to ACK_RECEIVED
+  // (conversation.js send_delay_ack) and supersedes the operator's open
+  // precision draft; the delay-ack sweep auto-sends; the clarification is left
+  // unanswered by any HUMAN. The state guard cannot see this — the conversation
+  // is no longer in AWAITING_PRECISION — so the decisions ledger is what must
+  // hold the nudge back: the only send here is decision 'auto_send'.
+  it('a machine-acked, never-human-answered clarification (ACK_RECEIVED) stays manual', async () => {
     writeSwitch({ auto_send_templates: ['T_FOLLOWUP_NUDGE'] });
-    const id = seedConv({ state: 'AWAITING_PRECISION', stateChangedAt: '2026-07-18T00:00:00Z' });
+    const id = seedConv({ state: 'ACK_RECEIVED', stateChangedAt: '2026-07-18T00:00:00Z', followUpAt: '2026-08-10' });
     seedInbound(id, { classification: 'clarification', receivedAt: '2026-07-06T10:00:00Z' });
-    seedOutbound(id, { sentAt: '2026-07-11T10:00:00Z' });   // machine-sent T_DELAY_ACK shape
+    seedOutbound(id, { sentAt: '2026-07-11T10:00:00Z' });                        // the machine's ack
+    seedDecision(id, { decision: 'auto_send', decidedAt: '2026-07-11 10:00:00', template: 'T_DELAY_ACK', state: 'ACK_RECEIVED' });
     seedInbound(id, { classification: 'delay_promise', receivedAt: '2026-07-15T10:00:00Z' });
-    // Sanity: the message-pure predicate DOES call this lazy — the state is the
-    // only thing holding the send back.
-    expect(isLazyConversation(db.listMessages(id))).toBe(true);
+    // The ledger holds no operator send at all, so nothing answered the question.
+    expect(db.listOperatorDecisionTimes(id)).toEqual([]);
     const gmail = fakeGmail();
     await runDailyFollowup(deps({ gmail }));
 
     expect(gmail.sendMessage).not.toHaveBeenCalled();
-    expect(db.listDecisions()).toHaveLength(0);
+    expect(db.listDecisions().filter((d) => d.draft_template === 'T_FOLLOWUP_NUDGE')).toHaveLength(0);
+    const escs = db.listOpenEscalationsForConversation(id);
+    expect(escs).toHaveLength(1);                       // drafted, awaiting the operator
+    expect(escs[0].draft_template).toBe('T_FOLLOWUP_NUDGE');
+  });
+
+  // The cheap state backstop, pinned on its own: here an operator DID reply
+  // after the clarification, so the ledger check passes — the state is the only
+  // thing left holding the send, which is exactly its job for a conversation
+  // still sitting on an unanswered question.
+  it('AWAITING_PRECISION never auto-sends, even when the ledger check would pass', async () => {
+    writeSwitch({ auto_send_templates: ['T_FOLLOWUP_NUDGE'] });
+    const id = seedConv({ state: 'AWAITING_PRECISION', stateChangedAt: '2026-07-18T00:00:00Z' });
+    seedInbound(id, { classification: 'clarification', receivedAt: '2026-07-06T10:00:00Z' });
+    seedOutbound(id, { sentAt: '2026-07-11T10:00:00Z' });
+    seedDecision(id, { decision: 'edit', decidedAt: '2026-07-11 10:00:00' });
+    seedInbound(id, { classification: 'delay_promise', receivedAt: '2026-07-15T10:00:00Z' });
+    // Sanity: the predicate DOES call this lazy — the state is the only thing
+    // holding the send back.
+    expect(isLazyConversation(db.listMessages(id), { operatorSendTimes: db.listOperatorDecisionTimes(id) })).toBe(true);
+    const gmail = fakeGmail();
+    await runDailyFollowup(deps({ gmail }));
+
+    expect(gmail.sendMessage).not.toHaveBeenCalled();
+    expect(db.listDecisions().some((d) => d.decision === 'auto_send')).toBe(false);
     const escs = db.listOpenEscalationsForConversation(id);
     expect(escs).toHaveLength(1);                       // drafted, awaiting the operator
     expect(escs[0].draft_template).toBe('T_FOLLOWUP_NUDGE');

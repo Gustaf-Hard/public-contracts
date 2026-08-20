@@ -226,28 +226,44 @@ export const AUTO_SEND_LAZY_CLASSIFICATIONS = new Set([
 // computed column falls back to the OLD, stricter raw count (fail closed), and
 // a row lacking both counts as 0.
 //
-// 2026-08-20 widening: a 'clarification' no longer disqualifies IF an
-// outbound exists strictly after it — the kommun asked, we answered, and
-// everything since is lazy (live: Jönköping conv 23, Burlöv conv 36). An
-// UNANSWERED clarification still fails: the generic nudge must never stand in
-// for the real reply the operator owes. The zero-stored-attachments condition
-// stays conversation-wide on purpose: a delivered file anywhere makes "jag
-// vill följa upp" a misdescription whatever came after, and a body-text
-// delivery (the Bjuv shape) still fails via its 'delivery' classification.
-export function isLazyConversation(messages) {
-  const msgs = messages ?? [];
-  const lastOutMs = Math.max(-Infinity, ...msgs
-    .filter((m) => m.direction === 'outbound')
-    .map((m) => Date.parse(m.received_at ?? ''))
-    .filter(Number.isFinite));
-  return msgs
+// 2026-08-20 widening: a 'clarification' no longer disqualifies IF a HUMAN
+// answered it — the kommun asked, an operator replied, and everything since is
+// lazy (live: Jönköping conv 23, Burlöv conv 36). An UNANSWERED clarification
+// still fails the whole conversation: the generic nudge must never stand in for
+// the real reply the operator owes.
+//
+// "Answered" is grounded in the decisions LEDGER, not in outbound message rows.
+// `opts.operatorSendTimes` is `db.listOperatorDecisionTimes(convId)`: the
+// `decided_at` of every send that was NOT `decision = 'auto_send'`, i.e. every
+// send a person made. Outbound rows cannot carry this rule, because a machine
+// send produces a row indistinguishable from a human one — and there is a live
+// path that manufactures exactly that: a `delay_promise` arriving in
+// AWAITING_PRECISION moves the conversation to ACK_RECEIVED and supersedes the
+// operator's open precision draft, the delay-ack sweep auto-sends, and that
+// machine outbound would otherwise read as our answer to a question no one ever
+// answered. A clarification therefore qualifies only when some OPERATOR send is
+// strictly later than it.
+//
+// Fail-closed default: with `operatorSendTimes` absent or null, every
+// clarification is unanswered — the pre-widening semantics. A caller that
+// cannot supply the ledger gets the strict rule, never the permissive one.
+//
+// The zero-stored-attachments condition stays conversation-wide on purpose: a
+// delivered file anywhere makes "jag vill följa upp" a misdescription whatever
+// came after, and a body-text delivery (the Bjuv shape) still fails via its
+// 'delivery' classification.
+export function isLazyConversation(messages, { operatorSendTimes = null } = {}) {
+  const lastOperatorMs = Math.max(-Infinity, ...(operatorSendTimes ?? [])
+    .map(dbTimeMs)
+    .filter((ms) => ms != null));
+  return (messages ?? [])
     .filter((m) => m.direction === 'inbound')
     .every((m) => {
       if ((m.stored_attachment_count ?? m.attachment_count ?? 0) !== 0) return false;
       if (AUTO_SEND_LAZY_CLASSIFICATIONS.has(m.classification)) return true;
       if (m.classification !== 'clarification') return false;
-      const ms = Date.parse(m.received_at ?? '');
-      return Number.isFinite(ms) && ms < lastOutMs; // answered = an outbound strictly after
+      const ms = dbTimeMs(m.received_at);
+      return ms != null && ms < lastOperatorMs; // answered = an OPERATOR send strictly after
     });
 }
 

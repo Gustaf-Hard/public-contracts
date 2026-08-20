@@ -553,6 +553,23 @@ export function openDb(path) {
     return db.prepare('SELECT * FROM decisions ORDER BY id').all();
   }
 
+  // When has a HUMAN sent in this conversation (2026-08-20)? The decisions
+  // ledger is the only place that distinguishes operator sends from machine
+  // ones: every unattended send is written with decision 'auto_send', every
+  // other decision came from a person (edit, approve_unmodified, …). The
+  // messages table cannot tell them apart — an outbound row looks identical
+  // either way — which is why isLazyConversation reads these times, not
+  // outbound rows, when judging whether a kommun's clarification was answered.
+  // Raw `decided_at` strings (SQLite "YYYY-MM-DD HH:MM:SS"); the caller
+  // normalises. Read-only, no schema change.
+  function listOperatorDecisionTimes(conversationId) {
+    return db.prepare(`
+      SELECT decided_at FROM decisions
+      WHERE conversation_id = ? AND decision <> 'auto_send'
+      ORDER BY decided_at, id
+    `).all(conversationId).map((r) => r.decided_at);
+  }
+
   // Read-only view for the on-demand edit-review report
   // (scripts/08-review-edits.js): every operator edit joined to its
   // conversation, newest first.
@@ -1463,6 +1480,7 @@ export function openDb(path) {
     transaction,
     recordDecision,
     listDecisions,
+    listOperatorDecisionTimes,
     listEditDecisions,
     listAutoSendDecisions,
     countAutoSendDecisions,

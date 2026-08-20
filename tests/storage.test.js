@@ -547,6 +547,24 @@ describe('auto-send decision queries (2026-08-20 delay-ack design)', () => {
     expect(db.countAutoSendDecisions(convId + 999, 'T_DELAY_ACK')).toBe(0);
   });
 
+  // The answered-clarification rule (2026-08-20) asks "did a HUMAN send here?".
+  // Only the decisions ledger can answer it — outbound message rows look the
+  // same whoever sent them — so this query must exclude exactly the auto_send
+  // rows and keep every operator decision, whatever its template.
+  it('listOperatorDecisionTimes returns operator decision times only, never auto_send', () => {
+    const { convId, escId } = seed();
+    const base = { escalation_id: escId, conversation_id: convId, conversation_state: 'ACK_RECEIVED', draft_body: 'x' };
+    db.recordDecision({ ...base, draft_template: 'T_DELAY_ACK', decision: 'auto_send' });
+    db.recordDecision({ ...base, draft_template: 'T_PRECISION', decision: 'edit' });
+    db.recordDecision({ ...base, draft_template: 'T_RECEIPT', decision: 'approve_unmodified' });
+    db.raw.prepare("UPDATE decisions SET decided_at = '2026-07-11 10:00:00' WHERE decision = 'edit'").run();
+    db.raw.prepare("UPDATE decisions SET decided_at = '2026-07-12 10:00:00' WHERE decision = 'approve_unmodified'").run();
+    db.raw.prepare("UPDATE decisions SET decided_at = '2026-07-13 10:00:00' WHERE decision = 'auto_send'").run();
+
+    expect(db.listOperatorDecisionTimes(convId)).toEqual(['2026-07-11 10:00:00', '2026-07-12 10:00:00']);
+    expect(db.listOperatorDecisionTimes(convId + 999)).toEqual([]);
+  });
+
   it('listAutoSendDecisions carries the trigger sender + snippet, NULL for proactive drafts', () => {
     const { convId, escId } = seed();
     db.recordDecision({

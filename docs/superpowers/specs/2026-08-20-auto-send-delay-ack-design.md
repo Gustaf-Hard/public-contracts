@@ -184,17 +184,16 @@ nudge graduation.
 
 ## Part 2 — answered-clarification nudges
 
-`isLazyConversation(messages)` (conversation.js) widens from "every inbound
-is LAZY" to:
+`isLazyConversation(messages, { operatorSendTimes })` (conversation.js) widens
+from "every inbound is LAZY" to:
 
 1. Every inbound is classified in `AUTO_SEND_LAZY_CLASSIFICATIONS` **or** is
    `'clarification'`. Everything else (delivery, dead_end, bounce, unknown,
    NULL) still fails the whole conversation — unchanged.
-2. Every `clarification` is **answered**: at least one outbound message has
-   `received_at` strictly after it. An unanswered question must never draw a
+2. Every `clarification` is **answered by a human**: some OPERATOR send is
+   strictly after its `received_at`. An unanswered question must never draw a
    generic "har ni haft möjlighet att titta på detta?" — that is the operator
-   drafting a real reply, exactly as today. A conversation with a
-   clarification and no outbound at all fails.
+   drafting a real reply, exactly as today.
 3. Every inbound still has zero stored attachments — the conversation-wide
    condition is **unchanged and deliberately NOT relaxed** to
    since-last-outbound: a stored attachment anywhere means the kommun
@@ -203,22 +202,39 @@ is LAZY" to:
    classification with zero attachments, the Bjuv shape): `delivery` is not
    in the widened set, so it still fails conversation-wide.
 
-The signature is unchanged — `db.listMessages(conv.id)` already contains
-outbound rows with `received_at`. The fail-closed `stored ?? raw ?? 0` chain is
-unchanged. The call site (`runDailyFollowup` nudge auto-send) gains ONE
-conjunct, `conv.state !== 'AWAITING_PRECISION'` (see below); the predicate
-itself stays message-pure.
+**"Answered" is read from the decisions ledger, never from outbound message
+rows.** An outbound row looks identical whoever sent it, and there is a live
+path that manufactures a machine one right after a question: a `delay_promise`
+arriving in `AWAITING_PRECISION` transitions the conversation to `ACK_RECEIVED`
+(`send_delay_ack`, conversation.js) and supersedes the operator's open precision
+draft, then the delay-ack sweep of Part 1 auto-sends. That machine outbound
+would pose as our answer to a question no human ever answered. The ledger is the
+one place the difference survives: every unattended send is
+`decision = 'auto_send'`, every other decision came from a person. A new
+read-only query, `db.listOperatorDecisionTimes(convId)` (storage.js, no schema
+change), returns the `decided_at` of each `decision <> 'auto_send'` row, and the
+call site passes it as `operatorSendTimes`. Times are normalised with the same
+`dbTimeMs` helper `isAutoSendableDelayAck` uses, so SQLite's
+`"YYYY-MM-DD HH:MM:SS"` is read as UTC rather than local time.
+
+**Fail-closed default:** with `operatorSendTimes` absent or null, every
+clarification is unanswered — the pre-widening semantics. A caller that cannot
+supply the ledger gets the strict rule, never the permissive one. The
+fail-closed `stored ?? raw ?? 0` chain is unchanged.
+
+The call site (`runDailyFollowup` nudge auto-send) also keeps
+`conv.state !== 'AWAITING_PRECISION'`, but only as a cheap backstop for the
+direct case — a conversation still sitting on the unanswered question. It is NOT
+the guarantee: leaving `AWAITING_PRECISION` does not imply we replied, because
+the `delay_promise` transition above moves a conversation out of the state with
+the question still open. The ledger check is what makes this safe.
 
 Effect on live data (verified against the 2026-08-19 snapshot): Jönköping
 (conv 23) and Burlöv (conv 36) become auto-eligible once their currently-open
-manual drafts are cleared; no other open conversation changes bucket.
+manual drafts are cleared — both have a real operator send after their
+clarification; no other open conversation changes bucket.
 `AWAITING_PRECISION` conversations still draft nudges on their fixed 10-day
-threshold (no jitter, per the 2026-08-17 spec) but NEVER auto-send: the state
-means the clarification is UNANSWERED — we still owe the precision reply, and a
-conversation leaves the state as soon as we send it (Jönköping went back to
-`ACK_RECEIVED`). The timestamp rule alone could be fooled there, because an
-auto-sent `T_DELAY_ACK` is an outbound strictly after the question and would
-read as an answer; the state is the robust signal, immune to machine-sent mail.
+threshold (no jitter, per the 2026-08-17 spec) but never auto-send.
 
 ## Visibility — Auto-skickade feed carries the trigger
 
