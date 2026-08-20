@@ -2257,6 +2257,13 @@ export function renderArenden({ cases = [], selected = null, selectedId = null, 
   // "Auto-skickade" (2026-08-17 design): the FYI surface for unattended sends.
   // Slack is not configured on the box, so this section IS the notification —
   // rendered only when at least one auto_send decision exists.
+  //
+  // Since 2026-08-20 a reactive template (T_DELAY_ACK) can auto-send too, so
+  // the row carries WHAT it answered: sender + the raw 160-char body prefix
+  // listAutoSendDecisions returns. That prefix is unescaped mail from a
+  // stranger — escapeHtml is load-bearing, not cosmetic. "N av 2" counts
+  // nudges only; any other template renders "—" rather than borrow a number
+  // that means nothing for it.
   const autoSection = autoSends.length === 0 ? '' : `
     <section class="auto-sends">
       <h2>Auto-skickade</h2>
@@ -2268,8 +2275,11 @@ export function renderArenden({ cases = [], selected = null, selectedId = null, 
             <td><a href="/arenden/${d.conversation_id}" data-pane-link>${escapeHtml(d.kommun_namn)}</a></td>
             <td>${escapeHtml(d.role)}</td>
             <td>${escapeHtml(d.draft_template ?? '')}</td>
-            <td>${d.followup_count} av 2</td>
-          </tr>`).join('')}
+            <td>${d.draft_template === 'T_FOLLOWUP_NUDGE' ? `${d.followup_count} av 2` : '—'}</td>
+          </tr>${d.trigger_snippet ? `<tr class="auto-send-trigger">
+            <td></td>
+            <td colspan="4"><small>svar på ${escapeHtml(d.trigger_from ?? '')}: ${escapeHtml(d.trigger_snippet)}…</small></td>
+          </tr>` : ''}`).join('')}
         </tbody>
       </table>
     </section>`;

@@ -1,4 +1,5 @@
 import { isInVacation } from './vacation.js';
+import { delayAckBodyGate } from './classifier.js';
 
 export function nextActionForClassification(state, classification, opts = {}) {
   if (classification === 'unknown') {
@@ -224,9 +225,114 @@ export const AUTO_SEND_LAZY_CLASSIFICATIONS = new Set([
 // The `??` chain is the safety property, not tidiness: a row that lacks the
 // computed column falls back to the OLD, stricter raw count (fail closed), and
 // a row lacking both counts as 0.
-export function isLazyConversation(messages) {
+//
+// 2026-08-20 widening: a 'clarification' no longer disqualifies IF a HUMAN
+// answered it — the kommun asked, an operator replied, and everything since is
+// lazy (live: Jönköping conv 23, Burlöv conv 36). An UNANSWERED clarification
+// still fails the whole conversation: the generic nudge must never stand in for
+// the real reply the operator owes.
+//
+// "Answered" is grounded in the decisions LEDGER, not in outbound message rows.
+// `opts.operatorSendTimes` is `db.listOperatorDecisionTimes(convId)`: the
+// `decided_at` of every decision on the send-shaped allowlist
+// (`approve_unmodified`, `edit`), i.e. every send a person made — `skip` and
+// `closed` resolve an escalation with nothing sent and must never count as an
+// answer. Outbound rows cannot carry this rule, because a machine
+// send produces a row indistinguishable from a human one — and there is a live
+// path that manufactures exactly that: a `delay_promise` arriving in
+// AWAITING_PRECISION moves the conversation to ACK_RECEIVED and supersedes the
+// operator's open precision draft, the delay-ack sweep auto-sends, and that
+// machine outbound would otherwise read as our answer to a question no one ever
+// answered. A clarification therefore qualifies only when some OPERATOR send is
+// strictly later than it.
+//
+// Fail-closed default: with `operatorSendTimes` absent or null, every
+// clarification is unanswered — the pre-widening semantics. A caller that
+// cannot supply the ledger gets the strict rule, never the permissive one.
+//
+// The zero-stored-attachments condition stays conversation-wide on purpose: a
+// delivered file anywhere makes "jag vill följa upp" a misdescription whatever
+// came after, and a body-text delivery (the Bjuv shape) still fails via its
+// 'delivery' classification.
+export function isLazyConversation(messages, { operatorSendTimes = null } = {}) {
+  const lastOperatorMs = Math.max(-Infinity, ...(operatorSendTimes ?? [])
+    .map(dbTimeMs)
+    .filter((ms) => ms != null));
   return (messages ?? [])
     .filter((m) => m.direction === 'inbound')
-    .every((m) => AUTO_SEND_LAZY_CLASSIFICATIONS.has(m.classification)
-      && (m.stored_attachment_count ?? m.attachment_count ?? 0) === 0);
+    .every((m) => {
+      if ((m.stored_attachment_count ?? m.attachment_count ?? 0) !== 0) return false;
+      if (AUTO_SEND_LAZY_CLASSIFICATIONS.has(m.classification)) return true;
+      if (m.classification !== 'clarification') return false;
+      const ms = dbTimeMs(m.received_at);
+      return ms != null && ms < lastOperatorMs; // answered = an OPERATOR send strictly after
+    });
+}
+
+// ---- T_DELAY_ACK auto-send eligibility (2026-08-20 design) ----
+//
+// Pure predicate over rows the caller fetched; never reads disk or DB. Every
+// unknown fails closed. Returns { ok, reason } so the sweep can log WHY a
+// draft stayed manual — the reasons are the spec's rule names.
+export const DELAY_ACK_AUTO_MIN_CONFIDENCE = 0.85;
+// Rollout guard: drafts already open when the feature deploys (including the
+// known-bad Borås/Eslöv ones) must never auto-send; only fresh drafts qualify.
+export const DELAY_ACK_AUTO_MAX_AGE_HOURS = 48;
+// Mail-loop bound (Örebro shape): our ack can trigger an autoresponder that
+// classifies delay_promise again with a fresh date, which hasDelayAckForDate
+// does not dedupe. Two lifetime auto-acks bounds the loop; later drafts
+// escalate to the operator as today. Operator sends never count.
+export const DELAY_ACK_AUTO_MAX_PER_CONV = 2;
+
+// SQLite datetime('now') is "YYYY-MM-DD HH:MM:SS" in UTC; normalise like
+// tick.js parseDbTime. Unparseable → null → fail closed.
+function dbTimeMs(s) {
+  const raw = String(s ?? '');
+  const ms = Date.parse(raw.includes('T') ? raw : `${raw.replace(' ', 'T')}Z`);
+  return Number.isFinite(ms) ? ms : null;
+}
+
+export function isAutoSendableDelayAck({ esc, messages, autoSentCount, now }) {
+  const no = (reason) => ({ ok: false, reason });
+  if (!esc || esc.draft_template !== 'T_DELAY_ACK' || esc.status !== 'open') return no('not_delay_ack');
+  if (esc.classifier_class !== 'delay_promise') return no('class');
+  // Number.isFinite, not typeof: NaN is typeof 'number' and every comparison
+  // against it is false, so `< MIN` alone would wave a NaN confidence through
+  // as eligible — precisely the shape that must never auto-send.
+  if (!Number.isFinite(esc.classifier_confidence)
+    || esc.classifier_confidence < DELAY_ACK_AUTO_MIN_CONFIDENCE) return no('confidence');
+
+  const createdMs = dbTimeMs(esc.created_at);
+  if (createdMs == null
+    || now.getTime() - createdMs > DELAY_ACK_AUTO_MAX_AGE_HOURS * 3600 * 1000) return no('stale_draft');
+
+  const inbound = (messages ?? []).filter((m) => m.direction === 'inbound');
+  const trigger = inbound.find((m) => m.id === esc.message_id);
+  if (!trigger) return no('trigger_missing');
+  // Strictly newest: any OTHER inbound at the same or a later received_at
+  // means the world may have moved — manual. Complementary to the
+  // STALE_ESCALATION guard in sendApprovedReply (which compares against the
+  // escalation's creation time, not the trigger's position).
+  const triggerMs = dbTimeMs(trigger.received_at);
+  if (triggerMs == null) return no('not_latest_inbound');
+  for (const m of inbound) {
+    if (m.id === trigger.id) continue;
+    const ms = dbTimeMs(m.received_at);
+    if (ms == null || ms >= triggerMs) return no('not_latest_inbound');
+  }
+
+  // Same fail-closed chain as isLazyConversation: missing computed column
+  // falls back to the raw carried count.
+  if ((trigger.stored_attachment_count ?? trigger.attachment_count ?? 0) !== 0) return no('attachments');
+
+  const gate = delayAckBodyGate(trigger.body_text);
+  if (!gate.ok) return no(gate.reason);
+
+  // An absent/undefined/NaN count is NOT "zero sent so far": a caller that
+  // forgot the argument, or a db seam that returned nothing, would otherwise
+  // read as "cap not reached" and unbound the very mail loop the cap exists
+  // to bound. No number, no auto-send.
+  if (!Number.isFinite(autoSentCount)
+    || autoSentCount >= DELAY_ACK_AUTO_MAX_PER_CONV) return no('auto_send_cap');
+  return { ok: true, reason: null };
 }

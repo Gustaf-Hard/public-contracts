@@ -553,6 +553,34 @@ export function openDb(path) {
     return db.prepare('SELECT * FROM decisions ORDER BY id').all();
   }
 
+  // When has a HUMAN actually SENT mail in this conversation (2026-08-20)? The
+  // decisions ledger is the only place that distinguishes operator sends from
+  // machine ones — the messages table cannot, an outbound row looks identical
+  // either way — which is why isLazyConversation reads these times, not
+  // outbound rows, when judging whether a kommun's clarification was answered.
+  //
+  // The ALLOWLIST is the safety property, not tidiness. Not every operator
+  // decision is a send: `skip` (daemon.js, dashboard.js,
+  // scripts/pilot-resolve.js) and `closed` (dashboard.js) resolve an escalation
+  // with nothing sent at all. Counting those would let silence answer a
+  // question — an operator skipping a precision draft would license an
+  // unattended nudge to a kommun still waiting for the reply. Exactly two
+  // values reach recordDecision from an operator send: 'approve_unmodified' and
+  // 'edit' (send-reply.js, after Gmail accepted the mail; the same path writes
+  // 'auto_send' when unattended). A positive list also fails closed against
+  // future decision values: a new non-send verb stays excluded until someone
+  // deliberately adds it here.
+  //
+  // Raw `decided_at` strings (SQLite "YYYY-MM-DD HH:MM:SS"); the caller
+  // normalises. Read-only, no schema change.
+  function listOperatorDecisionTimes(conversationId) {
+    return db.prepare(`
+      SELECT decided_at FROM decisions
+      WHERE conversation_id = ? AND decision IN ('approve_unmodified', 'edit')
+      ORDER BY decided_at, id
+    `).all(conversationId).map((r) => r.decided_at);
+  }
+
   // Read-only view for the on-demand edit-review report
   // (scripts/08-review-edits.js): every operator edit joined to its
   // conversation, newest first.
@@ -580,6 +608,10 @@ export function openDb(path) {
   // feed — the most recent machine sends, joined to their conversation.
   // decided_at is normalized to ISO (T/Z) so the views' time formatting never
   // has to guess at SQLite's space-separated datetime.
+  // trigger_from/trigger_snippet (2026-08-20 delay-ack design, Visibility):
+  // the inbound mail that provoked the send, so the operator can judge the
+  // machine's reading of it. LEFT joins — a proactive draft (nudge) carries no
+  // message_id, and its feed row must survive with NULL trigger fields.
   function listAutoSendDecisions(limit = 20) {
     return db.prepare(`
       SELECT
@@ -589,13 +621,27 @@ export function openDb(path) {
         conv.id AS conversation_id,
         conv.kommun_namn,
         conv.role,
-        conv.followup_count
+        conv.followup_count,
+        m.from_email AS trigger_from,
+        substr(m.body_text, 1, 160) AS trigger_snippet
       FROM decisions d
       JOIN conversations conv ON conv.id = d.conversation_id
+      LEFT JOIN escalations e ON e.id = d.escalation_id
+      LEFT JOIN messages m ON m.id = e.message_id
       WHERE d.decision = 'auto_send'
       ORDER BY d.decided_at DESC, d.id DESC
       LIMIT ?
     `).all(limit);
+  }
+
+  // How many times the machine has already sent this template for this
+  // conversation (2026-08-20 delay-ack design, loop bound). Operator
+  // decisions (edit / approve_unmodified) deliberately do not count.
+  function countAutoSendDecisions(conversationId, draftTemplate) {
+    return db.prepare(`
+      SELECT COUNT(*) AS n FROM decisions
+      WHERE conversation_id = ? AND draft_template = ? AND decision = 'auto_send'
+    `).get(conversationId, draftTemplate).n;
   }
 
   function listOpenEscalations() {
@@ -1445,8 +1491,10 @@ export function openDb(path) {
     transaction,
     recordDecision,
     listDecisions,
+    listOperatorDecisionTimes,
     listEditDecisions,
     listAutoSendDecisions,
+    countAutoSendDecisions,
     recordHeartbeat,
     markFollowupCompleted,
     getFollowupCompletedDate,

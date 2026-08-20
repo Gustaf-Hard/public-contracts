@@ -138,6 +138,38 @@ export function stripQuotedText(body) {
   return splitQuotedText(body).visible;
 }
 
+// ---- T_DELAY_ACK auto-send body gate (2026-08-20 design) ----
+//
+// A delay ack may only auto-send when the triggering mail is a plain "vi
+// återkommer" promise. This gate blocks the shapes the 2026-08-19 evaluation
+// found misfiled under delay_promise: a contract table pasted in the body
+// (Borås — currency amounts), a paper-pickup instruction that needs a real
+// answer (Eslöv — "hämta i receptionen"), and attachment talk that means the
+// mail is a delivery whatever the classifier thought. Operates on
+// stripQuotedText(body) so OUR OWN words quoted back never trigger it.
+// Deliberately a blocklist, not a promise-phrase allowlist: a false block
+// costs one manual approval; a false pass costs a wrong outbound.
+export const DELAY_ACK_AUTO_MAX_WORDS = 200;
+
+// "911 000,00 kr" / "1 234 SEK" / "911 000:-" — requires a digit group ending
+// in a currency token, so phone numbers ("0472-15067") and dates never match.
+const CURRENCY_RE = /\d[\d\s.,]*\s?(?:kr|sek)\b|:-\s*(?:$|\s)/i;
+const PICKUP_RE = /\bhämta[sr]?\b|\breception(?:en)?\b|\bavhämt/i;
+// Open-ended \w* covers the whole bifoga- paradigm (bifogar/bifogat/bifogad/
+// bifogade/bifogas) — an enumerated suffix set misses "se bifogade avtal",
+// which is the single most common way a delivery announces itself.
+const ATTACHMENT_RE = /\bbifoga\w*|\bbilag(?:a|an|or|orna)\b/i;
+
+export function delayAckBodyGate(body) {
+  const visible = stripQuotedText(body ?? '').trim();
+  if (!visible) return { ok: false, reason: 'empty' };
+  if (CURRENCY_RE.test(visible)) return { ok: false, reason: 'currency' };
+  if (PICKUP_RE.test(visible)) return { ok: false, reason: 'pickup' };
+  if (ATTACHMENT_RE.test(visible)) return { ok: false, reason: 'attachment_language' };
+  if (visible.split(/\s+/).length > DELAY_ACK_AUTO_MAX_WORDS) return { ok: false, reason: 'too_long' };
+  return { ok: true, reason: null };
+}
+
 // Fallback "this was everything" detector over the UNQUOTED part of the body
 // (review M9): used only when no LLM analysis is available. Deliberately the
 // declarative shape — demonstrative BEFORE the verb — so a question

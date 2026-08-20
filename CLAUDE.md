@@ -127,16 +127,16 @@ Phase-1 pipeline: `scripts/01|02|03 → src/seed.js|crawl.js|verify.js → data/
   the `T_REQUEST_MISSING` claim — we cannot say an avtal is missing while it
   sits unread on our own disk. Nothing is deleted: clearing
   `analysis_attempts` (or `--force`) re-queues.
-- **Auto-send is one template, fail-closed, kill-switched.** Only
-  `T_FOLLOWUP_NUDGE` may go out unattended, and only when EVERY inbound in the
-  conversation is classified in the LAZY set (`auto_ack`, `auto_reply`,
-  `delay_promise`, `handoff_internal`; zero inbound qualifies; NULL/`unknown`
-  never do) **and has no *stored* attachments** (`stored_attachment_count`, the
-  computed column `listMessages` adds — a stored attachment is substance
-  everywhere else, `inferThreadStatus`, the analysis queue, so a misclassified
-  ack holding the delivered avtal falls back to the operator; an
-  ingest-skipped signature logo is not, and the raw `attachment_count` the
-  dashboard reports still counts what the mail carried)
+- **Auto-send is two templates, fail-closed, kill-switched.** Only
+  `T_FOLLOWUP_NUDGE` and `T_DELAY_ACK` may go out unattended. The nudge goes
+  only when EVERY inbound in the conversation is classified in the LAZY set
+  (`auto_ack`, `auto_reply`, `delay_promise`, `handoff_internal`; zero inbound
+  qualifies; NULL/`unknown` never do) **and has no *stored* attachments**
+  (`stored_attachment_count`, the computed column `listMessages` adds — a
+  stored attachment is substance everywhere else, `inferThreadStatus`, the
+  analysis queue, so a misclassified ack holding the delivered avtal falls back
+  to the operator; an ingest-skipped signature logo is not, and the raw
+  `attachment_count` the dashboard reports still counts what the mail carried)
   AND `auto_send_templates` in `data/pilot-overrides.json` lists it —
   the file is re-read at the start of every `runDailyFollowup`, so pulling the
   key stops the next run without a restart. The send rides `sendApprovedReply`
@@ -146,6 +146,25 @@ Phase-1 pipeline: `scripts/01|02|03 → src/seed.js|crawl.js|verify.js → data/
   Gmail failure parks it `send_failed` — the automation NEVER retries either.
   Nudge thresholds are 9 + `nudgeJitterDays(conv.id)` (0–6, pure hash) days for
   SENT/ACK_RECEIVED so reminders don't fire like clockwork.
+  `T_DELAY_ACK` (2026-08-20 design) may also go out unattended via the same
+  `runDailyFollowup` + `sendApprovedReply` rails, but only when
+  `isAutoSendableDelayAck` (conversation.js) passes: switch lists it, open
+  draft ≤48h old (`stale_draft` — the deploy-day backlog never auto-sends),
+  `delay_promise` ≥0.85, trigger is the strictly-newest inbound with zero
+  stored attachments, `delayAckBodyGate` (classifier.js) finds no
+  currency/pickup/attachment language and ≤200 visible words, and fewer than
+  2 prior machine sends of this template for the conversation
+  (`countAutoSendDecisions` — the autoresponder-loop bound; operator sends
+  don't count). Every rule fails closed and every skip logs its reason.
+  `isLazyConversation` additionally admits a `clarification`, but only one the
+  LEDGER shows a human answered: an operator SEND
+  (`approve_unmodified`/`edit`, via `listOperatorDecisionTimes`;
+  `skip`/`closed`/`auto_send` never count) strictly after it — no operator
+  send times means every clarification is unanswered. Outbound message rows
+  cannot carry this rule (a machine send looks identical), so
+  `conv.state !== 'AWAITING_PRECISION'` at the call site is only a cheap
+  backstop, not the guarantee. The zero-stored-attachment rule stays
+  conversation-wide.
 
 ## Conventions that aren't obvious from the code alone
 
