@@ -359,6 +359,13 @@ describe('delayAckBodyGate', () => {
     expect(delayAckBodyGate(body)).toEqual({ ok: false, reason: 'currency' });
   });
 
+  it('blocks the bare Swedish price suffix "911 000:-" (no kr/sek token)', () => {
+    expect(delayAckBodyGate('Hej\n\nAvtalet: 911 000:-')).toEqual({ ok: false, reason: 'currency' });
+    expect(delayAckBodyGate('Hej\n\nAvtalet: 911 000:- per år\nMvh Anna')).toEqual({ ok: false, reason: 'currency' });
+    // ...but a smiley is not a price: ':-' only counts before whitespace or end.
+    expect(delayAckBodyGate('Hej, vi återkommer inom kort :-)\nMvh Anna').ok).toBe(true);
+  });
+
   it('does not mistake a phone number for a currency amount', () => {
     const body = 'Hej,\nVi återkommer inom kort.\nTel. 0472-15067\nPernilla';
     expect(delayAckBodyGate(body).ok).toBe(true);
@@ -369,9 +376,14 @@ describe('delayAckBodyGate', () => {
     expect(delayAckBodyGate(body)).toEqual({ ok: false, reason: 'pickup' });
   });
 
-  it('blocks attachment language', () => {
+  it('blocks attachment language across the bifoga- paradigm', () => {
     const body = 'Hej,\nSe bifogade avtal, fler kommer.\nMvh';
     expect(delayAckBodyGate(body)).toEqual({ ok: false, reason: 'attachment_language' });
+    // Every inflection we have seen live must block, not just the -ade form.
+    for (const w of ['bifogar', 'bifogas', 'bifogat', 'bifogad', 'bifoga']) {
+      expect(delayAckBodyGate(`Hej,\nJag ${w} avtalen.\nMvh`)).toEqual({ ok: false, reason: 'attachment_language' });
+    }
+    expect(delayAckBodyGate('Hej,\nSe bilagan.\nMvh')).toEqual({ ok: false, reason: 'attachment_language' });
   });
 
   it('blocks visible text over 200 words', () => {
