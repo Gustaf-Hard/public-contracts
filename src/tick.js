@@ -1418,10 +1418,21 @@ export async function runDailyFollowup(deps) {
       // approved-send rails (atomic claim, STALE_* guards, send_failed
       // parking); decision 'auto_send' is how the ledger permanently tells
       // machine sends from operator sends.
+      //
+      // AWAITING_PRECISION is excluded (2026-08-20): the state means WE still
+      // owe the kommun the precision answer they asked for — a conversation
+      // leaves the state as soon as we reply (live: Jönköping went back to
+      // ACK_RECEIVED). isLazyConversation stays message-pure and counts a
+      // clarification as answered when any outbound is strictly later, but an
+      // auto-sent T_DELAY_ACK is exactly such an outbound, so the timestamp
+      // rule ALONE could mark an operator-unanswered question as answered. The
+      // state is the robust signal, immune to machine-sent mail: a nudge
+      // drafted in AWAITING_PRECISION always goes to the operator.
       if (
         escId != null
         && draftTemplate === 'T_FOLLOWUP_NUDGE'
         && autoSendTemplates.includes('T_FOLLOWUP_NUDGE')
+        && conv.state !== 'AWAITING_PRECISION'
         && isLazyConversation(db.listMessages(conv.id))
       ) {
         const esc = db.raw.prepare('SELECT * FROM escalations WHERE id = ?').get(escId);

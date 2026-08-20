@@ -327,6 +327,31 @@ describe('runDailyFollowup auto-sends eligible T_FOLLOWUP_NUDGE', () => {
     expect(escs[0].draft_template).toBe('T_FOLLOWUP_NUDGE');
   });
 
+  // The state guard, not the timestamps (2026-08-20 ruling). AWAITING_PRECISION
+  // means WE still owe the precision answer; a conversation leaves the state as
+  // soon as we reply. Here the only outbound after the clarification is the
+  // machine-ack shape (an auto-sent T_DELAY_ACK), which satisfies
+  // isLazyConversation's "answered" test on timestamps alone — the state guard
+  // is what keeps the nudge with the operator.
+  it('AWAITING_PRECISION never auto-sends, even with an outbound after the clarification', async () => {
+    writeSwitch({ auto_send_templates: ['T_FOLLOWUP_NUDGE'] });
+    const id = seedConv({ state: 'AWAITING_PRECISION', stateChangedAt: '2026-07-18T00:00:00Z' });
+    seedInbound(id, { classification: 'clarification', receivedAt: '2026-07-06T10:00:00Z' });
+    seedOutbound(id, { sentAt: '2026-07-11T10:00:00Z' });   // machine-sent T_DELAY_ACK shape
+    seedInbound(id, { classification: 'delay_promise', receivedAt: '2026-07-15T10:00:00Z' });
+    // Sanity: the message-pure predicate DOES call this lazy — the state is the
+    // only thing holding the send back.
+    expect(isLazyConversation(db.listMessages(id))).toBe(true);
+    const gmail = fakeGmail();
+    await runDailyFollowup(deps({ gmail }));
+
+    expect(gmail.sendMessage).not.toHaveBeenCalled();
+    expect(db.listDecisions()).toHaveLength(0);
+    const escs = db.listOpenEscalationsForConversation(id);
+    expect(escs).toHaveLength(1);                       // drafted, awaiting the operator
+    expect(escs[0].draft_template).toBe('T_FOLLOWUP_NUDGE');
+  });
+
   it('a lazy-classified inbound with a STORED attachment → escalation stays open, nothing sent', async () => {
     // The classifier said auto_ack, but the mail came with a file the ingest
     // kept. Every other part of the system treats a stored attachment as

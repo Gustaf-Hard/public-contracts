@@ -203,16 +203,22 @@ is LAZY" to:
    classification with zero attachments, the Bjuv shape): `delivery` is not
    in the widened set, so it still fails conversation-wide.
 
-The signature and call site (`runDailyFollowup` nudge auto-send) are
-unchanged — `db.listMessages(conv.id)` already contains outbound rows with
-`received_at`. The fail-closed `stored ?? raw ?? 0` chain is unchanged.
+The signature is unchanged — `db.listMessages(conv.id)` already contains
+outbound rows with `received_at`. The fail-closed `stored ?? raw ?? 0` chain is
+unchanged. The call site (`runDailyFollowup` nudge auto-send) gains ONE
+conjunct, `conv.state !== 'AWAITING_PRECISION'` (see below); the predicate
+itself stays message-pure.
 
 Effect on live data (verified against the 2026-08-19 snapshot): Jönköping
 (conv 23) and Burlöv (conv 36) become auto-eligible once their currently-open
 manual drafts are cleared; no other open conversation changes bucket.
-`AWAITING_PRECISION` conversations can now qualify too (their `clarification`
-is answered by the precision reply that put them in that state) — their nudge
-threshold stays fixed 10 days, no jitter, per the 2026-08-17 spec.
+`AWAITING_PRECISION` conversations still draft nudges on their fixed 10-day
+threshold (no jitter, per the 2026-08-17 spec) but NEVER auto-send: the state
+means the clarification is UNANSWERED — we still owe the precision reply, and a
+conversation leaves the state as soon as we send it (Jönköping went back to
+`ACK_RECEIVED`). The timestamp rule alone could be fooled there, because an
+auto-sent `T_DELAY_ACK` is an outbound strictly after the question and would
+read as an answer; the state is the robust signal, immune to machine-sent mail.
 
 ## Visibility — Auto-skickade feed carries the trigger
 
