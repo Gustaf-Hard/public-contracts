@@ -5,7 +5,7 @@ import { crosscheckLabels } from './vendor-kb.js';
 import { buildCoverageFacts } from './coverage.js';
 import { classify, isCloserText } from './classifier.js';
 import { inferThreadStatus } from './threads.js';
-import { nextActionForClassification, staleAction, nudgeJitterDays, isLazyConversation } from './conversation.js';
+import { nextActionForClassification, staleAction, nudgeJitterDays, isLazyConversation, isAutoSendableDelayAck } from './conversation.js';
 import { loadAutoSendTemplates } from './pilot-config.js';
 import { sendApprovedReply } from './send-reply.js';
 import { parseInboundMessage, sameEmailDomain, archiveThread } from './gmail.js';
@@ -1460,6 +1460,59 @@ export async function runDailyFollowup(deps) {
               : `outcome UNCERTAIN (escalation status ${after ?? 'unknown'}) — the mail may have been sent; recoverStuckSends will escalate it to a human`;
           log?.(`AUTO-SEND ${outcome} for ${conv.kommun_namn}/${conv.role} (${e.code ?? 'SEND_ERROR'}): ${e.message}`);
         }
+      }
+    }
+  }
+
+  // ---- T_DELAY_ACK auto-send sweep (2026-08-20 design) ----
+  // Drafting happened at ingest (dispatchEscalationForIngest); this sweep sends
+  // the eligible fresh ones on the morning cadence. It runs AFTER the staleness
+  // loop so every swept conversation was already skipped there via
+  // hasActiveEscalation — no same-run interleaving. Skipped entirely inside the
+  // vacation window (drafts stay open for the operator) and, like the whole
+  // run, never reached while ingest is blind (the gate at the top returned).
+  if (autoSendTemplates.includes('T_DELAY_ACK') && !isInVacation(todayIso, cfg)) {
+    const openDelayAcks = db.listEscalationsByStatus('open')
+      .filter((e) => e.draft_template === 'T_DELAY_ACK');
+    for (const esc of openDelayAcks) {
+      const conv = db.getConversation(esc.conversation_id);
+      if (!conv) continue;
+      const verdict = isAutoSendableDelayAck({
+        esc,
+        messages: db.listMessages(conv.id),
+        autoSentCount: db.countAutoSendDecisions(conv.id, 'T_DELAY_ACK'),
+        now,
+      });
+      if (!verdict.ok) {
+        log?.(`DELAY-ACK stays manual for ${conv.kommun_namn}/${conv.role} (escalation ${esc.id}): ${verdict.reason}`);
+        continue;
+      }
+      try {
+        await sendApprovedReply({
+          db,
+          gmail: deps.gmailClient?.gmail,
+          env: deps.env,
+          conv,
+          esc,
+          finalBody: esc.draft_body,
+          finalSubject: esc.draft_subject,
+          decision: 'auto_send',
+          gmailSendImpl: deps.gmailOps.sendMessage,
+          archiveThreadImpl: deps.gmailOps.archiveThread,
+          slackClient: deps.slackClient ?? null,
+          log,
+        });
+        log?.(`AUTO-SENT T_DELAY_ACK → ${conv.kommun_namn}/${conv.role} (escalation ${esc.id})`);
+      } catch (e) {
+        // Same truthful outcome log as the nudge auto-send: read the status
+        // back and claim only what it proves. No retry, no status mutation.
+        const after = db.raw.prepare('SELECT status FROM escalations WHERE id = ?').get(esc.id)?.status ?? null;
+        const outcome = after === 'open'
+          ? 'refused before the send claim, did not go out'
+          : after === 'send_failed'
+            ? 'Gmail rejected it, did not go out'
+            : `outcome UNCERTAIN (escalation status ${after ?? 'unknown'}) — the mail may have been sent; recoverStuckSends will escalate it to a human`;
+        log?.(`AUTO-SEND ${outcome} for ${conv.kommun_namn}/${conv.role} (${e.code ?? 'SEND_ERROR'}): ${e.message}`);
       }
     }
   }
