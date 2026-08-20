@@ -225,11 +225,30 @@ export const AUTO_SEND_LAZY_CLASSIFICATIONS = new Set([
 // The `??` chain is the safety property, not tidiness: a row that lacks the
 // computed column falls back to the OLD, stricter raw count (fail closed), and
 // a row lacking both counts as 0.
+//
+// 2026-08-20 widening: a 'clarification' no longer disqualifies IF an
+// outbound exists strictly after it — the kommun asked, we answered, and
+// everything since is lazy (live: Jönköping conv 23, Burlöv conv 36). An
+// UNANSWERED clarification still fails: the generic nudge must never stand in
+// for the real reply the operator owes. The zero-stored-attachments condition
+// stays conversation-wide on purpose: a delivered file anywhere makes "jag
+// vill följa upp" a misdescription whatever came after, and a body-text
+// delivery (the Bjuv shape) still fails via its 'delivery' classification.
 export function isLazyConversation(messages) {
-  return (messages ?? [])
+  const msgs = messages ?? [];
+  const lastOutMs = Math.max(-Infinity, ...msgs
+    .filter((m) => m.direction === 'outbound')
+    .map((m) => Date.parse(m.received_at ?? ''))
+    .filter(Number.isFinite));
+  return msgs
     .filter((m) => m.direction === 'inbound')
-    .every((m) => AUTO_SEND_LAZY_CLASSIFICATIONS.has(m.classification)
-      && (m.stored_attachment_count ?? m.attachment_count ?? 0) === 0);
+    .every((m) => {
+      if ((m.stored_attachment_count ?? m.attachment_count ?? 0) !== 0) return false;
+      if (AUTO_SEND_LAZY_CLASSIFICATIONS.has(m.classification)) return true;
+      if (m.classification !== 'clarification') return false;
+      const ms = Date.parse(m.received_at ?? '');
+      return Number.isFinite(ms) && ms < lastOutMs; // answered = an outbound strictly after
+    });
 }
 
 // ---- T_DELAY_ACK auto-send eligibility (2026-08-20 design) ----

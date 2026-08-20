@@ -7,6 +7,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { openDb } from '../src/storage.js';
+import { isLazyConversation } from '../src/conversation.js';
 import { runDailyFollowup } from '../src/tick.js';
 import { sendApprovedReply } from '../src/send-reply.js';
 import { renderArenden } from '../src/dashboard-views.js';
@@ -141,6 +142,28 @@ function seedInbound(convId, { classification = null, receivedAt = '2026-07-26T1
   return messageId;
 }
 
+// Our own reply in the thread. `received_at` is NOT NULL in `messages` and is
+// what orders listMessages, so an outbound row needs an explicit timestamp —
+// it is the clock the answered-clarification rule reads.
+let outboundSeq = 0;
+function seedOutbound(convId, { sentAt = '2026-07-11T10:00:00Z' } = {}) {
+  outboundSeq += 1;
+  return db.recordMessage({
+    conversation_id: convId,
+    gmail_message_id: `out-seed-${outboundSeq}`,
+    direction: 'outbound',
+    from_email: env.GMAIL_USER_EMAIL,
+    to_email: 'kansli@ale.se',
+    subject: 'SV: Begäran om allmänna handlingar',
+    body_text: 'Hej, här är förtydligandet ni bad om.',
+    classification: null,
+    classification_confidence: null,
+    received_at: sentAt,
+    attachment_count: 0,
+    gmail_thread_id: 'thr-a',
+  });
+}
+
 function seedNudgeEscalation(convId) {
   return db.recordEscalation({
     conversation_id: convId, message_id: null, reason: 'stale SENT',
@@ -194,6 +217,47 @@ describe("sendApprovedReply guards apply to decision 'auto_send'", () => {
   });
 });
 
+describe('isLazyConversation with answered clarifications (2026-08-20)', () => {
+  const IN = (classification, received_at, extra = {}) => ({ direction: 'inbound', classification, received_at, stored_attachment_count: 0, attachment_count: 0, ...extra });
+  const OUT = (received_at) => ({ direction: 'outbound', classification: null, received_at, attachment_count: 0 });
+
+  it('answered clarification qualifies (Jönköping shape)', () => {
+    expect(isLazyConversation([
+      IN('auto_ack', '2026-07-05T10:00:00Z'),
+      IN('clarification', '2026-07-06T10:00:00Z'),
+      OUT('2026-07-11T10:00:00Z'),
+      IN('delay_promise', '2026-07-15T10:00:00Z'),
+    ])).toBe(true);
+  });
+
+  it('unanswered clarification does not (no outbound after it)', () => {
+    expect(isLazyConversation([
+      OUT('2026-07-05T09:00:00Z'),
+      IN('clarification', '2026-07-06T10:00:00Z'),
+    ])).toBe(false);
+    expect(isLazyConversation([IN('clarification', '2026-07-06T10:00:00Z')])).toBe(false);
+  });
+
+  it('clarification at the same timestamp as the outbound is unanswered (strict after)', () => {
+    expect(isLazyConversation([
+      IN('clarification', '2026-07-06T10:00:00Z'),
+      OUT('2026-07-06T10:00:00Z'),
+    ])).toBe(false);
+  });
+
+  it('a stored attachment on ANY inbound still disqualifies, clarification answered or not', () => {
+    expect(isLazyConversation([
+      IN('clarification', '2026-07-06T10:00:00Z', { stored_attachment_count: 1 }),
+      OUT('2026-07-11T10:00:00Z'),
+    ])).toBe(false);
+  });
+
+  it('delivery / unknown / NULL still disqualify conversation-wide', () => {
+    expect(isLazyConversation([IN('delivery', '2026-07-06T10:00:00Z'), OUT('2026-07-11T10:00:00Z')])).toBe(false);
+    expect(isLazyConversation([IN(null, '2026-07-06T10:00:00Z')])).toBe(false);
+  });
+});
+
 describe('runDailyFollowup auto-sends eligible T_FOLLOWUP_NUDGE', () => {
   it('eligible (SENT, zero inbound, switch on): exactly one send, resolved_send, decision auto_send, followup_count 1', async () => {
     writeSwitch({ auto_send_templates: ['T_FOLLOWUP_NUDGE'] });
@@ -228,6 +292,39 @@ describe('runDailyFollowup auto-sends eligible T_FOLLOWUP_NUDGE', () => {
 
     expect(gmail.sendMessage).toHaveBeenCalledTimes(1);
     expect(db.listDecisions()[0]?.decision).toBe('auto_send');
+  });
+
+  // Live shape (Jönköping conv 23): the kommun asked a question, we answered
+  // it, and everything since is lazy. End to end through runDailyFollowup, so
+  // the widening is proven on real DB rows and not only on the pure predicate.
+  it('an ANSWERED clarification (kommun asked, we replied, then only lazy mail) auto-sends', async () => {
+    writeSwitch({ auto_send_templates: ['T_FOLLOWUP_NUDGE'] });
+    const id = seedConv({ state: 'ACK_RECEIVED', stateChangedAt: '2026-07-18T00:00:00Z', followUpAt: '2026-08-10' });
+    seedInbound(id, { classification: 'auto_ack', receivedAt: '2026-07-05T10:00:00Z' });
+    seedInbound(id, { classification: 'clarification', receivedAt: '2026-07-06T10:00:00Z' });
+    seedOutbound(id, { sentAt: '2026-07-11T10:00:00Z' });
+    seedInbound(id, { classification: 'delay_promise', receivedAt: '2026-07-15T10:00:00Z' });
+    const gmail = fakeGmail();
+    await runDailyFollowup(deps({ gmail }));
+
+    expect(gmail.sendMessage).toHaveBeenCalledTimes(1);
+    expect(db.listDecisions()[0]?.decision).toBe('auto_send');
+  });
+
+  it('an UNANSWERED clarification (it arrived after our last reply) stays manual', async () => {
+    writeSwitch({ auto_send_templates: ['T_FOLLOWUP_NUDGE'] });
+    const id = seedConv({ state: 'ACK_RECEIVED', stateChangedAt: '2026-07-18T00:00:00Z', followUpAt: '2026-08-10' });
+    seedInbound(id, { classification: 'auto_ack', receivedAt: '2026-07-05T10:00:00Z' });
+    seedOutbound(id, { sentAt: '2026-07-11T10:00:00Z' });
+    seedInbound(id, { classification: 'clarification', receivedAt: '2026-07-12T10:00:00Z' });
+    const gmail = fakeGmail();
+    await runDailyFollowup(deps({ gmail }));
+
+    expect(gmail.sendMessage).not.toHaveBeenCalled();
+    expect(db.listDecisions()).toHaveLength(0);
+    const escs = db.listOpenEscalationsForConversation(id);
+    expect(escs).toHaveLength(1);
+    expect(escs[0].draft_template).toBe('T_FOLLOWUP_NUDGE');
   });
 
   it('a lazy-classified inbound with a STORED attachment → escalation stays open, nothing sent', async () => {
