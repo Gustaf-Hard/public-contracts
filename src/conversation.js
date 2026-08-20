@@ -1,4 +1,5 @@
 import { isInVacation } from './vacation.js';
+import { delayAckBodyGate } from './classifier.js';
 
 export function nextActionForClassification(state, classification, opts = {}) {
   if (classification === 'unknown') {
@@ -229,4 +230,64 @@ export function isLazyConversation(messages) {
     .filter((m) => m.direction === 'inbound')
     .every((m) => AUTO_SEND_LAZY_CLASSIFICATIONS.has(m.classification)
       && (m.stored_attachment_count ?? m.attachment_count ?? 0) === 0);
+}
+
+// ---- T_DELAY_ACK auto-send eligibility (2026-08-20 design) ----
+//
+// Pure predicate over rows the caller fetched; never reads disk or DB. Every
+// unknown fails closed. Returns { ok, reason } so the sweep can log WHY a
+// draft stayed manual — the reasons are the spec's rule names.
+export const DELAY_ACK_AUTO_MIN_CONFIDENCE = 0.85;
+// Rollout guard: drafts already open when the feature deploys (including the
+// known-bad Borås/Eslöv ones) must never auto-send; only fresh drafts qualify.
+export const DELAY_ACK_AUTO_MAX_AGE_HOURS = 48;
+// Mail-loop bound (Örebro shape): our ack can trigger an autoresponder that
+// classifies delay_promise again with a fresh date, which hasDelayAckForDate
+// does not dedupe. Two lifetime auto-acks bounds the loop; later drafts
+// escalate to the operator as today. Operator sends never count.
+export const DELAY_ACK_AUTO_MAX_PER_CONV = 2;
+
+// SQLite datetime('now') is "YYYY-MM-DD HH:MM:SS" in UTC; normalise like
+// tick.js parseDbTime. Unparseable → null → fail closed.
+function dbTimeMs(s) {
+  const raw = String(s ?? '');
+  const ms = Date.parse(raw.includes('T') ? raw : `${raw.replace(' ', 'T')}Z`);
+  return Number.isFinite(ms) ? ms : null;
+}
+
+export function isAutoSendableDelayAck({ esc, messages, autoSentCount, now }) {
+  const no = (reason) => ({ ok: false, reason });
+  if (!esc || esc.draft_template !== 'T_DELAY_ACK' || esc.status !== 'open') return no('not_delay_ack');
+  if (esc.classifier_class !== 'delay_promise') return no('class');
+  if (typeof esc.classifier_confidence !== 'number'
+    || esc.classifier_confidence < DELAY_ACK_AUTO_MIN_CONFIDENCE) return no('confidence');
+
+  const createdMs = dbTimeMs(esc.created_at);
+  if (createdMs == null
+    || now.getTime() - createdMs > DELAY_ACK_AUTO_MAX_AGE_HOURS * 3600 * 1000) return no('stale_draft');
+
+  const inbound = (messages ?? []).filter((m) => m.direction === 'inbound');
+  const trigger = inbound.find((m) => m.id === esc.message_id);
+  if (!trigger) return no('trigger_missing');
+  // Strictly newest: any OTHER inbound at the same or a later received_at
+  // means the world may have moved — manual. Complementary to the
+  // STALE_ESCALATION guard in sendApprovedReply (which compares against the
+  // escalation's creation time, not the trigger's position).
+  const triggerMs = dbTimeMs(trigger.received_at);
+  if (triggerMs == null) return no('not_latest_inbound');
+  for (const m of inbound) {
+    if (m.id === trigger.id) continue;
+    const ms = dbTimeMs(m.received_at);
+    if (ms == null || ms >= triggerMs) return no('not_latest_inbound');
+  }
+
+  // Same fail-closed chain as isLazyConversation: missing computed column
+  // falls back to the raw carried count.
+  if ((trigger.stored_attachment_count ?? trigger.attachment_count ?? 0) !== 0) return no('attachments');
+
+  const gate = delayAckBodyGate(trigger.body_text);
+  if (!gate.ok) return no(gate.reason);
+
+  if ((autoSentCount ?? 0) >= DELAY_ACK_AUTO_MAX_PER_CONV) return no('auto_send_cap');
+  return { ok: true, reason: null };
 }
