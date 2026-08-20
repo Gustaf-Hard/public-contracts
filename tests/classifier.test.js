@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { classify, splitQuotedText, stripQuotedText, extractReturnDate, isInternalForwardText } from '../src/classifier.js';
+import { classify, splitQuotedText, stripQuotedText, extractReturnDate, isInternalForwardText, delayAckBodyGate } from '../src/classifier.js';
 
 describe('splitQuotedText', () => {
   it('splits at the leading-date Gmail-sv attribution (no leading "Den")', () => {
@@ -340,5 +340,53 @@ describe('isInternalForwardText (pure, both directions)', () => {
   });
   it('false when there is no forward phrase', () => {
     expect(isInternalForwardText('Vi återkommer inom kort.')).toBe(false);
+  });
+});
+
+describe('delayAckBodyGate', () => {
+  it('passes a short clean delay promise (with signature + GDPR boilerplate)', () => {
+    const body = [
+      'Hej Gustaf,', '',
+      'Vi har mottagit ditt mail och jag arbetar med din fråga, återkommer så snart jag kan.', '',
+      'Med vänlig hälsning', 'Frida Örnborg', 'Gruppchef upphandling',
+      'Kommunen hanterar dina personuppgifter enligt Dataskyddsförordningen.',
+    ].join('\n');
+    expect(delayAckBodyGate(body)).toEqual({ ok: true, reason: null });
+  });
+
+  it('blocks a body-text contract table (currency amounts) — Borås shape', () => {
+    const body = 'Hej\n\nHär kommer resterande svar:\nBinogi\nBinogi Nordics AB\n2023-12-31\n911 000,00 kr\n';
+    expect(delayAckBodyGate(body)).toEqual({ ok: false, reason: 'currency' });
+  });
+
+  it('does not mistake a phone number for a currency amount', () => {
+    const body = 'Hej,\nVi återkommer inom kort.\nTel. 0472-15067\nPernilla';
+    expect(delayAckBodyGate(body).ok).toBe(true);
+  });
+
+  it('blocks pickup/paper-delivery language — Eslöv shape', () => {
+    const body = 'Hej,\nJag kommer inte maila avtalen, utan lägga dom i receptionen för dig att hämta.\nVänligen Malin';
+    expect(delayAckBodyGate(body)).toEqual({ ok: false, reason: 'pickup' });
+  });
+
+  it('blocks attachment language', () => {
+    const body = 'Hej,\nSe bifogade avtal, fler kommer.\nMvh';
+    expect(delayAckBodyGate(body)).toEqual({ ok: false, reason: 'attachment_language' });
+  });
+
+  it('blocks visible text over 200 words', () => {
+    const body = Array.from({ length: 201 }, (_, i) => `ord${i}`).join(' ');
+    expect(delayAckBodyGate(body)).toEqual({ ok: false, reason: 'too_long' });
+  });
+
+  it('blocks an empty / quoted-only body', () => {
+    expect(delayAckBodyGate('')).toEqual({ ok: false, reason: 'empty' });
+    expect(delayAckBodyGate(null)).toEqual({ ok: false, reason: 'empty' });
+    expect(delayAckBodyGate('Från: Gustaf <g@x.se>\n> gammal text')).toEqual({ ok: false, reason: 'empty' });
+  });
+
+  it('ignores currency inside the quoted trailing history', () => {
+    const body = 'Hej, vi återkommer inom kort.\n\nFrån: Gustaf Hård af Segerstad <gustaf.hard@gmail.com>\nSkickat: den 11 augusti\n…avtal värda 911 000 kr…';
+    expect(delayAckBodyGate(body).ok).toBe(true);
   });
 });
