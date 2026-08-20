@@ -404,6 +404,29 @@ describe('runDailyFollowup auto-sends eligible T_FOLLOWUP_NUDGE', () => {
     expect(escs[0].draft_template).toBe('T_FOLLOWUP_NUDGE');
   });
 
+  // Same chain, operator variant: the human DID act on the precision draft —
+  // they SKIPPED it, sending nothing. A ledger row exists, but silence is not
+  // an answer, so the question is still open and the nudge stays manual. This
+  // is why the query is a positive allowlist of send-shaped decisions rather
+  // than "anything but auto_send".
+  it('an operator SKIP of the precision draft does not answer the clarification', async () => {
+    writeSwitch({ auto_send_templates: ['T_FOLLOWUP_NUDGE'] });
+    const id = seedConv({ state: 'ACK_RECEIVED', stateChangedAt: '2026-07-18T00:00:00Z', followUpAt: '2026-08-10' });
+    seedInbound(id, { classification: 'clarification', receivedAt: '2026-07-06T10:00:00Z' });
+    seedDecision(id, { decision: 'skip', decidedAt: '2026-07-11 10:00:00' });     // resolved, nothing sent
+    seedInbound(id, { classification: 'delay_promise', receivedAt: '2026-07-15T10:00:00Z' });
+    expect(db.listDecisions()).toHaveLength(1);                 // the skip IS in the ledger
+    expect(db.listOperatorDecisionTimes(id)).toEqual([]);       // but it is not a send
+    const gmail = fakeGmail();
+    await runDailyFollowup(deps({ gmail }));
+
+    expect(gmail.sendMessage).not.toHaveBeenCalled();
+    expect(db.listDecisions().filter((d) => d.draft_template === 'T_FOLLOWUP_NUDGE')).toHaveLength(0);
+    const escs = db.listOpenEscalationsForConversation(id);
+    expect(escs).toHaveLength(1);                       // drafted, awaiting the operator
+    expect(escs[0].draft_template).toBe('T_FOLLOWUP_NUDGE');
+  });
+
   // The cheap state backstop, pinned on its own: here an operator DID reply
   // after the clarification, so the ledger check passes — the state is the only
   // thing left holding the send, which is exactly its job for a conversation

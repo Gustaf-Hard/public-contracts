@@ -209,13 +209,25 @@ arriving in `AWAITING_PRECISION` transitions the conversation to `ACK_RECEIVED`
 (`send_delay_ack`, conversation.js) and supersedes the operator's open precision
 draft, then the delay-ack sweep of Part 1 auto-sends. That machine outbound
 would pose as our answer to a question no human ever answered. The ledger is the
-one place the difference survives: every unattended send is
-`decision = 'auto_send'`, every other decision came from a person. A new
-read-only query, `db.listOperatorDecisionTimes(convId)` (storage.js, no schema
-change), returns the `decided_at` of each `decision <> 'auto_send'` row, and the
-call site passes it as `operatorSendTimes`. Times are normalised with the same
-`dbTimeMs` helper `isAutoSendableDelayAck` uses, so SQLite's
-`"YYYY-MM-DD HH:MM:SS"` is read as UTC rather than local time.
+one place the difference survives. A new read-only query,
+`db.listOperatorDecisionTimes(convId)` (storage.js, no schema change), returns
+the `decided_at` of each row whose
+`decision IN ('approve_unmodified', 'edit')`, and the call site passes it as
+`operatorSendTimes`. Times are normalised with the same `dbTimeMs` helper
+`isAutoSendableDelayAck` uses, so SQLite's `"YYYY-MM-DD HH:MM:SS"` is read as
+UTC rather than local time.
+
+That allowlist is deliberate, and it is NOT "any decision other than
+`auto_send`". An operator decision is not necessarily a send: `skip` (Slack
+daemon, dashboard, `pilot-resolve`) and `closed` (dashboard) resolve a draft
+with nothing sent. Counting them would let silence answer a question — an
+operator who skips the precision draft would license an unattended nudge to a
+kommun still waiting for the reply — and that is the same chain as above with a
+human in place of the sweep. `approve_unmodified` and `edit` are exactly the
+values `sendApprovedReply` records after Gmail accepted an operator's mail
+(unattended, the same path writes `auto_send`). A positive list also fails
+closed against future decision values: a new non-send verb is excluded until
+someone deliberately adds it.
 
 **Fail-closed default:** with `operatorSendTimes` absent or null, every
 clarification is unanswered — the pre-widening semantics. A caller that cannot

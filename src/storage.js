@@ -553,19 +553,30 @@ export function openDb(path) {
     return db.prepare('SELECT * FROM decisions ORDER BY id').all();
   }
 
-  // When has a HUMAN sent in this conversation (2026-08-20)? The decisions
-  // ledger is the only place that distinguishes operator sends from machine
-  // ones: every unattended send is written with decision 'auto_send', every
-  // other decision came from a person (edit, approve_unmodified, …). The
-  // messages table cannot tell them apart — an outbound row looks identical
+  // When has a HUMAN actually SENT mail in this conversation (2026-08-20)? The
+  // decisions ledger is the only place that distinguishes operator sends from
+  // machine ones — the messages table cannot, an outbound row looks identical
   // either way — which is why isLazyConversation reads these times, not
   // outbound rows, when judging whether a kommun's clarification was answered.
+  //
+  // The ALLOWLIST is the safety property, not tidiness. Not every operator
+  // decision is a send: `skip` (daemon.js, dashboard.js,
+  // scripts/pilot-resolve.js) and `closed` (dashboard.js) resolve an escalation
+  // with nothing sent at all. Counting those would let silence answer a
+  // question — an operator skipping a precision draft would license an
+  // unattended nudge to a kommun still waiting for the reply. Exactly two
+  // values reach recordDecision from an operator send: 'approve_unmodified' and
+  // 'edit' (send-reply.js, after Gmail accepted the mail; the same path writes
+  // 'auto_send' when unattended). A positive list also fails closed against
+  // future decision values: a new non-send verb stays excluded until someone
+  // deliberately adds it here.
+  //
   // Raw `decided_at` strings (SQLite "YYYY-MM-DD HH:MM:SS"); the caller
   // normalises. Read-only, no schema change.
   function listOperatorDecisionTimes(conversationId) {
     return db.prepare(`
       SELECT decided_at FROM decisions
-      WHERE conversation_id = ? AND decision <> 'auto_send'
+      WHERE conversation_id = ? AND decision IN ('approve_unmodified', 'edit')
       ORDER BY decided_at, id
     `).all(conversationId).map((r) => r.decided_at);
   }
