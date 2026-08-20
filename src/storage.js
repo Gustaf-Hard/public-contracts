@@ -580,6 +580,10 @@ export function openDb(path) {
   // feed — the most recent machine sends, joined to their conversation.
   // decided_at is normalized to ISO (T/Z) so the views' time formatting never
   // has to guess at SQLite's space-separated datetime.
+  // trigger_from/trigger_snippet (2026-08-20 delay-ack design, Visibility):
+  // the inbound mail that provoked the send, so the operator can judge the
+  // machine's reading of it. LEFT joins — a proactive draft (nudge) carries no
+  // message_id, and its feed row must survive with NULL trigger fields.
   function listAutoSendDecisions(limit = 20) {
     return db.prepare(`
       SELECT
@@ -589,13 +593,27 @@ export function openDb(path) {
         conv.id AS conversation_id,
         conv.kommun_namn,
         conv.role,
-        conv.followup_count
+        conv.followup_count,
+        m.from_email AS trigger_from,
+        substr(m.body_text, 1, 160) AS trigger_snippet
       FROM decisions d
       JOIN conversations conv ON conv.id = d.conversation_id
+      LEFT JOIN escalations e ON e.id = d.escalation_id
+      LEFT JOIN messages m ON m.id = e.message_id
       WHERE d.decision = 'auto_send'
       ORDER BY d.decided_at DESC, d.id DESC
       LIMIT ?
     `).all(limit);
+  }
+
+  // How many times the machine has already sent this template for this
+  // conversation (2026-08-20 delay-ack design, loop bound). Operator
+  // decisions (edit / approve_unmodified) deliberately do not count.
+  function countAutoSendDecisions(conversationId, draftTemplate) {
+    return db.prepare(`
+      SELECT COUNT(*) AS n FROM decisions
+      WHERE conversation_id = ? AND draft_template = ? AND decision = 'auto_send'
+    `).get(conversationId, draftTemplate).n;
   }
 
   function listOpenEscalations() {
@@ -1447,6 +1465,7 @@ export function openDb(path) {
     listDecisions,
     listEditDecisions,
     listAutoSendDecisions,
+    countAutoSendDecisions,
     recordHeartbeat,
     markFollowupCompleted,
     getFollowupCompletedDate,

@@ -515,3 +515,59 @@ describe('escalations watchlist_vendors', () => {
     expect(cols).toContain('watchlist_vendors');
   });
 });
+
+describe('auto-send decision queries (2026-08-20 delay-ack design)', () => {
+  function seed() {
+    const convId = db.createConversation({
+      kommun_kod: '1440', kommun_namn: 'Ale', role: 'central',
+      contact_email: 'kansli@ale.se', scheduled_send_at: '2026-07-01T00:00:00Z',
+    });
+    const msgId = db.recordMessage({
+      conversation_id: convId, gmail_message_id: 'in-1', direction: 'inbound',
+      from_email: 'upphandling@ale.se', to_email: 'me@x.se',
+      subject: 'SV: Begäran', body_text: 'Hej, vi återkommer så snart vi kan. Mvh',
+      classification: 'delay_promise', classification_confidence: 0.9,
+      received_at: '2026-08-20T06:00:00Z', attachment_count: 0, gmail_thread_id: 'thr-1',
+    });
+    const escId = db.recordEscalation({
+      conversation_id: convId, message_id: msgId, reason: 'delay ack until=2026-08-25',
+      draft_template: 'T_DELAY_ACK', draft_subject: 'Re: Begäran', draft_body: 'Hej,\n\nTack…',
+      classifier_class: 'delay_promise', classifier_confidence: 0.9, previous_state: 'ACK_RECEIVED',
+    });
+    return { convId, msgId, escId };
+  }
+
+  it('countAutoSendDecisions counts only auto_send rows for that conversation+template', () => {
+    const { convId, escId } = seed();
+    const base = { escalation_id: escId, conversation_id: convId, conversation_state: 'ACK_RECEIVED', draft_body: 'x' };
+    db.recordDecision({ ...base, draft_template: 'T_DELAY_ACK', decision: 'auto_send' });
+    db.recordDecision({ ...base, draft_template: 'T_DELAY_ACK', decision: 'edit' });          // operator: not counted
+    db.recordDecision({ ...base, draft_template: 'T_FOLLOWUP_NUDGE', decision: 'auto_send' }); // other template: not counted
+    expect(db.countAutoSendDecisions(convId, 'T_DELAY_ACK')).toBe(1);
+    expect(db.countAutoSendDecisions(convId + 999, 'T_DELAY_ACK')).toBe(0);
+  });
+
+  it('listAutoSendDecisions carries the trigger sender + snippet, NULL for proactive drafts', () => {
+    const { convId, escId } = seed();
+    db.recordDecision({
+      escalation_id: escId, conversation_id: convId, conversation_state: 'ACK_RECEIVED',
+      draft_template: 'T_DELAY_ACK', draft_body: 'x', decision: 'auto_send',
+    });
+    const nudgeEsc = db.recordEscalation({
+      conversation_id: convId, message_id: null, reason: 'stale SENT',
+      draft_template: 'T_FOLLOWUP_NUDGE', draft_body: 'y', classifier_class: 'followup_stale',
+    });
+    db.recordDecision({
+      escalation_id: nudgeEsc, conversation_id: convId, conversation_state: 'SENT',
+      draft_template: 'T_FOLLOWUP_NUDGE', draft_body: 'y', decision: 'auto_send',
+    });
+    const rows = db.listAutoSendDecisions(10);
+    const ack = rows.find((r) => r.draft_template === 'T_DELAY_ACK');
+    const nudge = rows.find((r) => r.draft_template === 'T_FOLLOWUP_NUDGE');
+    expect(ack.trigger_from).toBe('upphandling@ale.se');
+    expect(ack.trigger_snippet).toContain('vi återkommer');
+    expect(ack.trigger_snippet.length).toBeLessThanOrEqual(160);
+    expect(nudge.trigger_from).toBeNull();
+    expect(nudge.trigger_snippet).toBeNull();
+  });
+});
