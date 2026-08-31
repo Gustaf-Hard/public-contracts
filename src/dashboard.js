@@ -613,6 +613,12 @@ export function sortVendorRollups(rollups, { sort, order } = {}) {
 // Exported for tests + the Ärenden routes.
 export { buildOverviewRows, applyFilter };
 
+// Browser textareas submit \r\n; drafts are stored with \n. Normalize before
+// comparing or storing, or every untouched approval books as an 'edit'
+// (2026-08-31 honest-ledger design) — the ledger had ZERO approve_unmodified
+// rows despite most "edits" changing nothing.
+const normalizeNewlines = (s) => (s ?? '').replace(/\r\n/g, '\n');
+
 // ---- Route handlers ----
 
 export function createDashboardApp({
@@ -1025,7 +1031,7 @@ export function createDashboardApp({
     // (a tick, another tab), send that one instead of stacking a second.
     if (db.hasActiveEscalation(convId)) return res.redirect(backTo(req, `/arenden/${convId}`));
 
-    const finalBody = String(req.body.body ?? '').trim();
+    const finalBody = normalizeNewlines(String(req.body.body ?? '')).trim();
     if (!finalBody) return res.status(400).send('Cannot send an empty body');
 
     const gmail = currentGmail();
@@ -1331,9 +1337,16 @@ export function createDashboardApp({
     const gmail = currentGmail();
     if (!gmail) return res.status(503).send('Gmail not configured — run pilot-auth first.');
 
-    const finalBody = (action === 'edit' ? req.body.body : esc.draft_body) ?? '';
+    const finalBody = (action === 'edit' ? normalizeNewlines(req.body.body) : esc.draft_body) ?? '';
     const finalSubject = (action === 'edit' ? req.body.subject : esc.draft_subject) ?? undefined;
     if (!finalBody.trim()) return res.status(400).send('Cannot send an empty body');
+
+    // An "edit" that changed nothing is an unmodified approve and is held to an
+    // unmodified approve's bar: it faces STALE_ESCALATION (the operator did not
+    // write with newer context if they did not write at all).
+    const untouched = action === 'edit'
+      && finalBody === normalizeNewlines(esc.draft_body ?? '')
+      && (req.body.subject == null || req.body.subject === (esc.draft_subject ?? ''));
 
     try {
       await sendApprovedReply({
@@ -1341,7 +1354,7 @@ export function createDashboardApp({
         // A bounce resend form posts the corrected recipient as `finalTo`; the
         // normal reply form posts it as `to`.
         finalBody, finalSubject, finalTo: req.body.finalTo ?? req.body.to,
-        decision: action === 'send' ? 'approve_unmodified' : 'edit',
+        decision: action === 'send' || untouched ? 'approve_unmodified' : 'edit',
         slackClient,
       });
     } catch (e) {

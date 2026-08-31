@@ -1360,3 +1360,88 @@ describe('the write-a-reply box sits in the thread', () => {
     expect(res.text).toMatch(/thread-needs-action/);
   });
 });
+
+describe('resolve endpoint edit/approve honesty (2026-08-31)', () => {
+  // Browser textareas post \r\n, drafts are stored with \n, so the resolve
+  // endpoint booked EVERY approval that came through the edit form as an
+  // 'edit' — the ledger held zero approve_unmodified rows even though the
+  // operator had changed nothing. An untouched edit is an unmodified approve
+  // and is held to that bar, staleness guard included.
+  function seedOpenEscalation() {
+    const convId = db.createConversation({
+      kommun_kod: '2418', kommun_namn: 'Malå', role: 'central',
+      contact_email: 'kommun@mala.se', scheduled_send_at: '2026-07-01T00:00:00Z',
+    });
+    db.updateConversationState(convId, 'DELIVERING', { gmail_thread_id: 'thr-h' });
+    const msgId = db.recordMessage({
+      conversation_id: convId, gmail_message_id: `in-h-${Math.random()}`, direction: 'inbound',
+      from_email: 'kommun@mala.se', to_email: 'me@x.se', subject: 'Sv: Begäran',
+      body_text: 'Här kommer avtalen.', classification: 'delivery', classification_confidence: 0.9,
+      received_at: '2026-08-01T10:00:00Z', attachment_count: 0,
+    });
+    const escId = db.recordEscalation({
+      conversation_id: convId, message_id: msgId, reason: 'delivery',
+      draft_template: 'T_PRECISION', draft_subject: 'Re: Begäran',
+      draft_body: 'Hej,\n\nTack för avtalen.\n\nMvh', previous_state: 'DELIVERING',
+    });
+    return { convId, escId };
+  }
+
+  const appGmail = () => createDashboardApp({
+    db, municipalitiesLoader: () => JSON.parse(require('node:fs').readFileSync(muniPath, 'utf8')),
+    gmailClient: { gmail: {} }, env: { GMAIL_USER_EMAIL: 'me@x.se', GMAIL_FROM_NAME: 'Test' },
+  });
+
+  it('records approve_unmodified when the edited body is byte-identical modulo CRLF', async () => {
+    const { escId } = seedOpenEscalation();
+    const draft = db.raw.prepare('SELECT draft_body, draft_subject FROM escalations WHERE id = ?').get(escId);
+    const spy = vi.spyOn(gmailMod, 'sendMessage').mockResolvedValue({ id: 'm1', threadId: 'thr-h' });
+    try {
+      const res = await postForm(appGmail(), `/escalations/${escId}`, {
+        action: 'edit',
+        subject: draft.draft_subject,
+        body: draft.draft_body.replace(/\n/g, '\r\n'),  // what a browser textarea posts
+      });
+      expect(res.status).toBe(302);
+      expect(spy).toHaveBeenCalledTimes(1);
+      const d = db.raw.prepare('SELECT decision, final_body FROM decisions WHERE escalation_id = ?').get(escId);
+      expect(d.decision).toBe('approve_unmodified');
+      expect(d.final_body).not.toContain('\r');          // stored normalized
+    } finally { spy.mockRestore(); }
+  });
+
+  it('still records edit when the text actually changed', async () => {
+    const { escId } = seedOpenEscalation();
+    const draft = db.raw.prepare('SELECT draft_body, draft_subject FROM escalations WHERE id = ?').get(escId);
+    const spy = vi.spyOn(gmailMod, 'sendMessage').mockResolvedValue({ id: 'm1', threadId: 'thr-h' });
+    try {
+      const res = await postForm(appGmail(), `/escalations/${escId}`, {
+        action: 'edit', subject: draft.draft_subject,
+        body: (draft.draft_body + '\r\nPS. En rad till.').replace(/\n/g, '\r\n'),
+      });
+      expect(res.status).toBe(302);
+      const d = db.raw.prepare('SELECT decision FROM decisions WHERE escalation_id = ?').get(escId);
+      expect(d.decision).toBe('edit');
+    } finally { spy.mockRestore(); }
+  });
+
+  it('blocks an untouched edit on a stale escalation with 409 (faces STALE_ESCALATION like an approve)', async () => {
+    const { escId, convId } = seedOpenEscalation();
+    // a newer inbound AFTER the draft was created makes it stale
+    db.recordMessage({
+      conversation_id: convId, gmail_message_id: `gm-newer-${Math.random()}`, direction: 'inbound',
+      from_email: 'kommun@mala.se', to_email: 'me@x.se', subject: 'Sv', body_text: 'Nytt svar',
+      received_at: new Date(Date.now() + 3600_000).toISOString(), attachment_count: 0,
+    });
+    const draft = db.raw.prepare('SELECT draft_body FROM escalations WHERE id = ?').get(escId);
+    const spy = vi.spyOn(gmailMod, 'sendMessage').mockResolvedValue({ id: 'm1', threadId: 'thr-h' });
+    try {
+      const res = await postForm(appGmail(), `/escalations/${escId}`, {
+        action: 'edit', body: draft.draft_body.replace(/\n/g, '\r\n'),
+      });
+      expect(res.status).toBe(409);
+      expect(spy).not.toHaveBeenCalled();
+      expect(db.raw.prepare('SELECT status FROM escalations WHERE id = ?').get(escId).status).toBe('open');
+    } finally { spy.mockRestore(); }
+  });
+});
