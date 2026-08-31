@@ -1007,10 +1007,14 @@ export function renderOverview({ summary, rows, filter, sort, order, totalKommun
           const stateCell = r.states.length === 0
             // data-row-form: the client sends this without reloading the page and
             // swaps just this row (app.js). Without the script it stays a plain
-            // POST + redirect.
-            ? `<form method="post" action="/kommun/${escapeHtml(r.kommun_kod)}/quick-init" class="quick-init" data-row-form>
+            // POST + redirect. No contact address in the dataset ⇒ no Skicka
+            // button (quick-init could only answer 400); the compose link stays,
+            // since its form takes a hand-entered address.
+            ? `${r.has_contact
+                ? `<form method="post" action="/kommun/${escapeHtml(r.kommun_kod)}/quick-init" class="quick-init" data-row-form>
                  <button type="submit" class="compose-link" title="Skicka T-INITIAL till första kontakten">📨 Skicka</button>
-               </form>
+               </form>`
+                : '<span class="muted" title="Kommunen saknar registratoradress i datasetet">✉ adress saknas</span>'}
                <a class="muted quick-init-edit" href="/kommun/${escapeHtml(r.kommun_kod)}/compose" title="Redigera innan du skickar">✎</a>`
             : `<div class="pill-list">${r.states.map((s) => {
                 // Title attribute supports newlines on macOS/most modern browsers;

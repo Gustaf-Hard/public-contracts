@@ -82,6 +82,18 @@ describe('dashboard / overview', () => {
     expect(res.text).toContain('📨 Skicka');
   });
 
+  it('hides the Skicka button for kommuner without a contact address', async () => {
+    const res = await get(appWithFakes(), '/?filter=all');
+    // Malå has a contact → quick-init form. Boxholm/Testkommun have none →
+    // muted marker instead of a button that could only answer 400.
+    expect(res.text).toContain('/kommun/2418/quick-init');
+    expect(res.text).not.toContain('/kommun/0560/quick-init');
+    expect(res.text).not.toContain('/kommun/9999/quick-init');
+    expect(res.text).toContain('adress saknas');
+    // The edit-first compose link stays: its form takes a hand-entered address.
+    expect(res.text).toContain('/kommun/0560/compose');
+  });
+
   it('default home hides never-contacted kommuner and shows the queue heading', async () => {
     const app = appWithFakes();
     const res = await get(app, '/');
@@ -1017,7 +1029,7 @@ describe('/takt collection velocity', () => {
 describe('overview one-click send (quick-init)', () => {
   const baseArgs = (states) => ({
     summary: { in_pilot: 0, delivering: 0, done: 0, dead_end: 0, contracts: 0, avg_reply_days: null },
-    rows: [{ kommun_kod: '1489', kommun_namn: 'Alingsås', lan: 'Västra Götaland', folkmangd: 42861, states, contracts: 0, open_escalations: 0, follow_up_at: null, last_activity_at: null }],
+    rows: [{ kommun_kod: '1489', kommun_namn: 'Alingsås', lan: 'Västra Götaland', folkmangd: 42861, states, contracts: 0, open_escalations: 0, follow_up_at: null, last_activity_at: null, has_contact: true }],
     totalKommuner: 1, filter: 'all',
   });
 

@@ -275,6 +275,10 @@ function buildOverviewRows(municipalities, db, vacationConfig = { enabled: false
       last_activity_at: lastActivityAt,
       follow_up_at: earliestFollowUp,
       follow_up_source: earliestFollowUpSource,
+      // Whether quick-init has an address to send to — same rule as the
+      // /kommun/:kod/quick-init handler ((contacts ?? [])[0].email). The list
+      // must not offer a Skicka button that can only answer 400.
+      has_contact: Boolean((m.contacts ?? [])[0]?.email),
     };
   });
 }
