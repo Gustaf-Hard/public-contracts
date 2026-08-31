@@ -97,12 +97,17 @@ function fakeSlackOps() {
 }
 
 // sendMessage is passed DETACHED as gmailSendImpl, so capture via closure, not `this`.
-function fakeGmail({ sendError = null } = {}) {
+// `failOnCall` (1-based) throws on exactly that call and lets the rest succeed
+// — the cap-accounting tests need ONE claimed-but-thrown send among several
+// good ones, which a blanket sendError cannot express.
+function fakeGmail({ sendError = null, failOnCall = null } = {}) {
   const sent = [];
+  let calls = 0;
   return {
     sent,
     sendMessage: vi.fn(async (gmailClient, args) => {
-      if (sendError) throw new Error(sendError);
+      calls += 1;
+      if (sendError || calls === failOnCall) throw new Error(sendError ?? 'quota');
       sent.push(args);
       return { id: `out-${sent.length}`, threadId: 'thr-a' };
     }),
@@ -295,7 +300,10 @@ describe('runDailyFollowup T_FOLLOWUP_CLOSE sweep', () => {
     await runDailyFollowup(deps({ gmail, logs }));
     expect(gmail.sent).toHaveLength(0);
     expect(db.listEscalationsByStatus('open')).toHaveLength(1);
-    expect(logs.some((l) => l.includes('refused before the send claim'))).toBe(true);
+    // The phrase alone is shared with a STALE_INGEST refusal (a regressed
+    // seedHealthyTick would produce the identical string and pass this test for
+    // the wrong reason), so pin the code the log line carries.
+    expect(logs.some((l) => l.includes('refused before the send claim') && l.includes('STALE_ESCALATION'))).toBe(true);
     // and no retry within the run
     expect(db.listDecisions()).toHaveLength(0);
   });
@@ -328,6 +336,86 @@ describe('runDailyFollowup T_FOLLOWUP_CLOSE sweep', () => {
     await runDailyFollowup(d);
     expect(gmail.sent).toHaveLength(0);
     expect(db.listEscalationsByStatus('open')).toHaveLength(1);
+  });
+
+  // --- the steady-state path: this run drafts it AND this run sends it -------
+  // Every case above pre-seeds the escalation, which is the release-day
+  // backlog, not the shape of ordinary days. STALE_RULES.DELIVERING is
+  // `send_followup_close` at 14 days, so the staleness loop earlier in
+  // runDailyFollowup mints the draft that this sweep then sends.
+
+  it('drafts and auto-sends in the SAME run for a stale DELIVERING conversation', async () => {
+    writeSwitch({ auto_send_templates: ['T_FOLLOWUP_CLOSE'] });
+    const id = seedConv({ stateChangedAt: '2026-08-11T00:00:00Z' }); // 20 days
+    seedInbound(id, { receivedAt: '2026-08-11T06:00:00Z' });
+    const gmail = fakeGmail();
+    const logs = [];
+    await runDailyFollowup(deps({ gmail, logs }));
+    expect(logs.some((l) => l.includes('FOLLOWUP drafted (T_FOLLOWUP_CLOSE)'))).toBe(true);
+    expect(gmail.sent).toHaveLength(1);
+    expect(db.listEscalationsByStatus('open')).toHaveLength(0);
+    expect(db.listEscalationsByStatus('resolved_send')).toHaveLength(1);
+    const d = db.listDecisions().find((x) => x.decision === 'auto_send');
+    expect(d.draft_template).toBe('T_FOLLOWUP_CLOSE');
+  });
+
+  it('drafts but does NOT send in the same run when the state is CROSSCHECK', async () => {
+    // STALE_RULES.CROSSCHECK is also send_followup_close, so a change there
+    // must not turn into unattended mail: the guard is state-based, not
+    // template-based.
+    writeSwitch({ auto_send_templates: ['T_FOLLOWUP_CLOSE'] });
+    const id = seedConv({ state: 'CROSSCHECK', stateChangedAt: '2026-08-11T00:00:00Z' });
+    seedInbound(id, { receivedAt: '2026-08-11T06:00:00Z' });
+    const gmail = fakeGmail();
+    const logs = [];
+    await runDailyFollowup(deps({ gmail, logs }));
+    expect(logs.some((l) => l.includes('FOLLOWUP drafted (T_FOLLOWUP_CLOSE)'))).toBe(true);
+    expect(gmail.sent).toHaveLength(0);
+    expect(db.listEscalationsByStatus('open')).toHaveLength(1);
+    expect(logs.some((l) => l.includes('CLOSE stays manual') && l.includes('wrong_state'))).toBe(true);
+  });
+
+  // --- cap accounting, pinned at the boundary ------------------------------
+  // Both rules are one line in the catch (`if (after !== 'open') sentThisRun++`)
+  // and both are invisible below the cap, so they are exercised here with
+  // CLOSE_AUTO_MAX_PER_RUN + 1 candidates: deleting the line fails the first
+  // test, making it unconditional fails the second.
+
+  it('a claimed-but-thrown send consumes cap budget — the mail may already have left', async () => {
+    writeSwitch({ auto_send_templates: ['T_FOLLOWUP_CLOSE'] });
+    for (let i = 0; i < CLOSE_AUTO_MAX_PER_RUN + 1; i += 1) {
+      const id = seedConv();
+      seedInbound(id);
+      seedCloseEscalation(id);
+    }
+    // The oldest escalation's send throws AFTER sendApprovedReply claimed it.
+    const gmail = fakeGmail({ failOnCall: 1 });
+    await runDailyFollowup(deps({ gmail }));
+    expect(db.listEscalationsByStatus('send_failed')).toHaveLength(1);
+    // 1 thrown + 4 delivered = 5 counted, so the 6th is never attempted.
+    expect(gmail.sent).toHaveLength(CLOSE_AUTO_MAX_PER_RUN - 1);
+    expect(db.listEscalationsByStatus('resolved_send')).toHaveLength(CLOSE_AUTO_MAX_PER_RUN - 1);
+    expect(db.listEscalationsByStatus('open')).toHaveLength(1);
+  });
+
+  it('a refusal before the claim does NOT consume cap budget — no mail left', async () => {
+    writeSwitch({ auto_send_templates: ['T_FOLLOWUP_CLOSE'] });
+    // Oldest escalation is stale (a newer inbound landed after the draft), so
+    // sendApprovedReply refuses it before touching Gmail and it stays open.
+    const staleConv = seedConv();
+    seedInbound(staleConv);
+    const staleEsc = seedCloseEscalation(staleConv, { createdAt: '2026-08-30 07:00:00' });
+    seedInbound(staleConv, { receivedAt: '2026-08-30T18:00:00Z' });
+    for (let i = 0; i < CLOSE_AUTO_MAX_PER_RUN; i += 1) {
+      const id = seedConv();
+      seedInbound(id);
+      seedCloseEscalation(id);
+    }
+    const gmail = fakeGmail();
+    await runDailyFollowup(deps({ gmail }));
+    expect(gmail.sent).toHaveLength(CLOSE_AUTO_MAX_PER_RUN);
+    expect(db.listEscalationsByStatus('resolved_send')).toHaveLength(CLOSE_AUTO_MAX_PER_RUN);
+    expect(db.listEscalationsByStatus('open').map((e) => e.id)).toEqual([staleEsc]);
   });
 
   it('a 10-day-old draft still goes out — there is deliberately NO draft-age rule', async () => {

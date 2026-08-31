@@ -19,8 +19,11 @@ Two layers, both live:
    **Slack buttons** and a local **Express dashboard**. No outbound is sent
    without human approval, with two exceptions: the scheduled T-INITIAL,
    and — behind the `auto_send_templates` kill switch in
-   `data/pilot-overrides.json` — `T_FOLLOWUP_NUDGE` to kommuner whose every
-   inbound is a lazy ack (2026-08-17 auto-send design).
+   `data/pilot-overrides.json` — three graduated templates:
+   `T_FOLLOWUP_NUDGE` to kommuner whose every inbound is a lazy ack
+   (2026-08-17 auto-send design), `T_DELAY_ACK` to a fresh high-confidence
+   delay promise (2026-08-20), and `T_FOLLOWUP_CLOSE` to a DELIVERING
+   conversation with nothing left unread (2026-08-31).
 
 Node.js ESM (Node 20+). Design history lives in `docs/superpowers/specs/` —
 read `2026-07-05-autopilot-readiness-review.md` for the current safety

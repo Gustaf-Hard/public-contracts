@@ -1540,7 +1540,17 @@ export async function runDailyFollowup(deps) {
   }
 
   // ---- T_FOLLOWUP_CLOSE auto-send sweep (2026-08-31 design) ----
-  // Same rails and same run-position rationale as the delay-ack sweep above.
+  // Same RAILS as the delay-ack sweep above (kill switch, vacation gate, the
+  // run's blind-ingest gate, sendApprovedReply with decision 'auto_send', no
+  // retry) but deliberately NOT its run-position rationale: that comment says
+  // "no same-run interleaving", and here the opposite is the normal path. The
+  // staleness loop above MINTS these drafts (STALE_RULES.DELIVERING and
+  // .CROSSCHECK both → send_followup_close) and this sweep sends the eligible
+  // ones seconds later in the same run. That is intended and safe: a draft
+  // created seconds ago is by construction newer than every inbound, so
+  // STALE_ESCALATION passes, and every other guard is evaluated exactly as it
+  // is for a draft the operator left open overnight — a CROSSCHECK draft
+  // minted this run is still held back with wrong_state.
   // Capped per run: the deploy-day backlog (11 open on release day) drains
   // over ~3 daily runs instead of one burst. Oldest escalation first. A
   // catch where the claim went through counts toward the cap — the mail may
@@ -1548,11 +1558,14 @@ export async function runDailyFollowup(deps) {
   if (autoSendTemplates.includes('T_FOLLOWUP_CLOSE') && !isInVacation(todayIso, cfg)) {
     const openCloses = db.listEscalationsByStatus('open')
       .filter((e) => e.draft_template === 'T_FOLLOWUP_CLOSE')
+      // Redundant today (listEscalationsByStatus is already ORDER BY id) and
+      // kept as local defence: oldest-first is THIS sweep's rule to hold, not
+      // a property we want to inherit from a shared query's ordering.
       .sort((a, b) => a.id - b.id);
     let sentThisRun = 0;
     for (const esc of openCloses) {
       if (sentThisRun >= CLOSE_AUTO_MAX_PER_RUN) {
-        log?.(`CLOSE auto-send cap reached (${CLOSE_AUTO_MAX_PER_RUN}/run) — remaining open T_FOLLOWUP_CLOSE drafts wait for the next run`);
+        log?.(`CLOSE auto-send cap reached (${CLOSE_AUTO_MAX_PER_RUN}/run) — remaining open T_FOLLOWUP_CLOSE drafts were not attempted this run`);
         break;
       }
       const conv = db.getConversation(esc.conversation_id);
