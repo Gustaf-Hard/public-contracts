@@ -336,3 +336,27 @@ export function isAutoSendableDelayAck({ esc, messages, autoSentCount, now }) {
     || autoSentCount >= DELAY_ACK_AUTO_MAX_PER_CONV) return no('auto_send_cap');
   return { ok: true, reason: null };
 }
+
+// --- T_FOLLOWUP_CLOSE auto-send (2026-08-31 design): the third graduated ---
+// template. Evidence: 8/8 operator sends byte-identical to the draft. Pure
+// predicate; the sweep in tick.js supplies unreadDocs/autoSentCount from the
+// DB. Divergence from the delay-ack guard, deliberate: NO draft-age rule —
+// the template is timeless prose and the deploy-day backlog is the point.
+// Correctness against a changed world stays with sendApprovedReply
+// (STALE_ESCALATION on newer inbound, STALE_INGEST while blind).
+export function isAutoSendableFollowupClose({ esc, conv, unreadDocs, autoSentCount }) {
+  const no = (reason) => ({ ok: false, reason });
+  if (!esc || esc.draft_template !== 'T_FOLLOWUP_CLOSE') return no('not_followup_close');
+  if (esc.status !== 'open') return no('not_open');
+  // DELIVERING only: all 8 evidence sends were DELIVERING. CROSSCHECK earns
+  // its own record before it graduates.
+  if (!conv || conv.state !== 'DELIVERING') return no('wrong_state');
+  // "Is that everything?" may not go out while a delivered document sits
+  // unread (pending OR parked) on our own disk — same principle as the
+  // T_REQUEST_MISSING suppression. Non-finite fails closed.
+  if (!Number.isFinite(unreadDocs) || unreadDocs !== 0) return no('unread_documents');
+  // Once per conversation, ever. Operator sends do not count
+  // (countAutoSendDecisions semantics). Non-finite fails closed.
+  if (!Number.isFinite(autoSentCount) || autoSentCount !== 0) return no('auto_send_cap');
+  return { ok: true, reason: null };
+}
