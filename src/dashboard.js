@@ -616,8 +616,10 @@ export { buildOverviewRows, applyFilter };
 // Browser textareas submit \r\n; drafts are stored with \n. Normalize before
 // comparing or storing, or every untouched approval books as an 'edit'
 // (2026-08-31 honest-ledger design) — the ledger had ZERO approve_unmodified
-// rows despite most "edits" changing nothing.
-const normalizeNewlines = (s) => (s ?? '').replace(/\r\n/g, '\n');
+// rows despite most "edits" changing nothing. A lone \r counts too: a missed
+// match degrades an untouched approve back into an 'edit' that skips the
+// staleness bar, so normalize the whole family, not just the common case.
+const normalizeNewlines = (s) => (s ?? '').replace(/\r\n?/g, '\n');
 
 // ---- Route handlers ----
 

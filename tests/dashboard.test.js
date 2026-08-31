@@ -1440,8 +1440,57 @@ describe('resolve endpoint edit/approve honesty (2026-08-31)', () => {
         action: 'edit', body: draft.draft_body.replace(/\n/g, '\r\n'),
       });
       expect(res.status).toBe(409);
+      // Name the guard: a 409 from ESCALATION_NOT_OPEN or STALE_INGEST would
+      // pass a bare status check while proving nothing about staleness.
+      expect(res.text).toContain('newer inbound');
       expect(spy).not.toHaveBeenCalled();
       expect(db.raw.prepare('SELECT status FROM escalations WHERE id = ?').get(escId).status).toBe('open');
+    } finally { spy.mockRestore(); }
+  });
+
+  it('records edit when only the subject changed', async () => {
+    // Pins the subject clause of `untouched`: with it deleted, an operator who
+    // rewrote the subject and nothing else would book as an unmodified approve.
+    const { escId } = seedOpenEscalation();
+    const draft = db.raw.prepare('SELECT draft_body, draft_subject FROM escalations WHERE id = ?').get(escId);
+    const spy = vi.spyOn(gmailMod, 'sendMessage').mockResolvedValue({ id: 'm1', threadId: 'thr-h' });
+    try {
+      const res = await postForm(appGmail(), `/escalations/${escId}`, {
+        action: 'edit',
+        subject: draft.draft_subject + ' (kompletterat)',
+        body: draft.draft_body.replace(/\n/g, '\r\n'),
+      });
+      expect(res.status).toBe(302);
+      const d = db.raw.prepare('SELECT decision FROM decisions WHERE escalation_id = ?').get(escId);
+      expect(d.decision).toBe('edit');
+    } finally { spy.mockRestore(); }
+  });
+
+  it('normalizes the free-form composer body too, without reclassifying it', async () => {
+    // The composer stores draft = final by construction, so its decision stays
+    // 'edit' — but the body it stores and sends must still be \n, not \r\n.
+    const convId = db.createConversation({
+      kommun_kod: '2418', kommun_namn: 'Malå', role: 'central',
+      contact_email: 'kommun@mala.se', scheduled_send_at: '2026-07-01T00:00:00Z',
+    });
+    db.updateConversationState(convId, 'ACK_RECEIVED', { gmail_thread_id: 'thr-f' });
+    db.recordMessage({
+      conversation_id: convId, gmail_message_id: 'in-f', direction: 'inbound',
+      from_email: 'kommun@mala.se', to_email: 'me@x.se', subject: 'Sv: Begäran',
+      body_text: 'Kontakta utbildningsförvaltningen.', classification: 'unknown',
+      classification_confidence: 0.9, received_at: '2026-07-06T10:00:00Z', attachment_count: 0,
+    });
+    const spy = vi.spyOn(gmailMod, 'sendMessage').mockResolvedValue({ id: 'm1', threadId: 'thr-f' });
+    try {
+      const res = await postForm(appGmail(), `/arenden/${convId}/reply`, {
+        to: 'kommun@mala.se', subject: 'Re: Begäran',
+        body: 'Hej,\r\n\r\nHär är mitt svar.\r\n\r\nMvh',
+      });
+      expect(res.status).toBe(302);
+      const d = db.raw.prepare('SELECT decision, draft_body, final_body FROM decisions WHERE conversation_id = ?').get(convId);
+      expect(d.decision).toBe('edit');
+      expect(d.final_body).not.toContain('\r');
+      expect(d.draft_body).not.toContain('\r');
     } finally { spy.mockRestore(); }
   });
 });
