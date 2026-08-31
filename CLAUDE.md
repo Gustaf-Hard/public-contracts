@@ -19,8 +19,11 @@ Two layers, both live:
    **Slack buttons** and a local **Express dashboard**. No outbound is sent
    without human approval, with two exceptions: the scheduled T-INITIAL,
    and — behind the `auto_send_templates` kill switch in
-   `data/pilot-overrides.json` — `T_FOLLOWUP_NUDGE` to kommuner whose every
-   inbound is a lazy ack (2026-08-17 auto-send design).
+   `data/pilot-overrides.json` — three graduated templates:
+   `T_FOLLOWUP_NUDGE` to kommuner whose every inbound is a lazy ack
+   (2026-08-17 auto-send design), `T_DELAY_ACK` to a fresh high-confidence
+   delay promise (2026-08-20), and `T_FOLLOWUP_CLOSE` to a DELIVERING
+   conversation with nothing left unread (2026-08-31).
 
 Node.js ESM (Node 20+). Design history lives in `docs/superpowers/specs/` —
 read `2026-07-05-autopilot-readiness-review.md` for the current safety
@@ -127,9 +130,10 @@ Phase-1 pipeline: `scripts/01|02|03 → src/seed.js|crawl.js|verify.js → data/
   the `T_REQUEST_MISSING` claim — we cannot say an avtal is missing while it
   sits unread on our own disk. Nothing is deleted: clearing
   `analysis_attempts` (or `--force`) re-queues.
-- **Auto-send is two templates, fail-closed, kill-switched.** Only
-  `T_FOLLOWUP_NUDGE` and `T_DELAY_ACK` may go out unattended. The nudge goes
-  only when EVERY inbound in the conversation is classified in the LAZY set
+- **Auto-send is three templates, fail-closed, kill-switched.** Only
+  `T_FOLLOWUP_NUDGE`, `T_DELAY_ACK` and `T_FOLLOWUP_CLOSE` may go out
+  unattended. The nudge goes only when EVERY inbound in the conversation is
+  classified in the LAZY set
   (`auto_ack`, `auto_reply`, `delay_promise`, `handoff_internal`; zero inbound
   qualifies; NULL/`unknown` never do) **and has no *stored* attachments**
   (`stored_attachment_count`, the computed column `listMessages` adds — a
@@ -156,6 +160,14 @@ Phase-1 pipeline: `scripts/01|02|03 → src/seed.js|crawl.js|verify.js → data/
   2 prior machine sends of this template for the conversation
   (`countAutoSendDecisions` — the autoresponder-loop bound; operator sends
   don't count). Every rule fails closed and every skip logs its reason.
+  `T_FOLLOWUP_CLOSE` (2026-08-31 design) auto-sends only for a DELIVERING
+  conversation with zero unread (pending or parked) analysable attachments and
+  zero prior machine sends of the template, capped at `CLOSE_AUTO_MAX_PER_RUN`
+  (tick.js) per daily run, oldest first; it has deliberately NO draft-age rule
+  (timeless template, the backlog is the point) — STALE_ESCALATION and
+  STALE_INGEST carry world-changed correctness. The dashboard resolve endpoint
+  records an untouched 'edit' as `approve_unmodified` (CRLF-normalized), so
+  untouched sends face STALE_ESCALATION like any approve.
   `isLazyConversation` additionally admits a `clarification`, but only one the
   LEDGER shows a human answered: an operator SEND
   (`approve_unmodified`/`edit`, via `listOperatorDecisionTimes`;
