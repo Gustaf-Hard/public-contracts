@@ -123,3 +123,17 @@ describe('pipeline board', () => {
     }
   });
 });
+
+describe('kommunStage (overview funnel collapse, 2026-08-31)', () => {
+  it('collapses to the furthest stage; stoppat never wins over progress', async () => {
+    const { kommunStage } = await import('../src/pipeline.js');
+    expect(kommunStage([])).toBe('ej_kontaktad');
+    expect(kommunStage(['SENT'])).toBe('kontaktad');
+    expect(kommunStage(['SENT', 'DELIVERING'])).toBe('avtal_kommer');
+    expect(kommunStage(['ACK_RECEIVED', 'AWAITING_PRECISION'])).toBe('dialog');
+    expect(kommunStage(['DEAD_END', 'DELIVERING'])).toBe('avtal_kommer');
+    expect(kommunStage(['NEEDS_HUMAN'])).toBe('stoppat');
+    expect(kommunStage(['DONE', 'CROSSCHECK'])).toBe('klart');
+    expect(kommunStage(['REFRESH_DUE'])).toBe('slutkoll');
+  });
+});

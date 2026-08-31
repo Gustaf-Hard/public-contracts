@@ -34,6 +34,23 @@ export function stageForState(state) {
   return BY_STATE[state] ?? 'dialog';
 }
 
+// Collapse one kommun's conversation states to its single pipeline stage:
+// the FURTHEST any conversation reached, except 'stoppat' never wins (one
+// dead förvaltning does not stop the kommun). No conversations ⇒ not yet
+// contacted. Same rule as buildPipeline, exported so the overview's funnel
+// counts cannot drift from the /pipeline board.
+export function kommunStage(states) {
+  if (!states || states.length === 0) return 'ej_kontaktad';
+  const keys = STAGES.map((s) => s.key);
+  const rank = (s) => (s === 'stoppat' ? -1 : keys.indexOf(s));
+  let best = null;
+  for (const state of states) {
+    const stage = stageForState(state);
+    if (best === null || rank(stage) > rank(best)) best = stage;
+  }
+  return best;
+}
+
 // One row per KOMMUN, not per conversation: the operator thinks in
 // municipalities, and a kommun with three förvaltningar is one dot on the
 // board. Its stage is the FURTHEST any of its conversations has reached, so

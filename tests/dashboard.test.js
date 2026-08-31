@@ -82,6 +82,30 @@ describe('dashboard / overview', () => {
     expect(res.text).toContain('📨 Skicka');
   });
 
+  it('renders the funnel with per-stage counts and filters by ?filter=steg-*', async () => {
+    // Malå enrolled at DELIVERING → avtal_kommer; Boxholm/Testkommun uncontacted.
+    const convId = db.createConversation({
+      kommun_kod: '2418', kommun_namn: 'Malå', role: 'central',
+      contact_email: 'kommun@mala.se', scheduled_send_at: '2026-04-01T08:00:00Z',
+    });
+    db.updateConversationState(convId, 'DELIVERING');
+    const all = await get(appWithFakes(), '/?filter=all');
+    expect(all.text).toContain('funnel-bar');
+    expect(all.text).toContain('filter=steg-avtal_kommer');
+    // counts: 2 uncontacted, 1 at avtal kommer
+    expect(all.text).toMatch(/Ej kontaktad<span class="funnel-n">2<\/span>/);
+    expect(all.text).toMatch(/Avtal kommer<span class="funnel-n">1<\/span>/);
+    const step = await get(appWithFakes(), '/?filter=steg-avtal_kommer');
+    expect(step.text).toContain('Malå');
+    expect(step.text).not.toContain('Boxholm');
+    // counts survive filtering (summary is built before the filter applies)
+    expect(step.text).toMatch(/Ej kontaktad<span class="funnel-n">2<\/span>/);
+    // steg-klart matches nothing → the TABLE is empty (Malå may still appear
+    // in the Pågår/queue sections, which ignore the filter by design).
+    const empty = await get(appWithFakes(), '/?filter=steg-klart');
+    expect(empty.text).toContain('Inga kommuner matchar filtret');
+  });
+
   it('hides the Skicka button for kommuner without a contact address', async () => {
     const res = await get(appWithFakes(), '/?filter=all');
     // Malå has a contact → quick-init form. Boxholm/Testkommun have none →

@@ -8,7 +8,7 @@ import path from 'node:path';
 import { readFileSync, existsSync } from 'node:fs';
 import { openDb } from './storage.js';
 import { buildVelocityFacts } from './collection-velocity.js';
-import { buildPipeline } from './pipeline.js';
+import { buildPipeline, kommunStage } from './pipeline.js';
 import { effectiveFollowUp, TERMINAL_STATES } from './conversation.js';
 import { resolveVacationConfig, isInVacation } from './vacation.js';
 import { buildOAuthClient, loadStoredToken, saveToken, makeGmail, makeReloadingClient } from './gmail.js';
@@ -279,6 +279,9 @@ function buildOverviewRows(municipalities, db, vacationConfig = { enabled: false
       // /kommun/:kod/quick-init handler ((contacts ?? [])[0].email). The list
       // must not offer a Skicka button that can only answer 400.
       has_contact: Boolean((m.contacts ?? [])[0]?.email),
+      // The kommun's single funnel stage (pipeline.js collapse), driving the
+      // overview funnel counts and the steg-* filters.
+      stage: kommunStage(convs.map((c) => c.state)),
     };
   });
 }
@@ -296,8 +299,13 @@ function buildSummary(rows) {
     open_escalations: 0,
     contracts: 0,
     avg_reply_days: null,
+    // Kommuner per funnel stage — computed over ALL rows (the route builds the
+    // summary before filtering), so the funnel keeps its counts while a step
+    // is selected.
+    stages: {},
   };
   for (const r of rows) {
+    if (r.stage) summary.stages[r.stage] = (summary.stages[r.stage] ?? 0) + 1;
     if (r.states.length > 0) summary.in_pilot++;
     summary.open_escalations += r.open_escalations;
     summary.contracts += r.contracts;
@@ -316,6 +324,11 @@ function buildSummary(rows) {
 
 function applyFilter(rows, filter) {
   if (!filter || filter === 'all') return rows;
+  // Funnel-step filters (?filter=steg-<stage key> from the overview funnel).
+  if (filter.startsWith('steg-')) {
+    const stage = filter.slice('steg-'.length);
+    return rows.filter((r) => r.stage === stage);
+  }
   if (filter === 'in-pilot' || filter === 'active') return rows.filter((r) => r.states.length > 0);
   if (filter === 'needs-attention') return rows.filter((r) => r.states.some((s) => s.state === 'NEEDS_HUMAN') || r.open_escalations > 0);
   if (filter === 'delivering') return rows.filter((r) => r.states.some((s) => s.state === 'DELIVERING'));
