@@ -2,8 +2,13 @@
 // template. Unit half: the pure eligibility predicate. Integration half
 // (Task 3): the runDailyFollowup sweep.
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { isAutoSendableFollowupClose } from '../src/conversation.js';
+import { openDb } from '../src/storage.js';
+import { runDailyFollowup, CLOSE_AUTO_MAX_PER_RUN } from '../src/tick.js';
 
 function esc(overrides = {}) {
   return { id: 1, conversation_id: 10, status: 'open', draft_template: 'T_FOLLOWUP_CLOSE', ...overrides };
@@ -47,5 +52,295 @@ describe('isAutoSendableFollowupClose', () => {
     expect(check({ autoSentCount: 1 }).reason).toBe('auto_send_cap');
     expect(check({ autoSentCount: NaN }).reason).toBe('auto_send_cap');
     expect(check({ autoSentCount: undefined }).reason).toBe('auto_send_cap');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Integration half (Task 3): the runDailyFollowup sweep.
+//
+// Harness copied from tests/auto-send-delay-ack.test.js — same temp-dir DB,
+// same fakes, same load-bearing seedHealthyTick — with a `log` sink added
+// (the sweep's skip/cap reasons are part of the contract) and the escalation
+// seeded as a follow-up close draft (message_id null, like every staleness
+// draft escalateWithDraft mints).
+// ---------------------------------------------------------------------------
+
+let tmp, db, contractsDir, overridesPath;
+beforeEach(() => {
+  tmp = mkdtempSync(join(tmpdir(), 'pilot-close-'));
+  contractsDir = join(tmp, 'contracts');
+  overridesPath = join(tmp, 'overrides.json');
+  db = openDb(join(tmp, 'pilot.db'));
+  db.migrate();
+});
+afterEach(() => { db.close(); rmSync(tmp, { recursive: true, force: true }); });
+
+const env = {
+  GMAIL_USER_EMAIL: 'gustaf@mediagraf.se',
+  GMAIL_FROM_NAME: 'Gustaf',
+  SLACK_CHANNEL_ID: 'C1',
+};
+
+const NOW_RUN = new Date('2026-08-31T09:00:00Z');
+
+function writeSwitch(value) {
+  writeFileSync(overridesPath, typeof value === 'string' ? value : JSON.stringify(value));
+}
+
+function fakeSlackOps() {
+  return {
+    posts: [], updates: [],
+    postEscalation: vi.fn(async function (slack, { blocks }) { this.posts.push(blocks); return { ts: `s-${this.posts.length}`, channel: 'C1' }; }),
+    postAlert: vi.fn(async () => ({ ts: 'a', channel: 'C1' })),
+    updateEscalationResolved: vi.fn(async function (slack, args) { this.updates.push(args); }),
+  };
+}
+
+// sendMessage is passed DETACHED as gmailSendImpl, so capture via closure, not `this`.
+function fakeGmail({ sendError = null } = {}) {
+  const sent = [];
+  return {
+    sent,
+    sendMessage: vi.fn(async (gmailClient, args) => {
+      if (sendError) throw new Error(sendError);
+      sent.push(args);
+      return { id: `out-${sent.length}`, threadId: 'thr-a' };
+    }),
+    archiveThread: vi.fn(async () => {}),
+    listInboundQuery: vi.fn(async () => []),
+    getMessage: vi.fn(async () => null),
+  };
+}
+
+// Healthy to BOTH clocks in play — see the long note in
+// tests/auto-send-delay-ack.test.js: runDailyFollowup's gate uses the injected
+// fake clock, sendApprovedReply's STALE_INGEST guard uses the real one.
+// T_FOLLOWUP_CLOSE is in STALE_SENSITIVE_TEMPLATES, so a heartbeat stale to
+// either clock would refuse every send in this file.
+function seedHealthyTick(now = new Date()) {
+  const latest = Math.max(Date.now(), now.getTime());
+  db.recordHeartbeat({ kind: 'tick', error: null });
+  db.raw.prepare('UPDATE daemon_heartbeat SET last_success_at = ? WHERE id = 1')
+    .run(new Date(latest - 5 * 60000).toISOString());
+}
+
+function deps({ gmail = fakeGmail(), slackOps = fakeSlackOps(), slackClient = {}, now = NOW_RUN, logs = [] } = {}) {
+  seedHealthyTick(now);
+  return {
+    db, gmailClient: { gmail: {} }, gmailOps: gmail, slackClient, slackOps,
+    env, contractsDir, now, overridesPath, logs,
+    log: (m) => logs.push(String(m)),
+  };
+}
+
+let convSeq = 0;
+function seedConv({ state = 'DELIVERING', stateChangedAt = '2026-08-20T00:00:00Z', kommun = null } = {}) {
+  convSeq += 1;
+  const [kod, namn] = kommun ?? [`14${40 + convSeq}`, `Kommun${convSeq}`];
+  const id = db.createConversation({
+    kommun_kod: kod, kommun_namn: namn, role: 'central',
+    contact_email: `kansli${convSeq}@example.se`, scheduled_send_at: '2026-07-01T00:00:00Z',
+  });
+  db.updateConversationState(id, state, {
+    gmail_thread_id: 'thr-a', last_outbound_at: '2026-08-25T10:00:00Z',
+    followup_count: 1, follow_up_at: null,
+  });
+  db.raw.prepare('UPDATE conversations SET state_changed_at = ? WHERE id = ?').run(stateChangedAt, id);
+  return id;
+}
+
+let inboundSeq = 0;
+function seedInbound(convId, { receivedAt = '2026-08-29T06:00:00Z', storedAttachments = 0 } = {}) {
+  inboundSeq += 1;
+  const messageId = db.recordMessage({
+    conversation_id: convId,
+    gmail_message_id: `in-close-${inboundSeq}`,
+    direction: 'inbound',
+    from_email: 'kansli@example.se',
+    to_email: env.GMAIL_USER_EMAIL,
+    subject: 'SV: Begäran om allmänna handlingar',
+    body_text: 'Här kommer en del av handlingarna.',
+    classification: 'partial_delivery',
+    classification_confidence: 0.9,
+    received_at: receivedAt,
+    attachment_count: storedAttachments,
+    gmail_thread_id: 'thr-a',
+  });
+  for (let i = 0; i < storedAttachments; i += 1) {
+    db.recordAttachment({
+      message_id: messageId,
+      filename: `avtal-${inboundSeq}-${i + 1}.pdf`,
+      saved_path: join(contractsDir, `avtal-${inboundSeq}-${i + 1}.pdf`),
+      mime_type: 'application/pdf',
+      size_bytes: 12345,
+    });
+  }
+  return messageId;
+}
+
+// Staleness drafts carry message_id null (escalateWithDraft passes
+// parsedInbound: null) — so the STALE_ESCALATION guard weighs EVERY inbound.
+function seedCloseEscalation(convId, { createdAt = '2026-08-30 07:00:00', template = 'T_FOLLOWUP_CLOSE' } = {}) {
+  const escId = db.recordEscalation({
+    conversation_id: convId, message_id: null, reason: 'stale DELIVERING for 12 days',
+    draft_template: template, draft_subject: 'Re: Begäran om allmänna handlingar',
+    draft_body: 'Hej,\n\nJag följer upp min begäran. Är det allt ni har, eller väntar något mer?\n\nMvh Gustaf',
+    classifier_class: 'followup_stale', classifier_confidence: null, previous_state: 'DELIVERING',
+  });
+  db.raw.prepare('UPDATE escalations SET created_at = ? WHERE id = ?').run(createdAt, escId);
+  return escId;
+}
+
+describe('runDailyFollowup T_FOLLOWUP_CLOSE sweep', () => {
+  it('sends an eligible draft: exactly one mail, auto_send decision, escalation resolved', async () => {
+    writeSwitch({ auto_send_templates: ['T_FOLLOWUP_CLOSE'] });
+    const id = seedConv();
+    seedInbound(id);
+    seedCloseEscalation(id);
+    const gmail = fakeGmail();
+    await runDailyFollowup(deps({ gmail }));
+    expect(gmail.sent).toHaveLength(1);
+    expect(db.listEscalationsByStatus('open')).toHaveLength(0);
+    expect(db.listEscalationsByStatus('resolved_send')).toHaveLength(1);
+    const d = db.listDecisions().find((x) => x.decision === 'auto_send');
+    expect(d.draft_template).toBe('T_FOLLOWUP_CLOSE');
+  });
+
+  it('switch that does not list the template → nothing sent, draft stays open', async () => {
+    writeSwitch({ auto_send_templates: ['T_FOLLOWUP_NUDGE', 'T_DELAY_ACK'] });
+    const id = seedConv();
+    seedInbound(id);
+    seedCloseEscalation(id);
+    const gmail = fakeGmail();
+    await runDailyFollowup(deps({ gmail }));
+    expect(gmail.sent).toHaveLength(0);
+    expect(db.listEscalationsByStatus('open')).toHaveLength(1);
+  });
+
+  it('caps the run at CLOSE_AUTO_MAX_PER_RUN, oldest escalation first, and says so', async () => {
+    writeSwitch({ auto_send_templates: ['T_FOLLOWUP_CLOSE'] });
+    const escIds = [];
+    for (let i = 0; i < 7; i += 1) {
+      const id = seedConv();
+      seedInbound(id);
+      escIds.push(seedCloseEscalation(id));
+    }
+    const gmail = fakeGmail();
+    const logs = [];
+    await runDailyFollowup(deps({ gmail, logs }));
+    expect(CLOSE_AUTO_MAX_PER_RUN).toBe(5);
+    expect(gmail.sent).toHaveLength(CLOSE_AUTO_MAX_PER_RUN);
+    const sortedEscIds = [...escIds].sort((a, b) => a - b);
+    expect(db.listEscalationsByStatus('resolved_send').map((e) => e.id))
+      .toEqual(sortedEscIds.slice(0, CLOSE_AUTO_MAX_PER_RUN));
+    expect(db.listEscalationsByStatus('open').map((e) => e.id))
+      .toEqual(sortedEscIds.slice(CLOSE_AUTO_MAX_PER_RUN));
+    expect(logs.some((l) => l.includes('CLOSE auto-send cap reached (5/run)'))).toBe(true);
+  });
+
+  it('skips a non-DELIVERING conversation with reason wrong_state', async () => {
+    writeSwitch({ auto_send_templates: ['T_FOLLOWUP_CLOSE'] });
+    const id = seedConv({ state: 'CROSSCHECK' });
+    seedInbound(id);
+    seedCloseEscalation(id);
+    const gmail = fakeGmail();
+    const logs = [];
+    await runDailyFollowup(deps({ gmail, logs }));
+    expect(gmail.sent).toHaveLength(0);
+    expect(db.listEscalationsByStatus('open')).toHaveLength(1);
+    expect(logs.some((l) => l.includes('CLOSE stays manual') && l.includes('wrong_state'))).toBe(true);
+  });
+
+  it('skips while an unread analysable attachment sits on our own disk', async () => {
+    writeSwitch({ auto_send_templates: ['T_FOLLOWUP_CLOSE'] });
+    const id = seedConv();
+    seedInbound(id, { storedAttachments: 1 });
+    seedCloseEscalation(id);
+    expect(db.countUnreadAnalysableAttachments(id)).toBe(1);
+    const gmail = fakeGmail();
+    const logs = [];
+    await runDailyFollowup(deps({ gmail, logs }));
+    expect(gmail.sent).toHaveLength(0);
+    expect(db.listEscalationsByStatus('open')).toHaveLength(1);
+    expect(logs.some((l) => l.includes('CLOSE stays manual') && l.includes('unread_documents'))).toBe(true);
+  });
+
+  it('skips a conversation that already got a machine close (once ever)', async () => {
+    writeSwitch({ auto_send_templates: ['T_FOLLOWUP_CLOSE'] });
+    const id = seedConv();
+    seedInbound(id);
+    const prior = seedCloseEscalation(id, { createdAt: '2026-08-24 07:00:00' });
+    db.resolveEscalation(prior, { status: 'resolved_send' });
+    db.recordDecision({
+      escalation_id: prior, conversation_id: id, conversation_state: 'DELIVERING',
+      draft_template: 'T_FOLLOWUP_CLOSE', draft_body: 'x', decision: 'auto_send',
+    });
+    seedCloseEscalation(id);
+    const gmail = fakeGmail();
+    const logs = [];
+    await runDailyFollowup(deps({ gmail, logs }));
+    expect(gmail.sent).toHaveLength(0);
+    expect(db.listEscalationsByStatus('open')).toHaveLength(1);
+    expect(logs.some((l) => l.includes('CLOSE stays manual') && l.includes('auto_send_cap'))).toBe(true);
+  });
+
+  it('a newer inbound after the draft refuses the send before the claim, leaving it open', async () => {
+    writeSwitch({ auto_send_templates: ['T_FOLLOWUP_CLOSE'] });
+    const id = seedConv();
+    seedInbound(id);
+    seedCloseEscalation(id, { createdAt: '2026-08-30 07:00:00' });
+    seedInbound(id, { receivedAt: '2026-08-30T18:00:00Z' }); // the world moved
+    const gmail = fakeGmail();
+    const logs = [];
+    await runDailyFollowup(deps({ gmail, logs }));
+    expect(gmail.sent).toHaveLength(0);
+    expect(db.listEscalationsByStatus('open')).toHaveLength(1);
+    expect(logs.some((l) => l.includes('refused before the send claim'))).toBe(true);
+    // and no retry within the run
+    expect(db.listDecisions()).toHaveLength(0);
+  });
+
+  it('a Gmail failure parks send_failed and is never retried', async () => {
+    writeSwitch({ auto_send_templates: ['T_FOLLOWUP_CLOSE'] });
+    const id = seedConv();
+    seedInbound(id);
+    seedCloseEscalation(id);
+    const failing = fakeGmail({ sendError: 'quota' });
+    await runDailyFollowup(deps({ gmail: failing }));
+    expect(db.listEscalationsByStatus('send_failed')).toHaveLength(1);
+    expect(db.listEscalationsByStatus('open')).toHaveLength(0);
+    expect(db.listDecisions().filter((d) => d.decision === 'auto_send')).toHaveLength(0);
+    const gmail2 = fakeGmail();
+    await runDailyFollowup(deps({ gmail: gmail2, now: new Date('2026-09-01T09:00:00Z') }));
+    expect(gmail2.sent).toHaveLength(0);
+    expect(db.listEscalationsByStatus('send_failed')).toHaveLength(1);
+  });
+
+  it('the vacation window skips the sweep entirely', async () => {
+    writeSwitch({ auto_send_templates: ['T_FOLLOWUP_CLOSE'] });
+    const id = seedConv();
+    seedInbound(id);
+    seedCloseEscalation(id);
+    const gmail = fakeGmail();
+    const d = deps({ gmail });
+    // isInVacation compares MM-DD (year-agnostic window), see src/vacation.js.
+    d.vacationConfig = { enabled: true, start: '08-01', end: '08-31' };
+    await runDailyFollowup(d);
+    expect(gmail.sent).toHaveLength(0);
+    expect(db.listEscalationsByStatus('open')).toHaveLength(1);
+  });
+
+  it('a 10-day-old draft still goes out — there is deliberately NO draft-age rule', async () => {
+    // Pins the divergence from the delay-ack guard's 48h stale_draft rule. The
+    // close prose is timeless and the deploy-day backlog is exactly what this
+    // sweep is for; a refactor that copies the age rule across must fail here.
+    writeSwitch({ auto_send_templates: ['T_FOLLOWUP_CLOSE'] });
+    const id = seedConv();
+    seedInbound(id, { receivedAt: '2026-08-20T06:00:00Z' });
+    seedCloseEscalation(id, { createdAt: '2026-08-21 07:00:00' });
+    const gmail = fakeGmail();
+    await runDailyFollowup(deps({ gmail }));
+    expect(gmail.sent).toHaveLength(1);
+    expect(db.listEscalationsByStatus('resolved_send')).toHaveLength(1);
   });
 });

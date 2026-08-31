@@ -5,7 +5,7 @@ import { crosscheckLabels } from './vendor-kb.js';
 import { buildCoverageFacts } from './coverage.js';
 import { classify, isCloserText } from './classifier.js';
 import { inferThreadStatus } from './threads.js';
-import { nextActionForClassification, staleAction, nudgeJitterDays, isLazyConversation, isAutoSendableDelayAck } from './conversation.js';
+import { nextActionForClassification, staleAction, nudgeJitterDays, isLazyConversation, isAutoSendableDelayAck, isAutoSendableFollowupClose } from './conversation.js';
 import { loadAutoSendTemplates } from './pilot-config.js';
 import { sendApprovedReply } from './send-reply.js';
 import { parseInboundMessage, sameEmailDomain, archiveThread } from './gmail.js';
@@ -103,6 +103,11 @@ function parseDbTime(s) {
 // enough that a legitimately slow send from the *other* process (dashboard vs
 // daemon share the DB) is never mistaken for a crash.
 const STUCK_SEND_MIN = 15;
+
+// Most T_FOLLOWUP_CLOSE drafts the machine may send in one daily run
+// (2026-08-31 design). The release-day backlog drains over a few runs instead
+// of one burst of identical mail leaving the same address in one minute.
+export const CLOSE_AUTO_MAX_PER_RUN = 5;
 
 // Recover from crashes mid-send (autopilot review C2). Two shapes:
 //  - conversations stuck in SENDING: the T-INITIAL claim happened but the
@@ -1524,6 +1529,65 @@ export async function runDailyFollowup(deps) {
         // Same truthful outcome log as the nudge auto-send: read the status
         // back and claim only what it proves. No retry, no status mutation.
         const after = db.raw.prepare('SELECT status FROM escalations WHERE id = ?').get(esc.id)?.status ?? null;
+        const outcome = after === 'open'
+          ? 'refused before the send claim, did not go out'
+          : after === 'send_failed'
+            ? 'Gmail rejected it, did not go out'
+            : `outcome UNCERTAIN (escalation status ${after ?? 'unknown'}) — the mail may have been sent; recoverStuckSends will escalate it to a human`;
+        log?.(`AUTO-SEND ${outcome} for ${conv.kommun_namn}/${conv.role} (${e.code ?? 'SEND_ERROR'}): ${e.message}`);
+      }
+    }
+  }
+
+  // ---- T_FOLLOWUP_CLOSE auto-send sweep (2026-08-31 design) ----
+  // Same rails and same run-position rationale as the delay-ack sweep above.
+  // Capped per run: the deploy-day backlog (11 open on release day) drains
+  // over ~3 daily runs instead of one burst. Oldest escalation first. A
+  // catch where the claim went through counts toward the cap — the mail may
+  // have left, and the cap bounds outbound volume, not bookkeeping.
+  if (autoSendTemplates.includes('T_FOLLOWUP_CLOSE') && !isInVacation(todayIso, cfg)) {
+    const openCloses = db.listEscalationsByStatus('open')
+      .filter((e) => e.draft_template === 'T_FOLLOWUP_CLOSE')
+      .sort((a, b) => a.id - b.id);
+    let sentThisRun = 0;
+    for (const esc of openCloses) {
+      if (sentThisRun >= CLOSE_AUTO_MAX_PER_RUN) {
+        log?.(`CLOSE auto-send cap reached (${CLOSE_AUTO_MAX_PER_RUN}/run) — remaining open T_FOLLOWUP_CLOSE drafts wait for the next run`);
+        break;
+      }
+      const conv = db.getConversation(esc.conversation_id);
+      const verdict = isAutoSendableFollowupClose({
+        esc,
+        conv,
+        unreadDocs: conv ? db.countUnreadAnalysableAttachments(conv.id) : NaN,
+        autoSentCount: conv ? db.countAutoSendDecisions(conv.id, 'T_FOLLOWUP_CLOSE') : NaN,
+      });
+      if (!verdict.ok) {
+        log?.(`CLOSE stays manual for ${conv?.kommun_namn ?? '?'}/${conv?.role ?? '?'} (escalation ${esc.id}): ${verdict.reason}`);
+        continue;
+      }
+      try {
+        await sendApprovedReply({
+          db,
+          gmail: deps.gmailClient?.gmail,
+          env: deps.env,
+          conv,
+          esc,
+          finalBody: esc.draft_body,
+          finalSubject: esc.draft_subject,
+          decision: 'auto_send',
+          gmailSendImpl: deps.gmailOps.sendMessage,
+          archiveThreadImpl: deps.gmailOps.archiveThread,
+          slackClient: deps.slackClient ?? null,
+          log,
+        });
+        sentThisRun++;
+        log?.(`AUTO-SENT T_FOLLOWUP_CLOSE → ${conv.kommun_namn}/${conv.role} (escalation ${esc.id})`);
+      } catch (e) {
+        // Same truthful outcome log as the delay-ack sweep: read the status
+        // back and claim only what it proves. No retry, no status mutation.
+        const after = db.raw.prepare('SELECT status FROM escalations WHERE id = ?').get(esc.id)?.status ?? null;
+        if (after !== 'open') sentThisRun++; // claim went through: mail may have left; cap bounds outbound volume
         const outcome = after === 'open'
           ? 'refused before the send claim, did not go out'
           : after === 'send_failed'
