@@ -90,16 +90,21 @@ describe('dashboard / overview', () => {
     });
     db.updateConversationState(convId, 'DELIVERING');
     const all = await get(appWithFakes(), '/?filter=all');
-    expect(all.text).toContain('funnel-bar');
+    expect(all.text).toContain('class="stage-funnel"');
+    // The /takt page owns .funnel-bar/.funnel-n (a 12px overflow-hidden track
+    // in the shared stylesheet); the overview chevrons must not borrow them or
+    // they get clipped to a sliver (seen live 2026-09-01).
+    expect(all.text).not.toContain('class="funnel-bar"');
+    expect(all.text).not.toContain('class="funnel-n"');
     expect(all.text).toContain('filter=steg-avtal_kommer');
     // counts: 2 uncontacted, 1 at avtal kommer
-    expect(all.text).toMatch(/Ej kontaktad<span class="funnel-n">2<\/span>/);
-    expect(all.text).toMatch(/Avtal kommer<span class="funnel-n">1<\/span>/);
+    expect(all.text).toMatch(/Ej kontaktad<span class="stage-n">2<\/span>/);
+    expect(all.text).toMatch(/Avtal kommer<span class="stage-n">1<\/span>/);
     const step = await get(appWithFakes(), '/?filter=steg-avtal_kommer');
     expect(step.text).toContain('Malå');
     expect(step.text).not.toContain('Boxholm');
     // counts survive filtering (summary is built before the filter applies)
-    expect(step.text).toMatch(/Ej kontaktad<span class="funnel-n">2<\/span>/);
+    expect(step.text).toMatch(/Ej kontaktad<span class="stage-n">2<\/span>/);
     // steg-klart matches nothing → the TABLE is empty (Malå may still appear
     // in the Pågår/queue sections, which ignore the filter by design).
     const empty = await get(appWithFakes(), '/?filter=steg-klart');

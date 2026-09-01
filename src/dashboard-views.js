@@ -405,21 +405,22 @@ const baseCss = `
   details summary { cursor: pointer; color: var(--fg-muted); font-size: 12px; }
   .kommun-link { font-weight: 500; }
   .empty-row td { color: var(--fg-muted); font-style: italic; text-align: center; padding: 20px; }
-  /* Overview funnel — one chevron per pipeline stage */
-  .funnel-bar { display: flex; gap: 2px; margin-bottom: 8px; flex-wrap: wrap; }
-  .funnel-step {
+  /* Overview funnel — one chevron per pipeline stage. Own class names:
+     .funnel-bar/.funnel-n further down belong to the /takt track (12px, overflow hidden). */
+  .stage-funnel { display: flex; gap: 2px; margin-bottom: 8px; flex-wrap: wrap; }
+  .stage-step {
     position: relative; display: inline-flex; align-items: center; gap: 6px;
     padding: 5px 12px 5px 18px; font-size: 12px; color: var(--fg-muted);
     background: var(--bg-elev); border: 1px solid var(--border);
     clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%, 10px 50%);
   }
-  .funnel-bar .funnel-step:first-child { clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%); padding-left: 12px; border-radius: 6px 0 0 6px; }
-  .funnel-step.funnel-offtrack { margin-left: 10px; clip-path: none; border-radius: 6px; border-style: dashed; padding-left: 12px; }
-  .funnel-step:hover { color: var(--fg); background: var(--bg-elev-2); }
-  .funnel-step.active { background: var(--accent); color: white; }
-  .funnel-step.active .funnel-n { background: rgba(255,255,255,.25); color: white; }
-  .funnel-n { font-size: 11px; padding: 0 6px; border-radius: 8px; background: var(--bg-elev-2); color: var(--fg-muted); }
-  @media (max-width: 760px) { .funnel-step { padding: 4px 8px 4px 14px; font-size: 11px; } }
+  .stage-funnel .stage-step:first-child { clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%); padding-left: 12px; border-radius: 6px 0 0 6px; }
+  .stage-step.stage-offtrack { margin-left: 10px; clip-path: none; border-radius: 6px; border-style: dashed; padding-left: 12px; }
+  .stage-step:hover { color: var(--fg); background: var(--bg-elev-2); }
+  .stage-step.active { background: var(--accent); color: white; }
+  .stage-step.active .stage-n { background: rgba(255,255,255,.25); color: white; }
+  .stage-n { font-size: 11px; padding: 0 6px; border-radius: 8px; background: var(--bg-elev-2); color: var(--fg-muted); }
+  @media (max-width: 760px) { .stage-step { padding: 4px 8px 4px 14px; font-size: 11px; } }
   .filter-bar { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
   .filter-bar a { padding: 4px 10px; border-radius: 6px; background: var(--bg-elev); border: 1px solid var(--border); color: var(--fg-muted); font-size: 12px; }
   .filter-bar a.active { background: var(--accent); color: white; border-color: var(--accent); }
@@ -969,13 +970,13 @@ export function renderOverview({ summary, rows, filter, sort, order, totalKommun
   // clicking the active step again returns to the default view. Stoppat sits
   // apart — it is an off-track column, not a funnel step.
   const stageCounts = summary.stages ?? {};
-  const funnelBar = `<div class="funnel-bar">${STAGES.map((s) => {
+  const funnelBar = `<div class="stage-funnel">${STAGES.map((s) => {
     const key = `steg-${s.key}`;
     const active = activeFilter === key;
     const href = active ? `?${filterParams('active')}` : `?${filterParams(key)}`;
-    const cls = ['funnel-step', s.key === 'stoppat' ? 'funnel-offtrack' : '', active ? 'active' : '']
+    const cls = ['stage-step', s.key === 'stoppat' ? 'stage-offtrack' : '', active ? 'active' : '']
       .filter(Boolean).join(' ');
-    return `<a href="${href}" data-pane-link class="${cls}" title="${escapeHtml(s.hint)}">${escapeHtml(s.label)}<span class="funnel-n">${stageCounts[s.key] ?? 0}</span></a>`;
+    return `<a href="${href}" data-pane-link class="${cls}" title="${escapeHtml(s.hint)}">${escapeHtml(s.label)}<span class="stage-n">${stageCounts[s.key] ?? 0}</span></a>`;
   }).join('')}</div>`;
 
   const filterBar = `${funnelBar}<div class="filter-bar">${filters
