@@ -21,7 +21,12 @@
   // Swap the #content pane with the fragment for `url`. Falls back to a hard
   // navigation on any error so a failed fetch never leaves a dead pane.
   function loadPane(url, push) {
-    var u = new URL(url, location.origin);
+    // Resolve against the CURRENT page, not the origin root: sort headers and
+    // filter pills use bare "?sort=..." hrefs, and resolving those against
+    // location.origin silently fetched the overview from any subpage (the
+    // "sorting a column jumps to the main page" bug).
+    var u = new URL(url, location.href);
+    var clean = u.pathname + u.search;
     u.searchParams.set('partial', '1');
     return fetch(u.toString(), { headers: { 'X-Partial': '1' } })
       .then(function (res) {
@@ -29,7 +34,6 @@
         return res.text();
       })
       .then(function (html) {
-        var clean = url.replace(/([?&])partial=1\b/, '$1').replace(/[?&]$/, '');
         content().innerHTML = html;
         content().dataset.path = clean;
         if (push) history.pushState({ url: clean }, '', clean);
