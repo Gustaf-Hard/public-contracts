@@ -1221,8 +1221,33 @@ describe('runTick — final checklist', () => {
     getResult: { 'in-s': mkMsg('in-s', 'thr-s', 'Kommun <kommun@slut.se>', 'Det var samtliga avtal.', 'Sv') },
   };
 
+  // The probe pool is data-driven: a company is asked about only when >5
+  // kommuner fleet-wide hold an extracted contract with it. Seed that fleet.
+  function seedFleetContracts(vendor, n, baseKod) {
+    for (let i = 0; i < n; i++) {
+      const cid = db.createConversation({
+        kommun_kod: String(baseKod + i), kommun_namn: `Fleetkommun ${baseKod + i}`, role: 'central',
+        contact_email: `k${baseKod + i}@fleet.se`, scheduled_send_at: '2026-05-01T00:00:00Z',
+      });
+      const mid = db.recordMessage({
+        conversation_id: cid, gmail_message_id: `flt-${baseKod + i}`, direction: 'inbound',
+        from_email: `k${i}@fleet.se`, to_email: 'x', subject: 'avtal', body_text: 'avtal',
+        received_at: '2026-05-02T00:00:00Z', attachment_count: 1,
+      });
+      const aid = db.recordAttachment({ message_id: mid, filename: 'a.pdf', saved_path: '/tmp/a.pdf', mime_type: 'application/pdf', size_bytes: 1 });
+      storeContractAnalysis(db, aid, { is_contract: true, document_type: 'avtal', vendor_name: vendor,
+        products: [], avtalsvarde: null, valuta: null, period_start: null, period_end: null,
+        summary: 'a', confidence: 0.9, mentioned_agreements: [] }, { model: 'test' });
+    }
+  }
+
   it('drafts the checklist and moves to CROSSCHECK when contracts are on file', async () => {
     const id = seedDelivering();
+    // Fleet-wide: Binogi and ILT are popular (>5 kommuner). This kommun sends
+    // an ILT contract (via Polyglutt), so the checklist must probe Binogi
+    // under its category line and skip ILT.
+    seedFleetContracts('Binogi', 6, 9100);
+    seedFleetContracts('ILT Education', 6, 9200);
     // One extracted contract: ILT via Polyglutt, so the checklist must skip it.
     const analyseContracts = async ({ db: d, onlyMessageId }) => {
       for (const a of d.raw.prepare('SELECT id FROM attachments WHERE message_id = ?').all(onlyMessageId)) {
@@ -1245,7 +1270,7 @@ describe('runTick — final checklist', () => {
     expect(db.getConversation(id).state).toBe('CROSSCHECK');
     const esc = db.listOpenEscalationsForConversation(id)[0];
     expect(esc.draft_template).toBe('T_CROSSCHECK');
-    expect(esc.draft_body).toContain('- Binogi');
+    expect(esc.draft_body).toContain('- Läromedel: Binogi');
     expect(esc.draft_body).not.toContain('Inläsningstjänst');   // already received
   });
 

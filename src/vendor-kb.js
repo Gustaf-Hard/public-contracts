@@ -32,7 +32,13 @@ export const CATEGORY_RULES = {
   'läromedel': { exclusive: false },
   'lärplattform': { exclusive: true },
   'skoladministration': { exclusive: true },
+  'prov': { exclusive: true },
 };
+
+// The categories the final checklist (T_CROSSCHECK) may ask about, in the
+// order they appear in the mail. bedömning yields nothing until enough
+// kommuner hold extracted contracts in it — that is the design, not a gap.
+export const PROBE_CATEGORIES = ['läromedel', 'lärplattform', 'skoladministration', 'stödverktyg', 'prov', 'bedömning'];
 
 export const COMPANIES = [
   // ---- Watchlisted services ----
@@ -99,7 +105,7 @@ export const COMPANIES = [
   { canonical: 'StudyBee', slug: 'studybee', role: 'service', category: 'bedömning',
     aliases: ['studybee'], products: ['StudyBee Assess', 'StudyBee Insights', 'StudyBee Mobile'] },
   { canonical: 'Teachiq', slug: 'teachiq', role: 'service', category: 'prov',
-    aliases: ['teachiq'], products: [] },
+    aliases: ['teachiq', 'exam.net', 'examnet'], products: ['Kunskapsmatrisen', 'Exam.net'] },
 
   // ---- Services: stödverktyg / läromedel ----
   { canonical: 'Oribi', slug: 'oribi', role: 'service', category: 'stödverktyg',
@@ -158,8 +164,6 @@ export const COMPANIES = [
     aliases: ['wizkids'], products: ['AppWriter'] },
   { canonical: 'Svensk TalTeknologi', slug: 'svensk-talteknologi', role: 'service', category: 'stödverktyg',
     aliases: ['svensk talteknologi'], products: [] },
-  { canonical: 'Exam.net', slug: 'exam-net', role: 'service', category: 'prov',
-    aliases: ['exam.net', 'examnet', 'teachiq'], products: ['Kunskapsmatrisen'] },
   { canonical: 'Lexplore', slug: 'lexplore', role: 'service', category: 'bedömning',
     aliases: ['lexplore'], products: [] },
   { canonical: 'Microsoft', slug: 'microsoft', role: 'service', category: 'lärplattform',
@@ -269,21 +273,27 @@ export function resolveCompany(name) {
 // Asking by category matters for a second reason: a watchlist company appears
 // as one name among its peers, so the question reads as a generic completeness
 // check rather than interest in any one supplier.
-export function crosscheckLabels({ received = [] } = {}) {
+export function crosscheckProbeGroups({ received = [], popular = {} } = {}) {
   const seen = new Set();
+  const receivedCategories = new Set();
   for (const n of received) {
     const hit = resolveCompany(n);
-    if (hit) seen.add(hit.slug);
+    if (!hit) continue;
+    seen.add(hit.slug);
+    if (hit.role !== 'channel' && hit.category) receivedCategories.add(hit.category);
   }
-  // An exclusive category is settled as soon as we have seen one of its
-  // suppliers: they have a lärplattform, so do not read them a list of the
-  // other seven.
-  const settled = new Set();
-  for (const c of COMPANIES) {
-    if (seen.has(c.slug) && CATEGORY_RULES[c.category]?.exclusive) settled.add(c.category);
+  const groups = [];
+  for (const cat of PROBE_CATEGORIES) {
+    // One-per-kommun categories are settled by ANY company of that category
+    // in the conversation: they have a lärplattform (or skoladmin, or prov
+    // platform), so do not read them the list of the others.
+    if (CATEGORY_RULES[cat]?.exclusive && receivedCategories.has(cat)) continue;
+    const names = (popular[cat] ?? [])
+      .filter((c) => !seen.has(c.slug))
+      .map((c) => probeName(c))
+      .filter(Boolean);
+    if (names.length > 0) groups.push({ category: cat, label: CATEGORY_LABELS[cat] ?? cat, names });
   }
-  return COMPANIES
-    .filter((c) => c.checklist && !seen.has(c.slug) && !settled.has(c.category))
-    .map((c) => probeName(c))
-    .filter(Boolean);
+  return groups;
 }
+

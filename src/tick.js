@@ -1,7 +1,8 @@
 import { T_INITIAL, T_PRECISION, T_RECEIPT, T_FOLLOWUP_NUDGE, T_FOLLOWUP_CLOSE, T_REQUEST_MISSING, T_UPDATE, T_DELAY_ACK, T_CROSSCHECK, computeReceivedMissing, chooseDeliveryReply } from './templates.js';
 import { computeKommunReview } from './contract-lifecycle.js';
 import { matchWatchlist } from './watchlist.js';
-import { crosscheckLabels } from './vendor-kb.js';
+import { crosscheckProbeGroups } from './vendor-kb.js';
+import { popularProbeCompanies } from './vendor-analytics.js';
 import { buildCoverageFacts } from './coverage.js';
 import { classify, isCloserText } from './classifier.js';
 import { inferThreadStatus } from './threads.js';
@@ -41,7 +42,7 @@ function tplCtx(conv, env, extra = {}) {
     arendenummer: extra.arendenummer ?? conv.arendenummer ?? null,
     review_contracts: extra.review_contracts ?? [],
     // Final-checklist (T_CROSSCHECK) vendor list.
-    crosscheck_vendors: extra.crosscheck_vendors ?? [],
+    crosscheck_groups: extra.crosscheck_groups ?? [],
     // Delay/OOO acknowledgement (T_DELAY_ACK) context.
     delay_date: extra.delay_date ?? null,
   };
@@ -705,9 +706,13 @@ async function dispatchEscalationForIngest(pending, deps) {
     }
     const info = db.listContractInfoForConversation(updated.id);
     const { all } = computeReceivedMissing(info);
-    const vendors = info.some((r) => r.is_contract) ? crosscheckLabels({ received: all }) : [];
-    if (vendors.length > 0) {
-      templateCtx = { crosscheck_vendors: vendors };
+    // Probe pool is fleet-wide and data-driven: companies >5 kommuner already
+    // have (popularProbeCompanies), grouped by category, minus what THIS
+    // kommun has shown, with one-per-kommun categories settled entirely.
+    const popular = popularProbeCompanies(db.listContractFacts());
+    const groups = info.some((r) => r.is_contract) ? crosscheckProbeGroups({ received: all, popular }) : [];
+    if (groups.length > 0) {
+      templateCtx = { crosscheck_groups: groups };
       llmDraft = null;   // the deterministic checklist wins over the LLM's "tack"
     } else {
       // Nothing extracted, or nothing left to ask: reading the whole category

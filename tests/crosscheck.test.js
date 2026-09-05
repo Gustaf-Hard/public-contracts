@@ -2,7 +2,8 @@
 // confirmed" rather than "a human gave up". Before this, is_final_delivery was
 // computed on every reply and never acted on, so nothing reached DONE by itself.
 import { describe, it, expect } from 'vitest';
-import { crosscheckLabels, CATEGORY_RULES } from '../src/vendor-kb.js';
+import { crosscheckProbeGroups, CATEGORY_RULES, companyBySlug } from '../src/vendor-kb.js';
+import { popularProbeCompanies } from '../src/vendor-analytics.js';
 import { T_CROSSCHECK } from '../src/templates.js';
 import { nextActionForClassification, STALE_RULES } from '../src/conversation.js';
 import { buildPipeline, stageForState, STAGES } from '../src/pipeline.js';
@@ -12,41 +13,99 @@ const ctx = {
   from_name: 'Gustaf Hård af Segerstad', from_email: 'gustaf.hard@gmail.com',
 };
 
-describe('crosscheckLabels', () => {
-  it('asks about the läromedel category by its probe labels', () => {
-    // Probe labels, not corporate names: a kommun's system list says
-    // "Inläsningstjänst", never "ILT Education".
-    expect(crosscheckLabels()).toEqual([
-      'Magma', 'NE', 'Inläsningstjänst', 'Binogi', 'Skolplus', 'Sveriges Utbildningsradio',
-    ]);
+// The probe pool is DATA-DRIVEN (2026-09-05 design): a company is asked about
+// only when >5 kommuner already hold an extracted contract with it. Curation
+// (checklist flags) no longer drives the final question — popularity does.
+const POP = {
+  'läromedel': ['radish', 'ne', 'ilt', 'binogi', 'skolplus'].map(companyBySlug),
+  'lärplattform': ['unikum', 'schoolsoft'].map(companyBySlug),
+  'prov': ['digiexam', 'teachiq'].map(companyBySlug),
+  'stödverktyg': ['symbolbruket', 'oribi'].map(companyBySlug),
+};
+
+describe('crosscheckProbeGroups', () => {
+  it('groups popular companies by category under probe labels', () => {
+    const groups = crosscheckProbeGroups({ received: [], popular: POP });
+    const laromedel = groups.find((g) => g.category === 'läromedel');
+    expect(laromedel.label).toBe('Läromedel');
+    expect(laromedel.names).toEqual(['Magma', 'NE', 'Inläsningstjänst', 'Binogi', 'Skolplus']);
   });
 
-  it('never asks for something the kommun already sent, matching on product names', () => {
-    // Polyglutt is an ILT product; the KB resolves it to the company.
-    expect(crosscheckLabels({ received: ['Polyglutt', 'Binogi'] }))
-      .toEqual(['Magma', 'NE', 'Skolplus', 'Sveriges Utbildningsradio']);
+  it('drops an EXCLUSIVE category entirely once the kommun has any company in it', () => {
+    // They have SchoolSoft (lärplattform, exclusive) and DigiExam (prov,
+    // exclusive): neither category is asked at all — you have one of those.
+    const groups = crosscheckProbeGroups({ received: ['SchoolSoft', 'DigiExam'], popular: POP });
+    expect(groups.map((g) => g.category)).toEqual(['läromedel', 'stödverktyg']);
   });
 
-  it('keeps asking within an additive category — one läromedel implies nothing about the rest', () => {
-    expect(crosscheckLabels({ received: ['NE'] })).toContain('Binogi');
+  it('within an additive category only the received companies are struck, matching products too', () => {
+    // Polyglutt is an ILT product; läromedel stays additive.
+    const groups = crosscheckProbeGroups({ received: ['Polyglutt', 'Binogi'], popular: POP });
+    const laromedel = groups.find((g) => g.category === 'läromedel');
+    expect(laromedel.names).toEqual(['Magma', 'NE', 'Skolplus']);
   });
 
-  it('treats lärplattform and skoladministration as one-per-kommun', () => {
-    // Dormant while only läromedel is flagged, but the rule is what stops a
-    // kommun that has Unikum being read the other seven platforms.
+  it('drops empty categories and returns [] when nothing is left to ask', () => {
+    const groups = crosscheckProbeGroups({
+      received: ['Magma', 'NE', 'Inläsningstjänst', 'Binogi', 'Skolplus', 'Unikum', 'DigiExam', 'InPrint 3', 'Stava Rex'],
+      popular: POP,
+    });
+    expect(groups).toEqual([]);
+  });
+
+  it('prov is one-per-kommun like lärplattform and skoladministration; läromedel stays additive', () => {
+    expect(CATEGORY_RULES['prov'].exclusive).toBe(true);
     expect(CATEGORY_RULES['lärplattform'].exclusive).toBe(true);
     expect(CATEGORY_RULES['skoladministration'].exclusive).toBe(true);
     expect(CATEGORY_RULES['läromedel'].exclusive).toBe(false);
   });
 });
 
-describe('T_CROSSCHECK wording', () => {
-  const m = T_CROSSCHECK({ ...ctx, crosscheck_vendors: ['Magma', 'Binogi'] });
+describe('popularProbeCompanies', () => {
+  const row = (vendor, kommun) => ({ vendor_name: vendor, kommun_kod: kommun });
+  const kods = (n) => Array.from({ length: n }, (_, i) => String(1000 + i));
 
-  it('asks in the verifying form and lists only what we ask about', () => {
+  it('admits a company only above the kommun threshold, counting DISTINCT kommuner', () => {
+    const rows = [
+      ...kods(6).map((k) => row('Binogi', k)),          // 6 kommuner → in
+      ...kods(5).map((k) => row('Gleerups', k)),        // 5 kommuner → out
+      ...kods(3).map((k) => row('NE', k)),              // 3 kommuner...
+      ...kods(3).map((k) => row('NE.se', k)),           // ...same 3 via product alias → still 3, out
+      row('Binogi', '1000'), row('Binogi', '1000'),     // duplicates do not inflate
+    ];
+    const pop = popularProbeCompanies(rows, { minKommuner: 6 });
+    expect(pop['läromedel'].map((c) => c.slug)).toEqual(['binogi']);
+  });
+
+  it('ignores channels, unknown vendors and categories outside the probe set', () => {
+    const rows = [
+      ...kods(9).map((k) => row('Atea', k)),            // channel → never probed
+      ...kods(9).map((k) => row('Helt Okänd AB', k)),   // not in KB → never probed
+      ...kods(9).map((k) => row('Axiell', k)),          // KB category övrigt → outside probe set
+    ];
+    expect(popularProbeCompanies(rows, { minKommuner: 6 })).toEqual({});
+  });
+
+  it('orders companies within a category by kommun count, biggest first', () => {
+    const rows = [
+      ...kods(10).map((k) => row('ILT Education', k)),
+      ...kods(7).map((k) => row('Binogi', k)),
+    ];
+    const pop = popularProbeCompanies(rows, { minKommuner: 6 });
+    expect(pop['läromedel'].map((c) => c.slug)).toEqual(['ilt', 'binogi']);
+  });
+});
+
+describe('T_CROSSCHECK wording', () => {
+  const m = T_CROSSCHECK({ ...ctx, crosscheck_groups: [
+    { category: 'läromedel', label: 'Läromedel', names: ['Magma', 'Binogi'] },
+    { category: 'prov', label: 'Prov', names: ['DigiExam', 'Teachiq', 'Trelson'] },
+  ] });
+
+  it('asks in the verifying form, one line per category with names inline', () => {
     expect(m.body).toMatch(/stämmer det att kommunen inte har något avtal/i);
-    expect(m.body).toContain('- Magma');
-    expect(m.body).toContain('- Binogi');
+    expect(m.body).toContain('- Läromedel: Magma, Binogi');
+    expect(m.body).toContain('- Prov: DigiExam, Teachiq, Trelson');
   });
 
   it('lets silence close the case rather than stranding it', () => {

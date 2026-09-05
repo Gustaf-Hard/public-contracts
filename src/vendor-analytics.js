@@ -11,7 +11,7 @@
 
 import { computeNextReviewDate } from './contract-lifecycle.js';
 import { canonicalVendorName } from './vendor-aliases.js';
-import { resolveCompany } from './vendor-kb.js';
+import { resolveCompany, companyBySlug, PROBE_CATEGORIES } from './vendor-kb.js';
 
 // ---- Grade-level coverage schema (2026-07-10-product-intelligence design) ----
 
@@ -265,6 +265,34 @@ export function buildContractFacts(rows, { lanByKommunKod = new Map(), now }) {
     filename: r.filename ?? null,
     received_at: r.received_at ?? null,
   }));
+}
+
+// Data-driven probe pool for the final checklist (2026-09-05 design): a KB
+// company qualifies for T_CROSSCHECK probing only when MORE THAN five
+// kommuner already hold an extracted contract with it — we ask about what is
+// plausibly common, and the list grows with the data instead of curation.
+// Channels, unknown vendors and categories outside PROBE_CATEGORIES never
+// qualify. Returns { category: [company, ...] } sorted by kommun count desc.
+export function popularProbeCompanies(rows, { minKommuner = 6 } = {}) {
+  const kommunerBySlug = new Map();
+  for (const r of rows) {
+    if (!r.vendor_name || !r.kommun_kod) continue;
+    const c = resolveCompany(r.vendor_name);
+    if (!c || c.role === 'channel' || !c.category) continue;
+    if (!PROBE_CATEGORIES.includes(c.category)) continue;
+    if (!kommunerBySlug.has(c.slug)) kommunerBySlug.set(c.slug, new Set());
+    kommunerBySlug.get(c.slug).add(r.kommun_kod);
+  }
+  const out = {};
+  for (const [slug, kods] of kommunerBySlug) {
+    if (kods.size < minKommuner) continue;
+    const company = companyBySlug(slug);
+    (out[company.category] ??= []).push({ company, n: kods.size });
+  }
+  for (const cat of Object.keys(out)) {
+    out[cat] = out[cat].sort((a, b) => b.n - a.n).map((e) => e.company);
+  }
+  return out;
 }
 
 // ---- rollups & summaries -----------------------------------------------------

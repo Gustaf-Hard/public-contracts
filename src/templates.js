@@ -86,8 +86,10 @@ export function T_RECEIPT(ctx) {
 // are ASKING about, never what they sent: parroting our own extraction back
 // narrows their reply and can assert a wrong extraction as fact.
 export function T_CROSSCHECK(ctx) {
-  const vendors = (ctx.crosscheck_vendors ?? []).filter(Boolean);
-  const list = vendors.map((v) => `- ${v}`).join('\n');
+  // One line per category with the popular names inline — longer pool than
+  // the old flat six, kept readable by grouping (2026-09-05 design).
+  const groups = (ctx.crosscheck_groups ?? []).filter((g) => g && g.names?.length);
+  const list = groups.map((g) => `- ${g.label}: ${g.names.join(', ')}`).join('\n');
   return {
     subject: `Re: ${ctx.thread_subject}`,
     body: [
