@@ -20,7 +20,7 @@ kommun_kod,kommun_namn,lan,org_nr,webbplats,folkmangd,diarium_url,contact_count,
 0182,Nacka,Stockholms län,212000-0167,https://www.nacka.se/,113730,,3,medium,2026-05-17,
 0183,Sundbyberg,Stockholms län,212000-0175,http://www.sundbyberg.se,57000,,3,high,2026-05-17,
 0184,Solna,Stockholms län,212000-0183,http://www.solna.se,86435,,1,low,2026-05-17,
-0186,Lidingö,Stockholms län,212000-0191,https://www.lidingo.se/,48369,,0,low,2026-05-17,
+0186,Lidingö,Stockholms län,212000-0191,https://www.lidingo.se/,48369,,1,high,2026-09-05,"Manuell efterforskning 2026-09-05: registratorsadress från stadens begära-ut-handlingar-sida (sajten omstrukturerad efter crawlen, gamla URL:er 404). MX ok."
 0187,Vaxholm,Stockholms län,212000-2908,http://www.vaxholm.se,11636,,2,medium,2026-05-17,
 0188,Norrtälje,Stockholms län,212000-0217,http://www.norrtalje.se,66832,,4,medium,2026-05-17,
 0191,Sigtuna,Stockholms län,212000-0225,http://www.sigtuna.se,53365,,1,medium,2026-05-17,

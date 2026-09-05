@@ -857,10 +857,18 @@
     "org_nr": "212000-0191",
     "webbplats": "https://www.lidingo.se/",
     "diarium_url": null,
-    "contacts": [],
-    "confidence": "low",
-    "notes": null,
-    "verified_at": "2026-05-17",
+    "contacts": [
+      {
+        "email": "registrator@lidingo.se",
+        "role": "central",
+        "forvaltning_namn": null,
+        "source_url": "https://lidingo.se/stad-politik/sa-styrs-lidingo/sammantraden-och-handlingar/begara-ut-handlingar/",
+        "found_via": "manual_research"
+      }
+    ],
+    "confidence": "high",
+    "notes": "Manuell efterforskning 2026-09-05: registratorsadress från stadens begära-ut-handlingar-sida (sajten omstrukturerad efter crawlen, gamla URL:er 404). MX ok.",
+    "verified_at": "2026-09-05",
     "folkmangd": 48369
   },
   {

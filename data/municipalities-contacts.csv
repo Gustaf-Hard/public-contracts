@@ -79,6 +79,7 @@ kommun_kod,kommun_namn,email,role,forvaltning_namn,source_url,found_via
 0183,Sundbyberg,servicecenter@sundbyberg.se,central,,http://www.sundbyberg.se/kommun-och-politik/kontakta-oss/felanmalan,contact_page
 0183,Sundbyberg,forskolenamnden@sundbyberg.se,utbildning,Kontakta till Sundbybergs stads nämnder,http://www.sundbyberg.se/kommun-och-politik/kontakta-oss/kontakta-till-sundbybergs-stads-namnder,contact_page
 0184,Solna,kommunikation@solna.se,other,,https://www.solna.se/om-solna-stad/kontakt-och-kommunikation/grafisk-profil,pattern_match
+0186,Lidingö,registrator@lidingo.se,central,,https://lidingo.se/stad-politik/sa-styrs-lidingo/sammantraden-och-handlingar/begara-ut-handlingar/,manual_research
 0187,Vaxholm,kansliet@vaxholm.se,other,,http://www.vaxholm.se/,contact_page
 0187,Vaxholm,utbildning@vaxholm.se,utbildning,Kontakta förvaltningar,http://www.vaxholm.se/kommun--politik/kontakter-vaxholms-stad,contact_page
 0188,Norrtälje,kontaktcenter@norrtalje.se,central,,http://www.norrtalje.se/,pattern_match
