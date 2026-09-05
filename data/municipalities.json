@@ -27,10 +27,18 @@
     "org_nr": "212000-0027",
     "webbplats": "http://www.vallentuna.se",
     "diarium_url": null,
-    "contacts": [],
-    "confidence": "low",
-    "notes": "homepage fetch failed: fetch failed",
-    "verified_at": "2026-05-17",
+    "contacts": [
+      {
+        "email": "kommun@vallentuna.se",
+        "role": "central",
+        "forvaltning_namn": null,
+        "source_url": "https://www.vallentuna.se/kommun-och-politik/overklaga-beslut-rattssakerhet/offentlig-handling/",
+        "found_via": "manual_research"
+      }
+    ],
+    "confidence": "high",
+    "notes": "Manuell efterforskning 2026-09-05: Offentlig handling-sidan hänvisar till registrator via kommun@vallentuna.se.",
+    "verified_at": "2026-09-05",
     "folkmangd": 35361
   },
   {
@@ -663,10 +671,18 @@
     "org_nr": "212000-0126",
     "webbplats": "http://www.danderyd.se",
     "diarium_url": null,
-    "contacts": [],
-    "confidence": "low",
-    "notes": "homepage fetch failed: fetch failed",
-    "verified_at": "2026-05-17",
+    "contacts": [
+      {
+        "email": "kommunstyrelsen@danderyd.se",
+        "role": "central",
+        "forvaltning_namn": null,
+        "source_url": "https://www.danderyd.se/kommun-och-politik/diarium-och-arkiv/att-ta-del-av-allmanna-handlingar/",
+        "found_via": "manual_research"
+      }
+    ],
+    "confidence": "high",
+    "notes": "Manuell efterforskning 2026-09-05: Kommunstyrelsens diarium/registratur för allmänna handlingar.",
+    "verified_at": "2026-09-05",
     "folkmangd": 32500
   },
   {
@@ -725,10 +741,18 @@
     "org_nr": "212000-0142",
     "webbplats": "https://start.stockholm",
     "diarium_url": null,
-    "contacts": [],
-    "confidence": "low",
-    "notes": "homepage fetch failed: fetch failed",
-    "verified_at": "2026-05-17",
+    "contacts": [
+      {
+        "email": "kommunstyrelsen@stockholm.se",
+        "role": "central",
+        "forvaltning_namn": null,
+        "source_url": "https://start.stockholm/om-stockholms-stad/organisation/stadsledningskontoret/",
+        "found_via": "manual_research"
+      }
+    ],
+    "confidence": "high",
+    "notes": "Manuell efterforskning 2026-09-05: Stadsledningskontorets adress (KS registratur). Stockholm diarieför per förvaltning; mejldomän stockholm.se, webb start.stockholm.",
+    "verified_at": "2026-09-05",
     "folkmangd": 999239
   },
   {
@@ -2138,10 +2162,18 @@
     "org_nr": "212000-0506",
     "webbplats": "http://www.gnosjo.se",
     "diarium_url": null,
-    "contacts": [],
-    "confidence": "low",
-    "notes": "homepage fetch failed: fetch failed",
-    "verified_at": "2026-05-17",
+    "contacts": [
+      {
+        "email": "kommun@gnosjo.se",
+        "role": "central",
+        "forvaltning_namn": null,
+        "source_url": "https://www.gnosjo.se/kommun-och-politik/kontaktuppgifter-och-postadresser",
+        "found_via": "manual_research"
+      }
+    ],
+    "confidence": "high",
+    "notes": "Manuell efterforskning 2026-09-05: Kommunens officiella e-post på kontaktuppgiftssidan.",
+    "verified_at": "2026-09-05",
     "folkmangd": 9010
   },
   {
@@ -2417,10 +2449,18 @@
     "org_nr": "212000-0555",
     "webbplats": "https://kommun.varnamo.se",
     "diarium_url": null,
-    "contacts": [],
-    "confidence": "low",
-    "notes": null,
-    "verified_at": "2026-05-17",
+    "contacts": [
+      {
+        "email": "kontaktcenter@varnamo.se",
+        "role": "central",
+        "forvaltning_namn": null,
+        "source_url": "https://www.varnamo.se/varnamose/turistinformation/detouristeninformation.4.44c2f8bb171f4cc5ea75a9.html",
+        "found_via": "manual_research"
+      }
+    ],
+    "confidence": "medium",
+    "notes": "Manuell efterforskning 2026-09-05: Kontaktcenters adress, funnen på undersida (huvudsidorna hänvisar till telefon/e-tjänst).",
+    "verified_at": "2026-09-05",
     "folkmangd": 34534
   },
   {
@@ -2500,10 +2540,18 @@
     "org_nr": "212000-0571",
     "webbplats": "https://kommun.vetlanda.se/",
     "diarium_url": null,
-    "contacts": [],
-    "confidence": "low",
-    "notes": null,
-    "verified_at": "2026-05-17",
+    "contacts": [
+      {
+        "email": "kommun@vetlanda.se",
+        "role": "central",
+        "forvaltning_namn": null,
+        "source_url": "https://vetlanda.se/kommun-och-politik/kommunens-organisation/forvaltningar/kontakta-oss",
+        "found_via": "manual_research"
+      }
+    ],
+    "confidence": "high",
+    "notes": "Manuell efterforskning 2026-09-05: Kontaktcenter: 'E-posta kontaktcenter på kommun@vetlanda.se'.",
+    "verified_at": "2026-09-05",
     "folkmangd": 27313
   },
   {
@@ -2891,10 +2939,18 @@
     "org_nr": "212000-0688",
     "webbplats": "http://www.hogsby.se",
     "diarium_url": null,
-    "contacts": [],
-    "confidence": "low",
-    "notes": "homepage fetch failed: fetch failed",
-    "verified_at": "2026-05-17",
+    "contacts": [
+      {
+        "email": "kommun@hogsby.se",
+        "role": "central",
+        "forvaltning_namn": null,
+        "source_url": "https://hogsby.se/kommun-och-politik/kontakta-oss/",
+        "found_via": "manual_research"
+      }
+    ],
+    "confidence": "high",
+    "notes": "Manuell efterforskning 2026-09-05: Kommunens officiella e-post på kontakta-oss-sidan.",
+    "verified_at": "2026-09-05",
     "folkmangd": 5134
   },
   {
@@ -4306,13 +4362,6 @@
         "found_via": "contact_page"
       },
       {
-        "email": "lund.kommun@lund.se",
-        "role": "central",
-        "forvaltning_namn": null,
-        "source_url": "https://www.lund.se/kontakt/faktura-fran-lunds-kommun",
-        "found_via": "contact_page"
-      },
-      {
         "email": "kommunikation@lund.se",
         "role": "other",
         "forvaltning_namn": null,
@@ -4321,8 +4370,8 @@
       }
     ],
     "confidence": "medium",
-    "notes": null,
-    "verified_at": "2026-05-17",
+    "notes": "Manuell efterforskning 2026-09-05: tog bort felstavade lund.kommun@lund.se (studsade; rätt adress lunds.kommun@lund.se fanns redan).",
+    "verified_at": "2026-09-05",
     "folkmangd": 132333
   },
   {
@@ -4556,10 +4605,18 @@
     "org_nr": "212000-0977",
     "webbplats": "http://www.angelholm.se",
     "diarium_url": null,
-    "contacts": [],
-    "confidence": "low",
-    "notes": null,
-    "verified_at": "2026-05-17",
+    "contacts": [
+      {
+        "email": "info@engelholm.se",
+        "role": "central",
+        "forvaltning_namn": null,
+        "source_url": "https://www.engelholm.se/kontakt.html",
+        "found_via": "manual_research"
+      }
+    ],
+    "confidence": "high",
+    "notes": "Manuell efterforskning 2026-09-05: Kundtjänst; sajten ligger på engelholm.se (kommunens alternativstavning av angelholm.se), gamla registrator-sidan 404.",
+    "verified_at": "2026-09-05",
     "folkmangd": 45159
   },
   {
@@ -4683,11 +4740,11 @@
     "diarium_url": null,
     "contacts": [
       {
-        "email": "medborgarservice@laholm.se",
+        "email": "kontaktcenter@laholm.se",
         "role": "central",
         "forvaltning_namn": null,
-        "source_url": "http://www.laholm.se/",
-        "found_via": "contact_page"
+        "source_url": "https://laholm.se/kommun-och-politik/overklaga-beslut-rattssakerhet/allmanna-handlingar",
+        "found_via": "manual_research"
       },
       {
         "email": "kommun@laholm.se",
@@ -4747,8 +4804,8 @@
       }
     ],
     "confidence": "high",
-    "notes": null,
-    "verified_at": "2026-05-17",
+    "notes": "Manuell efterforskning 2026-09-05: kontaktcenter@laholm.se är sidans angivna väg för allmän handling; tog bort studsande medborgarservice@.",
+    "verified_at": "2026-09-05",
     "folkmangd": 26565
   },
   {
@@ -4758,10 +4815,18 @@
     "org_nr": "212000-1231",
     "webbplats": "https://kommun.falkenberg.se/",
     "diarium_url": null,
-    "contacts": [],
-    "confidence": "low",
-    "notes": null,
-    "verified_at": "2026-05-17",
+    "contacts": [
+      {
+        "email": "kontaktcenter@falkenberg.se",
+        "role": "central",
+        "forvaltning_namn": null,
+        "source_url": "https://kommun.falkenberg.se/kontakt-och-oppettider",
+        "found_via": "manual_research"
+      }
+    ],
+    "confidence": "high",
+    "notes": "Manuell efterforskning 2026-09-05: Kontaktcenter; sidan om allmänna handlingar hänvisar diarieärenden dit (adressen JS-maskerad i källkoden).",
+    "verified_at": "2026-09-05",
     "folkmangd": 47321
   },
   {
@@ -4771,10 +4836,18 @@
     "org_nr": "212000-1249",
     "webbplats": "https://www.varberg.se",
     "diarium_url": null,
-    "contacts": [],
-    "confidence": "low",
-    "notes": null,
-    "verified_at": "2026-05-17",
+    "contacts": [
+      {
+        "email": "varbergdirekt@varberg.se",
+        "role": "central",
+        "forvaltning_namn": null,
+        "source_url": "https://varberg.se/kontakt",
+        "found_via": "manual_research"
+      }
+    ],
+    "confidence": "high",
+    "notes": "Manuell efterforskning 2026-09-05: Kontaktcenter Varberg direkt; allmän handling-sidorna hänvisar dit.",
+    "verified_at": "2026-09-05",
     "folkmangd": 69460
   },
   {
@@ -4854,10 +4927,18 @@
     "org_nr": "212000-1272",
     "webbplats": "http://www.partille.se",
     "diarium_url": null,
-    "contacts": [],
-    "confidence": "low",
-    "notes": null,
-    "verified_at": "2026-05-17",
+    "contacts": [
+      {
+        "email": "kundcenter@partille.se",
+        "role": "central",
+        "forvaltning_namn": null,
+        "source_url": "https://www.partille.se/kommun--politik/arkiv--diarium/",
+        "found_via": "manual_research"
+      }
+    ],
+    "confidence": "high",
+    "notes": "Manuell efterforskning 2026-09-05: Arkiv & diarium-sidan hänvisar handlingsutlämning till kundcenter.",
+    "verified_at": "2026-09-05",
     "folkmangd": 41164
   },
   {
@@ -5602,10 +5683,18 @@
     "org_nr": "212000-1520",
     "webbplats": "http://www.herrljunga.se",
     "diarium_url": null,
-    "contacts": [],
-    "confidence": "low",
-    "notes": "homepage fetch failed: fetch failed",
-    "verified_at": "2026-05-17",
+    "contacts": [
+      {
+        "email": "herrljunga.kommun@herrljunga.se",
+        "role": "central",
+        "forvaltning_namn": null,
+        "source_url": "https://herrljunga.se/kommun-och-politik/kommunens-organisation/diarium-och-arkiv",
+        "found_via": "manual_research"
+      }
+    ],
+    "confidence": "high",
+    "notes": "Manuell efterforskning 2026-09-05: Kommunens officiella e-post på diarium/allmän handling-sidan.",
+    "verified_at": "2026-09-05",
     "folkmangd": 9509
   },
   {
@@ -6182,10 +6271,18 @@
     "org_nr": "212000-1686",
     "webbplats": "https://mariestad.se/Mariestads-kommun.html",
     "diarium_url": null,
-    "contacts": [],
-    "confidence": "low",
-    "notes": "homepage status 404",
-    "verified_at": "2026-05-17",
+    "contacts": [
+      {
+        "email": "demokratistod@mariestad.se",
+        "role": "central",
+        "forvaltning_namn": null,
+        "source_url": "https://mariestad.se/Mariestads-kommun/Kommun--politik/Politik-och-delaktighet/Demokrati-och-delaktighet/Allmanna-handlingar",
+        "found_via": "manual_research"
+      }
+    ],
+    "confidence": "high",
+    "notes": "Manuell efterforskning 2026-09-05: Enheten för demokratistöd (diarium/registratur) enligt Allmänna handlingar-sidan.",
+    "verified_at": "2026-09-05",
     "folkmangd": 24421
   },
   {
@@ -6274,11 +6371,11 @@
     "diarium_url": null,
     "contacts": [
       {
-        "email": "kontaktuppgifterdataskyddsombuddataskyddsombud@skovde.se",
-        "role": "other",
+        "email": "skovdekommun@skovde.se",
+        "role": "central",
         "forvaltning_namn": null,
-        "source_url": "https://www.skovde.se/sv/kommun-och-politik/kontakt-med-skovde-kommun/dataskyddsombud/",
-        "found_via": "contact_page"
+        "source_url": "https://www.skovde.se/kommun-politik/",
+        "found_via": "manual_research"
       },
       {
         "email": "medborgarserviceryd@skovde.se",
@@ -6286,18 +6383,11 @@
         "forvaltning_namn": null,
         "source_url": "https://www.skovde.se/sv/kommun-och-politik/kontakt-med-skovde-kommun/medborgarservice/",
         "found_via": "contact_page"
-      },
-      {
-        "email": "medborgarservicemedborgarserviceryd@skovde.se",
-        "role": "other",
-        "forvaltning_namn": null,
-        "source_url": "https://www.skovde.se/sv/kommun-och-politik/kontakt-med-skovde-kommun/medborgarservice/",
-        "found_via": "contact_page"
       }
     ],
-    "confidence": "low",
-    "notes": null,
-    "verified_at": "2026-05-17",
+    "confidence": "high",
+    "notes": "Manuell efterforskning 2026-09-05: skovdekommun@skovde.se från kommun-politik-sidan; tog bort två hopklistrade crawlartefakter.",
+    "verified_at": "2026-09-05",
     "folkmangd": 58272
   },
   {
@@ -6692,10 +6782,18 @@
     "org_nr": "212000-1843",
     "webbplats": "http://www.sunne.se",
     "diarium_url": null,
-    "contacts": [],
-    "confidence": "low",
-    "notes": null,
-    "verified_at": "2026-05-17",
+    "contacts": [
+      {
+        "email": "kommun@sunne.se",
+        "role": "central",
+        "forvaltning_namn": null,
+        "source_url": "https://www.sunne.se/kommun/kommun-och-politik/diarium-arkiv-och-sekretess/offentlig-handling/",
+        "found_via": "manual_research"
+      }
+    ],
+    "confidence": "high",
+    "notes": "Manuell efterforskning 2026-09-05: Kommunkansliet; offentlig handling-sidan hänvisar dit för begäran.",
+    "verified_at": "2026-09-05",
     "folkmangd": 13354
   },
   {
@@ -7580,10 +7678,18 @@
     "org_nr": "212000-2130",
     "webbplats": "http://www.vansbro.se",
     "diarium_url": null,
-    "contacts": [],
-    "confidence": "low",
-    "notes": null,
-    "verified_at": "2026-05-17",
+    "contacts": [
+      {
+        "email": "administration@vansbro.se",
+        "role": "central",
+        "forvaltning_namn": null,
+        "source_url": "https://www.vansbro.se/kommun-och-politik/arenden-protokoll-och-handlingar.html",
+        "found_via": "manual_research"
+      }
+    ],
+    "confidence": "high",
+    "notes": "Manuell efterforskning 2026-09-05: Administrativa funktionen för centrala diariet (Ciceron); vansbro.kommun@vansbro.se är alternativ.",
+    "verified_at": "2026-09-05",
     "folkmangd": 6741
   },
   {
@@ -7873,10 +7979,18 @@
     "org_nr": "212000-2213",
     "webbplats": "https://morakommun.se",
     "diarium_url": null,
-    "contacts": [],
-    "confidence": "low",
-    "notes": null,
-    "verified_at": "2026-05-17",
+    "contacts": [
+      {
+        "email": "mora.kommun@mora.se",
+        "role": "central",
+        "forvaltning_namn": null,
+        "source_url": "https://morakommun.se/arkiv/nyhetsarkiv/nyheter/2025-12-18-ny-e-tjanst-gor-det-enklare-att-begara-ut-allmanna-handlingar.html",
+        "found_via": "manual_research"
+      }
+    ],
+    "confidence": "high",
+    "notes": "Manuell efterforskning 2026-09-05: Officiell adress för begäran om allmän handling; mejldomän mora.se, webb morakommun.se.",
+    "verified_at": "2026-09-05",
     "folkmangd": 20419
   },
   {
@@ -8222,10 +8336,18 @@
     "org_nr": "212000-2338",
     "webbplats": "http://www.gavle.se",
     "diarium_url": null,
-    "contacts": [],
-    "confidence": "low",
-    "notes": "homepage fetch failed: Failed after 3 attempts: http://www.gavle.se/ (last status 503)",
-    "verified_at": "2026-05-17",
+    "contacts": [
+      {
+        "email": "gavle.kommun@gavle.se",
+        "role": "central",
+        "forvaltning_namn": null,
+        "source_url": "https://www.gavle.se/kommun-och-politik/kommunens-organisation/gavle-kommuns-diarium/",
+        "found_via": "manual_research"
+      }
+    ],
+    "confidence": "high",
+    "notes": "Manuell efterforskning 2026-09-05: Kundtjänst; diariesidan hänvisar allmän handling-begäran dit.",
+    "verified_at": "2026-09-05",
     "folkmangd": 104108
   },
   {
@@ -8361,10 +8483,18 @@
     "org_nr": "212000-2387",
     "webbplats": "http://www.ange.se",
     "diarium_url": null,
-    "contacts": [],
-    "confidence": "low",
-    "notes": null,
-    "verified_at": "2026-05-17",
+    "contacts": [
+      {
+        "email": "ange@ange.se",
+        "role": "central",
+        "forvaltning_namn": null,
+        "source_url": "https://invanare.ange.se/kommun-och-politik/kontakta-kommunen.html",
+        "found_via": "manual_research"
+      }
+    ],
+    "confidence": "high",
+    "notes": "Manuell efterforskning 2026-09-05: Kontaktcenter; vidarebefordrar till rätt förvaltning.",
+    "verified_at": "2026-09-05",
     "folkmangd": 9000
   },
   {
@@ -8766,10 +8896,18 @@
     "org_nr": "212000-2486",
     "webbplats": "http://www.stromsund.se",
     "diarium_url": null,
-    "contacts": [],
-    "confidence": "low",
-    "notes": null,
-    "verified_at": "2026-05-17",
+    "contacts": [
+      {
+        "email": "kommun@stromsund.se",
+        "role": "central",
+        "forvaltning_namn": null,
+        "source_url": "https://www.stromsund.se/1879.html",
+        "found_via": "manual_research"
+      }
+    ],
+    "confidence": "high",
+    "notes": "Manuell efterforskning 2026-09-05: Anges på Allmän handling-sidan för kommunövergripande ärenden.",
+    "verified_at": "2026-09-05",
     "folkmangd": 10904
   },
   {
@@ -8975,10 +9113,18 @@
     "org_nr": "212000-2536",
     "webbplats": "http://www.nordmaling.se",
     "diarium_url": null,
-    "contacts": [],
-    "confidence": "low",
-    "notes": "homepage fetch failed: fetch failed",
-    "verified_at": "2026-05-17",
+    "contacts": [
+      {
+        "email": "kommun@nordmaling.se",
+        "role": "central",
+        "forvaltning_namn": null,
+        "source_url": "https://www.nordmaling.se/",
+        "found_via": "manual_research"
+      }
+    ],
+    "confidence": "high",
+    "notes": "Manuell efterforskning 2026-09-05: Kommunens allmänna e-post (sajtens kontaktblock).",
+    "verified_at": "2026-09-05",
     "folkmangd": 6905
   },
   {
@@ -9177,10 +9323,18 @@
     "org_nr": "212000-2577",
     "webbplats": "http://www.storuman.se",
     "diarium_url": null,
-    "contacts": [],
-    "confidence": "low",
-    "notes": null,
-    "verified_at": "2026-05-17",
+    "contacts": [
+      {
+        "email": "ks@storuman.se",
+        "role": "central",
+        "forvaltning_namn": null,
+        "source_url": "https://www.storuman.se/kommun/Fler-kontaktuppgifter/",
+        "found_via": "manual_research"
+      }
+    ],
+    "confidence": "high",
+    "notes": "Manuell efterforskning 2026-09-05: Kommunstyrelsens funktionsbrevlåda; enda kommunövergripande adressen som publiceras.",
+    "verified_at": "2026-09-05",
     "folkmangd": 5543
   },
   {
@@ -9484,10 +9638,18 @@
     "org_nr": "212000-2643",
     "webbplats": "http://www.skelleftea.se",
     "diarium_url": null,
-    "contacts": [],
-    "confidence": "low",
-    "notes": null,
-    "verified_at": "2026-05-17",
+    "contacts": [
+      {
+        "email": "kundtjanst@skelleftea.se",
+        "role": "central",
+        "forvaltning_namn": null,
+        "source_url": "https://skelleftea.se/invanare/startsida/kommun-och-politik/diarium-och-arkiv",
+        "found_via": "manual_research"
+      }
+    ],
+    "confidence": "high",
+    "notes": "Manuell efterforskning 2026-09-05: Diarium och arkiv-sidan hänvisar allmänna handlingar till kundtjänst.",
+    "verified_at": "2026-09-05",
     "folkmangd": 75405
   },
   {
@@ -9705,12 +9867,20 @@
     "kommun_namn": "Gällivare",
     "lan": "Norrbottens län",
     "org_nr": "212000-2726",
-    "webbplats": "http://www.gellivare.se",
+    "webbplats": "https://gallivare.se",
     "diarium_url": null,
-    "contacts": [],
-    "confidence": "low",
-    "notes": "homepage fetch failed: fetch failed",
-    "verified_at": "2026-05-17",
+    "contacts": [
+      {
+        "email": "post@gallivare.se",
+        "role": "central",
+        "forvaltning_namn": null,
+        "source_url": "https://gallivare.se/ovrigt/kontakter/funktion/kom-i-kontakt-med-oss",
+        "found_via": "manual_research"
+      }
+    ],
+    "confidence": "high",
+    "notes": "Manuell efterforskning 2026-09-05: Kommunens huvudadress; sajten ligger numera på gallivare.se (gellivare.se är död legacy).",
+    "verified_at": "2026-09-05",
     "folkmangd": 17135
   },
   {

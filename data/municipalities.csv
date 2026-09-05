@@ -1,6 +1,6 @@
 kommun_kod,kommun_namn,lan,org_nr,webbplats,folkmangd,diarium_url,contact_count,confidence,verified_at,notes
 0114,Upplands Väsby,Stockholms län,212000-0019,http://www.upplandsvasby.se,50495,,1,medium,2026-05-17,
-0115,Vallentuna,Stockholms län,212000-0027,http://www.vallentuna.se,35361,,0,low,2026-05-17,homepage fetch failed: fetch failed
+0115,Vallentuna,Stockholms län,212000-0027,http://www.vallentuna.se,35361,,1,high,2026-09-05,Manuell efterforskning 2026-09-05: Offentlig handling-sidan hänvisar till registrator via kommun@vallentuna.se.
 0117,Österåker,Stockholms län,212000-2890,https://www.osteraker.se/,49943,,5,medium,2026-05-17,
 0120,Värmdö,Stockholms län,212000-0035,http://www.varmdo.se,46601,,4,high,2026-05-17,
 0123,Järfälla,Stockholms län,212000-0043,http://www.jarfalla.se,90180,,16,high,2026-05-17,
@@ -13,9 +13,9 @@ kommun_kod,kommun_namn,lan,org_nr,webbplats,folkmangd,diarium_url,contact_count,
 0139,Upplands-Bro,Stockholms län,212000-0100,https://www.upplands-bro.se,33333,,6,high,2026-05-17,
 0140,Nykvarn,Stockholms län,212000-2999,http://www.nykvarn.se,12384,,1,medium,2026-05-17,
 0160,Täby,Stockholms län,212000-0118,http://www.taby.se,78514,,2,low,2026-05-17,
-0162,Danderyd,Stockholms län,212000-0126,http://www.danderyd.se,32500,,0,low,2026-05-17,homepage fetch failed: fetch failed
+0162,Danderyd,Stockholms län,212000-0126,http://www.danderyd.se,32500,,1,high,2026-09-05,Manuell efterforskning 2026-09-05: Kommunstyrelsens diarium/registratur för allmänna handlingar.
 0163,Sollentuna,Stockholms län,212000-0134,https://www.sollentuna.se/,78033,,5,high,2026-05-17,
-0180,Stockholm,Stockholms län,212000-0142,https://start.stockholm,999239,,0,low,2026-05-17,homepage fetch failed: fetch failed
+0180,Stockholm,Stockholms län,212000-0142,https://start.stockholm,999239,,1,high,2026-09-05,"Manuell efterforskning 2026-09-05: Stadsledningskontorets adress (KS registratur). Stockholm diarieför per förvaltning; mejldomän stockholm.se, webb start.stockholm."
 0181,Södertälje,Stockholms län,212000-0159,http://www.sodertalje.se,102772,,2,medium,2026-05-17,
 0182,Nacka,Stockholms län,212000-0167,https://www.nacka.se/,113730,,3,medium,2026-05-17,
 0183,Sundbyberg,Stockholms län,212000-0175,http://www.sundbyberg.se,57000,,3,high,2026-05-17,
@@ -56,16 +56,16 @@ kommun_kod,kommun_namn,lan,org_nr,webbplats,folkmangd,diarium_url,contact_count,
 0584,Vadstena,Östergötlands län,212000-2825,http://www.vadstena.se,7484,,2,high,2026-05-17,
 0586,Mjölby,Östergötlands län,212000-0480,http://www.mjolby.se,28823,,1,medium,2026-05-17,
 0604,Aneby,Jönköpings län,212000-0498,http://www.aneby.se,6851,,2,medium,2026-05-16,
-0617,Gnosjö,Jönköpings län,212000-0506,http://www.gnosjo.se,9010,,0,low,2026-05-17,homepage fetch failed: fetch failed
+0617,Gnosjö,Jönköpings län,212000-0506,http://www.gnosjo.se,9010,,1,high,2026-09-05,Manuell efterforskning 2026-09-05: Kommunens officiella e-post på kontaktuppgiftssidan.
 0642,Mullsjö,Jönköpings län,212000-1603,http://www.mullsjo.se,7546,,2,medium,2026-05-17,
 0643,Habo,Jönköpings län,212000-1611,http://www.habokommun.se,13511,,3,high,2026-05-17,
 0662,Gislaved,Jönköpings län,212000-0514,http://www.gislaved.se,28641,,3,medium,2026-05-17,
 0665,Vaggeryd,Jönköpings län,212000-0522,http://www.vaggeryd.se,14943,,6,high,2026-05-17,
 0680,Jönköping,Jönköpings län,212000-0530,http://www.jonkoping.se,148152,,2,medium,2026-05-17,
 0682,Nässjö,Jönköpings län,212000-0548,http://www.nassjo.se,31474,,10,high,2026-05-17,
-0683,Värnamo,Jönköpings län,212000-0555,https://kommun.varnamo.se,34534,,0,low,2026-05-17,
+0683,Värnamo,Jönköpings län,212000-0555,https://kommun.varnamo.se,34534,,1,medium,2026-09-05,"Manuell efterforskning 2026-09-05: Kontaktcenters adress, funnen på undersida (huvudsidorna hänvisar till telefon/e-tjänst)."
 0684,Sävsjö,Jönköpings län,212000-0563,http://www.savsjo.se,11531,,8,high,2026-05-17,
-0685,Vetlanda,Jönköpings län,212000-0571,https://kommun.vetlanda.se/,27313,,0,low,2026-05-17,
+0685,Vetlanda,Jönköpings län,212000-0571,https://kommun.vetlanda.se/,27313,,1,high,2026-09-05,Manuell efterforskning 2026-09-05: Kontaktcenter: 'E-posta kontaktcenter på kommun@vetlanda.se'.
 0686,Eksjö,Jönköpings län,212000-0589,http://www.eksjo.se,17660,,7,high,2026-05-17,
 0687,Tranås,Jönköpings län,212000-0597,http://www.tranas.se,18555,,2,medium,2026-05-17,
 0760,Uppvidinge,Kronobergs län,212000-0605,http://www.uppvidinge.se,8911,,6,high,2026-05-17,
@@ -76,7 +76,7 @@ kommun_kod,kommun_namn,lan,org_nr,webbplats,folkmangd,diarium_url,contact_count,
 0767,Markaryd,Kronobergs län,212000-0654,http://www.markaryd.se,9862,,2,medium,2026-05-17,
 0780,Växjö,Kronobergs län,212000-0662,https://www.vaxjo.se/,98940,,1,medium,2026-05-17,
 0781,Ljungby,Kronobergs län,212000-0670,http://www.ljungby.se,28132,,3,medium,2026-05-17,
-0821,Högsby,Kalmar län,212000-0688,http://www.hogsby.se,5134,,0,low,2026-05-17,homepage fetch failed: fetch failed
+0821,Högsby,Kalmar län,212000-0688,http://www.hogsby.se,5134,,1,high,2026-09-05,Manuell efterforskning 2026-09-05: Kommunens officiella e-post på kontakta-oss-sidan.
 0834,Torsås,Kalmar län,212000-0696,https://www.torsas.se/,6919,,3,medium,2026-05-17,
 0840,Mörbylånga,Kalmar län,212000-0704,http://www.morbylanga.se,16306,,3,medium,2026-05-17,
 0860,Hultsfred,Kalmar län,212000-0712,http://www.hultsfred.se,13484,,1,medium,2026-05-17,
@@ -116,7 +116,7 @@ kommun_kod,kommun_namn,lan,org_nr,webbplats,folkmangd,diarium_url,contact_count,
 1277,Åstorp,Skåne län,212000-0936,http://www.astorp.se,16491,,1,medium,2026-05-17,
 1278,Båstad,Skåne län,212000-0944,http://www.bastad.se,16046,,2,medium,2026-05-17,
 1280,Malmö,Skåne län,212000-1124,http://www.malmo.se,367924,,1,medium,2026-05-17,
-1281,Lund,Skåne län,212000-1132,https://www.lund.se,132333,,3,medium,2026-05-17,
+1281,Lund,Skåne län,212000-1132,https://www.lund.se,132333,,2,medium,2026-09-05,Manuell efterforskning 2026-09-05: tog bort felstavade lund.kommun@lund.se (studsade; rätt adress lunds.kommun@lund.se fanns redan).
 1282,Landskrona,Skåne län,212000-1140,http://www.landskrona.se,47571,,1,medium,2026-05-17,
 1283,Helsingborg,Skåne län,212000-1157,http://www.helsingborg.se,152776,,1,medium,2026-05-17,
 1284,Höganäs,Skåne län,212000-1165,http://www.hoganas.se,28489,,2,medium,2026-05-17,
@@ -125,16 +125,16 @@ kommun_kod,kommun_namn,lan,org_nr,webbplats,folkmangd,diarium_url,contact_count,
 1287,Trelleborg,Skåne län,212000-1199,http://www.trelleborg.se,47405,,2,medium,2026-05-17,
 1290,Kristianstad,Skåne län,212000-0951,http://www.kristianstad.se,85908,,3,high,2026-05-17,
 1291,Simrishamn,Skåne län,212000-0969,http://www.simrishamn.se,18779,,5,medium,2026-05-17,
-1292,Ängelholm,Skåne län,212000-0977,http://www.angelholm.se,45159,,0,low,2026-05-17,
+1292,Ängelholm,Skåne län,212000-0977,http://www.angelholm.se,45159,,1,high,2026-09-05,"Manuell efterforskning 2026-09-05: Kundtjänst; sajten ligger på engelholm.se (kommunens alternativstavning av angelholm.se), gamla registrator-sidan 404."
 1293,Hässleholm,Skåne län,212000-0985,http://www.hassleholm.se,51915,,6,high,2026-05-17,
 1315,Hylte,Hallands län,212000-1207,http://www.hylte.se,10094,,3,medium,2026-05-17,
 1380,Halmstad,Hallands län,212000-1215,http://www.halmstad.se,106315,,1,low,2026-05-17,
-1381,Laholm,Hallands län,212000-1223,http://www.laholm.se,26565,,9,high,2026-05-17,
-1382,Falkenberg,Hallands län,212000-1231,https://kommun.falkenberg.se/,47321,,0,low,2026-05-17,
-1383,Varberg,Hallands län,212000-1249,https://www.varberg.se,69460,,0,low,2026-05-17,
+1381,Laholm,Hallands län,212000-1223,http://www.laholm.se,26565,,9,high,2026-09-05,Manuell efterforskning 2026-09-05: kontaktcenter@laholm.se är sidans angivna väg för allmän handling; tog bort studsande medborgarservice@.
+1382,Falkenberg,Hallands län,212000-1231,https://kommun.falkenberg.se/,47321,,1,high,2026-09-05,Manuell efterforskning 2026-09-05: Kontaktcenter; sidan om allmänna handlingar hänvisar diarieärenden dit (adressen JS-maskerad i källkoden).
+1383,Varberg,Hallands län,212000-1249,https://www.varberg.se,69460,,1,high,2026-09-05,Manuell efterforskning 2026-09-05: Kontaktcenter Varberg direkt; allmän handling-sidorna hänvisar dit.
 1384,Kungsbacka,Hallands län,212000-1256,http://www.kungsbacka.se,86332,,2,medium,2026-05-17,
 1401,Härryda,Västra Götalands län,212000-1264,http://www.harryda.se,40011,,4,high,2026-05-17,
-1402,Partille,Västra Götalands län,212000-1272,http://www.partille.se,41164,,0,low,2026-05-17,
+1402,Partille,Västra Götalands län,212000-1272,http://www.partille.se,41164,,1,high,2026-09-05,Manuell efterforskning 2026-09-05: Arkiv & diarium-sidan hänvisar handlingsutlämning till kundcenter.
 1407,Öckerö,Västra Götalands län,212000-1280,http://www.ockero.se,12863,,1,medium,2026-05-17,
 1415,Stenungsund,Västra Götalands län,212000-1298,https://www.stenungsund.se/,27854,,1,medium,2026-05-17,
 1419,Tjörn,Västra Götalands län,212000-1306,https://tjorn.se,16003,,2,high,2026-05-17,
@@ -158,7 +158,7 @@ kommun_kod,kommun_namn,lan,org_nr,webbplats,folkmangd,diarium_url,contact_count,
 1462,Lilla Edet,Västra Götalands län,212000-1496,http://www.lillaedet.se,14398,,3,medium,2026-05-17,
 1463,Mark,Västra Götalands län,212000-1504,http://www.mark.se,35134,,2,medium,2026-05-17,
 1465,Svenljunga,Västra Götalands län,212000-1512,https://www.svenljunga.se,10616,,2,medium,2026-05-17,
-1466,Herrljunga,Västra Götalands län,212000-1520,http://www.herrljunga.se,9509,,0,low,2026-05-17,homepage fetch failed: fetch failed
+1466,Herrljunga,Västra Götalands län,212000-1520,http://www.herrljunga.se,9509,,1,high,2026-09-05,Manuell efterforskning 2026-09-05: Kommunens officiella e-post på diarium/allmän handling-sidan.
 1470,Vara,Västra Götalands län,212000-2924,https://www.vara.se,16011,,1,medium,2026-05-17,
 1471,Götene,Västra Götalands län,212000-1652,https://www.gotene.se,13223,,4,high,2026-05-17,
 1472,Tibro,Västra Götalands län,212000-1660,http://www.tibro.se,11326,,3,high,2026-05-17,
@@ -175,10 +175,10 @@ kommun_kod,kommun_namn,lan,org_nr,webbplats,folkmangd,diarium_url,contact_count,
 1490,Borås,Västra Götalands län,212000-1561,https://www.boras.se,115238,,3,medium,2026-05-16,
 1491,Ulricehamn,Västra Götalands län,212000-1579,https://www.ulricehamn.se,24954,,1,medium,2026-05-17,
 1492,Åmål,Västra Götalands län,212000-1587,http://www.amal.se,11679,,2,medium,2026-05-17,
-1493,Mariestad,Västra Götalands län,212000-1686,https://mariestad.se/Mariestads-kommun.html,24421,,0,low,2026-05-17,homepage status 404
+1493,Mariestad,Västra Götalands län,212000-1686,https://mariestad.se/Mariestads-kommun.html,24421,,1,high,2026-09-05,Manuell efterforskning 2026-09-05: Enheten för demokratistöd (diarium/registratur) enligt Allmänna handlingar-sidan.
 1494,Lidköping,Västra Götalands län,212000-1694,https://lidkoping.se,40359,,5,medium,2026-05-17,
 1495,Skara,Västra Götalands län,212000-1702,https://www.skara.se,18753,,2,medium,2026-05-17,
-1496,Skövde,Västra Götalands län,212000-1710,https://www.skovde.se,58272,,3,low,2026-05-17,
+1496,Skövde,Västra Götalands län,212000-1710,https://www.skovde.se,58272,,2,high,2026-09-05,Manuell efterforskning 2026-09-05: skovdekommun@skovde.se från kommun-politik-sidan; tog bort två hopklistrade crawlartefakter.
 1497,Hjo,Västra Götalands län,212000-1728,http://www.hjo.se,9322,,2,medium,2026-05-17,
 1498,Tidaholm,Västra Götalands län,212000-1736,http://www.tidaholm.se,12736,,5,high,2026-05-17,
 1499,Falköping,Västra Götalands län,212000-1744,http://www.falkoping.se,32794,,3,high,2026-05-17,
@@ -191,7 +191,7 @@ kommun_kod,kommun_namn,lan,org_nr,webbplats,folkmangd,diarium_url,contact_count,
 1763,Forshaga,Värmlands län,212000-1819,http://www.forshaga.se,11439,,1,medium,2026-05-17,
 1764,Grums,Värmlands län,212000-1827,https://www.grums.se/,8854,,1,low,2026-05-17,
 1765,Årjäng,Värmlands län,212000-1835,http://www.arjang.se,9734,,2,medium,2026-05-17,
-1766,Sunne,Värmlands län,212000-1843,http://www.sunne.se,13354,,0,low,2026-05-17,
+1766,Sunne,Värmlands län,212000-1843,http://www.sunne.se,13354,,1,high,2026-09-05,Manuell efterforskning 2026-09-05: Kommunkansliet; offentlig handling-sidan hänvisar dit för begäran.
 1780,Karlstad,Värmlands län,212000-1850,https://karlstad.se,99007,,1,medium,2026-05-17,
 1781,Kristinehamn,Värmlands län,212000-1868,http://www.kristinehamn.se,23590,,4,medium,2026-05-17,
 1782,Filipstad,Värmlands län,212000-1876,http://www.filipstad.se,9625,,1,medium,2026-05-17,
@@ -220,7 +220,7 @@ kommun_kod,kommun_namn,lan,org_nr,webbplats,folkmangd,diarium_url,contact_count,
 1982,Fagersta,Västmanlands län,212000-2106,http://www.fagersta.se,12915,,8,high,2026-05-17,
 1983,Köping,Västmanlands län,212000-2114,http://www.koping.se,25610,,5,medium,2026-05-17,
 1984,Arboga,Västmanlands län,212000-2122,https://www.arboga.se,13929,,1,medium,2026-05-16,
-2021,Vansbro,Dalarnas län,212000-2130,http://www.vansbro.se,6741,,0,low,2026-05-17,
+2021,Vansbro,Dalarnas län,212000-2130,http://www.vansbro.se,6741,,1,high,2026-09-05,Manuell efterforskning 2026-09-05: Administrativa funktionen för centrala diariet (Ciceron); vansbro.kommun@vansbro.se är alternativ.
 2023,Malung-Sälen,Dalarnas län,212000-2148,https://www.malung-salen.se,10192,,2,medium,2026-05-17,
 2026,Gagnef,Dalarnas län,212000-2155,http://www.gagnef.se,10307,,1,medium,2026-05-17,
 2029,Leksand,Dalarnas län,212000-2163,http://www.leksand.se,16167,,3,high,2026-05-17,
@@ -228,7 +228,7 @@ kommun_kod,kommun_namn,lan,org_nr,webbplats,folkmangd,diarium_url,contact_count,
 2034,Orsa,Dalarnas län,212000-2189,http://www.orsa.se,6902,,1,medium,2026-05-17,
 2039,Älvdalen,Dalarnas län,212000-2197,http://www.alvdalen.se,6831,,2,medium,2026-05-17,
 2061,Smedjebacken,Dalarnas län,212000-2205,http://www.smedjebacken.se,10758,,4,medium,2026-05-17,
-2062,Mora,Dalarnas län,212000-2213,https://morakommun.se,20419,,0,low,2026-05-17,
+2062,Mora,Dalarnas län,212000-2213,https://morakommun.se,20419,,1,high,2026-09-05,"Manuell efterforskning 2026-09-05: Officiell adress för begäran om allmän handling; mejldomän mora.se, webb morakommun.se."
 2080,Falu,Dalarnas län,212000-2221,https://www.falun.se/,59974,,4,high,2026-05-17,
 2081,Borlänge,Dalarnas län,212000-2239,http://www.borlange.se,51354,,5,high,2026-05-16,
 2082,Säter,Dalarnas län,212000-2247,http://www.sater.se,11222,,1,medium,2026-05-17,
@@ -240,12 +240,12 @@ kommun_kod,kommun_namn,lan,org_nr,webbplats,folkmangd,diarium_url,contact_count,
 2121,Ovanåker,Gävleborgs län,212000-2304,https://www.ovanaker.se/,11272,,1,medium,2026-05-17,
 2132,Nordanstig,Gävleborgs län,212000-2312,http://www.nordanstig.se,9284,,1,medium,2026-05-17,
 2161,Ljusdal,Gävleborgs län,212000-2320,http://www.ljusdal.se,18377,,1,medium,2026-05-17,
-2180,Gävle,Gävleborgs län,212000-2338,http://www.gavle.se,104108,,0,low,2026-05-17,homepage fetch failed: Failed after 3 attempts: http://www.gavle.se/ (last status 503)
+2180,Gävle,Gävleborgs län,212000-2338,http://www.gavle.se,104108,,1,high,2026-09-05,Manuell efterforskning 2026-09-05: Kundtjänst; diariesidan hänvisar allmän handling-begäran dit.
 2181,Sandviken,Gävleborgs län,212000-2346,https://sandviken.se,38033,,2,medium,2026-05-17,
 2182,Söderhamn,Gävleborgs län,212000-2353,http://www.soderhamn.se,24163,,4,high,2026-05-17,
 2183,Bollnäs,Gävleborgs län,212000-2361,http://www.bollnas.se,26018,,2,medium,2026-05-16,
 2184,Hudiksvall,Gävleborgs län,212000-2379,http://www.hudiksvall.se,37341,,2,medium,2026-05-17,
-2260,Ånge,Västernorrlands län,212000-2387,http://www.ange.se,9000,,0,low,2026-05-17,
+2260,Ånge,Västernorrlands län,212000-2387,http://www.ange.se,9000,,1,high,2026-09-05,Manuell efterforskning 2026-09-05: Kontaktcenter; vidarebefordrar till rätt förvaltning.
 2262,Timrå,Västernorrlands län,212000-2395,http://www.timra.se,17465,,1,medium,2026-05-17,
 2280,Härnösand,Västernorrlands län,212000-2403,https://www.harnosand.se,24348,,7,high,2026-05-17,
 2281,Sundsvall,Västernorrlands län,212000-2411,http://www.sundsvall.se,98962,,4,medium,2026-05-17,
@@ -255,18 +255,18 @@ kommun_kod,kommun_namn,lan,org_nr,webbplats,folkmangd,diarium_url,contact_count,
 2303,Ragunda,Jämtlands län,212000-2452,https://www.ragunda.se/,5152,,13,medium,2026-05-17,
 2305,Bräcke,Jämtlands län,212000-2460,http://www.bracke.se,5950,,2,medium,2026-05-17,
 2309,Krokom,Jämtlands län,212000-2478,http://www.krokom.se,15795,,1,medium,2026-05-17,
-2313,Strömsund,Jämtlands län,212000-2486,http://www.stromsund.se,10904,,0,low,2026-05-17,
+2313,Strömsund,Jämtlands län,212000-2486,http://www.stromsund.se,10904,,1,high,2026-09-05,Manuell efterforskning 2026-09-05: Anges på Allmän handling-sidan för kommunövergripande ärenden.
 2321,Åre,Jämtlands län,212000-2494,http://www.are.se,12770,,3,medium,2026-05-17,
 2326,Berg,Jämtlands län,212000-2502,https://www.berg.se,7085,,3,medium,2026-05-16,
 2361,Härjedalen,Jämtlands län,212000-2510,https://www.herjedalen.se/,10117,,4,high,2026-05-17,
 2380,Östersund,Jämtlands län,212000-2528,http://www.ostersund.se,64963,,10,high,2026-05-17,
-2401,Nordmaling,Västerbottens län,212000-2536,http://www.nordmaling.se,6905,,0,low,2026-05-17,homepage fetch failed: fetch failed
+2401,Nordmaling,Västerbottens län,212000-2536,http://www.nordmaling.se,6905,,1,high,2026-09-05,Manuell efterforskning 2026-09-05: Kommunens allmänna e-post (sajtens kontaktblock).
 2403,Bjurholm,Västerbottens län,212000-2833,https://www.bjurholm.se/,2327,,3,medium,2026-05-16,
 2404,Vindeln,Västerbottens län,212000-2544,http://www.vindeln.se,5421,,3,high,2026-05-17,
 2409,Robertsfors,Västerbottens län,212000-2551,http://www.robertsfors.se,6595,,4,medium,2026-05-17,
 2417,Norsjö,Västerbottens län,212000-2858,https://www.norsjo.se/,3811,,3,medium,2026-05-17,
 2418,Malå,Västerbottens län,212000-2866,http://www.mala.se,2902,,4,high,2026-05-17,
-2421,Storuman,Västerbottens län,212000-2577,http://www.storuman.se,5543,,0,low,2026-05-17,
+2421,Storuman,Västerbottens län,212000-2577,http://www.storuman.se,5543,,1,high,2026-09-05,Manuell efterforskning 2026-09-05: Kommunstyrelsens funktionsbrevlåda; enda kommunövergripande adressen som publiceras.
 2422,Sorsele,Västerbottens län,212000-2585,http://www.sorsele.se,2362,,1,medium,2026-05-17,
 2425,Dorotea,Västerbottens län,212000-2809,http://www.dorotea.se,2241,,1,medium,2026-05-17,
 2460,Vännäs,Västerbottens län,212000-2841,https://www.vannas.se,9225,,3,high,2026-05-17,
@@ -274,7 +274,7 @@ kommun_kod,kommun_namn,lan,org_nr,webbplats,folkmangd,diarium_url,contact_count,
 2463,Åsele,Västerbottens län,212000-2791,http://www.asele.se,2683,,1,medium,2026-05-17,
 2480,Umeå,Västerbottens län,212000-2627,http://www.umea.se,135273,,20,high,2026-05-17,
 2481,Lycksele,Västerbottens län,212000-2635,http://www.lycksele.se,12159,,1,medium,2026-05-17,
-2482,Skellefteå,Västerbottens län,212000-2643,http://www.skelleftea.se,75405,,0,low,2026-05-17,
+2482,Skellefteå,Västerbottens län,212000-2643,http://www.skelleftea.se,75405,,1,high,2026-09-05,Manuell efterforskning 2026-09-05: Diarium och arkiv-sidan hänvisar allmänna handlingar till kundtjänst.
 2505,Arvidsjaur,Norrbottens län,212000-2650,https://www.arvidsjaur.se/,6026,,2,medium,2026-05-16,
 2506,Arjeplog,Norrbottens län,212000-2668,http://www.arjeplog.se,2570,,2,medium,2026-05-16,
 2510,Jokkmokk,Norrbottens län,212000-2676,http://www.jokkmokk.se,4695,,4,medium,2026-05-17,
@@ -282,7 +282,7 @@ kommun_kod,kommun_namn,lan,org_nr,webbplats,folkmangd,diarium_url,contact_count,
 2514,Kalix,Norrbottens län,212000-2692,http://www.kalix.se,15252,,1,medium,2026-05-17,
 2518,Övertorneå,Norrbottens län,212000-2700,http://www.overtornea.se,3995,,2,medium,2026-05-17,
 2521,Pajala,Norrbottens län,212000-2718,http://www.pajala.se,5706,,3,medium,2026-05-17,
-2523,Gällivare,Norrbottens län,212000-2726,http://www.gellivare.se,17135,,0,low,2026-05-17,homepage fetch failed: fetch failed
+2523,Gällivare,Norrbottens län,212000-2726,https://gallivare.se,17135,,1,high,2026-09-05,Manuell efterforskning 2026-09-05: Kommunens huvudadress; sajten ligger numera på gallivare.se (gellivare.se är död legacy).
 2560,Älvsbyn,Norrbottens län,212000-2734,http://www.alvsbyn.se,7815,,3,high,2026-05-17,
 2580,Luleå,Norrbottens län,212000-2742,http://www.lulea.se,80304,,2,medium,2026-05-17,
 2581,Piteå,Norrbottens län,212000-2759,http://www.pitea.se,42184,,2,medium,2026-05-17,
