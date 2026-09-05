@@ -14,6 +14,7 @@ import {
   UNKNOWN,
 } from '../public/explorer-core.js';
 import { STAGES } from './pipeline.js';
+import { CATEGORY_LABELS } from './vendor-kb.js';
 import { GRADE_LEVELS, slugifyProductName } from './vendor-analytics.js';
 import { matchResellers, RESELLERS } from './resellers.js';
 import { canonicalVendorName } from './vendor-aliases.js';
@@ -424,6 +425,12 @@ const baseCss = `
   .filter-bar { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
   .filter-bar a { padding: 4px 10px; border-radius: 6px; background: var(--bg-elev); border: 1px solid var(--border); color: var(--fg-muted); font-size: 12px; }
   .filter-bar a.active { background: var(--accent); color: white; border-color: var(--accent); }
+  /* Vendor category tags (/leverantorer) */
+  .cat-pill { display: inline-flex; align-items: center; gap: 5px; }
+  .cat-pill .cat-n { font-size: 11px; padding: 0 5px; border-radius: 8px; background: var(--bg-elev-2); color: var(--fg-muted); }
+  .cat-pill.active .cat-n { background: rgba(255,255,255,.25); color: white; }
+  .cat-chip { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 8px; font-size: 11px;
+    background: var(--bg-elev-2); color: var(--fg-muted); border: 1px solid var(--border); vertical-align: 1px; }
   .signature-fields dl { margin: 4px 0; display: grid; grid-template-columns: max-content 1fr; gap: 2px 12px; font-size: 12px; }
   .signature-fields dt { color: var(--fg-muted); }
   /* Action forms (send / edit / init) */
@@ -2697,9 +2704,13 @@ function marketRollupRow(r, todayIso) {
     : '<span class="muted">okänt</span>';
   // No dead links: a canonical vendor without a slug (grouping may merge a
   // slugged + un-slugged variant) renders as a muted plain name.
-  const vendorCell = r.vendor_slug
+  const vendorLink = r.vendor_slug
     ? `<a class="kommun-link" href="/leverantor/${escapeHtml(r.vendor_slug)}" data-pane-link>${escapeHtml(r.vendor_name)}</a>`
     : `<span class="muted">${escapeHtml(r.vendor_name)}</span>`;
+  // Category chip: only for KB-known vendors. An unknown vendor gets no
+  // guessed tag; it simply has no chip (its filter pill is "Utan kategori").
+  const chip = r.category ? ` <span class="cat-chip">${escapeHtml(CATEGORY_LABELS[r.category] ?? r.category)}</span>` : '';
+  const vendorCell = `${vendorLink}${chip}`;
   return `<tr>
     <td>${vendorCell}</td>
     <td class="num">${r.kommun_count}</td>
@@ -2711,7 +2722,7 @@ function marketRollupRow(r, todayIso) {
   </tr>`;
 }
 
-export function renderVendorMarket({ summary, rollups = [], facts = [], sort = null, order = null, todayIso, heartbeat = null, partial = false, escalationCount = 0 }) {
+export function renderVendorMarket({ summary, rollups = [], facts = [], sort = null, order = null, kategori = null, todayIso, heartbeat = null, partial = false, escalationCount = 0 }) {
   const totalCard = summary.total_annual_sek == null
     ? '<div class="value">okänt</div>'
     : `<div class="value good">${escapeHtml(fmtSekCompact(summary.total_annual_sek))}/år</div>`;
@@ -2725,9 +2736,32 @@ export function renderVendorMarket({ summary, rollups = [], facts = [], sort = n
       <div class="stat-card"><div class="label">Förnyelser inom 12 mån</div><div class="value${summary.renewals_within_12mo > 0 ? ' warn' : ''}">${summary.renewals_within_12mo}</div></div>
     </div>`;
 
+  // Category filter pills. Counts come from the FULL rollup set so they stay
+  // stable while a filter is active (same rule as the overview funnel).
+  // 'utan-kategori' collects vendors the KB does not know — shown, not hidden.
+  const catCounts = new Map();
+  for (const r of rollups) {
+    const k = r.category ?? 'utan-kategori';
+    catCounts.set(k, (catCounts.get(k) ?? 0) + 1);
+  }
+  const pillOrder = [...Object.keys(CATEGORY_LABELS), 'utan-kategori'].filter((k) => catCounts.has(k));
+  const catLabel = (k) => k === 'utan-kategori' ? 'Utan kategori' : (CATEGORY_LABELS[k] ?? k);
+  const pills = pillOrder.map((k) => {
+    const active = kategori === k;
+    const p = new URLSearchParams();
+    if (!active) p.set('kategori', k);
+    if (sort) { p.set('sort', sort); if (order) p.set('order', order); }
+    const q = p.toString();
+    return `<a href="?${q}" data-pane-link class="cat-pill${active ? ' active' : ''}">${escapeHtml(catLabel(k))} <span class="cat-n">${catCounts.get(k)}</span></a>`;
+  }).join('');
+  const pillBar = pillOrder.length ? `<div class="filter-bar cat-bar">${pills}</div>` : '';
+  const shownRollups = kategori
+    ? rollups.filter((r) => (r.category ?? 'utan-kategori') === kategori)
+    : rollups;
+
   const headerArgs = { currentSort: sort, currentOrder: order };
-  const table = rollups.length === 0
-    ? '<div class="empty-state">Inga leverantörer ännu — avtal analyseras när kommuner levererar.</div>'
+  const table = shownRollups.length === 0
+    ? `<div class="empty-state">${kategori ? 'Inga leverantörer i den kategorin.' : 'Inga leverantörer ännu — avtal analyseras när kommuner levererar.'}</div>`
     : `<table>
         <thead><tr>
           ${vendorSortHeader({ ...headerArgs, key: 'vendor_name', label: 'Leverantör' })}
@@ -2738,7 +2772,7 @@ export function renderVendorMarket({ summary, rollups = [], facts = [], sort = n
           <th>Produkter</th>
           ${vendorSortHeader({ ...headerArgs, key: 'next_renewal_date', label: 'Nästa förnyelse' })}
         </tr></thead>
-        <tbody>${rollups.map((r) => marketRollupRow(r, todayIso)).join('')}</tbody>
+        <tbody>${shownRollups.map((r) => marketRollupRow(r, todayIso)).join('')}</tbody>
       </table>`;
 
   const body = `
@@ -2746,7 +2780,8 @@ export function renderVendorMarket({ summary, rollups = [], facts = [], sort = n
     ${stats}
     <p class="muted honesty-note">Summor bygger enbart på avtal med känd årskostnad — okända värden visas som ”okänt” och hittas i utforskaren nedan.</p>
     <section class="board-section">
-      <h2>Marknadsöversikt <span class="count">${rollups.length}</span></h2>
+      <h2>Marknadsöversikt <span class="count">${shownRollups.length}</span></h2>
+      ${pillBar}
       ${table}
     </section>
     ${renderExplorer(facts, todayIso)}

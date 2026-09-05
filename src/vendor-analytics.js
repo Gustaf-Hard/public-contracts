@@ -332,10 +332,15 @@ export function buildVendorRollups(facts, { now }) {
     // so the row links; fall back to the first member. The DISPLAY name is the
     // canonical (collapses the near-dupes into one label).
     const rep = group.find((f) => f.vendor_slug) ?? group[0];
+    // KB category tag: a channel is shown as 'återförsäljare' regardless of
+    // category; a vendor the KB does not know stays untagged (null) — never
+    // guessed.
+    const kbCompany = resolveCompany(group[0].vendor_name);
     rollups.push({
       vendor_id: rep.vendor_id,
       vendor_name: groupingCompanyName(group[0].vendor_name),
       vendor_slug: rep.vendor_slug,
+      category: kbCompany ? (kbCompany.role === 'channel' ? 'återförsäljare' : kbCompany.category) : null,
       contract_count: group.length,
       kommun_count: new Set(group.map((f) => f.kommun_kod)).size,
       total_annual_sek: known.length ? known.reduce((s, f) => s + f.annual_value_sek, 0) : null,

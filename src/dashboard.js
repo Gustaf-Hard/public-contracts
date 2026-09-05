@@ -1179,9 +1179,10 @@ export function createDashboardApp({
     const { facts, rollups, summary, todayIso } = vendorData(new Date());
     const sort = typeof req.query.sort === 'string' ? req.query.sort : null;
     const order = typeof req.query.order === 'string' ? req.query.order : null;
+    const kategori = typeof req.query.kategori === 'string' ? req.query.kategori : null;
     res.set('Content-Type', 'text/html; charset=utf-8');
     res.send(renderVendorMarket({
-      summary, rollups: sortVendorRollups(rollups, { sort, order }), facts, sort, order, todayIso,
+      summary, rollups: sortVendorRollups(rollups, { sort, order }), facts, sort, order, kategori, todayIso,
       heartbeat: hb(), partial: isPartial(req), escalationCount: escCount(),
     }));
   });

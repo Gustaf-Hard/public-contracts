@@ -514,6 +514,24 @@ describe('vendor pages', () => {
     expect(res.text).toContain('Skolon Plattform');
   });
 
+  it('/leverantorer renders category pills and ?kategori= filters the market table', async () => {
+    seedVendorWithContract();
+    const app = appWithFakes();
+    const all = await get(app, '/leverantorer');
+    // Skolon is a KB channel → tagged Återförsäljare, with a filter pill.
+    expect(all.text).toContain('kategori=%C3%A5terf%C3%B6rs%C3%A4ljare');
+    expect(all.text).toContain('Återförsäljare');
+    // Filter to a category Skolon is not in → the MARKET TABLE row disappears
+    // (the explorer below keeps its own links — it has its own filters).
+    const rowLink = 'class="kommun-link" href="/leverantor/skolon"';
+    expect(all.text).toContain(rowLink);
+    const filtered = await get(app, '/leverantorer?kategori=l%C3%A4romedel');
+    expect(filtered.text).not.toContain(rowLink);
+    expect(filtered.text).toContain('Inga leverantörer i den kategorin');
+    const active = await get(app, '/leverantorer?kategori=%C3%A5terf%C3%B6rs%C3%A4ljare');
+    expect(active.text).toContain(rowLink);
+  });
+
   it('/leverantor/:slug is the vendor dossier with PDF links and kommun', async () => {
     const { attId } = seedVendorWithContract();
     const app = appWithFakes();

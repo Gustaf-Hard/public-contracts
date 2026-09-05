@@ -11,6 +11,23 @@
 // listing the other seven is noise that makes the mail read like an audit. An
 // additive category (digitala läromedel) is the opposite: a kommun buys several
 // in parallel, so seeing NE says nothing about whether they also have Binogi.
+// Display labels for vendor categories (the market page's tag chips and
+// filter pills). 'återförsäljare' is not a KB category — it is derived from
+// role === 'channel' at read time.
+export const CATEGORY_LABELS = {
+  'läromedel': 'Läromedel',
+  'lärplattform': 'Lärplattform',
+  'skoladministration': 'Skoladministration',
+  'stödverktyg': 'Stödverktyg',
+  'prov': 'Prov',
+  'bedömning': 'Bedömning',
+  'elevhälsa': 'Elevhälsa',
+  'integration': 'Integration',
+  'konsultbolag': 'Konsultbolag',
+  'övrigt': 'Övrigt',
+  'återförsäljare': 'Återförsäljare',
+};
+
 export const CATEGORY_RULES = {
   'läromedel': { exclusive: false },
   'lärplattform': { exclusive: true },
@@ -117,6 +134,63 @@ export const COMPANIES = [
   { canonical: 'Sirvoy', slug: 'sirvoy', role: 'service', category: 'övrigt',
     aliases: ['sirvoy'], products: [] },
 
+
+  // ---- Services added 2026-09-05 (category tags on /leverantorer): the most
+  // frequent live vendors the KB did not know. Categorising a company here
+  // also lets its bare mentions pass the coverage evidence gate — intended.
+  { canonical: 'SLI Education', slug: 'sli', role: 'service', category: 'läromedel',
+    aliases: ['sli education', 'sli'], products: ['SLI Play'] },
+  { canonical: 'Trelson', slug: 'trelson', role: 'service', category: 'prov',
+    aliases: ['trelson'], products: ['Trelson Assessment'] },
+  { canonical: 'Gleerups', slug: 'gleerups', role: 'service', category: 'läromedel',
+    aliases: ['gleerups', 'gleerups utbildning'], products: [] },
+  { canonical: 'Studentlitteratur', slug: 'studentlitteratur', role: 'service', category: 'läromedel',
+    aliases: ['studentlitteratur'], products: [] },
+  { canonical: 'Sanoma Utbildning', slug: 'sanoma', role: 'service', category: 'läromedel',
+    aliases: ['sanoma', 'sanoma utbildning'], products: [] },
+  { canonical: 'Swedish Film', slug: 'swedish-film', role: 'service', category: 'läromedel',
+    aliases: ['swedish film', 'swedishfilm'], products: [] },
+  { canonical: 'Musikoteket', slug: 'musikoteket', role: 'service', category: 'läromedel',
+    aliases: ['musikoteket'], products: [] },
+  { canonical: 'Nomp', slug: 'nomp', role: 'service', category: 'läromedel',
+    aliases: ['nomp'], products: ['Nomp Plus'] },
+  { canonical: 'Wizkids', slug: 'wizkids', role: 'service', category: 'stödverktyg',
+    aliases: ['wizkids'], products: ['AppWriter'] },
+  { canonical: 'Svensk TalTeknologi', slug: 'svensk-talteknologi', role: 'service', category: 'stödverktyg',
+    aliases: ['svensk talteknologi'], products: [] },
+  { canonical: 'Exam.net', slug: 'exam-net', role: 'service', category: 'prov',
+    aliases: ['exam.net', 'examnet', 'teachiq'], products: ['Kunskapsmatrisen'] },
+  { canonical: 'Lexplore', slug: 'lexplore', role: 'service', category: 'bedömning',
+    aliases: ['lexplore'], products: [] },
+  { canonical: 'Microsoft', slug: 'microsoft', role: 'service', category: 'lärplattform',
+    aliases: ['microsoft'], products: ['Microsoft 365', 'Office 365'] },
+  { canonical: 'Google', slug: 'google', role: 'service', category: 'lärplattform',
+    aliases: ['google'], products: ['Google Workspace for Education', 'Google Workspace'] },
+  { canonical: 'Showbie', slug: 'showbie', role: 'service', category: 'lärplattform',
+    aliases: ['showbie'], products: [] },
+  { canonical: 'SpeedAdmin', slug: 'speedadmin', role: 'service', category: 'skoladministration',
+    aliases: ['speedadmin'], products: [] },
+  { canonical: 'StudyAlong', slug: 'studyalong', role: 'service', category: 'skoladministration',
+    aliases: ['studyalong'], products: [] },
+  { canonical: 'Tyra', slug: 'tyra', role: 'service', category: 'skoladministration',
+    aliases: ['tyra'], products: ['Tyra-appen'] },
+  { canonical: 'Vitec MV', slug: 'vitec-mv', role: 'service', category: 'stödverktyg',
+    aliases: ['vitec mv', 'vitec'], products: [] },
+  { canonical: 'Skolfederation', slug: 'skolfederation', role: 'service', category: 'integration',
+    aliases: ['skolfederation'], products: [] },
+  { canonical: 'Axiell', slug: 'axiell', role: 'service', category: 'övrigt',
+    aliases: ['axiell'], products: ['WeLib'] },
+  { canonical: 'BTJ', slug: 'btj', role: 'service', category: 'övrigt',
+    aliases: ['btj', 'bibliotekstjänst'], products: [] },
+  { canonical: 'Chas Visual Management', slug: 'chas', role: 'service', category: 'konsultbolag',
+    aliases: ['chas visual management', 'chas'], products: [] },
+  { canonical: 'Pulsen', slug: 'pulsen', role: 'service', category: 'konsultbolag',
+    aliases: ['pulsen'], products: [] },
+  { canonical: 'Softronic', slug: 'softronic', role: 'service', category: 'konsultbolag',
+    aliases: ['softronic'], products: [] },
+  { canonical: 'Plan Digital', slug: 'plan-digital', role: 'service', category: 'konsultbolag',
+    aliases: ['plan digital'], products: [] },
+
   // ---- Channels (procurement / distribution / reseller partners) ----
   { canonical: 'Adda', slug: 'adda', role: 'channel',
     aliases: ['adda', 'skl kommentus', 'sklkommentus', 'kommentus'], products: [] },
@@ -136,6 +210,12 @@ export const COMPANIES = [
     aliases: ['insight', 'insight technology solutions'], products: [] },
   { canonical: 'Devoteam Cloud Services', slug: 'devoteam', role: 'channel',
     aliases: ['devoteam', 'devoteam cloud services'], products: [] },
+  { canonical: 'Online Partner', slug: 'online-partner', role: 'channel',
+    aliases: ['online partner', 'onlinepartner'], products: [] },
+  { canonical: 'Foxway', slug: 'foxway', role: 'channel',
+    aliases: ['foxway', 'foxway education'], products: [] },
+  { canonical: 'Mediapoolen Västra Götaland', slug: 'mediapoolen', role: 'channel',
+    aliases: ['mediapoolen', 'mediapoolen västra götaland'], products: [] },
 ];
 
 export function normalizeVendorName(s) {
@@ -166,12 +246,12 @@ export function resolveCompany(name) {
   // Company alias first, then product, in COMPANIES order.
   for (const c of COMPANIES) {
     if (c.aliases.some((a) => wholeWord(a, normed))) {
-      return { canonical: c.canonical, slug: c.slug, role: c.role, matchedAs: 'company' };
+      return { canonical: c.canonical, slug: c.slug, role: c.role, category: c.category ?? null, matchedAs: 'company' };
     }
   }
   for (const c of COMPANIES) {
     const hit = c.products.find((p) => wholeWord(p, normed));
-    if (hit) return { canonical: c.canonical, slug: c.slug, role: c.role, matchedAs: 'product', product: hit };
+    if (hit) return { canonical: c.canonical, slug: c.slug, role: c.role, category: c.category ?? null, matchedAs: 'product', product: hit };
   }
   return null;
 }

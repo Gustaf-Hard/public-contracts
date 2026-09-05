@@ -225,6 +225,15 @@ describe('buildVendorRollups', () => {
     expect(rollups.map((r) => r.vendor_name).sort()).toEqual(['Radish', 'Skolon']);
   });
 
+  it('tags each rollup with the KB category — channel role wins as återförsäljare, unknown stays null', () => {
+    expect(rollups.find((r) => r.vendor_name === 'Skolon').category).toBe('återförsäljare');
+    expect(rollups.find((r) => r.vendor_name === 'Radish').category).toBe('läromedel');
+    const unknown = buildVendorRollups(buildContractFacts([
+      row({ contract_id: 9, vendor_id: 7, vendor_name: 'Okänd AB', vendor_slug: null, attachment_id: 19 }),
+    ], { lanByKommunKod: LAN, now: NOW }), { now: NOW });
+    expect(unknown[0].category).toBeNull();
+  });
+
   it('counts kommuner and contracts, sums only known values, tracks completeness', () => {
     const skolon = rollups.find((r) => r.vendor_name === 'Skolon');
     expect(skolon.contract_count).toBe(3);

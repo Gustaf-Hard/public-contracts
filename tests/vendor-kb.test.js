@@ -34,6 +34,19 @@ describe('resolveCompany', () => {
     expect(companyBySlug('radish')).toMatchObject({ canonical: 'Radish' });
     expect(companyBySlug('nope')).toBeUndefined();
   });
+  it('exposes the KB category on resolved companies (channels stay category-less)', () => {
+    expect(resolveCompany('Binogi').category).toBe('läromedel');
+    expect(resolveCompany('Atea').category).toBeNull();
+    expect(resolveCompany('Atea').role).toBe('channel');
+  });
+
+  it('every company carries a category, or is a channel (rendered as Återförsäljare)', () => {
+    for (const c of COMPANIES) {
+      if (c.role === 'channel') continue;
+      expect(typeof c.category, `${c.canonical} lacks a category`).toBe('string');
+    }
+  });
+
   it('every company has a unique slug and non-empty canonical', () => {
     const slugs = COMPANIES.map((c) => c.slug);
     expect(new Set(slugs).size).toBe(slugs.length);
