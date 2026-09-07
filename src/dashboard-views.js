@@ -426,6 +426,8 @@ const baseCss = `
   .filter-bar a { padding: 4px 10px; border-radius: 6px; background: var(--bg-elev); border: 1px solid var(--border); color: var(--fg-muted); font-size: 12px; }
   .filter-bar a.active { background: var(--accent); color: white; border-color: var(--accent); }
   /* Vendor category tags (/leverantorer) */
+  .queue-more { display: block; margin-top: 8px; font-size: 12px; color: var(--fg-muted); }
+  .queue-more:hover { color: var(--fg); }
   .cat-pill { display: inline-flex; align-items: center; gap: 5px; }
   .cat-pill .cat-n { font-size: 11px; padding: 0 5px; border-radius: 8px; background: var(--bg-elev-2); color: var(--fg-muted); }
   .cat-pill.active .cat-n { background: rgba(255,255,255,.25); color: white; }
@@ -1021,13 +1023,22 @@ export function renderOverview({ summary, rows, filter, sort, order, totalKommun
             queueRow(a, `<span class="q-action">${escapeHtml(a.action)}</span>`)).join('')}</div>`}
     </section>`;
 
+  // Only the 10 most overdue render here — the full set duplicates the kommun
+  // table below (operator feedback 2026-09-07). The ranking (soonest/most
+  // overdue follow-up first) is the one thing the table does not show at a
+  // glance; "visa alla" hands over to the table sorted the same way.
+  const WAITING_CAP = 10;
+  const waitingShown = waiting.slice(0, WAITING_CAP);
+  const waitingMore = waiting.length > WAITING_CAP
+    ? `<a class="queue-more" href="?filter=active&sort=follow_up&order=asc" data-pane-link>Visa alla ${waiting.length} i tabellen, sorterade på Återkommer ↓</a>`
+    : '';
   const waitingSection = `
     <section class="board-section">
       <h2>Pågår · väntar <span class="count">${waiting.length}</span></h2>
       ${waiting.length === 0
         ? '<div class="empty-state">Inga öppna ärenden väntar på svar.</div>'
-        : `<div class="queue">${waiting.map((w) =>
-            queueRow(w, `${stateBadge(w.state)} ${fmtFollowUpBadge(w.follow_up_at, w.follow_up_source) ?? ''}`)).join('')}</div>`}
+        : `<div class="queue">${waitingShown.map((w) =>
+            queueRow(w, `${stateBadge(w.state)} ${fmtFollowUpBadge(w.follow_up_at, w.follow_up_source) ?? ''}`)).join('')}</div>${waitingMore}`}
     </section>`;
 
   const searchForm = `

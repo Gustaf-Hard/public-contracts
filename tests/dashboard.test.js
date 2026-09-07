@@ -111,6 +111,22 @@ describe('dashboard / overview', () => {
     expect(empty.text).toContain('Inga kommuner matchar filtret');
   });
 
+  it('caps Pågår · väntar at 10 rows and links the rest to the sorted table', async () => {
+    // 12 waiting conversations → 10 rendered, badge shows the true total,
+    // and a visa-alla link sorts the kommun table by Återkommer instead.
+    for (let i = 0; i < 12; i++) {
+      const id = db.createConversation({
+        kommun_kod: String(8800 + i), kommun_namn: `Väntkommun ${i}`, role: 'central',
+        contact_email: `v${i}@vant.se`, scheduled_send_at: '2026-04-01T08:00:00Z',
+      });
+      db.updateConversationState(id, 'SENT', { last_outbound_at: '2026-04-01T08:00:00Z' });
+    }
+    const res = await get(appWithFakes(), '/');
+    expect(res.text).toContain('Pågår · väntar <span class="count">12</span>');
+    expect((res.text.match(/Väntkommun /g) ?? []).length).toBeLessThanOrEqual(10);
+    expect(res.text).toContain('?filter=active&sort=follow_up&order=asc');
+  });
+
   it('hides the Skicka button for kommuner without a contact address', async () => {
     const res = await get(appWithFakes(), '/?filter=all');
     // Malå has a contact → quick-init form. Boxholm/Testkommun have none →
