@@ -368,6 +368,41 @@ export function openDb(path) {
     if (!attCols.includes('analysis_parked_alerted_at')) {
       db.exec('ALTER TABLE attachments ADD COLUMN analysis_parked_alerted_at TEXT');
     }
+
+    // Handoff-task backfill (2026-09-06 design §2): the NEWEST handoff-
+    // classified inbound per conversation seeds a task, so hänvisningar that
+    // predate the table are not lost. Idempotent two ways: an address with ANY
+    // existing task row (pending, started, dismissed, superseded) is skipped —
+    // a re-run must never resurrect a dismissed task — and addresses that
+    // already have a conversation are born 'started'.
+    const backfillRows = db.prepare(`
+      SELECT m.id AS message_id, m.conversation_id, m.analysis_json,
+             c.kommun_kod
+      FROM messages m
+      JOIN conversations c ON c.id = m.conversation_id
+      WHERE m.direction = 'inbound' AND m.analysis_json LIKE '%"intent":"handoff"%'
+        AND m.id = (SELECT MAX(m2.id) FROM messages m2
+                    WHERE m2.conversation_id = m.conversation_id
+                      AND m2.direction = 'inbound'
+                      AND m2.analysis_json LIKE '%"intent":"handoff"%')
+    `).all();
+    for (const row of backfillRows) {
+      let email = null;
+      try { email = JSON.parse(row.analysis_json)?.extracted?.handoff_to_email ?? null; } catch { /* unparsable */ }
+      if (!email || !String(email).includes('@')) continue;
+      const addr = String(email).trim().toLowerCase();
+      const anyTask = db.prepare('SELECT id FROM handoff_tasks WHERE kommun_kod = ? AND address = ?')
+        .get(row.kommun_kod, addr);
+      if (anyTask) continue;
+      const startedConv = db.prepare('SELECT id FROM conversations WHERE kommun_kod = ? AND lower(contact_email) = ?')
+        .get(row.kommun_kod, addr);
+      upsertHandoffTask({
+        kommun_kod: row.kommun_kod, address: addr,
+        source_conversation_id: row.conversation_id, source_message_id: row.message_id,
+        verbatim: 1, same_domain: 0,
+        started_conv_id: startedConv?.id ?? null,
+      });
+    }
   }
 
   function createConversation({ kommun_kod, kommun_namn, role, contact_email, scheduled_send_at }) {

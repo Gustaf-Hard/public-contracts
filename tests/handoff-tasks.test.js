@@ -42,6 +42,30 @@ const task = (convId, msgId, over = {}) => ({
   verbatim: 1, same_domain: 0, ...over,
 });
 
+describe('backfill from existing handoff mail', () => {
+  it('migrate creates pending tasks for unactioned handoffs, started for addressed ones, idempotently', () => {
+    const c1 = seedConv();
+    seedHandoffMessage(c1);                                   // unactioned → pending
+    const c2 = seedConv({ kod: '1480', name: 'Göteborg', email: 'stadsledning@goteborg.se' });
+    db.recordMessage({
+      conversation_id: c2, gmail_message_id: 'ho-gbg', direction: 'inbound',
+      from_email: 'stadsledning@goteborg.se', to_email: 'x', subject: 'Sv',
+      body_text: 'Kontakta grundskola@goteborg.se.', received_at: '2026-08-20T08:00:00Z',
+      attachment_count: 0,
+      analysis_json: JSON.stringify({ intent: 'handoff', extracted: { handoff_to_email: 'grundskola@goteborg.se' } }),
+    });
+    seedConv({ kod: '1480', name: 'Göteborg', role: 'utbildning', email: 'grundskola@goteborg.se' }); // already started
+    db.migrate();                                             // backfill pass
+    db.migrate();                                             // idempotent
+    const pending = db.listPendingHandoffTasks();
+    expect(pending).toHaveLength(1);
+    expect(pending[0].address).toBe('helen.pettersson@amal.se');
+    const gbg = db.listHandoffTasksForConversation(c2);
+    expect(gbg).toHaveLength(1);
+    expect(gbg[0].status).toBe('started');
+  });
+});
+
 describe('handoff_tasks storage', () => {
   it('upsert creates a pending task with a lowercased address', () => {
     const c = seedConv(); const m = seedHandoffMessage(c);
