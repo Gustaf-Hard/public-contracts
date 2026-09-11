@@ -712,3 +712,49 @@ describe('inbound Gmail query shape', () => {
     );
   });
 });
+
+describe('runTick — handoff mail creates a durable task (2026-09-06 design)', () => {
+  const handoffAnalysis = (email) => ({
+    intent: 'handoff', confidence: 0.92, summary: 'hänvisar',
+    suggested_action: 'escalate', is_final_delivery: false,
+    draft_reply: 'Tack, jag kontaktar dem.', follow_up_at: null,
+    extracted: { handoff_to_email: email, handoff_to_forvaltning: 'IT-enheten' },
+  });
+
+  it('ingesting a handoff mail records a pending task in the same pass; re-ticks never duplicate', async () => {
+    const id = seedConv();
+    const spy = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue(handoffAnalysis('it-enheten@ale.se'));
+    const gmail = fakeGmail({
+      listResult: [{ id: 'ho-1' }],
+      getResult: { 'ho-1': mkMsg('ho-1', 'thr-a', 'Registrator <kansli@ale.se>', 'Kontakta it-enheten@ale.se för avtalen.') },
+    });
+    await runTick(deps({ gmail }));
+    await runTick(deps({ gmail }));   // same mail again → dedupe on gmail id AND task uniqueness
+    spy.mockRestore();
+
+    const tasks = db.listHandoffTasksForConversation(id);
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0].status).toBe('pending');
+    expect(tasks[0].address).toBe('it-enheten@ale.se');
+    expect(tasks[0].source_message_id).toBeTruthy();
+    expect(tasks[0].same_domain).toBe(1);
+    expect(tasks[0].verbatim).toBe(1);
+  });
+
+  it('a handoff to an address that already has a conversation is born started', async () => {
+    const id = seedConv();
+    const other = seedConv({ role: 'utbildning', email: 'skola@ale.se', thread: 'thr-b' });
+    const spy = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue(handoffAnalysis('skola@ale.se'));
+    const gmail = fakeGmail({
+      listResult: [{ id: 'ho-2' }],
+      getResult: { 'ho-2': mkMsg('ho-2', 'thr-a', 'Registrator <kansli@ale.se>', 'Kontakta skola@ale.se.') },
+    });
+    await runTick(deps({ gmail }));
+    spy.mockRestore();
+
+    const tasks = db.listHandoffTasksForConversation(id);
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0].status).toBe('started');
+    expect(tasks[0].started_conv_id).toBe(other);
+  });
+});

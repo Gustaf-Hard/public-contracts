@@ -2,6 +2,7 @@ import { T_INITIAL, T_PRECISION, T_RECEIPT, T_FOLLOWUP_NUDGE, T_FOLLOWUP_CLOSE, 
 import { computeKommunReview } from './contract-lifecycle.js';
 import { matchWatchlist } from './watchlist.js';
 import { crosscheckProbeGroups } from './vendor-kb.js';
+import { parseHandoffTargets } from './handoff.js';
 import { popularProbeCompanies } from './vendor-analytics.js';
 import { buildCoverageFacts } from './coverage.js';
 import { classify, isCloserText } from './classifier.js';
@@ -774,6 +775,38 @@ async function dispatchEscalationForIngest(pending, deps) {
         resolved_text: 'voided: the kommun replied after this draft was written',
       });
       deps.log?.(`VOIDED escalation ${stale.id} for ${updated.kommun_namn}/${updated.role} — kommun replied after the draft`);
+    }
+  }
+
+  // Durable handoff task (2026-09-06 design): the extracted address must
+  // survive as a work item even if the operator never revisits this ärende.
+  // Inside the same ingest pass as the message; upsert dedupes on
+  // (kommun, address) and an address that already has a conversation is
+  // linked as 'started' instead of nagging. homeDomain is approximated by the
+  // conversation's own contact domain — it only feeds the same_domain FLAG,
+  // never a gate.
+  if (analysis?.intent === 'handoff') {
+    try {
+      const siblings = db.raw
+        .prepare('SELECT id, role, contact_email FROM conversations WHERE kommun_kod = ?')
+        .all(updated.kommun_kod);
+      const homeDomain = (updated.contact_email ?? '').split('@')[1] ?? null;
+      const targets = parseHandoffTargets({
+        analysis, bodyText: parsed.body ?? '',
+        homeDomain, usedRoles: siblings.map((r) => r.role),
+      });
+      for (const t of targets) {
+        const started = siblings.find((r) => (r.contact_email ?? '').toLowerCase() === t.email.toLowerCase());
+        db.upsertHandoffTask({
+          kommun_kod: updated.kommun_kod, address: t.email,
+          forvaltning: t.forvaltning ?? null, role: t.roleSlug ?? null,
+          source_conversation_id: updated.id, source_message_id: messageId,
+          verbatim: t.verbatim ? 1 : 0, same_domain: t.sameDomain ? 1 : 0,
+          started_conv_id: started?.id ?? null,
+        });
+      }
+    } catch (e) {
+      deps.log?.(`handoff task upsert failed for conversation ${updated.id}: ${e.message}`);
     }
   }
 
