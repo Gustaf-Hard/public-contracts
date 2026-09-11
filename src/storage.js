@@ -135,6 +135,26 @@ CREATE TABLE IF NOT EXISTS escalations (
 );
 CREATE INDEX IF NOT EXISTS idx_escalations_status ON escalations(status);
 
+CREATE TABLE IF NOT EXISTS handoff_tasks (
+  id INTEGER PRIMARY KEY,
+  kommun_kod TEXT NOT NULL,
+  address TEXT NOT NULL,
+  forvaltning TEXT,
+  role TEXT,
+  source_conversation_id INTEGER NOT NULL REFERENCES conversations(id),
+  source_message_id INTEGER NOT NULL REFERENCES messages(id),
+  verbatim INTEGER NOT NULL DEFAULT 0,
+  same_domain INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'pending',
+  started_conv_id INTEGER REFERENCES conversations(id),
+  dismissed_reason TEXT,
+  last_nag_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  resolved_at TEXT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_handoff_tasks_pending
+  ON handoff_tasks(kommun_kod, address) WHERE status = 'pending';
+
 CREATE TABLE IF NOT EXISTS decisions (
   id INTEGER PRIMARY KEY,
   escalation_id INTEGER NOT NULL REFERENCES escalations(id),
@@ -347,6 +367,41 @@ export function openDb(path) {
     }
     if (!attCols.includes('analysis_parked_alerted_at')) {
       db.exec('ALTER TABLE attachments ADD COLUMN analysis_parked_alerted_at TEXT');
+    }
+
+    // Handoff-task backfill (2026-09-06 design §2): the NEWEST handoff-
+    // classified inbound per conversation seeds a task, so hänvisningar that
+    // predate the table are not lost. Idempotent two ways: an address with ANY
+    // existing task row (pending, started, dismissed, superseded) is skipped —
+    // a re-run must never resurrect a dismissed task — and addresses that
+    // already have a conversation are born 'started'.
+    const backfillRows = db.prepare(`
+      SELECT m.id AS message_id, m.conversation_id, m.analysis_json,
+             c.kommun_kod
+      FROM messages m
+      JOIN conversations c ON c.id = m.conversation_id
+      WHERE m.direction = 'inbound' AND m.analysis_json LIKE '%"intent":"handoff"%'
+        AND m.id = (SELECT MAX(m2.id) FROM messages m2
+                    WHERE m2.conversation_id = m.conversation_id
+                      AND m2.direction = 'inbound'
+                      AND m2.analysis_json LIKE '%"intent":"handoff"%')
+    `).all();
+    for (const row of backfillRows) {
+      let email = null;
+      try { email = JSON.parse(row.analysis_json)?.extracted?.handoff_to_email ?? null; } catch { /* unparsable */ }
+      if (!email || !String(email).includes('@')) continue;
+      const addr = String(email).trim().toLowerCase();
+      const anyTask = db.prepare('SELECT id FROM handoff_tasks WHERE kommun_kod = ? AND address = ?')
+        .get(row.kommun_kod, addr);
+      if (anyTask) continue;
+      const startedConv = db.prepare('SELECT id FROM conversations WHERE kommun_kod = ? AND lower(contact_email) = ?')
+        .get(row.kommun_kod, addr);
+      upsertHandoffTask({
+        kommun_kod: row.kommun_kod, address: addr,
+        source_conversation_id: row.conversation_id, source_message_id: row.message_id,
+        verbatim: 1, same_domain: 0,
+        started_conv_id: startedConv?.id ?? null,
+      });
     }
   }
 
@@ -1455,9 +1510,106 @@ export function openDb(path) {
     return parseResellerRelationRows(rows);
   }
 
+
+  // ---- Handoff lifecycle (2026-09-06 design) ------------------------------
+  // A kommun's "contact X instead" becomes a durable task: pending until a
+  // conversation to the address exists (started) or the operator dismisses
+  // it. At most ONE pending row per (kommun, address) — partial unique index.
+
+  // Upsert rules: existing pending row for the same (kommun, address) wins
+  // (no dupe); a task whose address already has a conversation is born
+  // 'started' (link, don't nag); a new PENDING task supersedes the source
+  // conversation's other pending tasks (newest handoff wins, mirroring the
+  // escalation supersede rule).
+  function upsertHandoffTask({ kommun_kod, address, forvaltning = null, role = null,
+    source_conversation_id, source_message_id, verbatim = 0, same_domain = 0,
+    started_conv_id = null }) {
+    const addr = String(address).trim().toLowerCase();
+    const existing = db.prepare(
+      "SELECT id, status FROM handoff_tasks WHERE kommun_kod = ? AND address = ? AND status = 'pending'"
+    ).get(kommun_kod, addr);
+    if (existing && !started_conv_id) return existing;
+    if (existing && started_conv_id) {
+      db.prepare("UPDATE handoff_tasks SET status='started', started_conv_id=?, resolved_at=datetime('now') WHERE id=?")
+        .run(started_conv_id, existing.id);
+      return { id: existing.id, status: 'started' };
+    }
+    const status = started_conv_id ? 'started' : 'pending';
+    if (status === 'pending') {
+      // Newest handoff MAIL wins — but two addresses named in the SAME mail
+      // are siblings and must coexist, so only tasks from OTHER messages of
+      // this conversation are superseded.
+      db.prepare(`UPDATE handoff_tasks SET status='superseded', resolved_at=datetime('now')
+                  WHERE source_conversation_id = ? AND status = 'pending'
+                    AND source_message_id != ? AND address != ?`)
+        .run(source_conversation_id, source_message_id, addr);
+    }
+    const r = db.prepare(`INSERT INTO handoff_tasks
+        (kommun_kod, address, forvaltning, role, source_conversation_id, source_message_id,
+         verbatim, same_domain, status, started_conv_id, resolved_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CASE WHEN ? IS NULL THEN NULL ELSE datetime('now') END)`)
+      .run(kommun_kod, addr, forvaltning, role, source_conversation_id, source_message_id,
+           verbatim ? 1 : 0, same_domain ? 1 : 0, status, started_conv_id, started_conv_id);
+    return { id: Number(r.lastInsertRowid), status };
+  }
+
+  function listPendingHandoffTasks() {
+    return db.prepare(`SELECT h.*, c.kommun_namn FROM handoff_tasks h
+        JOIN conversations c ON c.id = h.source_conversation_id
+        WHERE h.status = 'pending' ORDER BY h.created_at, h.id`).all();
+  }
+
+  function listHandoffTasksForConversation(conversationId) {
+    return db.prepare('SELECT * FROM handoff_tasks WHERE source_conversation_id = ? ORDER BY id').all(conversationId);
+  }
+
+  // A conversation to the address now EXISTS (any route: task button, manual
+  // compose, quick-init) — pending tasks for it must stop nagging. Called from
+  // sendInitial so no caller can forget it.
+  function startHandoffTasksForAddress(kommun_kod, address, conversationId) {
+    const r = db.prepare(`UPDATE handoff_tasks
+        SET status='started', started_conv_id=?, resolved_at=datetime('now')
+        WHERE kommun_kod = ? AND address = ? AND status = 'pending'`)
+      .run(conversationId, kommun_kod, String(address).trim().toLowerCase());
+    return r.changes;
+  }
+
+  function dismissHandoffTask(id, reason) {
+    if (!reason || !String(reason).trim()) throw new Error('dismissHandoffTask requires a reason');
+    db.prepare(`UPDATE handoff_tasks SET status='dismissed', dismissed_reason=?, resolved_at=datetime('now')
+        WHERE id = ? AND status = 'pending'`).run(String(reason).trim(), id);
+  }
+
+  // Nag window: pending, at least minAgeDays old, and not nagged within
+  // renagDays. last_nag_at is stamped by markHandoffTasksNagged ONLY after a
+  // successful Slack post and only for the tasks the post named.
+  function listNaggableHandoffTasks({ now = new Date(), minAgeDays = 2, renagDays = 3 } = {}) {
+    const nowIso = now.toISOString().replace('T', ' ').slice(0, 19);
+    return db.prepare(`SELECT h.*, c.kommun_namn FROM handoff_tasks h
+        JOIN conversations c ON c.id = h.source_conversation_id
+        WHERE h.status = 'pending'
+          AND julianday(?) - julianday(h.created_at) >= ?
+          AND (h.last_nag_at IS NULL OR julianday(?) - julianday(h.last_nag_at) >= ?)
+        ORDER BY h.created_at, h.id`).all(nowIso, minAgeDays, nowIso, renagDays);
+  }
+
+  function markHandoffTasksNagged(ids, now = new Date()) {
+    if (!ids?.length) return;
+    const nowIso = now.toISOString().replace('T', ' ').slice(0, 19);
+    const stmt = db.prepare('UPDATE handoff_tasks SET last_nag_at = ? WHERE id = ?');
+    for (const id of ids) stmt.run(nowIso, id);
+  }
+
   return {
     raw: db,
     migrate,
+    upsertHandoffTask,
+    listPendingHandoffTasks,
+    listHandoffTasksForConversation,
+    startHandoffTasksForAddress,
+    dismissHandoffTask,
+    listNaggableHandoffTasks,
+    markHandoffTasksNagged,
     createConversation,
     getConversation,
     listConversationsByState,

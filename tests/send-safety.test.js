@@ -345,3 +345,77 @@ describe('parseDbTime', () => {
     expect(parseDbTime(null)).toBe(null);
   });
 });
+
+describe('sendInitial — starting a conversation resolves matching handoff tasks (2026-09-06 design)', () => {
+  it('flips pending→started even when the Gmail send later fails (the conversation exists either way)', async () => {
+    const src = db.createConversation({
+      kommun_kod: '9997', kommun_namn: 'Hänviskommun', role: 'central',
+      contact_email: 'kommun@hanvis.se', scheduled_send_at: '2026-08-01T00:00:00Z',
+    });
+    const msg = db.recordMessage({
+      conversation_id: src, gmail_message_id: 'ho-x', direction: 'inbound',
+      from_email: 'kommun@hanvis.se', to_email: 'x', subject: 's', body_text: 'kontakta ny@hanvis.se',
+      received_at: '2026-09-01T00:00:00Z', attachment_count: 0,
+    });
+    db.upsertHandoffTask({
+      kommun_kod: '9997', address: 'NY@hanvis.se',
+      source_conversation_id: src, source_message_id: msg, verbatim: 1, same_domain: 1,
+    });
+
+    const gmail = { users: { messages: { send: async () => ({ data: { id: 'o1', threadId: 't1' } }) } } };
+    await sendInitial({
+      db, gmail, env,
+      kommun_kod: '9997', kommun_namn: 'Hänviskommun', role: 'utbildning',
+      contact_email: 'ny@hanvis.se', subject: 's', body: 'b',
+    });
+    const task = db.listHandoffTasksForConversation(src)[0];
+    expect(task.status).toBe('started');
+    expect(task.started_conv_id).toBeTruthy();
+
+    // Failure path: task for another address still flips — conversation EXISTS.
+    const msg2 = db.recordMessage({
+      conversation_id: src, gmail_message_id: 'ho-y', direction: 'inbound',
+      from_email: 'kommun@hanvis.se', to_email: 'x', subject: 's', body_text: 'kontakta tre@hanvis.se',
+      received_at: '2026-09-02T00:00:00Z', attachment_count: 0,
+    });
+    db.upsertHandoffTask({
+      kommun_kod: '9997', address: 'tre@hanvis.se',
+      source_conversation_id: src, source_message_id: msg2, verbatim: 1, same_domain: 1,
+    });
+    const failing = { users: { messages: { send: async () => { throw new Error('boom'); } } } };
+    await expect(sendInitial({
+      db, gmail: failing, env,
+      kommun_kod: '9997', kommun_namn: 'Hänviskommun', role: 'other',
+      contact_email: 'tre@hanvis.se', subject: 's', body: 'b',
+    })).rejects.toThrow('boom');
+    const t2 = db.listHandoffTasksForConversation(src).find((t) => t.address === 'tre@hanvis.se');
+    expect(t2.status).toBe('started');   // parked NEEDS_HUMAN conv still counts as in play
+  });
+});
+
+describe('post-approve warning: pending hänvisning surfaces at the moment of send (2026-09-06 §3)', () => {
+  it('sendApprovedReply returns the pending addresses and passes the warning to the Slack update', async () => {
+    const { conv, esc, convId } = seedConvWithEscalation();
+    const msgId = db.recordMessage({
+      conversation_id: convId, gmail_message_id: 'ho-w', direction: 'inbound',
+      from_email: 'registrator@arboga.se', to_email: 'x', subject: 's', body_text: 'kontakta ny@arboga.se',
+      received_at: '2026-09-01T00:00:00Z', attachment_count: 0,
+    });
+    db.upsertHandoffTask({
+      kommun_kod: '1', address: 'ny@arboga.se',
+      source_conversation_id: convId, source_message_id: msgId, verbatim: 1, same_domain: 1,
+    });
+    const slackClient = fakeSlackClient();
+    const result = await sendApprovedReply({
+      db, gmail: {}, env: { ...env, SLACK_CHANNEL_ID: 'C1' }, slackClient, conv, esc,
+      finalBody: 'Hej', decision: 'edit',
+      gmailSendImpl: async () => ({ id: 'o-w', threadId: 'thr-orig' }),
+    });
+    expect(result.pending_handoffs).toEqual(['ny@arboga.se']);
+    // The Slack resolution update carries the warning line.
+    const updateArgs = slackClient.chat.update.mock.calls[0]?.[0] ?? {};
+    const text = JSON.stringify(updateArgs);
+    expect(text).toContain('hänvisning väntar');
+    expect(text).toContain('ny@arboga.se');
+  });
+});
