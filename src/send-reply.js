@@ -360,6 +360,11 @@ export async function sendInitial({ db, gmail, env, kommun_kod, kommun_namn, rol
     contact_email,
     scheduled_send_at: nowIso,
   });
+  // The conversation to this address now EXISTS — any pending handoff task
+  // for it must stop nagging, whichever route created it (task button, manual
+  // compose, quick-init). Lives here so no caller can forget it (2026-09-06
+  // design §4); a later parked NEEDS_HUMAN send still counts as in play.
+  db.startHandoffTasksForAddress?.(kommun_kod, contact_email, convId);
   // Two-phase (autopilot review C2): claim the fresh INITIAL row as SENDING
   // *before* the Gmail call. A failed or crashed send must never leave a due
   // INITIAL row behind — the tick would later auto-send the canned template
