@@ -33,9 +33,9 @@ function b64(s) {
 
 function fakeSlackOps() {
   return {
-    posts: [], updates: [],
+    posts: [], updates: [], alerts: [],
     postEscalation: vi.fn(async function (slack, { blocks }) { this.posts.push(blocks); return { ts: `s-${this.posts.length}`, channel: 'C1' }; }),
-    postAlert: vi.fn(async () => ({ ts: 'a', channel: 'C1' })),
+    postAlert: vi.fn(async function (slack, { text }) { this.alerts.push(text); return { ts: 'a', channel: 'C1' }; }),
     updateEscalationResolved: vi.fn(async function (slack, args) { this.updates.push(args); }),
   };
 }
@@ -608,5 +608,55 @@ describe('daily follow-up catch-up after a blind 09:00', () => {
     });
     expect(db.listOpenEscalations()).toHaveLength(0);
     expect(db.getFollowupCompletedDate()).toBe(localDateStr(now));
+  });
+});
+
+describe('hänvisning nag digest (2026-09-06 design)', () => {
+  function seedPendingTask({ ageDays = 3, now = new Date('2026-09-11T09:00:00Z') } = {}) {
+    const convId = db.createConversation({
+      kommun_kod: '1460', kommun_namn: 'Bengtsfors', role: 'central',
+      contact_email: 'kommun@bengtsfors.se', scheduled_send_at: '2026-08-01T08:00:00Z',
+    });
+    const msgId = db.recordMessage({
+      conversation_id: convId, gmail_message_id: 'nag-m', direction: 'inbound',
+      from_email: 'kommun@bengtsfors.se', to_email: 'x', subject: 's', body_text: 'kontakta helen',
+      received_at: '2026-08-14T07:53:00Z', attachment_count: 0,
+    });
+    const t = db.upsertHandoffTask({
+      kommun_kod: '1460', address: 'helen.pettersson@amal.se',
+      source_conversation_id: convId, source_message_id: msgId, verbatim: 1, same_domain: 0,
+    });
+    const created = new Date(now.getTime() - ageDays * 86400000).toISOString().replace('T', ' ').slice(0, 19);
+    db.raw.prepare('UPDATE handoff_tasks SET created_at = ? WHERE id = ?').run(created, t.id);
+    return t.id;
+  }
+
+  it('posts ONE digest line for old pending tasks and stamps last_nag_at only on success', async () => {
+    seedPendingTask();
+    const slackOps = fakeSlackOps();
+    const now = new Date('2026-09-11T09:00:00Z');
+    await runDailyFollowup(deps({ slackOps, now }));
+    const nags = slackOps.alerts.filter((t) => t.includes('hänvisning'));
+    expect(nags).toHaveLength(1);
+    expect(nags[0]).toContain('Bengtsfors → helen.pettersson@amal.se (3 d)');
+    // Re-run same day → throttled by last_nag_at.
+    await runDailyFollowup(deps({ slackOps, now }));
+    expect(slackOps.alerts.filter((t) => t.includes('hänvisning'))).toHaveLength(1);
+  });
+
+  it('a failed Slack post does not stamp last_nag_at (retry on a later run)', async () => {
+    const id = seedPendingTask();
+    const slackOps = fakeSlackOps();
+    slackOps.postAlert = vi.fn(async () => { throw new Error('slack down'); });
+    await runDailyFollowup(deps({ slackOps, now: new Date('2026-09-11T09:00:00Z') }));
+    const row = db.raw.prepare('SELECT last_nag_at FROM handoff_tasks WHERE id = ?').get(id);
+    expect(row.last_nag_at).toBeNull();
+  });
+
+  it('a fresh task (< 2 days) is not nagged', async () => {
+    seedPendingTask({ ageDays: 1 });
+    const slackOps = fakeSlackOps();
+    await runDailyFollowup(deps({ slackOps, now: new Date('2026-09-11T09:00:00Z') }));
+    expect(slackOps.alerts.filter((t) => t.includes('hänvisning'))).toHaveLength(0);
   });
 });

@@ -1649,6 +1649,29 @@ export async function runDailyFollowup(deps) {
     }
   }
 
+  // Hänvisning nag digest (2026-09-06 design §5): pending handoff tasks at
+  // least 2 days old, not nagged in the last 3 days, in ONE Slack line per
+  // run. last_nag_at is stamped only after a successful post and only for the
+  // tasks the post named (the analysis_parked_alerted_at pattern). Nothing is
+  // ever sent to a kommun from here.
+  try {
+    const naggable = db.listNaggableHandoffTasks?.({ now }) ?? [];
+    if (naggable.length > 0 && deps.slackOps?.postAlert && deps.env?.SLACK_CHANNEL_ID) {
+      const ageDays = (t) => Math.floor((now.getTime() - new Date(t.created_at.replace(' ', 'T') + 'Z').getTime()) / 86400000);
+      const line = naggable
+        .map((t) => `${t.kommun_namn} → ${t.address} (${ageDays(t)} d)`)
+        .join(', ');
+      await deps.slackOps.postAlert(deps.slackClient, {
+        channel: deps.env.SLACK_CHANNEL_ID,
+        text: `📮 ${naggable.length} hänvisning${naggable.length === 1 ? '' : 'ar'} väntar på ärende: ${line} — starta eller avfärda i dashboarden.`,
+      });
+      db.markHandoffTasksNagged(naggable.map((t) => t.id), now);
+      log?.(`HANDOFF NAG posted for ${naggable.length} pending task(s)`);
+    }
+  } catch (e) {
+    log?.(`handoff nag digest failed: ${e.message} — will retry on a later run`);
+  }
+
   // Reached the end: today's staleness pass really happened (a vacation pause
   // counts — the decision was made and it was "nudge nobody"). Only a run that
   // returned early at the ingest gate leaves the date unstamped, which is what
