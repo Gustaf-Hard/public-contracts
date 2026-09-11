@@ -426,6 +426,10 @@ const baseCss = `
   .filter-bar a { padding: 4px 10px; border-radius: 6px; background: var(--bg-elev); border: 1px solid var(--border); color: var(--fg-muted); font-size: 12px; }
   .filter-bar a.active { background: var(--accent); color: white; border-color: var(--accent); }
   /* Vendor category tags (/leverantorer) */
+  .handoff-banner { background: color-mix(in srgb, var(--accent) 8%, var(--bg-elev)); border: 1px solid var(--accent);
+    border-radius: 8px; padding: 10px 14px; font-size: 13px; margin-bottom: var(--sp-3); }
+  .dismiss-reason { width: 110px; font-size: 11px; padding: 2px 6px; margin-left: 8px;
+    background: var(--bg-elev); color: var(--fg); border: 1px solid var(--border); border-radius: 4px; }
   .queue-more { display: block; margin-top: 8px; font-size: 12px; color: var(--fg-muted); }
   .queue-more:hover { color: var(--fg); }
   .cat-pill { display: inline-flex; align-items: center; gap: 5px; }
@@ -1447,7 +1451,7 @@ function docTypeBadge(att) {
   }
 }
 
-export function renderKommunDetail({ kommun, conversations, messagesByConv, attachmentsByMsg, escalationsByConv, signatures, followUpByConv = {}, threadsByConv = {}, initialDrafts = {}, gmailReady = false, vendorSlugsByName = new Map(), resellerRelationsByVendor = new Map(), handoffContacts = [], heartbeat = null, partial = false, escalationCount = 0 }) {
+export function renderKommunDetail({ kommun, conversations, messagesByConv, attachmentsByMsg, escalationsByConv, signatures, followUpByConv = {}, threadsByConv = {}, initialDrafts = {}, gmailReady = false, vendorSlugsByName = new Map(), resellerRelationsByVendor = new Map(), handoffContacts = [], handoffTasksPending = [], heartbeat = null, partial = false, escalationCount = 0 }) {
   if (!kommun) {
     return layout({ title: 'Saknad kommun', body: '<p>Hittade inte kommunen.</p>', currentPath: '/', heartbeat, partial, escalationCount });
   }
@@ -1592,6 +1596,11 @@ export function renderKommunDetail({ kommun, conversations, messagesByConv, atta
     ? '<p class="muted" style="font-size:12px;margin:6px 0 0">Inga leverantörer fångade ännu.</p>'
     : `${confirmedGroup}${mentionedGroup}`;
 
+  const pendingHandoffs = (handoffTasksPending ?? []);
+  const handoffBanner = pendingHandoffs.length
+    ? `<div class="handoff-banner">⚠️ Hänvisning väntar: ${pendingHandoffs.map((t) =>
+        `<a href="/arenden/${t.source_conversation_id}" data-pane-link>${escapeHtml(t.address)}</a>`).join(' · ')} — starta ärende från ärendesidan.</div>`
+    : '';
   const mergedContacts = mergeContacts(kommun.contacts ?? [], handoffContacts);
   const datasetContacts = mergedContacts.length === 0
     ? '<p class="muted" style="font-size:12px;margin:6px 0 0">Inga adresser.</p>'
@@ -1745,7 +1754,7 @@ export function renderKommunDetail({ kommun, conversations, messagesByConv, atta
       ${contractsSection}
     </div>`;
 
-  const body = `<div class="kommun-page">${sidebar}${mainColumn}</div>`;
+  const body = `${handoffBanner}<div class="kommun-page">${sidebar}${mainColumn}</div>`;
   return layout({ title: kommun.kommun_namn, body, currentPath: '/', heartbeat, partial, escalationCount });
 }
 
@@ -2274,9 +2283,14 @@ function renderHandoffSuggestions(targets, convId, gmailReady = false) {
           <td class="muted">${t.started_conv_id ? '' : escapeHtml(t.roleSlug)}</td>
           <td data-state-cell>${t.started_conv_id
             ? `<a href="/arenden/${t.started_conv_id}" data-pane-link>✓ Startat · Ärende #${t.started_conv_id}</a>`
-            : `<form method="post" action="/arenden/${convId}/handoff-start">
+            : `<form method="post" action="/arenden/${convId}/handoff-start" style="display:inline">
               <input type="hidden" name="email" value="${escapeHtml(t.email)}">
               <button type="submit" class="compose-link" ${disabled} title="Starta ärende och skicka T-INITIAL">📨 Skicka</button>
+            </form>
+            <form method="post" action="/handoff-tasks/${t.task_id}/dismiss" style="display:inline" title="Avfärda hänvisningen (kräver anledning)">
+              <input type="hidden" name="return_to" value="/arenden/${convId}">
+              <input type="text" name="reason" placeholder="anledning…" required class="dismiss-reason">
+              <button type="submit" class="compose-link">Avfärda</button>
             </form>`}</td>
         </tr>`).join('')}</tbody>
       </table>

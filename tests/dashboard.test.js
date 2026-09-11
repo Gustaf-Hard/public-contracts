@@ -518,6 +518,55 @@ function seedVendorWithContract() {
   return { v, attId };
 }
 
+describe('handoff tasks (2026-09-06 design)', () => {
+  function seedHandoffTask() {
+    const convId = db.createConversation({
+      kommun_kod: '2418', kommun_namn: 'Malå', role: 'central',
+      contact_email: 'kommun@mala.se', scheduled_send_at: '2026-08-01T08:00:00Z',
+    });
+    const msgId = db.recordMessage({
+      conversation_id: convId, gmail_message_id: 'ho-dash', direction: 'inbound',
+      from_email: 'kommun@mala.se', to_email: 'x', subject: 'Sv',
+      body_text: 'Kontakta skola@mala.se.', received_at: '2026-08-20T08:00:00Z', attachment_count: 0,
+    });
+    const t = db.upsertHandoffTask({
+      kommun_kod: '2418', address: 'skola@mala.se', forvaltning: 'Skolkontoret', role: 'utbildning',
+      source_conversation_id: convId, source_message_id: msgId, verbatim: 1, same_domain: 1,
+    });
+    return { convId, taskId: t.id };
+  }
+
+  it('a pending task appears in Behöver dig and on the ärende panel', async () => {
+    const { convId } = seedHandoffTask();
+    const app = appWithFakes();
+    const overview = await get(app, '/');
+    expect(overview.text).toContain('Hänvisning: starta ärende → skola@mala.se');
+    const arende = await get(app, `/arenden/${convId}`);
+    expect(arende.text).toContain('Föreslagna ärenden');
+    expect(arende.text).toContain('skola@mala.se');
+    expect(arende.text).toContain('Avfärda');
+  });
+
+  it('the kommun page shows a pending-hänvisning banner', async () => {
+    seedHandoffTask();
+    const res = await get(appWithFakes(), '/kommun/2418');
+    expect(res.text).toContain('Hänvisning väntar');
+    expect(res.text).toContain('skola@mala.se');
+  });
+
+  it('dismiss requires a reason and removes the task from the queue', async () => {
+    const { convId, taskId } = seedHandoffTask();
+    const app = appWithFakes();
+    const bad = await postForm(app, `/handoff-tasks/${taskId}/dismiss`, {});
+    expect(bad.status).toBe(400);
+    const ok = await postForm(app, `/handoff-tasks/${taskId}/dismiss`, { reason: 'täcks av annat ärende', return_to: `/arenden/${convId}` });
+    expect([200, 302]).toContain(ok.status);
+    expect(db.listPendingHandoffTasks()).toHaveLength(0);
+    const overview = await get(app, '/');
+    expect(overview.text).not.toContain('Hänvisning: starta ärende');
+  });
+});
+
 describe('vendor pages', () => {
   it('/leverantorer is the market overview + explorer (data center)', async () => {
     seedVendorWithContract();
@@ -1203,6 +1252,19 @@ describe('handoff suggested ärenden', () => {
       from_email: 'ink@ink.goteborg.se', to_email: 'me@x.se', subject: 'SV', body_text: BODY,
       classification: 'unknown', classification_confidence: 0.88,
       received_at: '2026-07-31T07:44:00Z', attachment_count: 0, analysis_json: GBG_ANALYSIS });
+    // The panel is a view of durable handoff_tasks (2026-09-06 design) — seed
+    // the tasks the tick's ingest (or the backfill) would have created.
+    const msgId = db.raw.prepare("SELECT id FROM messages WHERE gmail_message_id = 'in-h'").get().id;
+    db.upsertHandoffTask({
+      kommun_kod: '1480', address: 'info@educ.goteborg.se',
+      forvaltning: 'Utbildningsförvaltningen och Grundskoleförvaltningen', role: 'utbildning',
+      source_conversation_id: convId, source_message_id: msgId, verbatim: 1, same_domain: 1,
+    });
+    db.upsertHandoffTask({
+      kommun_kod: '1480', address: 'grundskola@grundskola.goteborg.se',
+      forvaltning: 'Utbildningsförvaltningen och Grundskoleförvaltningen', role: 'gymnasie',
+      source_conversation_id: convId, source_message_id: msgId, verbatim: 1, same_domain: 1,
+    });
     return convId;
   }
   const MUNIS = [{ kommun_kod: '1480', kommun_namn: 'Göteborg', lan: 'X', folkmangd: 1,

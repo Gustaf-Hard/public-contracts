@@ -15,7 +15,7 @@ import { buildOAuthClient, loadStoredToken, saveToken, makeGmail, makeReloadingC
 import { beginReauth } from './gmail-auth.js';
 import { requireAuth, requireOriginToken, mountAuthRoutes } from './web-auth.js';
 import { sendApprovedReply, sendInitial, renderInitialDraft } from './send-reply.js';
-import { parseHandoffTargets, homeDomainFromWebbplats } from './handoff.js';
+import { homeDomainFromWebbplats } from './handoff.js';
 import { makeSlackClient, updateEscalationResolved } from './slack.js';
 import { resolveReplyRecipient } from './threads.js';
 import {
@@ -445,6 +445,20 @@ export function buildActionQueue(db) {
       since: caseSince(c),
     });
   }
+  // Durable hänvisningar (2026-09-06 design): a pending handoff task is
+  // operator work exactly like an open escalation — surfacing it here is what
+  // makes a missed click on the ärende page recoverable.
+  for (const t of (db.listPendingHandoffTasks?.() ?? [])) {
+    out.push({
+      conv_id: t.source_conversation_id,
+      kommun_kod: t.kommun_kod,
+      kommun_namn: t.kommun_namn,
+      role: t.role ?? 'handoff',
+      state: 'HANDOFF',
+      action: `Hänvisning: starta ärende → ${t.address}`,
+      since: (t.created_at ?? '').replace(' ', 'T'),
+    });
+  }
   return out.sort((a, b) => (a.since ?? '').localeCompare(b.since ?? ''));
 }
 
@@ -548,27 +562,18 @@ function loadCaseDetail(db, convId, kommunFor = () => null) {
   // older redirect that a later message superseded is not re-suggested. The
   // intent lives in analysis_json — the classification column says 'unknown'
   // for a handoff on purpose, so a rule keyed on it would never fire.
-  let handoff_targets = [];
-  const lastHandoff = [...messages].reverse().find((m) => {
-    if (m.direction !== 'inbound' || !m.analysis_json) return false;
-    try { return JSON.parse(m.analysis_json)?.intent === 'handoff'; } catch { return false; }
-  });
-  if (lastHandoff) {
-    const siblings = db.raw
-      .prepare('SELECT id, role, contact_email FROM conversations WHERE kommun_kod = ?')
-      .all(conv.kommun_kod);
-    // Which addresses have already been contacted. The double-message guard is
-    // per KOMMUN ADDRESS, not per role: role de-dup would slide a repeat click
-    // to 'utbildning-2', which sendInitial's kommun+role check does not catch.
-    const startedByEmail = new Map(
-      siblings.filter((s) => s.contact_email).map((s) => [s.contact_email.toLowerCase(), s.id]));
-    handoff_targets = parseHandoffTargets({
-      analysis: JSON.parse(lastHandoff.analysis_json),
-      bodyText: lastHandoff.body_text ?? '',
-      homeDomain: homeDomainFromWebbplats(kommunFor(conv.kommun_kod)?.webbplats),
-      usedRoles: siblings.map((s) => s.role),
-    }).map((t) => ({ ...t, started_conv_id: startedByEmail.get(t.email) ?? null }));
-  }
+  // Suggested ärenden are the durable handoff_tasks (2026-09-06 design) — the
+  // panel is a VIEW of DB state, not a render-time recompute, so a task the
+  // operator never saw still exists in Behöver dig and the daily nag.
+  const handoff_targets = (db.listHandoffTasksForConversation?.(convId) ?? [])
+    .filter((t) => t.status === 'pending' || t.status === 'started')
+    .map((t) => ({
+      task_id: t.id, status: t.status,
+      email: t.address, forvaltning: t.forvaltning ?? '',
+      verbatim: !!t.verbatim, sameDomain: !!t.same_domain,
+      roleSlug: t.role ?? 'handoff',
+      started_conv_id: t.started_conv_id ?? null,
+    }));
 
   // Awaiting us with nothing drafted: the queue surfaces these (caseBucket's
   // awaiting_us), so the page must offer a way to answer rather than only
@@ -853,6 +858,7 @@ export function createDashboardApp({
       vendorSlugsByName,
       resellerRelationsByVendor,
       handoffContacts,
+      handoffTasksPending: (db?.listPendingHandoffTasks?.() ?? []).filter((t) => t.kommun_kod === kommun.kommun_kod),
       heartbeat: hb(), partial: isPartial(req), escalationCount: escCount(),
     }));
   });
@@ -1582,6 +1588,15 @@ export function createDashboardApp({
       return res.status(500).send(`Send failed: ${escapeForError(e.message)}`);
     }
     done();
+  });
+
+  // Dismiss a pending hänvisning with an auditable reason (2026-09-06 design).
+  app.post('/handoff-tasks/:id/dismiss', (req, res) => {
+    if (!db) return res.status(500).send('No database');
+    const reason = String(req.body?.reason ?? '').trim();
+    if (!reason) return res.status(400).send('Ange en anledning för att avfärda hänvisningen.');
+    db.dismissHandoffTask(parseInt(req.params.id, 10), reason);
+    res.redirect(req.body?.return_to ?? '/');
   });
 
   return app;

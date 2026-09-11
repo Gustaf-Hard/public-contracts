@@ -1536,9 +1536,13 @@ export function openDb(path) {
     }
     const status = started_conv_id ? 'started' : 'pending';
     if (status === 'pending') {
+      // Newest handoff MAIL wins — but two addresses named in the SAME mail
+      // are siblings and must coexist, so only tasks from OTHER messages of
+      // this conversation are superseded.
       db.prepare(`UPDATE handoff_tasks SET status='superseded', resolved_at=datetime('now')
-                  WHERE source_conversation_id = ? AND status = 'pending' AND address != ?`)
-        .run(source_conversation_id, addr);
+                  WHERE source_conversation_id = ? AND status = 'pending'
+                    AND source_message_id != ? AND address != ?`)
+        .run(source_conversation_id, source_message_id, addr);
     }
     const r = db.prepare(`INSERT INTO handoff_tasks
         (kommun_kod, address, forvaltning, role, source_conversation_id, source_message_id,
