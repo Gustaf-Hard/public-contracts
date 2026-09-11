@@ -308,9 +308,19 @@ export async function sendApprovedReply({ db, gmail, env, conv, esc, finalBody, 
     status: resolvedStatus,
     resolved_text: finalBody,
   });
+  // Pending hänvisningar surface AT THE MOMENT OF APPROVE (2026-09-06 design
+  // §3): the operator who just clicked send is told the second click — start
+  // the handoff ärende — is still owed. Carried on the Slack resolution
+  // update and in the return value for the dashboard.
+  const pendingHandoffs = (db.listHandoffTasksForConversation?.(conv.id) ?? [])
+    .filter((t) => t.status === 'pending')
+    .map((t) => t.address);
+  const handoffDetail = pendingHandoffs.length
+    ? `⚠️ hänvisning väntar: starta ärende till ${pendingHandoffs.join(', ')}`
+    : undefined;
   // Pass the decision so an unattended send is not labelled as operator-approved
   // (2026-08-17 design). Presentation only — resolvedStatus is what is stored.
-  await stripSlackButtons({ slackClient, env, esc, kommun_namn: conv.kommun_namn, status: resolvedStatus, decision, log });
+  await stripSlackButtons({ slackClient, env, esc, kommun_namn: conv.kommun_namn, status: resolvedStatus, detail: handoffDetail, decision, log });
   // Keep the inbox clean: archive the thread we replied into. The refresh path
   // opens a brand-new thread (no inbound, nothing in the inbox), so archiving it
   // is a harmless no-op there; every other reply archives the inbound thread.
@@ -328,7 +338,7 @@ export async function sendApprovedReply({ db, gmail, env, conv, esc, finalBody, 
     decision,
     final_body: finalBody,
   });
-  return sent;
+  return { ...sent, pending_handoffs: pendingHandoffs };
 }
 
 // Render the T-INITIAL template for a given kommun + role. Used by the

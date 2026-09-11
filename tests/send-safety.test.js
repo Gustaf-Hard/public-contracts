@@ -392,3 +392,30 @@ describe('sendInitial — starting a conversation resolves matching handoff task
     expect(t2.status).toBe('started');   // parked NEEDS_HUMAN conv still counts as in play
   });
 });
+
+describe('post-approve warning: pending hänvisning surfaces at the moment of send (2026-09-06 §3)', () => {
+  it('sendApprovedReply returns the pending addresses and passes the warning to the Slack update', async () => {
+    const { conv, esc, convId } = seedConvWithEscalation();
+    const msgId = db.recordMessage({
+      conversation_id: convId, gmail_message_id: 'ho-w', direction: 'inbound',
+      from_email: 'registrator@arboga.se', to_email: 'x', subject: 's', body_text: 'kontakta ny@arboga.se',
+      received_at: '2026-09-01T00:00:00Z', attachment_count: 0,
+    });
+    db.upsertHandoffTask({
+      kommun_kod: '1', address: 'ny@arboga.se',
+      source_conversation_id: convId, source_message_id: msgId, verbatim: 1, same_domain: 1,
+    });
+    const slackClient = fakeSlackClient();
+    const result = await sendApprovedReply({
+      db, gmail: {}, env: { ...env, SLACK_CHANNEL_ID: 'C1' }, slackClient, conv, esc,
+      finalBody: 'Hej', decision: 'edit',
+      gmailSendImpl: async () => ({ id: 'o-w', threadId: 'thr-orig' }),
+    });
+    expect(result.pending_handoffs).toEqual(['ny@arboga.se']);
+    // The Slack resolution update carries the warning line.
+    const updateArgs = slackClient.chat.update.mock.calls[0]?.[0] ?? {};
+    const text = JSON.stringify(updateArgs);
+    expect(text).toContain('hänvisning väntar');
+    expect(text).toContain('ny@arboga.se');
+  });
+});
