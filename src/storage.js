@@ -778,6 +778,42 @@ export function openDb(path) {
       .all(conversationId);
   }
 
+  // Queue-hygiene queries (2026-09-12 design) — read-only, feed the daily
+  // digest in tick.js. datetime('now', ?) takes the modifier as a bound
+  // string ('-N days'), not a literal spliced into the SQL.
+  function listOpenEscalationsAgedDays(days) {
+    return db.prepare(`
+      SELECT e.id, e.conversation_id, e.created_at, e.respond_by, c.kommun_namn, c.role
+      FROM escalations e JOIN conversations c ON c.id = e.conversation_id
+      WHERE e.status = 'open' AND e.created_at <= datetime('now', ?)
+      ORDER BY e.created_at
+    `).all(`-${Math.floor(days)} days`);
+  }
+
+  function listOpenEscalationsWithDeadlineDue(byIsoDate) {
+    return db.prepare(`
+      SELECT e.id, e.conversation_id, e.created_at, e.respond_by, c.kommun_namn, c.role
+      FROM escalations e JOIN conversations c ON c.id = e.conversation_id
+      WHERE e.status = 'open' AND e.respond_by IS NOT NULL AND e.respond_by <= ?
+      ORDER BY e.respond_by
+    `).all(byIsoDate);
+  }
+
+  // NEEDS_HUMAN with nothing actionable: no open escalation AND no pending
+  // handoff task. The void path in tick.js legitimately produces this state
+  // (kommun replied after a draft, reply warranted no new draft) — the digest
+  // is what stops it from being invisible (Karlstad/Avesta, 2026-09-12 review).
+  function listOrphanNeedsHuman() {
+    return db.prepare(`
+      SELECT c.id, c.kommun_namn, c.role, c.state_changed_at
+      FROM conversations c
+      WHERE c.state = 'NEEDS_HUMAN'
+        AND NOT EXISTS (SELECT 1 FROM escalations e WHERE e.conversation_id = c.id AND e.status = 'open')
+        AND NOT EXISTS (SELECT 1 FROM handoff_tasks t WHERE t.kommun_kod = c.kommun_kod AND t.status = 'pending')
+      ORDER BY c.state_changed_at
+    `).all();
+  }
+
   const activeStatusPlaceholders = ACTIVE_ESCALATION_STATUSES.map(() => '?').join(', ');
 
   function listActiveEscalationsForConversation(conversationId) {
@@ -1651,6 +1687,9 @@ export function openDb(path) {
     listOpenEscalations,
     listEscalationsByStatus,
     listOpenEscalationsForConversation,
+    listOpenEscalationsAgedDays,
+    listOpenEscalationsWithDeadlineDue,
+    listOrphanNeedsHuman,
     listActiveEscalationsForConversation,
     hasActiveEscalation,
     hasDelayAckForDate,

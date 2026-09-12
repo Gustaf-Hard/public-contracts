@@ -660,3 +660,32 @@ describe('hänvisning nag digest (2026-09-06 design)', () => {
     expect(slackOps.alerts.filter((t) => t.includes('hänvisning'))).toHaveLength(0);
   });
 });
+
+describe('queue hygiene digest (2026-09-12 design)', () => {
+  function seedQueueHygieneCases() {
+    const convA = db.createConversation({ kommun_kod: '0001', kommun_namn: 'Gammal', role: 'central', contact_email: 'a@a.se', scheduled_send_at: '2026-08-01T08:00:00Z' });
+    const escA = db.recordEscalation({ conversation_id: convA, reason: 'r' });
+    db.raw.prepare("UPDATE escalations SET created_at = datetime('now', '-9 days') WHERE id = ?").run(escA);
+    const convB = db.createConversation({ kommun_kod: '0002', kommun_namn: 'Frist', role: 'central', contact_email: 'b@b.se', scheduled_send_at: '2026-08-01T08:00:00Z' });
+    db.recordEscalation({ conversation_id: convB, reason: 'r', respond_by: '2026-09-13' });
+    const convC = db.createConversation({ kommun_kod: '0003', kommun_namn: 'Föräldralös', role: 'central', contact_email: 'c@c.se', scheduled_send_at: '2026-08-01T08:00:00Z' });
+    db.updateConversationState(convC, 'NEEDS_HUMAN');
+  }
+
+  it('posts one digest naming due deadlines, aged drafts, and orphaned NEEDS_HUMAN', async () => {
+    seedQueueHygieneCases();
+    const slackOps = fakeSlackOps();
+    await runDailyFollowup(deps({ slackOps, now: new Date('2026-09-12T09:00:00Z') }));
+    const digest = slackOps.alerts.find((t) => t.includes('Köhälsa'));
+    expect(digest).toBeTruthy();
+    expect(digest).toContain('⏰');
+    expect(digest).toContain('🕰');
+    expect(digest).toContain('🧭');
+  });
+
+  it('posts nothing when the queue is healthy', async () => {
+    const slackOps = fakeSlackOps();
+    await runDailyFollowup(deps({ slackOps, now: new Date('2026-09-12T09:00:00Z') }));
+    expect(slackOps.alerts.find((t) => t.includes('Köhälsa'))).toBeUndefined();
+  });
+});

@@ -664,3 +664,22 @@ describe('draft-context storage helpers (2026-09-12 design)', () => {
     expect(rows[0].is_contract).toBe(0);
   });
 });
+
+describe('queue hygiene queries (2026-09-12 design)', () => {
+  it('aged, deadline-due, and orphan queries each find their case', () => {
+    const convA = db.createConversation({ kommun_kod: '0001', kommun_namn: 'Gammal', role: 'central', contact_email: 'a@a.se', scheduled_send_at: '2026-08-01T08:00:00Z' });
+    const escA = db.recordEscalation({ conversation_id: convA, reason: 'r' });
+    db.raw.prepare("UPDATE escalations SET created_at = datetime('now', '-9 days') WHERE id = ?").run(escA);
+    const convB = db.createConversation({ kommun_kod: '0002', kommun_namn: 'Frist', role: 'central', contact_email: 'b@b.se', scheduled_send_at: '2026-08-01T08:00:00Z' });
+    db.recordEscalation({ conversation_id: convB, reason: 'r', respond_by: '2026-09-13' });
+    const convC = db.createConversation({ kommun_kod: '0003', kommun_namn: 'Föräldralös', role: 'central', contact_email: 'c@c.se', scheduled_send_at: '2026-08-01T08:00:00Z' });
+    db.updateConversationState(convC, 'NEEDS_HUMAN');
+
+    expect(db.listOpenEscalationsAgedDays(7).map((e) => e.kommun_namn)).toContain('Gammal');
+    expect(db.listOpenEscalationsAgedDays(7).map((e) => e.kommun_namn)).not.toContain('Frist');
+    expect(db.listOpenEscalationsWithDeadlineDue('2026-09-14').map((e) => e.kommun_namn)).toEqual(['Frist']);
+    const orphans = db.listOrphanNeedsHuman().map((c) => c.kommun_namn);
+    expect(orphans).toContain('Föräldralös');
+    expect(orphans).not.toContain('Gammal'); // has an open escalation
+  });
+});

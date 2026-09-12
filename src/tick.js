@@ -1678,6 +1678,34 @@ export async function runDailyFollowup(deps) {
     log?.(`handoff nag digest failed: ${e.message} — will retry on a later run`);
   }
 
+  // Queue-hygiene digest (2026-09-12 design): due/overdue reply deadlines,
+  // open drafts older than 7 days, and NEEDS_HUMAN cases with nothing
+  // actionable. Read-only; posts at most one Slack message per run.
+  try {
+    const todayIso = now.toISOString().slice(0, 10);
+    const due = db.listOpenEscalationsWithDeadlineDue?.(addDaysIso(todayIso, 2)) ?? [];
+    const dueIds = new Set(due.map((e) => e.id));
+    const aged = (db.listOpenEscalationsAgedDays?.(7) ?? []).filter((e) => !dueIds.has(e.id));
+    const orphans = db.listOrphanNeedsHuman?.() ?? [];
+    if ((due.length > 0 || aged.length > 0 || orphans.length > 0) && deps.slackOps?.postAlert && deps.env?.SLACK_CHANNEL_ID) {
+      const ageDays = (iso) => Math.floor((now.getTime() - new Date(iso.replace(' ', 'T') + 'Z').getTime()) / 86400000);
+      const parts = [];
+      if (due.length > 0) parts.push(`⏰ *Svarsfrist inom 2 dagar eller passerad:* ${due.map((e) => `${e.kommun_namn} (senast ${e.respond_by})`).join(', ')}`);
+      if (aged.length > 0) {
+        const top = aged.slice(0, 10).map((e) => `${e.kommun_namn} (${ageDays(e.created_at)} d)`).join(', ');
+        parts.push(`🕰 *Öppna utkast äldre än 7 dagar:* ${aged.length} st: ${top}${aged.length > 10 ? ', …' : ''}`);
+      }
+      if (orphans.length > 0) parts.push(`🧭 *Behöver dig utan utkast:* ${orphans.map((c) => c.kommun_namn).join(', ')}`);
+      await deps.slackOps.postAlert(deps.slackClient, {
+        channel: deps.env.SLACK_CHANNEL_ID,
+        text: `🧹 *Köhälsa:*\n${parts.join('\n')}`,
+      });
+      log?.(`QUEUE HYGIENE digest posted (${due.length} due, ${aged.length} aged, ${orphans.length} orphaned)`);
+    }
+  } catch (e) {
+    log?.(`queue hygiene digest failed: ${e.message} — will retry on a later run`);
+  }
+
   // Reached the end: today's staleness pass really happened (a vacation pause
   // counts — the decision was made and it was "nudge nobody"). Only a run that
   // returned early at the ingest gate leaves the date unstamped, which is what
