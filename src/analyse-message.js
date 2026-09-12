@@ -93,6 +93,10 @@ ISO-datum (YYYY-MM-DD) när boten ska kolla tillbaka om inget hörs av kommunen.
 - För "clarification" / "delivery" / "delay_promise": konversationen rör sig vidare, sätt rimlig grace (5-7 dagar).
 - För terminalstaten "dead_end" / "fee_demand" / "handoff" / "unknown": null.
 
+# respond_by_date
+
+ISO-datum (YYYY-MM-DD) när KOMMUNEN kräver svar av OSS ("svara inom 7 dagar annars stängs ärendet", "återkom senast 2026-09-02 med faktureringsuppgifter"). Skilj från promised_response_date (kommunens löfte till oss). Anges dagar: räkna från Dagens datum. null när ingen frist ställs.
+
 # mentioned_vendors och reseller_relations
 
 - "mentioned_vendors": alla leverantörs-/produktnamn som nämns i svaret (som förut). Oförändrat fält.
@@ -104,55 +108,61 @@ Inkommande:
 > Tack för din begäran. Ärendenummer: K202642713. Vi återkommer.
 
 Output:
-{"intent":"auto_ack","confidence":0.95,"summary":"Automatiskt mottagningskvitto med ärendenummer K202642713.","extracted":{"arendenummer":"K202642713","promised_response_days":null,"promised_response_date":null,"handoff_to_email":null,"handoff_to_forvaltning":null,"questions":null,"mentioned_vendors":null,"reseller_relations":null},"suggested_action":"wait","is_final_delivery":false,"draft_reply":"Hej,\\n\\nTack för bekräftelsen. Jag inväntar handlingarna.\\n\\nMed vänliga hälsningar,\\n${from_name}\\n${from_email}","follow_up_at":null}
+{"intent":"auto_ack","confidence":0.95,"summary":"Automatiskt mottagningskvitto med ärendenummer K202642713.","extracted":{"arendenummer":"K202642713","promised_response_days":null,"promised_response_date":null,"respond_by_date":null,"handoff_to_email":null,"handoff_to_forvaltning":null,"questions":null,"mentioned_vendors":null,"reseller_relations":null},"suggested_action":"wait","is_final_delivery":false,"draft_reply":"Hej,\\n\\nTack för bekräftelsen. Jag inväntar handlingarna.\\n\\nMed vänliga hälsningar,\\n${from_name}\\n${from_email}","follow_up_at":null}
 
 Inkommande:
 > Hej, för att kunna hjälpa dig på bästa sätt önskar jag veta: avser begäran en viss tidsperiod, och gäller den specifika system eller leverantörer?
 
 Output:
-{"intent":"clarification","confidence":0.9,"summary":"Registratorn ber om precisering kring tidsperiod och specifika system.","extracted":{"arendenummer":null,"promised_response_days":null,"promised_response_date":null,"handoff_to_email":null,"handoff_to_forvaltning":null,"questions":["Avser begäran en viss tidsperiod?","Gäller den specifika system eller leverantörer?"],"mentioned_vendors":null,"reseller_relations":null},"suggested_action":"send_precision","is_final_delivery":false,"draft_reply":"Hej,\\n\\nTack för snabbt svar! Jag preciserar:\\n\\nJag efterfrågar aktiva avtal (ej utgångna) avseende digitala verktyg inom utbildningsförvaltningen, inklusive lärplattformar, digitala läromedel och administrativa system. Jag önskar de fullständiga avtalshandlingarna i PDF-format.\\n\\nMed vänliga hälsningar,\\n${from_name}\\n${from_email}","follow_up_at":null}
+{"intent":"clarification","confidence":0.9,"summary":"Registratorn ber om precisering kring tidsperiod och specifika system.","extracted":{"arendenummer":null,"promised_response_days":null,"promised_response_date":null,"respond_by_date":null,"handoff_to_email":null,"handoff_to_forvaltning":null,"questions":["Avser begäran en viss tidsperiod?","Gäller den specifika system eller leverantörer?"],"mentioned_vendors":null,"reseller_relations":null},"suggested_action":"send_precision","is_final_delivery":false,"draft_reply":"Hej,\\n\\nTack för snabbt svar! Jag preciserar:\\n\\nJag efterfrågar aktiva avtal (ej utgångna) avseende digitala verktyg inom utbildningsförvaltningen, inklusive lärplattformar, digitala läromedel och administrativa system. Jag önskar de fullständiga avtalshandlingarna i PDF-format.\\n\\nMed vänliga hälsningar,\\n${from_name}\\n${from_email}","follow_up_at":null}
 
 Inkommande:
 > Hej, vi behöver cirka 10 arbetsdagar för att ta fram materialet. Återkommer senast 2026-06-08.
 
 Output:
-{"intent":"delay_promise","confidence":0.95,"summary":"Kommunen utlovar svar inom 10 arbetsdagar, senast 2026-06-08.","extracted":{"arendenummer":null,"promised_response_days":10,"promised_response_date":"2026-06-08","handoff_to_email":null,"handoff_to_forvaltning":null,"questions":null,"mentioned_vendors":null,"reseller_relations":null},"suggested_action":"acknowledge","is_final_delivery":false,"draft_reply":"Hej,\\n\\nTack för uppdateringen. Jag inväntar handlingarna.\\n\\nMed vänliga hälsningar,\\n${from_name}\\n${from_email}","follow_up_at":"2026-06-11"}
+{"intent":"delay_promise","confidence":0.95,"summary":"Kommunen utlovar svar inom 10 arbetsdagar, senast 2026-06-08.","extracted":{"arendenummer":null,"promised_response_days":10,"promised_response_date":"2026-06-08","respond_by_date":null,"handoff_to_email":null,"handoff_to_forvaltning":null,"questions":null,"mentioned_vendors":null,"reseller_relations":null},"suggested_action":"acknowledge","is_final_delivery":false,"draft_reply":"Hej,\\n\\nTack för uppdateringen. Jag inväntar handlingarna.\\n\\nMed vänliga hälsningar,\\n${from_name}\\n${from_email}","follow_up_at":"2026-06-11"}
 
 Inkommande (MASKINELLT autosvar — vänta tyst, inget svar):
 > Autosvar: Hej! Jag har semester och är åter på kontoret måndag 20 juli. Vid akuta ärenden kan ni kontakta min kollega Mirella Beck, mirella.beck@kommunen.se.
 
 Output:
-{"intent":"auto_reply","confidence":0.95,"summary":"Frånvaroautosvar: registratorn är åter 20 juli; kollega anges endast för akuta ärenden (ej handoff).","extracted":{"arendenummer":null,"promised_response_days":null,"promised_response_date":"2026-07-20","handoff_to_email":null,"handoff_to_forvaltning":null,"questions":null,"mentioned_vendors":null,"reseller_relations":null},"suggested_action":"wait","is_final_delivery":false,"draft_reply":"","follow_up_at":"2026-07-23"}
+{"intent":"auto_reply","confidence":0.95,"summary":"Frånvaroautosvar: registratorn är åter 20 juli; kollega anges endast för akuta ärenden (ej handoff).","extracted":{"arendenummer":null,"promised_response_days":null,"promised_response_date":"2026-07-20","respond_by_date":null,"handoff_to_email":null,"handoff_to_forvaltning":null,"questions":null,"mentioned_vendors":null,"reseller_relations":null},"suggested_action":"wait","is_final_delivery":false,"draft_reply":"","follow_up_at":"2026-07-23"}
 
 Inkommande:
 > Hej, dessa avtal hanteras av stadsledningskontoret. Vänligen kontakta dem på registrator@stadsledningen.kommun.se.
 
 Output:
-{"intent":"handoff","confidence":0.95,"summary":"Hänvisas till stadsledningskontoret på registrator@stadsledningen.kommun.se.","extracted":{"arendenummer":null,"promised_response_days":null,"promised_response_date":null,"handoff_to_email":"registrator@stadsledningen.kommun.se","handoff_to_forvaltning":"stadsledningskontoret","questions":null,"mentioned_vendors":null,"reseller_relations":null},"suggested_action":"escalate","is_final_delivery":false,"draft_reply":"Hej,\\n\\nTack för hänvisningen. Jag tar kontakt med stadsledningskontoret separat.\\n\\nMed vänliga hälsningar,\\n${from_name}\\n${from_email}","follow_up_at":null}
+{"intent":"handoff","confidence":0.95,"summary":"Hänvisas till stadsledningskontoret på registrator@stadsledningen.kommun.se.","extracted":{"arendenummer":null,"promised_response_days":null,"promised_response_date":null,"respond_by_date":null,"handoff_to_email":"registrator@stadsledningen.kommun.se","handoff_to_forvaltning":"stadsledningskontoret","questions":null,"mentioned_vendors":null,"reseller_relations":null},"suggested_action":"escalate","is_final_delivery":false,"draft_reply":"Hej,\\n\\nTack för hänvisningen. Jag tar kontakt med stadsledningskontoret separat.\\n\\nMed vänliga hälsningar,\\n${from_name}\\n${from_email}","follow_up_at":null}
 
 Inkommande (INTERN vidarebefordran, vänta tyst, inget svar, ingen ny adress för oss):
 > Tack för ditt mail. Jag skickar det vidare till vår skol- och IT-chef som får återkomma. Med anledning av semestertider kan återkopplingen ta något längre tid än vanligt.
 
 Output:
-{"intent":"handoff_internal","confidence":0.92,"summary":"Registratorn har skickat vår begäran vidare internt till skol- och IT-chef; semestertider kan fördröja svaret. Ingen extern adress för oss att kontakta.","extracted":{"arendenummer":null,"promised_response_days":null,"promised_response_date":null,"handoff_to_email":null,"handoff_to_forvaltning":"skol- och IT-chef","questions":null,"mentioned_vendors":null,"reseller_relations":null},"suggested_action":"wait","is_final_delivery":false,"draft_reply":"","follow_up_at":null}
+{"intent":"handoff_internal","confidence":0.92,"summary":"Registratorn har skickat vår begäran vidare internt till skol- och IT-chef; semestertider kan fördröja svaret. Ingen extern adress för oss att kontakta.","extracted":{"arendenummer":null,"promised_response_days":null,"promised_response_date":null,"respond_by_date":null,"handoff_to_email":null,"handoff_to_forvaltning":"skol- och IT-chef","questions":null,"mentioned_vendors":null,"reseller_relations":null},"suggested_action":"wait","is_final_delivery":false,"draft_reply":"","follow_up_at":null}
 
 Inkommande:
 > Här bifogas avtalet med Skolon och Google Workspace-avtalet. Hör av dig om något saknas.
 
 Output:
-{"intent":"delivery","confidence":0.9,"summary":"Levererar avtal med Skolon och Google Workspace.","extracted":{"arendenummer":null,"promised_response_days":null,"promised_response_date":null,"handoff_to_email":null,"handoff_to_forvaltning":null,"questions":null,"mentioned_vendors":["Skolon","Google Workspace"],"reseller_relations":null},"suggested_action":"send_receipt","is_final_delivery":false,"draft_reply":"Hej,\\n\\nTack så mycket för avtalen, jag har tagit emot dem. Är detta samtliga avtal eller är fler på väg?\\n\\nMed vänliga hälsningar,\\n${from_name}\\n${from_email}","follow_up_at":null}
+{"intent":"delivery","confidence":0.9,"summary":"Levererar avtal med Skolon och Google Workspace.","extracted":{"arendenummer":null,"promised_response_days":null,"promised_response_date":null,"respond_by_date":null,"handoff_to_email":null,"handoff_to_forvaltning":null,"questions":null,"mentioned_vendors":["Skolon","Google Workspace"],"reseller_relations":null},"suggested_action":"send_receipt","is_final_delivery":false,"draft_reply":"Hej,\\n\\nTack så mycket för avtalen, jag har tagit emot dem. Är detta samtliga avtal eller är fler på väg?\\n\\nMed vänliga hälsningar,\\n${from_name}\\n${from_email}","follow_up_at":null}
 
 Inkommande:
 > Hej, NE och Magma finns som underleverantörer i vårt avtal med Läromedia. Vi har inget eget direktavtal med dem.
 
 Output:
-{"intent":"delivery","confidence":0.85,"summary":"NE och Magma nås via kommunens ramavtal med Läromedia — inget direktavtal.","extracted":{"arendenummer":null,"promised_response_days":null,"promised_response_date":null,"handoff_to_email":null,"handoff_to_forvaltning":null,"questions":null,"mentioned_vendors":["NE","Magma","Läromedia"],"reseller_relations":[{"vendor":"NE","ramavtal":"Läromedia"},{"vendor":"Magma","ramavtal":"Läromedia"}]},"suggested_action":"send_receipt","is_final_delivery":false,"draft_reply":"Hej,\\n\\nTack för förtydligandet. Jag noterar att NE och Magma nås via ert avtal med Läromedia.\\n\\nMed vänliga hälsningar,\\n${from_name}\\n${from_email}","follow_up_at":null}
+{"intent":"delivery","confidence":0.85,"summary":"NE och Magma nås via kommunens ramavtal med Läromedia — inget direktavtal.","extracted":{"arendenummer":null,"promised_response_days":null,"promised_response_date":null,"respond_by_date":null,"handoff_to_email":null,"handoff_to_forvaltning":null,"questions":null,"mentioned_vendors":["NE","Magma","Läromedia"],"reseller_relations":[{"vendor":"NE","ramavtal":"Läromedia"},{"vendor":"Magma","ramavtal":"Läromedia"}]},"suggested_action":"send_receipt","is_final_delivery":false,"draft_reply":"Hej,\\n\\nTack för förtydligandet. Jag noterar att NE och Magma nås via ert avtal med Läromedia.\\n\\nMed vänliga hälsningar,\\n${from_name}\\n${from_email}","follow_up_at":null}
 
 Inkommande (begäran uppges aldrig ha kommit fram, se SKRIVREGEL 5):
 > Vi kan tyvärr inte se att din begäran har kommit fram till oss. Vänligen skicka den på nytt.
 
 Output:
-{"intent":"clarification","confidence":0.9,"summary":"Kommunen uppger att vår begäran aldrig kommit fram och ber oss skicka den igen.","extracted":{"arendenummer":null,"promised_response_days":null,"promised_response_date":null,"handoff_to_email":null,"handoff_to_forvaltning":null,"questions":null,"mentioned_vendors":null,"reseller_relations":null},"suggested_action":"send_precision","is_final_delivery":false,"draft_reply":"Hej,\\n\\nTack för beskedet, jag skickar begäran igen i sin helhet:\\n\\nMed stöd av offentlighetsprincipen (2 kap. tryckfrihetsförordningen) begär jag ut samtliga gällande avtal avseende digitala verktyg och läromedel som används inom er utbildningsförvaltning, inklusive lärplattformar, digitala läromedel och administrativa system. Jag önskar de fullständiga avtalshandlingarna i PDF-format.\\n\\nMed vänliga hälsningar,\\n${from_name}\\n${from_email}","follow_up_at":null}
+{"intent":"clarification","confidence":0.9,"summary":"Kommunen uppger att vår begäran aldrig kommit fram och ber oss skicka den igen.","extracted":{"arendenummer":null,"promised_response_days":null,"promised_response_date":null,"respond_by_date":null,"handoff_to_email":null,"handoff_to_forvaltning":null,"questions":null,"mentioned_vendors":null,"reseller_relations":null},"suggested_action":"send_precision","is_final_delivery":false,"draft_reply":"Hej,\\n\\nTack för beskedet, jag skickar begäran igen i sin helhet:\\n\\nMed stöd av offentlighetsprincipen (2 kap. tryckfrihetsförordningen) begär jag ut samtliga gällande avtal avseende digitala verktyg och läromedel som används inom er utbildningsförvaltning, inklusive lärplattformar, digitala läromedel och administrativa system. Jag önskar de fullständiga avtalshandlingarna i PDF-format.\\n\\nMed vänliga hälsningar,\\n${from_name}\\n${from_email}","follow_up_at":null}
+
+Inkommande (Dagens datum: 2026-08-26, kommunen sätter en egen frist på OSS — beräkna respond_by_date som dagens datum + antal dagar):
+> Ärende KC-1: Vi behöver en komplettering av din begäran innan vi kan behandla den. Svara på detta mejl inom 7 dagar annars stängs ditt ärende.
+
+Output:
+{"intent":"clarification","confidence":0.9,"summary":"Kommunen kräver komplettering och sätter en frist på 7 dagar (2026-09-02), annars stängs ärendet.","extracted":{"arendenummer":"KC-1","promised_response_days":null,"promised_response_date":null,"respond_by_date":"2026-09-02","handoff_to_email":null,"handoff_to_forvaltning":null,"questions":["Vilken komplettering önskas?"],"mentioned_vendors":null,"reseller_relations":null},"suggested_action":"send_precision","is_final_delivery":false,"draft_reply":"Hej,\\n\\nTack för meddelandet. Kan ni förtydliga vilken komplettering som önskas, så återkommer jag omgående?\\n\\nMed vänliga hälsningar,\\n${from_name}\\n${from_email}","follow_up_at":null}
 
 # Viktigt
 
@@ -161,7 +171,7 @@ Output:
 - För confidence: 0.9+ = mycket säker, 0.7-0.9 = ganska säker, <0.7 = osäker (intent bör vara "unknown").`;
 }
 
-const ANALYSIS_SCHEMA = {
+export const ANALYSIS_SCHEMA = {
   type: 'object',
   additionalProperties: false,
   required: ['intent', 'confidence', 'summary', 'extracted', 'suggested_action', 'is_final_delivery', 'draft_reply', 'follow_up_at'],
@@ -178,11 +188,15 @@ const ANALYSIS_SCHEMA = {
     extracted: {
       type: 'object',
       additionalProperties: false,
-      required: ['arendenummer', 'promised_response_days', 'promised_response_date', 'handoff_to_email', 'handoff_to_forvaltning', 'questions', 'mentioned_vendors', 'reseller_relations'],
+      required: ['arendenummer', 'promised_response_days', 'promised_response_date', 'respond_by_date', 'handoff_to_email', 'handoff_to_forvaltning', 'questions', 'mentioned_vendors', 'reseller_relations'],
       properties: {
         arendenummer: { anyOf: [{ type: 'string' }, { type: 'null' }] },
         promised_response_days: { anyOf: [{ type: 'integer' }, { type: 'null' }] },
         promised_response_date: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+        // A deadline the KOMMUN imposes on US ("svara inom 7 dagar annars
+        // stängs ärendet") — distinct from promised_response_date, which is
+        // their promise to us. Persisted on escalations by Task 6.
+        respond_by_date: { anyOf: [{ type: 'string' }, { type: 'null' }] },
         handoff_to_email: { anyOf: [{ type: 'string' }, { type: 'null' }] },
         handoff_to_forvaltning: { anyOf: [{ type: 'string' }, { type: 'null' }] },
         questions: { anyOf: [{ type: 'array', items: { type: 'string' } }, { type: 'null' }] },
@@ -310,6 +324,18 @@ export function normaliseDelayAnalysis(analysis, todayIso) {
   return analysis;
 }
 
+// Deterministic safety net over respond_by_date (pure, exported for tests):
+// the model must emit ISO or null; anything else (Swedish prose, a
+// half-formed date) is nulled rather than trusted downstream. Deliberately
+// does NOT reject a past date — a kommun-imposed deadline that has already
+// passed is still a fact worth surfacing (Task 8 digests overdue dates), and
+// "past by more than a day" guarding is presentation-side, not extraction.
+export function normaliseRespondBy(analysis) {
+  const v = analysis?.extracted?.respond_by_date;
+  if (v != null && !ISO_DATE_RE.test(v)) analysis.extracted.respond_by_date = null;
+  return analysis;
+}
+
 let cachedClient = null;
 function getClient(apiKey) {
   if (!apiKey) return null;
@@ -383,7 +409,7 @@ export async function analyseMessage(body, ctx, { env = process.env, client = nu
     if (!textBlock || !textBlock.text) return null;
     try {
       const parsed = JSON.parse(textBlock.text);
-      return normaliseDelayAnalysis(parsed, ctx.today_iso);
+      return normaliseRespondBy(normaliseDelayAnalysis(parsed, ctx.today_iso));
     } catch (e) {
       return null;
     }

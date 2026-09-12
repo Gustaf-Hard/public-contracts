@@ -6,6 +6,8 @@ import {
   buildSystemPrompt,
   addDaysIso,
   parseSwedishDateToIso,
+  ANALYSIS_SCHEMA,
+  normaliseRespondBy,
 } from '../src/analyse-message.js';
 
 function fakeClientReturning(analysisObject) {
@@ -491,5 +493,22 @@ describe('thread context (2026-09-12 design)', () => {
     expect(sys).toContain('Påstå ALDRIG att handlingar saknas');
     expect(sys).toContain('Upprepa ALDRIG en fråga');
     expect(sys).toContain('begäran aldrig nått dem');
+  });
+});
+
+describe('respond_by_date (2026-09-12 design)', () => {
+  it('survives the schema round-trip and normalisation', async () => {
+    const expected = { intent: 'unknown', confidence: 0.95, summary: 'Komplettering krävs inom 7 dagar.', extracted: { arendenummer: 'KC-1', promised_response_days: null, promised_response_date: null, respond_by_date: '2026-09-02', handoff_to_email: null, handoff_to_forvaltning: null, questions: null, mentioned_vendors: null, reseller_relations: null }, suggested_action: 'escalate', is_final_delivery: false, draft_reply: 'd', follow_up_at: null };
+    const r = await analyseMessage('Svara inom 7 dagar annars stängs ärendet.', baseCtx, { env: { ANTHROPIC_API_KEY: 'k' }, client: fakeClientReturning(expected) });
+    expect(r.extracted.respond_by_date).toBe('2026-09-02');
+  });
+  it('normaliseRespondBy nulls a non-ISO value', () => {
+    const a = { extracted: { respond_by_date: 'nästa vecka' } };
+    expect(normaliseRespondBy(a).extracted.respond_by_date).toBeNull();
+  });
+  it('schema stays at 10 union-typed params', () => {
+    // count anyOf occurrences — the 16-limit guard from memory
+    const json = JSON.stringify(ANALYSIS_SCHEMA);
+    expect((json.match(/"anyOf"/g) ?? []).length).toBe(10);
   });
 });
