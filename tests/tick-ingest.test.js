@@ -758,3 +758,30 @@ describe('runTick — handoff mail creates a durable task (2026-09-06 design)', 
     expect(tasks[0].started_conv_id).toBe(other);
   });
 });
+
+describe('runTick — draft context wiring (2026-09-12 draft-context design)', () => {
+  it('passes thread context (prior outbound + trigger attachments) to analyseMessage', async () => {
+    const SEEDED_OUTBOUND_BODY = 'Jag begär avtal enligt offentlighetsprincipen.';
+    const id = seedConv();
+    db.recordMessage({
+      conversation_id: id, gmail_message_id: 'out-1', direction: 'outbound',
+      from_email: 'gustaf@mediagraf.se', to_email: 'kansli@ale.se', subject: 'Begäran',
+      body_text: SEEDED_OUTBOUND_BODY, classification: null, classification_confidence: null,
+      received_at: '2026-06-10T10:00:00Z', attachment_count: 0,
+    });
+
+    const spy = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue(null);
+    const gmail = fakeGmail({
+      listResult: [{ id: 'm1' }],
+      getResult: { 'm1': mkMsg('m1', 'thr-a', 'Registrator <kansli@ale.se>', 'Se bifogat avtal.') },
+    });
+    await runTick(deps({ gmail }));
+    // Assert BEFORE mockRestore (which clears call history).
+    expect(spy).toHaveBeenCalled();
+    const ctx = spy.mock.calls[0][1];
+    expect(ctx.thread_context).toContain('# Ursprunglig begäran');
+    expect(ctx.thread_context).toContain(SEEDED_OUTBOUND_BODY);
+    expect(ctx.thread_context).toContain('# Bilagor i det inkommande mejlet');
+    spy.mockRestore();
+  });
+});

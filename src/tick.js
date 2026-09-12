@@ -15,6 +15,7 @@ import { buildEscalationBlocks } from './slack.js';
 import { saveAttachment, extractFilesFromZip, dedupeFilenames, isTrivialImage } from './attachments.js';
 import { extractSignature } from './extract-signature.js';
 import { analyseMessage, analysisToLegacyClassification, addDaysIso } from './analyse-message.js';
+import { buildDraftContext } from './draft-context.js';
 import { analysePendingContracts } from './analyse-contract.js';
 import { isInVacation, vacationDaysBetween } from './vacation.js';
 import { isBounce, failedRecipient } from './bounce.js';
@@ -371,6 +372,7 @@ async function ingestMessage({ conv, item, deps }) {
     conversation_state: conv.state,
     days_since_last_outbound: daysSinceLastOutbound,
     today_iso: now.toISOString().slice(0, 10),
+    thread_context: buildDraftContext(db, conv, parsed),
   }, { env });
   const classification = analysis
     ? analysisToLegacyClassification(analysis)
