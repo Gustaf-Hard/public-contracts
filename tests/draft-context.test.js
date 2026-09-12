@@ -61,10 +61,41 @@ describe('buildDraftContext', () => {
     seedMsg({ dir: 'outbound', gmailId: 'o1', body: 'Begäran.', at: '2026-08-17T14:45:24Z' });
     const m = seedMsg({ gmailId: 'i1', body: 'Här kommer avtalen.', at: '2026-08-19T14:15:00Z', analysis: { summary: 'Levererar avtal.' } });
     db.recordAttachment({ message_id: m, filename: 'NE Avtal.pdf', saved_path: '/x/1.pdf', mime_type: 'application/pdf', size_bytes: 10 });
-    const out = buildDraftContext(db, conv(), { attachments: [{ filename: 'Skolplus_avtal.pdf' }] });
+    const out = buildDraftContext(db, conv(), { attachments: [{ filename: 'Skolplus_avtal.pdf', mime_type: 'application/pdf', size_bytes: 12_345 }] });
     expect(out).toContain('NE Avtal.pdf');
     expect(out).toContain('# Bilagor i det inkommande mejlet');
     expect(out).toContain('Skolplus_avtal.pdf');
+  });
+
+  it('renders a substantive trigger attachment with filename, mime type and size', () => {
+    seedMsg({ dir: 'outbound', gmailId: 'o1', body: 'Begäran.', at: '2026-08-17T14:45:24Z' });
+    const out = buildDraftContext(db, conv(), {
+      attachments: [{ filename: 'avtal.pdf', mime_type: 'application/pdf', size_bytes: 45_000 }],
+    });
+    expect(out).toContain('- avtal.pdf (application/pdf, 45000 B)');
+  });
+
+  it('a lone trivial signature-logo image renders the skipped-note, not a bare filename list', () => {
+    seedMsg({ dir: 'outbound', gmailId: 'o1', body: 'Begäran.', at: '2026-08-17T14:45:24Z' });
+    const out = buildDraftContext(db, conv(), {
+      attachments: [{ filename: 'image001.png', mime_type: 'image/png', size_bytes: 4_096 }],
+    });
+    expect(out).not.toContain('- image001.png');
+    expect(out).toContain('(inga dokumentbilagor; 1 trivial bild(er) hoppades över)');
+  });
+
+  it('renders (inga) when the trigger mail carried no attachments at all', () => {
+    seedMsg({ dir: 'outbound', gmailId: 'o1', body: 'Begäran.', at: '2026-08-17T14:45:24Z' });
+    const out = buildDraftContext(db, conv(), noAtts);
+    expect(out).toContain('# Bilagor i det inkommande mejlet\n(inga)');
+  });
+
+  it('appends an [avkortat] marker only when the stored outbound body actually exceeded the cap', () => {
+    seedMsg({ dir: 'outbound', gmailId: 'o1', body: 'Kort begäran.', at: '2026-08-17T14:45:24Z' });
+    seedMsg({ dir: 'outbound', gmailId: 'o2', body: 'X'.repeat(2000), at: '2026-08-18T14:45:24Z' });
+    const out = buildDraftContext(db, conv(), noAtts);
+    expect(out).toContain('… [avkortat]');
+    expect(out).not.toContain('Kort begäran. … [avkortat]');
   });
 
   it('summarises extracted contracts with document_type', () => {

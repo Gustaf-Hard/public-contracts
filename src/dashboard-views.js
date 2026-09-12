@@ -580,6 +580,7 @@ const baseCss = `
   .queue-alert .queue-row { border-left: 3px solid var(--bad); }
   .queue-row .q-kommun { font-weight: 600; }
   .queue-row .q-action { color: var(--bad); font-size: 13px; font-weight: 500; }
+  .q-action .bad { color: var(--bad); font-weight: 500; }
   .queue-row .q-age { font-size: 12px; white-space: nowrap; }
   .empty-state { padding: 20px; text-align: center; color: var(--fg-muted); background: var(--bg-elev); border: 1px dashed var(--border); border-radius: var(--r-2); font-size: 13px; }
   .table-search { margin: 0 0 var(--sp-3); }

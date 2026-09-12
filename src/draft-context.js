@@ -9,6 +9,8 @@
 // db.listMessages returns exactly the prior thread; the trigger mail's
 // attachments arrive as parsed metadata only.
 
+import { isTrivialImage } from './attachments.js';
+
 const MAX_MESSAGES = 20;
 const MAX_OUTBOUND_CHARS = 1500;
 const MAX_INBOUND_CHARS = 300;
@@ -39,9 +41,11 @@ export function buildDraftContext(db, conv, parsed) {
     const files = attsByMsg.get(m.id) ?? [];
     const fileNote = files.length ? ` [bilagor: ${files.join(', ')}]` : '';
     if (m.direction === 'outbound') {
-      const body = (m.body_text ?? '').trim().slice(0, MAX_OUTBOUND_CHARS);
+      const fullBody = (m.body_text ?? '').trim();
+      const body = fullBody.slice(0, MAX_OUTBOUND_CHARS);
+      const truncated = fullBody.length > MAX_OUTBOUND_CHARS;
       lines.push(`## VI skrev (${date})${fileNote}`);
-      lines.push(body);
+      lines.push(truncated ? `${body} … [avkortat]` : body);
     } else {
       let summary = null;
       try { summary = JSON.parse(m.analysis_json ?? 'null')?.summary ?? null; } catch { /* unparsable */ }
@@ -53,8 +57,16 @@ export function buildDraftContext(db, conv, parsed) {
   }
 
   lines.push('# Bilagor i det inkommande mejlet');
-  const triggerFiles = (parsed?.attachments ?? []).map((a) => a.filename).filter(Boolean);
-  lines.push(triggerFiles.length ? triggerFiles.map((f) => `- ${f}`).join('\n') : '(inga)');
+  const triggerAtts = parsed?.attachments ?? [];
+  const substantive = triggerAtts.filter((a) => a?.filename && !isTrivialImage(a));
+  const skippedCount = triggerAtts.length - substantive.length;
+  if (substantive.length > 0) {
+    lines.push(substantive.map((a) => `- ${a.filename} (${a.mime_type ?? 'okänd typ'}, ${a.size_bytes ?? '?'} B)`).join('\n'));
+  } else if (skippedCount > 0) {
+    lines.push(`(inga dokumentbilagor; ${skippedCount} trivial bild(er) hoppades över)`);
+  } else {
+    lines.push('(inga)');
+  }
   lines.push('');
 
   lines.push('# Avtal vi redan extraherat ur mottagna bilagor');

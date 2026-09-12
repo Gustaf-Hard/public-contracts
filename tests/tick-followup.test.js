@@ -688,4 +688,26 @@ describe('queue hygiene digest (2026-09-12 design)', () => {
     await runDailyFollowup(deps({ slackOps, now: new Date('2026-09-12T09:00:00Z') }));
     expect(slackOps.alerts.find((t) => t.includes('Köhälsa'))).toBeUndefined();
   });
+
+  it('still posts while ingest is blind (Gmail-free, DB-only) — but still sends no nudges', async () => {
+    seedQueueHygieneCases();
+    const nudgeConvId = seedConv({ stateChangedAt: '2026-06-01T00:00:00Z' }); // far past the nudge threshold
+    const slackOps = fakeSlackOps();
+    const now = new Date('2026-09-12T09:00:00Z');
+    const d = deps({ slackOps, now });
+    // Force ingest to look blind (mirrors tests/tick-health.test.js): last
+    // successful tick well past TICK_STALE_THRESHOLD_MIN before `now`.
+    db.raw.prepare('UPDATE daemon_heartbeat SET last_success_at = ? WHERE id = 1')
+      .run(new Date(now.getTime() - 3 * 24 * 60 * 60000).toISOString());
+    const lines = [];
+    await runDailyFollowup({ ...d, log: (l) => lines.push(l) });
+    expect(lines.some((l) => l.includes('FOLLOWUP paused'))).toBe(true);
+    const digest = slackOps.alerts.find((t) => t.includes('Köhälsa'));
+    expect(digest).toBeTruthy();
+    expect(digest).toContain('⏰');
+    expect(digest).toContain('🕰');
+    expect(digest).toContain('🧭');
+    // Existing behavior preserved: a blind tick still drafts no staleness nudge.
+    expect(db.listOpenEscalationsForConversation(nudgeConvId)).toHaveLength(0);
+  });
 });

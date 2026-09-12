@@ -678,6 +678,45 @@ describe('runTick — soft internal-forward ingest (2026-07-20 §5)', () => {
     expect(open[0].respond_by).toBe('2026-09-20');
   });
 
+  it('a supersede with no new respond_by_date inherits the deadline from the escalation it replaces (2026-09-12 review finding 3)', async () => {
+    const spy = vi.spyOn(analyseMod, 'analyseMessage');
+    spy.mockResolvedValueOnce({
+      intent: 'handoff', confidence: 0.95, summary: 'Hänvisas externt, kräver komplettering inom 7 dagar.',
+      extracted: { arendenummer: null, promised_response_days: null, promised_response_date: null, respond_by_date: '2026-09-20', handoff_to_email: 'registrator@stadsledningen.se', handoff_to_forvaltning: 'stadsledningen', questions: null, mentioned_vendors: null, reseller_relations: null },
+      suggested_action: 'escalate', is_final_delivery: false, draft_reply: 'Hej, jag kontaktar dem separat.', follow_up_at: null,
+    });
+    const id = seedConv({ email: 'kansli@ale.se', thread: 'thr-a' });
+    const slackOps = fakeSlackOps();
+    const gmail1 = fakeGmail({
+      listResult: [{ id: 'rb-a' }],
+      getResult: { 'rb-a': mkMsg('rb-a', 'thr-a', 'K <kansli@ale.se>', 'Kontakta registrator@stadsledningen.se istället, svara inom 7 dagar.') },
+    });
+    await runTick(deps({ gmail: gmail1, slackOps, now: new Date('2026-06-24T12:00:00Z') }));
+
+    const escA = db.raw.prepare("SELECT * FROM escalations WHERE conversation_id=? AND status='open'").all(id);
+    expect(escA).toHaveLength(1);
+    expect(escA[0].respond_by).toBe('2026-09-20');
+
+    spy.mockResolvedValueOnce({
+      intent: 'handoff', confidence: 0.9, summary: 'Ytterligare hänvisning, inget datum nämnt denna gång.',
+      extracted: { arendenummer: null, promised_response_days: null, promised_response_date: null, respond_by_date: null, handoff_to_email: 'registrator@stadsledningen.se', handoff_to_forvaltning: 'stadsledningen', questions: null, mentioned_vendors: null, reseller_relations: null },
+      suggested_action: 'escalate', is_final_delivery: false, draft_reply: 'Hej, jag kontaktar dem separat igen.', follow_up_at: null,
+    });
+    const gmail2 = fakeGmail({
+      listResult: [{ id: 'rb-b' }],
+      getResult: { 'rb-b': mkMsg('rb-b', 'thr-a', 'K <kansli@ale.se>', 'Ytterligare hänvisning, inget nytt datum nämnt.') },
+    });
+    await runTick(deps({ gmail: gmail2, slackOps, now: new Date('2026-06-25T12:00:00Z') }));
+    spy.mockRestore();
+
+    const supersededA = db.raw.prepare('SELECT status FROM escalations WHERE id = ?').get(escA[0].id);
+    expect(supersededA.status).toBe('superseded');
+
+    const escB = db.raw.prepare("SELECT * FROM escalations WHERE conversation_id=? AND status='open'").all(id);
+    expect(escB).toHaveLength(1);
+    expect(escB[0].respond_by).toBe('2026-09-20'); // inherited — the kommun's deadline still stands
+  });
+
   it('PRECISION (offline): an external redirect naming an address escalates, not handoff_internal', async () => {
     const spy = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue(null);
     const id = seedConv({ email: 'kansli@ale.se', thread: 'thr-a' });

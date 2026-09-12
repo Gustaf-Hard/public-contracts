@@ -178,7 +178,13 @@ async function escalateWithDraft({ conv, parsedInbound, messageId = null, classi
   // review H1). A fresher draft supersedes any open escalation: its status
   // flips to 'superseded' (so a stale approve fails the atomic claim) and its
   // Slack buttons are stripped best-effort.
+  // The kommun's deadline still stands even when the newer inbound doesn't
+  // restate it — carry the superseded escalation's respond_by forward so a
+  // supersede never silently drops a live Svarsfrist (2026-09-12 review
+  // finding 3). Last superseded row with a respond_by wins if more than one.
+  let inheritedRespondBy = null;
   for (const existing of db.listOpenEscalationsForConversation(conv.id)) {
+    if (existing.respond_by) inheritedRespondBy = existing.respond_by;
     db.resolveEscalation(existing.id, {
       status: 'superseded',
       resolved_text: 'superseded by a newer escalation for this conversation',
@@ -234,7 +240,7 @@ async function escalateWithDraft({ conv, parsedInbound, messageId = null, classi
     classifier_confidence: classification?.confidence ?? null,
     previous_state: previousState ?? null,
     watchlist_vendors: watchlistVendors.length ? JSON.stringify(watchlistVendors) : null,
-    respond_by: respondBy,
+    respond_by: respondBy ?? inheritedRespondBy ?? null,
   });
 
   if (slackOps && env.SLACK_CHANNEL_ID) {
@@ -246,7 +252,7 @@ async function escalateWithDraft({ conv, parsedInbound, messageId = null, classi
       draft_reply: `Subject: ${subject}\n\n${body}`,
       gmail_thread_id: conv.gmail_thread_id ?? '(no thread)',
       watchlist_vendors: watchlistVendors,
-      respond_by: respondBy,
+      respond_by: respondBy ?? inheritedRespondBy ?? null,
     });
     // The ONLY unguarded Slack call used to live here — and it sits AFTER
     // recordEscalation, so a Slack outage threw with the row already written:
@@ -1371,6 +1377,37 @@ export async function runDailyFollowup(deps) {
   // window via resolveVacation(overrides).
   const cfg = deps.vacationConfig ?? { enabled: false };
 
+  // Queue-hygiene digest (2026-09-12 design): due/overdue reply deadlines,
+  // open drafts older than 7 days, and NEEDS_HUMAN cases with nothing
+  // actionable. Read-only; posts at most one Slack message per run. This
+  // runs regardless of ingest health — it asserts nothing about kommun
+  // silence, only about the state of our own queue, so a stale-tick outage
+  // must not silence it too (2026-09-12 review finding 1).
+  try {
+    const todayIso = now.toISOString().slice(0, 10);
+    const due = db.listOpenEscalationsWithDeadlineDue?.(addDaysIso(todayIso, 2)) ?? [];
+    const dueIds = new Set(due.map((e) => e.id));
+    const aged = (db.listOpenEscalationsAgedDays?.(7) ?? []).filter((e) => !dueIds.has(e.id));
+    const orphans = db.listOrphanNeedsHuman?.() ?? [];
+    if ((due.length > 0 || aged.length > 0 || orphans.length > 0) && deps.slackOps?.postAlert && deps.env?.SLACK_CHANNEL_ID) {
+      const ageDays = (iso) => Math.floor((now.getTime() - new Date(iso.replace(' ', 'T') + 'Z').getTime()) / 86400000);
+      const parts = [];
+      if (due.length > 0) parts.push(`⏰ *Svarsfrist inom 2 dagar eller passerad:* ${due.map((e) => `${e.kommun_namn} (senast ${e.respond_by})`).join(', ')}`);
+      if (aged.length > 0) {
+        const top = aged.slice(0, 10).map((e) => `${e.kommun_namn} (${ageDays(e.created_at)} d)`).join(', ');
+        parts.push(`🕰 *Öppna utkast äldre än 7 dagar:* ${aged.length} st: ${top}${aged.length > 10 ? ', …' : ''}`);
+      }
+      if (orphans.length > 0) parts.push(`🧭 *Behöver dig utan utkast:* ${orphans.map((c) => c.kommun_namn).join(', ')}`);
+      await deps.slackOps.postAlert(deps.slackClient, {
+        channel: deps.env.SLACK_CHANNEL_ID,
+        text: `🧹 *Köhälsa:*\n${parts.join('\n')}`,
+      });
+      log?.(`QUEUE HYGIENE digest posted (${due.length} due, ${aged.length} aged, ${orphans.length} orphaned)`);
+    }
+  } catch (e) {
+    log?.(`queue hygiene digest failed: ${e.message} — will retry on a later run`);
+  }
+
   // Ingest gate: everything below is staleness drafting — "we have heard
   // nothing for N days" — computed purely from the DB. When ingest is blind
   // (dead Gmail token, daemon down) the DB is NOT the world: replies can be
@@ -1676,34 +1713,6 @@ export async function runDailyFollowup(deps) {
     }
   } catch (e) {
     log?.(`handoff nag digest failed: ${e.message} — will retry on a later run`);
-  }
-
-  // Queue-hygiene digest (2026-09-12 design): due/overdue reply deadlines,
-  // open drafts older than 7 days, and NEEDS_HUMAN cases with nothing
-  // actionable. Read-only; posts at most one Slack message per run.
-  try {
-    const todayIso = now.toISOString().slice(0, 10);
-    const due = db.listOpenEscalationsWithDeadlineDue?.(addDaysIso(todayIso, 2)) ?? [];
-    const dueIds = new Set(due.map((e) => e.id));
-    const aged = (db.listOpenEscalationsAgedDays?.(7) ?? []).filter((e) => !dueIds.has(e.id));
-    const orphans = db.listOrphanNeedsHuman?.() ?? [];
-    if ((due.length > 0 || aged.length > 0 || orphans.length > 0) && deps.slackOps?.postAlert && deps.env?.SLACK_CHANNEL_ID) {
-      const ageDays = (iso) => Math.floor((now.getTime() - new Date(iso.replace(' ', 'T') + 'Z').getTime()) / 86400000);
-      const parts = [];
-      if (due.length > 0) parts.push(`⏰ *Svarsfrist inom 2 dagar eller passerad:* ${due.map((e) => `${e.kommun_namn} (senast ${e.respond_by})`).join(', ')}`);
-      if (aged.length > 0) {
-        const top = aged.slice(0, 10).map((e) => `${e.kommun_namn} (${ageDays(e.created_at)} d)`).join(', ');
-        parts.push(`🕰 *Öppna utkast äldre än 7 dagar:* ${aged.length} st: ${top}${aged.length > 10 ? ', …' : ''}`);
-      }
-      if (orphans.length > 0) parts.push(`🧭 *Behöver dig utan utkast:* ${orphans.map((c) => c.kommun_namn).join(', ')}`);
-      await deps.slackOps.postAlert(deps.slackClient, {
-        channel: deps.env.SLACK_CHANNEL_ID,
-        text: `🧹 *Köhälsa:*\n${parts.join('\n')}`,
-      });
-      log?.(`QUEUE HYGIENE digest posted (${due.length} due, ${aged.length} aged, ${orphans.length} orphaned)`);
-    }
-  } catch (e) {
-    log?.(`queue hygiene digest failed: ${e.message} — will retry on a later run`);
   }
 
   // Reached the end: today's staleness pass really happened (a vacation pause
