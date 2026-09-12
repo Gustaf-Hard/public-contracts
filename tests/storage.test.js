@@ -595,3 +595,42 @@ describe('auto-send decision queries (2026-08-20 delay-ack design)', () => {
     expect(nudge.trigger_snippet).toBeNull();
   });
 });
+
+describe('draft-context storage helpers (2026-09-12 design)', () => {
+  it('listAttachmentsForConversation returns filename per message, in attachment order', () => {
+    const convId = db.createConversation({
+      kommun_kod: '1280', kommun_namn: 'Malmö', role: 'central',
+      contact_email: 'malmostad@malmo.se', scheduled_send_at: '2026-08-01T08:00:00Z',
+    });
+    const m1 = db.recordMessage({
+      conversation_id: convId, gmail_message_id: 'dc-m1', direction: 'inbound',
+      from_email: 'k@malmo.se', to_email: 'us', subject: 's', body_text: 'b',
+      received_at: '2026-08-19T14:15:00Z', attachment_count: 2,
+    });
+    db.recordAttachment({ message_id: m1, filename: 'NE Avtal.pdf', saved_path: '/x/1.pdf', mime_type: 'application/pdf', size_bytes: 10 });
+    db.recordAttachment({ message_id: m1, filename: 'Dugga.pdf', saved_path: '/x/2.pdf', mime_type: 'application/pdf', size_bytes: 10 });
+    const rows = db.listAttachmentsForConversation(convId);
+    expect(rows).toEqual([
+      { message_id: m1, filename: 'NE Avtal.pdf' },
+      { message_id: m1, filename: 'Dugga.pdf' },
+    ]);
+  });
+
+  it('listContractInfoForConversation includes document_type', () => {
+    const convId = db.createConversation({
+      kommun_kod: '1281', kommun_namn: 'Lund', role: 'central',
+      contact_email: 'k@lund.se', scheduled_send_at: '2026-08-01T08:00:00Z',
+    });
+    const m = db.recordMessage({
+      conversation_id: convId, gmail_message_id: 'dc-m2', direction: 'inbound',
+      from_email: 'k@lund.se', to_email: 'us', subject: 's', body_text: 'b',
+      received_at: '2026-08-19T14:15:00Z', attachment_count: 1,
+    });
+    const att = db.recordAttachment({ message_id: m, filename: 'oversikt.pdf', saved_path: '/x/3.pdf', mime_type: 'application/pdf', size_bytes: 10 });
+    db.recordContract({ attachment_id: att, vendor_id: null, is_contract: 0, document_type: 'följebrev_sammanställning', summary: 'En översikt.' });
+    const rows = db.listContractInfoForConversation(convId);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].document_type).toBe('följebrev_sammanställning');
+    expect(rows[0].is_contract).toBe(0);
+  });
+});

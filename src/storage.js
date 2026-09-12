@@ -1158,11 +1158,25 @@ export function openDb(path) {
   // batch would re-ask for contracts the first batch already delivered.
   function listContractInfoForConversation(conversationId) {
     return db.prepare(`
-      SELECT c.is_contract AS is_contract, v.name AS vendor_name, c.analysis_json AS analysis_json
+      SELECT c.is_contract AS is_contract, v.name AS vendor_name, c.analysis_json AS analysis_json, c.document_type AS document_type
       FROM attachments a
       JOIN contracts c ON c.attachment_id = a.id
       JOIN messages m ON m.id = a.message_id
       LEFT JOIN vendors v ON v.id = c.vendor_id
+      WHERE m.conversation_id = ?
+      ORDER BY a.id
+    `).all(conversationId);
+  }
+
+  // Filenames per message for the WHOLE conversation, in attachment-id order.
+  // Feeds the draft-context thread log (2026-09-12 design): the draft LLM must
+  // see what each mail carried so it can never claim a delivered avtal is
+  // missing.
+  function listAttachmentsForConversation(conversationId) {
+    return db.prepare(`
+      SELECT a.message_id AS message_id, a.filename AS filename
+      FROM attachments a
+      JOIN messages m ON m.id = a.message_id
       WHERE m.conversation_id = ?
       ORDER BY a.id
     `).all(conversationId);
@@ -1674,6 +1688,7 @@ export function openDb(path) {
     markParkedAnalysesAlerted,
     listContractInfoForMessage,
     listContractInfoForConversation,
+    listAttachmentsForConversation,
     countUnreadAnalysableAttachments,
     listContractDeliveryEvents,
     listCaseTimings,
