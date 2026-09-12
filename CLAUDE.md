@@ -60,6 +60,9 @@ scripts/pilot-daemon.js → src/daemon.js
   │                          runDailyFollowup: staleness nudges
   ├── src/conversation.js    pure FSM (INITIAL→SENT→ACK_RECEIVED→…→DONE/DEAD_END)
   ├── src/analyse-message.js LLM reply analysis (Haiku) — identity from env
+  ├── src/draft-context.js   thread/attachment/contract context for the drafting
+  │                          prompt (2026-09-12) — the draft LLM must never see
+  │                          less than the operator does
   ├── src/analyse-contract.js LLM PDF extraction (Opus) → vendors/contracts tables
   ├── src/classifier.js      regex fallback classifier (offline path)
   ├── src/send-reply.js      THE only approved-send path (Slack, dashboard, CLI)
@@ -188,6 +191,12 @@ probes (`PRAGMA table_info`). New *string values* in existing TEXT columns
 **LLM identity comes from env.** The analysis prompt signs drafts with
 `GMAIL_FROM_NAME` / `GMAIL_USER_EMAIL` (`buildSystemPrompt`) — never
 hardcode a name or address into a prompt.
+
+**`escalations.respond_by` is the kommun-imposed reply deadline** (extracted as
+`respond_by_date` by the analysis, ISO date or NULL). It sorts Behöver dig
+deadline-first, renders the ⏰ line in Slack escalations, and feeds the daily
+Köhälsa digest. It is advisory surfacing only — no guard or automation keys
+off it.
 
 **Polite scraping is enforced in `src/http.js`** (Phase 1). Every outbound
 HTTP call must go through `politeFetch` (1 req/sec/host, retry on 429/503,
