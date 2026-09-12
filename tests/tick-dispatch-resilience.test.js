@@ -272,6 +272,23 @@ describe('retryUnpostedEscalations — bounds', () => {
     expect(db.raw.prepare('SELECT slack_ts FROM escalations WHERE id = ?').get(escId).slack_ts).toBe('s-1');
   });
 
+  it('a re-posted orphan carries its stored respond_by deadline into the Slack blocks (2026-09-12 design)', async () => {
+    const id = seedConv();
+    db.recordEscalation({
+      conversation_id: id, reason: 'slack was down', draft_template: 'T_RECEIPT',
+      draft_subject: 'Re: Svar', draft_body: 'Tack för handlingarna.',
+      respond_by: '2026-09-20',
+    });
+
+    const slackOps = fakeSlackOps();
+    await runTick(mkDeps(slackOps));
+
+    expect(slackOps.posts).toHaveLength(1);
+    const texts = slackOps.posts[0].map((b) => b.text?.text ?? '').join('\n');
+    expect(texts).toContain('⏰');
+    expect(texts).toContain('2026-09-20');
+  });
+
   it('the per-tick cap bounds Slack API calls, not successes — a ts-less response cannot flood', async () => {
     for (let i = 0; i < 8; i += 1) {
       const id = seedConv({ kod: String(1500 + i), namn: `K${i}`, email: `k${i}@k${i}.se`, thread: `thr-${i}` });

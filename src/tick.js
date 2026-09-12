@@ -892,6 +892,7 @@ async function retryUnpostedEscalations(deps) {
       draft_reply: `Subject: ${esc.draft_subject ?? ''}\n\n${esc.draft_body ?? ''}`,
       gmail_thread_id: conv.gmail_thread_id ?? '(no thread)',
       watchlist_vendors: watchlistVendors,
+      respond_by: esc.respond_by,
     });
     try {
       attempts += 1;
