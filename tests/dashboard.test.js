@@ -794,6 +794,36 @@ describe('home buckets', () => {
     expect(w.some((x) => x.conv_id === escId)).toBe(false); // in the action queue instead
   });
 
+  let testKommunCounter = 1000;
+  const seedConvWithOpenEscalation = ({ kommun = 'TestKommun', respond_by = null } = {}) => {
+    const code = String(testKommunCounter++).padStart(4, '0');
+    const cid = db.createConversation({
+      kommun_kod: code,
+      kommun_namn: kommun,
+      role: 'central',
+      contact_email: 'k@test.se',
+      scheduled_send_at: '2026-05-24T10:00:00Z',
+    });
+    db.recordEscalation({
+      conversation_id: cid,
+      reason: 'test',
+      draft_template: 'free_form',
+      draft_subject: 'Re',
+      draft_body: 'test body',
+      respond_by,
+    });
+    return cid;
+  };
+
+  it('buildActionQueue sorts deadline-bearing escalations first, soonest first', () => {
+    const a = seedConvWithOpenEscalation({ kommun: 'Aneby' });
+    const b = seedConvWithOpenEscalation({ kommun: 'Boden', respond_by: '2026-09-20' });
+    const c = seedConvWithOpenEscalation({ kommun: 'Cala', respond_by: '2026-09-14' });
+    const q = buildActionQueue(db);
+    expect(q.map((r) => r.kommun_namn).slice(0, 2)).toEqual(['Cala', 'Boden']);
+    expect(q.find((r) => r.kommun_namn === 'Aneby').respond_by).toBeNull();
+  });
+
   it('counts real avtal, not every attachment, for the tile and the column', () => {
     // 3 files on one delivery: 1 avtal, 1 bilaga, 1 unanalysed. Only the avtal
     // is an avtal — the tile used to report all 3.

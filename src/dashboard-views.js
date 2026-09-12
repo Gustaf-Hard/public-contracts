@@ -1024,7 +1024,7 @@ export function renderOverview({ summary, rows, filter, sort, order, totalKommun
       ${actionQueue.length === 0
         ? '<div class="empty-state">Inget kräver din uppmärksamhet just nu. 🎉</div>'
         : `<div class="queue queue-alert">${actionQueue.map((a) =>
-            queueRow(a, `<span class="q-action">${escapeHtml(a.action)}</span>`)).join('')}</div>`}
+            queueRow(a, `<span class="q-action">${a.respond_by ? `<span class="bad">⏰ senast ${escapeHtml(a.respond_by)}</span> · ` : ''}${escapeHtml(a.action)}</span>`)).join('')}</div>`}
     </section>`;
 
   // Only the 10 most overdue render here — the full set duplicates the kommun

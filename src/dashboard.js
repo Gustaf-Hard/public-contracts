@@ -443,6 +443,7 @@ export function buildActionQueue(db) {
       state: c.state,
       action: openEsc.length > 0 ? escalationActionLabel(openEsc[0]) : 'granska och svara',
       since: caseSince(c),
+      respond_by: openEsc.length > 0 ? openEsc[0].respond_by ?? null : null,
     });
   }
   // Durable hänvisningar (2026-09-06 design): a pending handoff task is
@@ -457,9 +458,15 @@ export function buildActionQueue(db) {
       state: 'HANDOFF',
       action: `Hänvisning: starta ärende → ${t.address}`,
       since: (t.created_at ?? '').replace(' ', 'T'),
+      respond_by: null,
     });
   }
-  return out.sort((a, b) => (a.since ?? '').localeCompare(b.since ?? ''));
+  return out.sort((a, b) => {
+    if (a.respond_by && b.respond_by) return a.respond_by.localeCompare(b.respond_by) || (a.since ?? '').localeCompare(b.since ?? '');
+    if (a.respond_by) return -1;
+    if (b.respond_by) return 1;
+    return (a.since ?? '').localeCompare(b.since ?? '');
+  });
 }
 
 // Open cases that are progressing on their own (waiting on the kommun), i.e. NOT
