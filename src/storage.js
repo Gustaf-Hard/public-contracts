@@ -131,6 +131,7 @@ CREATE TABLE IF NOT EXISTS escalations (
   classifier_confidence REAL,
   previous_state TEXT,
   watchlist_vendors TEXT,
+  respond_by TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_escalations_status ON escalations(status);
@@ -310,6 +311,11 @@ export function openDb(path) {
     const escCols = db.prepare("PRAGMA table_info(escalations)").all().map((r) => r.name);
     if (!escCols.includes('watchlist_vendors')) {
       db.exec('ALTER TABLE escalations ADD COLUMN watchlist_vendors TEXT');
+    }
+    // Kommun-imposed reply deadline (2026-09-12 design) — sorts the queue and
+    // feeds the daily hygiene digest. NULL = no deadline stated.
+    if (!escCols.includes('respond_by')) {
+      db.exec('ALTER TABLE escalations ADD COLUMN respond_by TEXT');
     }
     // Lifecycle fields for the perpetual-refresh loop (2026-07-09 design §2).
     const contractCols = db.prepare("PRAGMA table_info(contracts)").all().map((r) => r.name);
@@ -577,14 +583,14 @@ export function openDb(path) {
 
   function recordEscalation(e) {
     const r = db.prepare(`
-      INSERT INTO escalations (conversation_id, message_id, reason, draft_template, draft_subject, draft_body, slack_ts, classifier_class, classifier_confidence, previous_state, watchlist_vendors)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO escalations (conversation_id, message_id, reason, draft_template, draft_subject, draft_body, slack_ts, classifier_class, classifier_confidence, previous_state, watchlist_vendors, respond_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       e.conversation_id, e.message_id ?? null, e.reason,
       e.draft_template ?? null, e.draft_subject ?? null, e.draft_body ?? null,
       e.slack_ts ?? null,
       e.classifier_class ?? null, e.classifier_confidence ?? null, e.previous_state ?? null,
-      e.watchlist_vendors ?? null
+      e.watchlist_vendors ?? null, e.respond_by ?? null
     );
     return Number(r.lastInsertRowid);
   }

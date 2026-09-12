@@ -516,6 +516,36 @@ describe('escalations watchlist_vendors', () => {
   });
 });
 
+describe('escalations respond_by (2026-09-12 design)', () => {
+  it('recordEscalation persists respond_by and migrate() adds the column to old DBs', () => {
+    const convId = db.createConversation({ kommun_kod: '0580', kommun_namn: 'Linköping', role: 'central', contact_email: 'k@linkoping.se', scheduled_send_at: '2026-08-01T08:00:00Z' });
+    const id = db.recordEscalation({ conversation_id: convId, reason: 'fee_demand', respond_by: '2026-09-02' });
+    expect(db.raw.prepare('SELECT respond_by FROM escalations WHERE id = ?').get(id).respond_by).toBe('2026-09-02');
+  });
+
+  it('defaults respond_by to null when omitted', () => {
+    const convId = db.createConversation({ kommun_kod: '1', kommun_namn: 'X', role: 'central', contact_email: 'k@x.se', scheduled_send_at: '2026-01-01T00:00:00Z' });
+    const id = db.recordEscalation({ conversation_id: convId, reason: 'r', draft_template: 'free_form', draft_body: '(ingen draft)' });
+    expect(db.raw.prepare('SELECT respond_by FROM escalations WHERE id = ?').get(id).respond_by).toBeNull();
+  });
+
+  it('adds respond_by to a pre-existing escalations table (migration)', () => {
+    const migDb = openDb(':memory:');
+    // Simulate an old DB: escalations without the new column.
+    migDb.raw.exec('DROP TABLE IF EXISTS escalations');
+    migDb.raw.exec(`CREATE TABLE escalations (
+      id INTEGER PRIMARY KEY, conversation_id INTEGER, message_id INTEGER, reason TEXT NOT NULL,
+      draft_template TEXT, draft_subject TEXT, draft_body TEXT, slack_ts TEXT,
+      status TEXT NOT NULL DEFAULT 'open', resolved_at TEXT, resolved_text TEXT,
+      classifier_class TEXT, classifier_confidence REAL, previous_state TEXT, created_at TEXT
+    )`);
+    migDb.migrate();
+    const cols = migDb.raw.prepare('PRAGMA table_info(escalations)').all().map((r) => r.name);
+    expect(cols).toContain('respond_by');
+    migDb.close();
+  });
+});
+
 describe('auto-send decision queries (2026-08-20 delay-ack design)', () => {
   function seed() {
     const convId = db.createConversation({

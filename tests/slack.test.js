@@ -67,6 +67,21 @@ describe('buildEscalationBlocks watchlist banner', () => {
   });
 });
 
+describe('buildEscalationBlocks respond_by deadline line (2026-09-12 design)', () => {
+  it('renders a deadline line when respond_by is set', () => {
+    const blocks = buildEscalationBlocks({ escalation_id: 1, kommun_namn: 'Linköping', from_email: 'k@l.se', reply_text: 't', draft_reply: 'd', gmail_thread_id: 'g', respond_by: '2026-09-02' });
+    const texts = blocks.map((b) => b.text?.text ?? '').join('\n');
+    expect(texts).toContain('⏰');
+    expect(texts).toContain('2026-09-02');
+  });
+
+  it('omits the deadline line when respond_by is not set', () => {
+    const blocks = buildEscalationBlocks({ escalation_id: 1, kommun_namn: 'Linköping', from_email: 'k@l.se', reply_text: 't', draft_reply: 'd', gmail_thread_id: 'g' });
+    const texts = blocks.map((b) => b.text?.text ?? '').join('\n');
+    expect(texts).not.toContain('⏰');
+  });
+});
+
 describe('parseInteractivityPayload', () => {
   it('extracts action_id, value, and trigger_id from form-encoded payload', () => {
     const payload = {

@@ -157,7 +157,7 @@ async function recoverStuckSends(deps) {
   }
 }
 
-async function escalateWithDraft({ conv, parsedInbound, messageId = null, classification, previousState, draftTemplate, llmDraft, reason, templateCtx = {}, watchlistVendors = [], draftSubject = null, draftBody = null, deps }) {
+async function escalateWithDraft({ conv, parsedInbound, messageId = null, classification, previousState, draftTemplate, llmDraft, reason, templateCtx = {}, watchlistVendors = [], draftSubject = null, draftBody = null, respondBy = null, deps }) {
   const { db, slackClient, slackOps, env, log } = deps;
 
   // Never create a draft next to an unresolved send (hardening findings 2/3).
@@ -234,6 +234,7 @@ async function escalateWithDraft({ conv, parsedInbound, messageId = null, classi
     classifier_confidence: classification?.confidence ?? null,
     previous_state: previousState ?? null,
     watchlist_vendors: watchlistVendors.length ? JSON.stringify(watchlistVendors) : null,
+    respond_by: respondBy,
   });
 
   if (slackOps && env.SLACK_CHANNEL_ID) {
@@ -245,6 +246,7 @@ async function escalateWithDraft({ conv, parsedInbound, messageId = null, classi
       draft_reply: `Subject: ${subject}\n\n${body}`,
       gmail_thread_id: conv.gmail_thread_id ?? '(no thread)',
       watchlist_vendors: watchlistVendors,
+      respond_by: respondBy,
     });
     // The ONLY unguarded Slack call used to live here — and it sits AFTER
     // recordEscalation, so a Slack outage threw with the row already written:
@@ -831,6 +833,7 @@ async function dispatchEscalationForIngest(pending, deps) {
       reason,
       templateCtx,
       watchlistVendors,
+      respondBy: analysis?.extracted?.respond_by_date ?? null,
       deps,
     });
   }

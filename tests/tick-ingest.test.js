@@ -658,6 +658,26 @@ describe('runTick — soft internal-forward ingest (2026-07-20 §5)', () => {
     expect(db.getConversation(id).state).toBe('NEEDS_HUMAN');
   });
 
+  it('respond_by_date from analysis.extracted is persisted on the resulting escalation (2026-09-12 design)', async () => {
+    const spy = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue({
+      intent: 'handoff', confidence: 0.95, summary: 'Hänvisas externt, kräver komplettering inom 7 dagar.',
+      extracted: { arendenummer: null, promised_response_days: null, promised_response_date: null, respond_by_date: '2026-09-20', handoff_to_email: 'registrator@stadsledningen.se', handoff_to_forvaltning: 'stadsledningen', questions: null, mentioned_vendors: null, reseller_relations: null },
+      suggested_action: 'escalate', is_final_delivery: false, draft_reply: 'Hej, jag kontaktar dem separat.', follow_up_at: null,
+    });
+    const id = seedConv({ email: 'kansli@ale.se', thread: 'thr-a' });
+    const slackOps = fakeSlackOps();
+    const gmail = fakeGmail({
+      listResult: [{ id: 'rb-1' }],
+      getResult: { 'rb-1': mkMsg('rb-1', 'thr-a', 'K <kansli@ale.se>', 'Kontakta registrator@stadsledningen.se istället, svara inom 7 dagar.') },
+    });
+    await runTick(deps({ gmail, slackOps, now: new Date('2026-06-24T12:00:00Z') }));
+    spy.mockRestore();
+
+    const open = db.raw.prepare("SELECT * FROM escalations WHERE conversation_id=? AND status='open'").all(id);
+    expect(open).toHaveLength(1);
+    expect(open[0].respond_by).toBe('2026-09-20');
+  });
+
   it('PRECISION (offline): an external redirect naming an address escalates, not handoff_internal', async () => {
     const spy = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue(null);
     const id = seedConv({ email: 'kansli@ale.se', thread: 'thr-a' });

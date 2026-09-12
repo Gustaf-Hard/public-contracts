@@ -5,13 +5,16 @@ export function makeSlackClient(token) {
   return new WebClient(token);
 }
 
-export function buildEscalationBlocks({ escalation_id, kommun_namn, from_email, reply_text, draft_reply, gmail_thread_id, watchlist_vendors = [] }) {
+export function buildEscalationBlocks({ escalation_id, kommun_namn, from_email, reply_text, draft_reply, gmail_thread_id, watchlist_vendors = [], respond_by = null }) {
   const idStr = String(escalation_id);
   const blocks = [
     { type: 'header', text: { type: 'plain_text', text: `Eskalering: ${kommun_namn}` } },
   ];
   if (watchlist_vendors.length > 0) {
     blocks.push({ type: 'section', text: { type: 'mrkdwn', text: `⚠️ *BEVAKAD LEVERANTÖR:* ${watchlist_vendors.join(', ')} — kontrollera innan du svarar.` } });
+  }
+  if (respond_by) {
+    blocks.push({ type: 'section', text: { type: 'mrkdwn', text: `⏰ *Kommunens svarsfrist:* ${respond_by}. Skickas inget innan dess kan kommunen stänga ärendet.` } });
   }
   blocks.push(
     {
