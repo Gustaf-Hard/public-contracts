@@ -466,3 +466,30 @@ describe('buildSystemPrompt — contracts held elsewhere in the kommun', () => {
     expect(p).toMatch(/avropade på ett ramavtal|avrop eller beställningar/);
   });
 });
+
+describe('thread context (2026-09-12 design)', () => {
+  it('appends ctx.thread_context to the user message after the incoming body', async () => {
+    const client = fakeClientReturning({ intent: 'delivery', confidence: 0.9, summary: 's', extracted: {}, suggested_action: 'send_receipt', is_final_delivery: false, draft_reply: 'd', follow_up_at: null });
+    await analyseMessage('Här kommer avtalen.', {
+      ...baseCtx,
+      thread_context: '# Ursprunglig begäran (vårt första mejl, ordagrant)\nBegärantext.',
+    }, { env: { ANTHROPIC_API_KEY: 'k' }, client });
+    const call = client.messages.create.mock.calls[0][0];
+    const user = call.messages[0].content;
+    expect(user).toContain('Här kommer avtalen.');
+    expect(user).toContain('# Konversationskontext');
+    expect(user).toContain('Begärantext.');
+    expect(user.indexOf('Här kommer avtalen.')).toBeLessThan(user.indexOf('Begärantext.'));
+    // system prompt stays context-free so its cache_control keeps hitting
+    expect(call.system[0].text).not.toContain('Begärantext.');
+  });
+
+  it('system prompt carries the three new drafting rules', async () => {
+    const client = fakeClientReturning({ intent: 'auto_ack', confidence: 0.95, summary: 's', extracted: {}, suggested_action: 'wait', is_final_delivery: false, draft_reply: '', follow_up_at: null });
+    await analyseMessage('Tack.', baseCtx, { env: { ANTHROPIC_API_KEY: 'k' }, client });
+    const sys = client.messages.create.mock.calls[0][0].system[0].text;
+    expect(sys).toContain('Påstå ALDRIG att handlingar saknas');
+    expect(sys).toContain('Upprepa ALDRIG en fråga');
+    expect(sys).toContain('begäran aldrig nått dem');
+  });
+});

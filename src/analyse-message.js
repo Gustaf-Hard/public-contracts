@@ -70,6 +70,9 @@ Skriv alltid ett konkret förslag på svar på svenska, även för "wait"-fall (
 SKRIVREGLER för draft_reply (gäller ALLTID):
 1. ALDRIG relativ tid. Skriv aldrig "för 10 dagar sedan", "förra veckan", "nyligen", "i går" eller liknande. Ett utkast skrivs av boten men skickas av en människa, kanske flera dagar senare, så varje påstående om förfluten tid är fel när kommunen läser det. Ange absolut datum ("min begäran från den 1 augusti 2026") eller utelämna tidsangivelsen helt. Datum som kommunen själv angett får återges.
 2. ALDRIG tankstreck (— eller –) som skiljetecken i löptext. Det läser som AI-skriven text. Använd punkt, komma eller kolon.
+3. Påstå ALDRIG att handlingar saknas eller inte bifogats när konversationskontextens bilagelista visar mottagna filer. Bekräfta mottagna handlingar med filnamn eller leverantörsnamn. "Jag saknar X" får bara skrivas när X varken finns i bilagelistan eller bland redan extraherade avtal.
+4. Upprepa ALDRIG en fråga som ett tidigare utgående mejl (se "VI skrev" i konversationskontexten) redan ställt, om inte kommunen lämnat den obesvarad. Omförhandla ALDRIG en avgift som ett tidigare utgående mejl accepterat eller som kommunen redan besvarat med ett motiverat nej: ett lämnat åtagande (accepterad avgift, lämnade faktureringsuppgifter) står fast.
+5. Om kommunen uppger att vår begäran aldrig nått dem: draft_reply MÅSTE innehålla den ursprungliga begäran i sin helhet, kopierad ordagrant från "Ursprunglig begäran" i konversationskontexten. Aldrig en sammanfattning, aldrig bara "jag skickar den på nytt".
 
 # Avtal som finns någon annanstans i kommunen
 
@@ -144,6 +147,12 @@ Inkommande:
 
 Output:
 {"intent":"delivery","confidence":0.85,"summary":"NE och Magma nås via kommunens ramavtal med Läromedia — inget direktavtal.","extracted":{"arendenummer":null,"promised_response_days":null,"promised_response_date":null,"handoff_to_email":null,"handoff_to_forvaltning":null,"questions":null,"mentioned_vendors":["NE","Magma","Läromedia"],"reseller_relations":[{"vendor":"NE","ramavtal":"Läromedia"},{"vendor":"Magma","ramavtal":"Läromedia"}]},"suggested_action":"send_receipt","is_final_delivery":false,"draft_reply":"Hej,\\n\\nTack för förtydligandet. Jag noterar att NE och Magma nås via ert avtal med Läromedia.\\n\\nMed vänliga hälsningar,\\n${from_name}\\n${from_email}","follow_up_at":null}
+
+Inkommande (begäran uppges aldrig ha kommit fram, se SKRIVREGEL 5):
+> Vi kan tyvärr inte se att din begäran har kommit fram till oss. Vänligen skicka den på nytt.
+
+Output:
+{"intent":"clarification","confidence":0.9,"summary":"Kommunen uppger att vår begäran aldrig kommit fram och ber oss skicka den igen.","extracted":{"arendenummer":null,"promised_response_days":null,"promised_response_date":null,"handoff_to_email":null,"handoff_to_forvaltning":null,"questions":null,"mentioned_vendors":null,"reseller_relations":null},"suggested_action":"send_precision","is_final_delivery":false,"draft_reply":"Hej,\\n\\nTack för beskedet, jag skickar begäran igen i sin helhet:\\n\\nMed stöd av offentlighetsprincipen (2 kap. tryckfrihetsförordningen) begär jag ut samtliga gällande avtal avseende digitala verktyg och läromedel som används inom er utbildningsförvaltning, inklusive lärplattformar, digitala läromedel och administrativa system. Jag önskar de fullständiga avtalshandlingarna i PDF-format.\\n\\nMed vänliga hälsningar,\\n${from_name}\\n${from_email}","follow_up_at":null}
 
 # Viktigt
 
@@ -331,6 +340,11 @@ function userPromptFor(ctx, body) {
   lines.push('---');
   lines.push(body.trim());
   lines.push('---');
+  if (ctx.thread_context) {
+    lines.push('');
+    lines.push('# Konversationskontext (bakgrund; det inkommande svaret ovan är det du analyserar)');
+    lines.push(ctx.thread_context);
+  }
   return lines.join('\n');
 }
 
