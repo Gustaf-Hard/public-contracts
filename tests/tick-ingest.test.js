@@ -432,6 +432,51 @@ describe('runTick — a voided draft does not take the deadline with it (F2)', (
     expect(lines.some((l) => l.includes('VOID kept deadline 2026-09-15'))).toBe(true);
   });
 
+  // Round-5 J1 (critical): the operator answered the mail they could SEE. A
+  // komplettering delivered 09:50 but ingested 10:05, after a 10:00 operator
+  // send, was dropped by the delivery-time rule alone and the kommun appeared
+  // in the digest with no date at all.
+  it('a deadline mail delivered before the operator send but ingested after it stays outstanding', async () => {
+    const id = seedConv();
+    const answered = db.recordMessage({
+      conversation_id: id, gmail_message_id: 'answered', direction: 'inbound',
+      from_email: 'kansli@ale.se', to_email: 'x', subject: 's', body_text: 'b',
+      received_at: '2026-09-11T08:00:00Z', attachment_count: 0,
+      analysis_json: JSON.stringify({ extracted: { respond_by_date: null } }),
+    });
+    db.updateConversationState(id, 'NEEDS_HUMAN', {});
+    // The open draft the operator edited and sent at 10:00, naming the inbound
+    // it answered. Undated on purpose: the assertion must come from the message.
+    const esc = db.recordEscalation({ conversation_id: id, message_id: answered, reason: 'r', draft_template: 'free_form', draft_body: 'b' });
+    const did = db.recordDecision({
+      escalation_id: esc, conversation_id: id, conversation_state: 'NEEDS_HUMAN',
+      draft_body: 'b', decision: 'edit',
+    });
+    db.raw.prepare('UPDATE decisions SET decided_at = ? WHERE id = ?').run('2026-09-12 10:00:00', did);
+
+    const spy = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue({
+      intent: 'clarification', confidence: 0.9, summary: 'Begär komplettering.',
+      extracted: { arendenummer: null, promised_response_days: null, promised_response_date: null, respond_by_date: '2026-09-20', handoff_to_email: null, handoff_to_forvaltning: null, questions: ['Vilken period?'], mentioned_vendors: null, reseller_relations: null },
+      suggested_action: 'send_precision', is_final_delivery: false, draft_reply: 'd', follow_up_at: null,
+    });
+    const lines = [];
+    await runTick({
+      ...deps({
+        gmail: fakeGmail({
+          listResult: [{ id: 'cross-1' }],
+          // Delivered 09:50, i.e. BEFORE the 10:00 operator send.
+          getResult: { 'cross-1': mkMsg('cross-1', 'thr-a', 'K <kansli@ale.se>', 'Komplettera senast 2026-09-20.', { internalDate: String(Date.parse('2026-09-12T09:50:00Z')) }) },
+        }),
+        now: new Date('2026-09-12T10:05:00Z'),
+      }),
+      log: (l) => lines.push(l),
+    });
+    spy.mockRestore();
+
+    expect(db.latestRespondByForConversation(id)).toBe('2026-09-20');
+    expect(lines.some((l) => l.includes('VOID kept deadline 2026-09-20'))).toBe(true);
+  });
+
   // Round-3 G1 (Codex R2 #1): after the void, the NEXT inbound opens a fresh
   // escalation of its own. It restates no frist, and escalateWithDraft only
   // inherited from the escalation it was superseding — which by then was

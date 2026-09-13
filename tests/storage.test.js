@@ -934,4 +934,58 @@ describe('latestRespondByForConversation (round-2 finding F2)', () => {
       expect(db.latestRespondByForConversation(id)).toBeNull();
     });
   });
+  // Round-5 J1 (critical): delivery time and ingest order are different clocks.
+  // A mail DELIVERED before our operator send but INGESTED after it (crossing
+  // mails, or an ingest outage while the operator keeps replying) cannot
+  // possibly have been answered, yet the time rule alone dropped it. The
+  // arrival-order boundary is the highest messages.id any answered escalation
+  // pointed at.
+  describe('arrival-order boundary (round-5 J1)', () => {
+    // An operator decision whose escalation names the inbound it answered.
+    function answerMessage(convId, messageId, decidedAt, decision = 'edit') {
+      const escId = db.recordEscalation({ conversation_id: convId, message_id: messageId, reason: 'r' });
+      const did = db.recordDecision({
+        escalation_id: escId, conversation_id: convId, conversation_state: 'NEEDS_HUMAN',
+        draft_body: 'b', decision,
+      });
+      db.raw.prepare('UPDATE decisions SET decided_at = ? WHERE id = ?').run(decidedAt, did);
+      return escId;
+    }
+
+    it('an inbound ingested AFTER the answered one stays outstanding even though it was delivered first', () => {
+      const id = seed();
+      const answered = inbound(id, { at: '2026-09-05T08:00:00Z', respondBy: null });
+      answerMessage(id, answered, '2026-09-06 10:00:00');
+      // Delivered 09:50, ingested at 10:05 — a higher row id, an earlier clock.
+      inbound(id, { at: '2026-09-06T09:50:00Z', respondBy: '2026-09-20' });
+      expect(db.latestRespondByForConversation(id)).toBe('2026-09-20');
+    });
+
+    it('an inbound that arrived BEFORE the answered one and predates the send is discharged', () => {
+      const id = seed();
+      inbound(id, { at: '2026-09-04T08:00:00Z', respondBy: '2026-09-20' });
+      const answered = inbound(id, { at: '2026-09-05T08:00:00Z', respondBy: null });
+      answerMessage(id, answered, '2026-09-06 10:00:00');
+      expect(db.latestRespondByForConversation(id)).toBeNull();
+    });
+
+    it('with no operator decision at all every inbound is outstanding', () => {
+      const id = seed();
+      inbound(id, { at: '2026-09-04T08:00:00Z', respondBy: '2026-09-20' });
+      inbound(id, { at: '2026-09-05T08:00:00Z', respondBy: null });
+      expect(db.latestRespondByForConversation(id)).toBe('2026-09-20');
+    });
+
+    // The escalation fallback gets the same two-part rule: a row whose
+    // originating inbound arrived after the answered one is still live.
+    it('an escalation whose originating inbound arrived after the answered one keeps its deadline', () => {
+      const id = seed();
+      const answered = inbound(id, { at: '2026-09-05T08:00:00Z', respondBy: null });
+      answerMessage(id, answered, '2026-09-06 10:00:00');
+      const later = inbound(id, { at: '2026-09-06T09:50:00Z', respondBy: null });
+      const esc = db.recordEscalation({ conversation_id: id, message_id: later, reason: 'r', respond_by: '2026-09-21' });
+      db.raw.prepare('UPDATE escalations SET created_at = ? WHERE id = ?').run('2026-09-06 10:05:00', esc);
+      expect(db.latestRespondByForConversation(id)).toBe('2026-09-21');
+    });
+  });
 });

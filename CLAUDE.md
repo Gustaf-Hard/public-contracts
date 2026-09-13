@@ -207,7 +207,13 @@ auto-send rule keys off it. **Only an OPERATOR send discharges it**
 `conversations.last_outbound_at` — every send stamps that, so the three
 unattended templates would silently delete a deadline nobody answered; an
 automatic ack is not an answer, and `skip`/`closed` sent nothing at all. With no
-operator send in the conversation, nothing is discharged.
+operator send in the conversation, nothing is discharged. **Discharge also
+respects ingest ORDER, not delivery time alone**: delivery time
+(`messages.received_at`) and arrival order (`messages.id`) are different clocks,
+and an operator answers what ingest has shown them, so a mail whose id is higher
+than the newest inbound an operator send actually answered (the highest
+`escalations.message_id` behind an `approve_unmodified`/`edit` decision) stays
+outstanding even when it was delivered before that send. Both halves fail open.
 
 **Polite scraping is enforced in `src/http.js`** (Phase 1). Every outbound
 HTTP call must go through `politeFetch` (1 req/sec/host, retry on 429/503,

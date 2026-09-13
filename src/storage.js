@@ -884,23 +884,49 @@ export function openDb(path) {
   // everything). A timestamp we cannot parse is likewise considered rather than
   // dropped: showing an operator one date too many is recoverable, silently
   // hiding a live frist is the failure this helper exists to prevent.
+  //
+  // ARRIVAL ORDER IS THE SECOND CLOCK (round-5 J1). Delivery time
+  // (messages.received_at, Gmail internalDate) and ingest order (messages.id)
+  // are different clocks, and the operator answers what INGEST has shown them.
+  // A mail delivered 09:50 but ingested 10:05 cannot have been answered by a
+  // 10:00 send -- crossing mails, or any ingest outage while the operator keeps
+  // working the queue -- yet the delivery-time rule alone dropped it and the
+  // digest named the kommun with no date. So an inbound is outstanding when it
+  // arrived after the newest inbound an operator send actually answered
+  // (`lastAnsweredMessageId`: the highest messages.id any escalation behind an
+  // 'approve_unmodified'/'edit' decision pointed at) OR when the time rule says
+  // so. Both halves fail open: no answered message id leaves the time rule
+  // alone, no operator decision leaves everything outstanding.
   // Read-only surfacing: no guard or automation keys off this.
   function latestRespondByForConversation(conversationId) {
     const dischargedAtMs = latestOperatorSendMs(conversationId);
-    const outstanding = (at) => {
+    // messages.id is ingest order (AUTOINCREMENT rowid), so MAX() over the
+    // answered escalations' trigger mails is "the newest mail a human had in
+    // front of them when they last replied". NULL when no answered escalation
+    // names a message (a proactive draft, or legacy rows).
+    const lastAnsweredMessageId = db.prepare(`
+      SELECT MAX(e.message_id) AS message_id
+      FROM decisions d JOIN escalations e ON e.id = d.escalation_id
+      WHERE d.conversation_id = ? AND d.decision IN ('approve_unmodified', 'edit')
+    `).get(conversationId)?.message_id ?? null;
+    const outstandingByTime = (at) => {
       if (Number.isNaN(dischargedAtMs)) return true;
       const ms = timestampMs(at);
       return Number.isNaN(ms) ? true : ms > dischargedAtMs;
     };
+    const outstanding = (messageId, at) => (
+      (lastAnsweredMessageId != null && messageId != null && messageId > lastAnsweredMessageId)
+      || outstandingByTime(at)
+    );
     const fromMessages = db.prepare(`
-      SELECT m.received_at AS received_at,
+      SELECT m.id AS id, m.received_at AS received_at,
              json_extract(m.analysis_json, '$.extracted.respond_by_date') AS respond_by
       FROM messages m
       WHERE m.conversation_id = ? AND m.direction = 'inbound'
         AND m.analysis_json IS NOT NULL AND json_valid(m.analysis_json)
       ORDER BY m.received_at DESC, m.id DESC
     `).all(conversationId);
-    const hit = fromMessages.find((r) => asIsoDate(r.respond_by) != null && outstanding(r.received_at));
+    const hit = fromMessages.find((r) => asIsoDate(r.respond_by) != null && outstanding(r.id, r.received_at));
     if (hit) return asIsoDate(hit.respond_by);
     // Escalation fallback. The row's own created_at is NOT evidence that its
     // deadline is live (round-4 H2): an escalation minted after our reply can
@@ -910,7 +936,9 @@ export function openDb(path) {
     // boundary is compared against. A NULL message_id (a proactive draft from
     // the daily follow-up, which has no trigger mail) falls back to created_at.
     // A message_id pointing at a row we cannot read leaves received_at NULL,
-    // which `outstanding` treats as considered -- fail open, as above.
+    // which `outstanding` treats as considered -- fail open, as above. The
+    // arrival-order half applies here too (round-5 J1): a row whose trigger mail
+    // was ingested after the newest answered one is live whatever its clock says.
     const esc = db.prepare(`
       SELECT e.created_at AS created_at, e.respond_by AS respond_by,
              e.message_id AS message_id, m.received_at AS trigger_received_at
@@ -919,7 +947,9 @@ export function openDb(path) {
       ORDER BY e.id DESC
     `).all(conversationId)
       .find((r) => asIsoDate(r.respond_by) != null
-        && outstanding(r.message_id != null ? r.trigger_received_at : r.created_at));
+        && (r.message_id != null
+          ? outstanding(r.message_id, r.trigger_received_at)
+          : outstandingByTime(r.created_at)));
     return esc ? asIsoDate(esc.respond_by) : null;
   }
 
