@@ -93,15 +93,14 @@ export function splitAlertText(text, max = SECTION_MAX_CHARS) {
   }
   flush();
   if (chunks.length === 0) return [source];
-  if (chunks.length > MAX_SECTION_BLOCKS) {
-    const dropped = chunks.length - (MAX_SECTION_BLOCKS - 1);
-    // Say what was cut instead of silently dropping it (and instead of letting
-    // Slack reject the message over the 50-block limit, which drops all of it).
-    return [
-      ...chunks.slice(0, MAX_SECTION_BLOCKS - 1),
-      `_…avkortat: ${dropped} avsnitt till fick inte plats i detta meddelande._`,
-    ];
-  }
+  // Round-11 P1 (critical): NO truncation here. This used to cap at
+  // MAX_SECTION_BLOCKS and replace the tail with an "avkortat" marker, which
+  // silently poisoned every caller that books items as alerted after a
+  // successful post (digestUnmatched's seenUnmatched cache, the parked-analysis
+  // digest's durable analysis_parked_alerted_at): they book EVERY item they
+  // handed in, including the ones the marker cut, so a cut item was suppressed
+  // until restart or for ever. postAlert paginates across the 50-block ceiling
+  // instead, so "posted" and "booked" mean the same set again.
   return chunks;
 }
 
@@ -122,15 +121,33 @@ function notificationTextFor(firstBlockText) {
   return `${firstBlockText.slice(0, SECTION_MAX_CHARS - suffix.length)}${suffix}`;
 }
 
+// Round-11 P1 (critical): post EVERY block, paginating over Slack's 50-block
+// per-message ceiling. Pages go out in order; pages after the first are threaded
+// under the first so the channel sees one conversation rather than N walls of
+// text (a caller-supplied thread_ts wins and carries every page). The return
+// shape is unchanged: the FIRST page's { ts, channel }, which is what the
+// escalation-threading callers key on.
+//
+// If any page fails, the error propagates. Every booking caller already treats a
+// throw as "not posted" and books nothing, so a half-delivered digest is
+// re-posted in full next tick. Re-posting a page the channel already saw is the
+// benign failure; permanently suppressing an unmatched mail or a parked contract
+// is not.
 export async function postAlert(slack, { channel, text, thread_ts = null }) {
   const blocks = splitAlertText(text).map((t) => ({ type: 'section', text: { type: 'mrkdwn', text: t } }));
-  const res = await slack.chat.postMessage({
-    channel,
-    text: notificationTextFor(blocks[0].text.text),
-    blocks,
-    ...(thread_ts ? { thread_ts } : {}),
-  });
-  return { ts: res.ts, channel: res.channel };
+  let first = null;
+  for (let i = 0; i < blocks.length; i += MAX_SECTION_BLOCKS) {
+    const page = blocks.slice(i, i + MAX_SECTION_BLOCKS);
+    const parent = thread_ts ?? first?.ts ?? null;
+    const res = await slack.chat.postMessage({
+      channel,
+      text: notificationTextFor(page[0].text.text),
+      blocks: page,
+      ...(parent ? { thread_ts: parent } : {}),
+    });
+    if (first === null) first = { ts: res.ts, channel: res.channel };
+  }
+  return first;
 }
 
 // Replace an escalation's Slack message with a resolved (button-less) version.

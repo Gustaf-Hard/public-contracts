@@ -172,18 +172,23 @@ describe('postAlert block budget', () => {
   // fake here does the same, so a regression that reintroduces the full
   // original string in `text` fails LOUD instead of passing silently the way
   // the pre-fix suite did.
-  function fakeSlack() {
+  // Round-11 P1: the fake also enforces Slack's 50-block ceiling and hands back a
+  // DISTINCT ts per call, so a paginated alert's threading is observable and an
+  // over-50-block page fails loud. `failOnCall` injects a mid-pagination failure.
+  function fakeSlack({ failOnCall = null } = {}) {
     const calls = [];
     return {
       calls,
       chat: {
         postMessage: async (args) => {
           if (args.text.length > 40000) throw new Error(`Slack text field exceeds 40000 chars (${args.text.length})`);
+          if (args.blocks.length > 50) throw new Error(`Slack blocks exceed 50 per message (${args.blocks.length})`);
           for (const b of args.blocks) {
             if (b.text.text.length > 3000) throw new Error(`Slack section block exceeds 3000 chars (${b.text.text.length})`);
           }
           calls.push(args);
-          return { ts: 't-1', channel: args.channel };
+          if (failOnCall === calls.length) throw new Error(`simulated Slack failure on page ${failOnCall}`);
+          return { ts: `t-${calls.length}`, channel: args.channel };
         },
       },
     };
@@ -234,17 +239,62 @@ describe('postAlert block budget', () => {
     expect(slack.calls[0].text).toBe(texts[0]);
   });
 
-  it('caps at 50 blocks and says what it cut rather than letting Slack reject the message', async () => {
-    const text = Array.from({ length: 1000 }, (_, i) => `rad ${i} ${'z'.repeat(200)}`).join('\n');
+  // Round-11 P1 (critical): the old behaviour truncated at 50 blocks with an
+  // "avkortat" marker. Every caller that books items as alerted AFTER a
+  // successful post (digestUnmatched's seenUnmatched cache, the parked-analysis
+  // digest's analysis_parked_alerted_at) books EVERY item it handed in,
+  // including the ones the marker cut, so those items were suppressed until a
+  // restart / for ever. Nothing may be dropped: paginate instead.
+  it('paginates past 50 blocks into several messages instead of truncating', async () => {
+    // 120 lines of exactly the 2900-char budget: one chunk each, so 120 blocks.
+    const lines = Array.from({ length: 120 }, (_, i) => `${String(i).padStart(3, '0')} ${'z'.repeat(2896)}`);
+    for (const l of lines) expect(l.length).toBe(LIMIT);
+    const text = lines.join('\n');
     const slack = fakeSlack();
-    await postAlert(slack, { channel: 'C1', text });
-    const texts = blockTexts(slack);
-    expect(texts).toHaveLength(50);
-    for (const t of texts) expect(t.length).toBeLessThanOrEqual(LIMIT);
-    expect(texts[49]).toMatch(/avkortat/);
-    // O1: even in the overflow case, the fallback text is bounded by LIMIT.
-    expect(slack.calls[0].text.length).toBeLessThanOrEqual(LIMIT);
-    expect(slack.calls[0].text).toBe(texts[0]);
+    const res = await postAlert(slack, { channel: 'C1', text });
+
+    expect(slack.calls).toHaveLength(3); // 50 + 50 + 20
+    expect(slack.calls.map((c) => c.blocks.length)).toEqual([50, 50, 20]);
+    for (const c of slack.calls) {
+      expect(c.blocks.length).toBeLessThanOrEqual(50);
+      for (const b of c.blocks) {
+        expect(b).toMatchObject({ type: 'section', text: { type: 'mrkdwn' } });
+        expect(b.text.text.length).toBeLessThanOrEqual(LIMIT);
+      }
+      // O1 per page: the fallback text is THAT page's first block, capped.
+      expect(c.text).toBe(c.blocks[0].text.text);
+      expect(c.text.length).toBeLessThanOrEqual(LIMIT);
+    }
+    // No marker, nothing dropped: every input line appears in exactly one block.
+    const allBlockTexts = slack.calls.flatMap((c) => c.blocks.map((b) => b.text.text));
+    expect(allBlockTexts).toHaveLength(120);
+    expect(allBlockTexts.join('\n')).toBe(text);
+    for (const l of lines) expect(allBlockTexts.filter((t) => t.includes(l))).toHaveLength(1);
+    for (const t of allBlockTexts) expect(t).not.toMatch(/avkortat/);
+
+    // Pages 2..n hang under page 1, so the channel sees one thread, not three
+    // unrelated walls of text.
+    expect(slack.calls[0].thread_ts).toBeUndefined();
+    expect(slack.calls[1].thread_ts).toBe('t-1');
+    expect(slack.calls[2].thread_ts).toBe('t-1');
+    // Return shape unchanged: the FIRST page's ts/channel.
+    expect(res).toEqual({ ts: 't-1', channel: 'C1' });
+  });
+
+  it('posts every page under a caller-supplied thread_ts', async () => {
+    const lines = Array.from({ length: 60 }, (_, i) => `${String(i).padStart(3, '0')} ${'z'.repeat(2896)}`);
+    const slack = fakeSlack();
+    const res = await postAlert(slack, { channel: 'C1', text: lines.join('\n'), thread_ts: 's-9' });
+    expect(slack.calls).toHaveLength(2);
+    expect(slack.calls.map((c) => c.thread_ts)).toEqual(['s-9', 's-9']);
+    expect(res).toEqual({ ts: 't-1', channel: 'C1' });
+  });
+
+  it('throws when a later page fails, so the caller books nothing as alerted', async () => {
+    const lines = Array.from({ length: 120 }, (_, i) => `${String(i).padStart(3, '0')} ${'z'.repeat(2896)}`);
+    const slack = fakeSlack({ failOnCall: 2 });
+    await expect(postAlert(slack, { channel: 'C1', text: lines.join('\n') }))
+      .rejects.toThrow(/simulated Slack failure on page 2/);
   });
 
   it('still threads a split alert under an existing escalation message', async () => {

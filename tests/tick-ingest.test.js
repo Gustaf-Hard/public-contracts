@@ -10,6 +10,7 @@ import { runTick, matchInbound, deriveFetchWindowDays, localDateStr } from '../s
 import * as analyseMod from '../src/analyse-message.js';
 import { dedupeFilenames } from '../src/attachments.js';
 import { buildActionQueue } from '../src/dashboard.js';
+import { postAlert as realPostAlert } from '../src/slack.js';
 
 let tmp, db, contractsDir;
 beforeEach(() => {
@@ -220,6 +221,61 @@ describe('runTick — unmatched inbound is surfaced once (H5, L5)', () => {
     expect(slackOps.alerts).toHaveLength(2);
     expect(slackOps.alerts[1]).toContain('um-22@kommunalforbund.se');
     expect(seenUnmatched.size).toBe(23);
+    spy.mockRestore();
+  });
+
+  // Round-11 P1 (critical), the adversary's repro, end to end through the REAL
+  // postAlert rather than the text-capturing fake: 20 unmatched mails with
+  // absurdly long subjects blow past Slack's 50-block ceiling. postAlert used to
+  // truncate with an "avkortat" marker while digestUnmatched booked all 20 into
+  // seenUnmatched, so the cut ones were suppressed for the daemon's lifetime and
+  // surfaced nowhere. Pagination is what makes "posted" and "booked" the same set.
+  it('posts every unmatched line across paginated Slack messages when the digest blows past 50 blocks', async () => {
+    const spy = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue(null);
+    seedConv();
+    const seenUnmatched = new Map();
+    const ids = Array.from({ length: 20 }, (_, i) => `um-long-${i}`);
+    const getResult = Object.fromEntries(ids.map((id) => [
+      id,
+      mkMsg(id, `thr-${id}`, `Okänd <${id}@kommunalforbund.se>`, 'Svar', {
+        subject: `AKT ${id} ${'q'.repeat(8000)}`,
+      }),
+    ]));
+    const gmail = fakeGmail({ listResult: ids.map((id) => ({ id })), getResult });
+
+    // A Slack client with Slack's real limits, driving the real postAlert.
+    const posted = [];
+    const slackClient = {
+      chat: {
+        postMessage: async (args) => {
+          expect(args.blocks.length).toBeLessThanOrEqual(50);
+          for (const b of args.blocks) expect(b.text.text.length).toBeLessThanOrEqual(3000);
+          expect(args.text.length).toBeLessThanOrEqual(40000);
+          posted.push(args);
+          return { ts: `t-${posted.length}`, channel: args.channel };
+        },
+      },
+    };
+    const slackOps = {
+      postEscalation: vi.fn(async () => ({ ts: 's-1', channel: 'C1' })),
+      postAlert: realPostAlert,
+    };
+
+    await runTick({ ...deps({ gmail, slackOps, seenUnmatched }), slackClient });
+
+    expect(posted.length).toBeGreaterThan(1); // paginated, not truncated
+    const allBlocks = posted.flatMap((p) => p.blocks.map((b) => b.text.text));
+    const joined = allBlocks.join('\n');
+    expect(joined).not.toMatch(/avkortat/);
+    // Every one of the 20 labels reached the channel, and every one is booked.
+    for (const id of ids) {
+      expect(joined).toContain(`${id}@kommunalforbund.se`);
+      expect(seenUnmatched.has(id)).toBe(true);
+    }
+    expect(seenUnmatched.size).toBe(20);
+    // Pages 2..n hang under page 1.
+    expect(posted[0].thread_ts).toBeUndefined();
+    for (const p of posted.slice(1)) expect(p.thread_ts).toBe('t-1');
     spy.mockRestore();
   });
 });
