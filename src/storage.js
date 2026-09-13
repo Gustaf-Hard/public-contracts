@@ -816,32 +816,6 @@ export function openDb(path) {
     `).all(`-${Math.floor(days)} days`);
   }
 
-  // Open escalations whose EFFECTIVE reply deadline falls on or before
-  // byIsoDate, soonest first (round-4 H3). "Effective" is the point: the query
-  // used to require `e.respond_by IS NOT NULL`, so an undated open escalation --
-  // which is what every row written before escalateWithDraft started inheriting
-  // the frist looks like -- was invisible here while buildActionQueue showed its
-  // date, and the draftless source below could not pick it up either (it
-  // requires NO open escalation). The case fell between the two lists and the
-  // operator saw a date on the dashboard that Slack never mentioned.
-  //
-  // Filtering and sorting happen in JS because the effective deadline is not a
-  // column: effectiveRespondBy reads the conversation's outstanding frist when
-  // the row carries none. Both readers now call the same helper, so they cannot
-  // disagree. `respond_by` on the returned rows is the effective value, which is
-  // what the digest labels.
-  function listOpenEscalationsWithDeadlineDue(byIsoDate) {
-    return db.prepare(`
-      SELECT e.id, e.conversation_id, e.created_at, e.respond_by, c.kommun_namn, c.role
-      FROM escalations e JOIN conversations c ON c.id = e.conversation_id
-      WHERE e.status = 'open' AND c.state NOT IN ('DONE', 'DEAD_END')
-      ORDER BY e.id
-    `).all()
-      .map((e) => ({ ...e, respond_by: effectiveRespondBy(e.conversation_id, e.respond_by) }))
-      .filter((e) => e.respond_by != null && e.respond_by <= byIsoDate)
-      .sort((a, b) => a.respond_by.localeCompare(b.respond_by) || a.id - b.id);
-  }
-
   // EVERY live case whose EFFECTIVE reply deadline is due on or before
   // byIsoDate, one row per conversation, soonest first. This is the Slack
   // digest's only ⏰ source (round-5 J2).
@@ -856,31 +830,36 @@ export function openDb(path) {
   // what closes that gap for good.
   //
   // `has_open_escalation` is what the digest labels "utan utkast": there is a
-  // deadline but nothing to approve. `escalation_id` (the newest open row, NULL
-  // when there is none) is carried so the 🕰 aged section can drop what ⏰
-  // already named. Closed cases are excluded here, as in every other digest
-  // query (round-4 H5). Filtering and sorting happen in JS because the effective
-  // deadline is not a column. Advisory surfacing only.
+  // deadline but nothing to approve. It reads ACTIVE_ESCALATION_STATUSES, not
+  // status='open' (round-6 K6): a parked send (`send_failed`,
+  // `send_unconfirmed` — a mail that MAY have gone out) and an in-flight one
+  // (`sending`) are the most urgent artefacts in the system, so calling their
+  // case draftless is exactly backwards. The row carries no escalation_id: the
+  // digest's 🕰 and 🧭 sections dedupe by CONVERSATION, never by escalation, and
+  // the field only invited that misreading.
+  //
+  // Closed cases are excluded here, as in every other digest query (round-4 H5).
+  // Filtering and sorting happen in JS because the effective deadline is not a
+  // column. Advisory surfacing only.
   function listConversationsWithDeadlineDue(byIsoDate) {
     return db.prepare(`
       SELECT c.id AS conversation_id, c.kommun_namn, c.role,
              (SELECT e.id FROM escalations e
-                WHERE e.conversation_id = c.id AND e.status = 'open'
-                ORDER BY e.id DESC LIMIT 1) AS escalation_id,
+                WHERE e.conversation_id = c.id AND e.status IN (${activeStatusPlaceholders})
+                ORDER BY e.id DESC LIMIT 1) AS active_escalation_id,
              (SELECT e.respond_by FROM escalations e
-                WHERE e.conversation_id = c.id AND e.status = 'open'
+                WHERE e.conversation_id = c.id AND e.status IN (${activeStatusPlaceholders})
                 ORDER BY e.id DESC LIMIT 1) AS open_respond_by
       FROM conversations c
       WHERE c.state NOT IN ('DONE', 'DEAD_END')
       ORDER BY c.id
-    `).all()
+    `).all(...ACTIVE_ESCALATION_STATUSES, ...ACTIVE_ESCALATION_STATUSES)
       .map((r) => ({
         conversation_id: r.conversation_id,
         kommun_namn: r.kommun_namn,
         role: r.role,
         respond_by: effectiveRespondBy(r.conversation_id, r.open_respond_by),
-        has_open_escalation: r.escalation_id != null,
-        escalation_id: r.escalation_id,
+        has_open_escalation: r.active_escalation_id != null,
       }))
       .filter((r) => r.respond_by != null && r.respond_by <= byIsoDate)
       .sort((a, b) => a.respond_by.localeCompare(b.respond_by) || a.conversation_id - b.conversation_id);
@@ -1022,38 +1001,37 @@ export function openDb(path) {
     return asIsoDate(openEscRespondBy) ?? latestRespondByForConversation(conversationId);
   }
 
-  // NEEDS_HUMAN with no draft to approve: state NEEDS_HUMAN and no OPEN
-  // escalation. The void path in tick.js legitimately produces this state
-  // (kommun replied after a draft, reply warranted no new draft) — the digest
-  // is what stops it from being invisible (Karlstad/Avesta, 2026-09-12 review).
+  // NEEDS_HUMAN with nothing actionable at all: state NEEDS_HUMAN, no OPEN
+  // escalation to approve, and no pending handoff task for the kommun (spec §C
+  // list 3 — the operator has a click waiting there, so the case is not
+  // orphaned). The void path in tick.js legitimately produces this state (kommun
+  // replied after a draft, the reply warranted no new draft) and the digest's 🧭
+  // section is what stops it from being invisible (Karlstad/Avesta, 2026-09-12
+  // review).
+  //
   // Each row carries respond_by (finding F2): such a case is exactly the one
   // whose deadline no escalation holds any more, so the digest would otherwise
   // name the kommun with no date.
   //
-  // Deliberately WITHOUT the pending-handoff exclusion (round-3 G2): a pending
-  // hänvisning is other work, it does not discharge a reply deadline, so the
-  // digest's ⏰ section reads from here. listOrphanNeedsHuman below is this list
-  // plus that exclusion, so the two cannot drift apart.
-  function listNeedsHumanWithoutOpenEscalation() {
-    const rows = db.prepare(`
+  // Round-6 K6: the un-excluded half used to be its own exported query,
+  // `listNeedsHumanWithoutOpenEscalation`. The ⏰ section read it until round-5
+  // J2 gave that section one conversation-keyed source
+  // (`listConversationsWithDeadlineDue`, which deliberately carries NO
+  // pending-handoff exclusion, round-3 G2), after which nothing but this
+  // function called it. Inlined rather than left as a one-caller indirection.
+  function listOrphanNeedsHuman() {
+    const pending = db.prepare(
+      "SELECT 1 FROM handoff_tasks WHERE kommun_kod = ? AND status = 'pending' LIMIT 1"
+    );
+    return db.prepare(`
       SELECT c.id, c.kommun_kod, c.kommun_namn, c.role, c.state_changed_at
       FROM conversations c
       WHERE c.state = 'NEEDS_HUMAN'
         AND NOT EXISTS (SELECT 1 FROM escalations e WHERE e.conversation_id = c.id AND e.status = 'open')
       ORDER BY c.state_changed_at
-    `).all();
-    return rows.map((r) => ({ ...r, respond_by: latestRespondByForConversation(r.id) }));
-  }
-
-  // NEEDS_HUMAN with nothing actionable at all: the list above minus every
-  // conversation whose kommun already has a pending handoff task (spec §C list
-  // 3 — the operator has a click waiting there, so the case is not orphaned).
-  function listOrphanNeedsHuman() {
-    const pending = db.prepare(
-      "SELECT 1 FROM handoff_tasks WHERE kommun_kod = ? AND status = 'pending' LIMIT 1"
-    );
-    return listNeedsHumanWithoutOpenEscalation()
-      .filter((r) => pending.get(r.kommun_kod) == null);
+    `).all()
+      .filter((r) => pending.get(r.kommun_kod) == null)
+      .map((r) => ({ ...r, respond_by: latestRespondByForConversation(r.id) }));
   }
 
   const activeStatusPlaceholders = ACTIVE_ESCALATION_STATUSES.map(() => '?').join(', ');
@@ -1930,10 +1908,8 @@ export function openDb(path) {
     listEscalationsByStatus,
     listOpenEscalationsForConversation,
     listOpenEscalationsAgedDays,
-    listOpenEscalationsWithDeadlineDue,
     listConversationsWithDeadlineDue,
     listOrphanNeedsHuman,
-    listNeedsHumanWithoutOpenEscalation,
     latestRespondByForConversation,
     effectiveRespondBy,
     listActiveEscalationsForConversation,

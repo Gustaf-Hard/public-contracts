@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { openDb } from '../src/storage.js';
+import { openDb, ACTIVE_ESCALATION_STATUSES } from '../src/storage.js';
 
 let tmp, db;
 beforeEach(() => {
@@ -677,7 +677,7 @@ describe('queue hygiene queries (2026-09-12 design)', () => {
 
     expect(db.listOpenEscalationsAgedDays(7).map((e) => e.kommun_namn)).toContain('Gammal');
     expect(db.listOpenEscalationsAgedDays(7).map((e) => e.kommun_namn)).not.toContain('Frist');
-    expect(db.listOpenEscalationsWithDeadlineDue('2026-09-14').map((e) => e.kommun_namn)).toEqual(['Frist']);
+    expect(db.listConversationsWithDeadlineDue('2026-09-14').map((r) => r.kommun_namn)).toEqual(['Frist']);
     const orphans = db.listOrphanNeedsHuman().map((c) => c.kommun_namn);
     expect(orphans).toContain('Föräldralös');
     expect(orphans).not.toContain('Gammal'); // has an open escalation
@@ -688,7 +688,7 @@ describe('queue hygiene queries (2026-09-12 design)', () => {
   // utkast" list but wrong for the deadline section — a pending referral does
   // not discharge a reply deadline. The two lists now come from one query so
   // they cannot drift.
-  it('listNeedsHumanWithoutOpenEscalation keeps a handoff-bearing case that listOrphanNeedsHuman drops', () => {
+  it('a handoff-bearing case keeps its deadline in the due list and drops out of listOrphanNeedsHuman', () => {
     const cid = db.createConversation({ kommun_kod: '0042', kommun_namn: 'Hänvisad', role: 'central', contact_email: 'h@h.se', scheduled_send_at: '2026-08-01T08:00:00Z' });
     const mid = db.recordMessage({
       conversation_id: cid, gmail_message_id: 'g-h', direction: 'inbound',
@@ -699,9 +699,9 @@ describe('queue hygiene queries (2026-09-12 design)', () => {
     db.updateConversationState(cid, 'NEEDS_HUMAN');
     db.upsertHandoffTask({ kommun_kod: '0042', source_conversation_id: cid, source_message_id: mid, address: 'annan@h.se', forvaltning: null, same_domain: 1 });
 
-    const without = db.listNeedsHumanWithoutOpenEscalation();
-    expect(without.map((c) => c.kommun_namn)).toContain('Hänvisad');
-    expect(without.find((c) => c.id === cid).respond_by).toBe('2026-09-13');
+    const due = db.listConversationsWithDeadlineDue('2026-09-14');
+    expect(due.map((r) => r.kommun_namn)).toContain('Hänvisad');
+    expect(due.find((r) => r.conversation_id === cid).respond_by).toBe('2026-09-13');
     expect(db.listOrphanNeedsHuman().map((c) => c.kommun_namn)).not.toContain('Hänvisad');
   });
 
@@ -717,8 +717,8 @@ describe('queue hygiene queries (2026-09-12 design)', () => {
     }
     expect(db.listOpenEscalationsAgedDays(7).map((e) => e.kommun_namn)).not.toContain('KlarDone');
     expect(db.listOpenEscalationsAgedDays(7).map((e) => e.kommun_namn)).not.toContain('KlarDead');
-    expect(db.listOpenEscalationsWithDeadlineDue('2026-09-14').map((e) => e.kommun_namn)).not.toContain('KlarDone');
-    expect(db.listOpenEscalationsWithDeadlineDue('2026-09-14').map((e) => e.kommun_namn)).not.toContain('KlarDead');
+    expect(db.listConversationsWithDeadlineDue('2026-09-14').map((r) => r.kommun_namn)).not.toContain('KlarDone');
+    expect(db.listConversationsWithDeadlineDue('2026-09-14').map((r) => r.kommun_namn)).not.toContain('KlarDead');
   });
 
   // Round-4 H3: one effective-deadline source for the dashboard and the digest.
@@ -726,7 +726,7 @@ describe('queue hygiene queries (2026-09-12 design)', () => {
   // conversation whose inbound carries an outstanding frist showed the date on
   // the dashboard and never in Slack, because the due query required
   // e.respond_by IS NOT NULL.
-  it('listOpenEscalationsWithDeadlineDue finds an undated open escalation via the conversation frist', () => {
+  it('the due list finds an undated open escalation via the conversation frist', () => {
     const cid = db.createConversation({ kommun_kod: '0103', kommun_namn: 'Odaterad', role: 'central', contact_email: 'o@o.se', scheduled_send_at: '2026-08-01T08:00:00Z' });
     db.recordMessage({
       conversation_id: cid, gmail_message_id: 'g-o', direction: 'inbound',
@@ -735,9 +735,10 @@ describe('queue hygiene queries (2026-09-12 design)', () => {
       analysis_json: JSON.stringify({ extracted: { respond_by_date: '2026-09-13' } }),
     });
     db.recordEscalation({ conversation_id: cid, reason: 'r' }); // no respond_by
-    const hit = db.listOpenEscalationsWithDeadlineDue('2026-09-14').find((e) => e.conversation_id === cid);
+    const hit = db.listConversationsWithDeadlineDue('2026-09-14').find((r) => r.conversation_id === cid);
     expect(hit).toBeTruthy();
     expect(hit.respond_by).toBe('2026-09-13'); // the effective deadline, not the row's NULL
+    expect(hit.has_open_escalation).toBe(true);
   });
 
   it('effectiveRespondBy prefers the escalation row and falls back to the conversation', () => {
@@ -790,6 +791,42 @@ describe('queue hygiene queries (2026-09-12 design)', () => {
     expect(rows.map((r) => r.kommun_namn)).not.toContain('Stängd');
   });
 
+  // Round-6 K6: "utan utkast" means there is nothing to approve. A parked send
+  // (send_failed / send_unconfirmed — a mail that MAY have gone out) and an
+  // in-flight one (sending) are the most urgent artefacts in the system, so
+  // labelling their case draftless is exactly backwards. has_open_escalation
+  // reads ACTIVE_ESCALATION_STATUSES, the same list every draft guard uses.
+  it.each(ACTIVE_ESCALATION_STATUSES)('has_open_escalation is true for a %s escalation', (status) => {
+    const cid = db.createConversation({ kommun_kod: `04${status.length}`, kommun_namn: `Aktiv-${status}`, role: 'central', contact_email: 'a@a.se', scheduled_send_at: '2026-08-01T08:00:00Z' });
+    const esc = db.recordEscalation({ conversation_id: cid, reason: 'r', respond_by: '2026-09-13' });
+    db.raw.prepare('UPDATE escalations SET status = ? WHERE id = ?').run(status, esc);
+    const hit = db.listConversationsWithDeadlineDue('2026-09-14').find((r) => r.conversation_id === cid);
+    expect(hit).toBeTruthy();
+    expect(hit.has_open_escalation).toBe(true);
+  });
+
+  it.each(['resolved_send', 'resolved_edit', 'resolved_skip', 'resolved_closed', 'superseded'])(
+    'has_open_escalation is false for a terminal %s escalation', (status) => {
+      const cid = db.createConversation({ kommun_kod: `05${status.length}`, kommun_namn: `Klar-${status}`, role: 'central', contact_email: 'b@b.se', scheduled_send_at: '2026-08-01T08:00:00Z' });
+      const esc = db.recordEscalation({ conversation_id: cid, reason: 'r', respond_by: '2026-09-13' });
+      db.raw.prepare('UPDATE escalations SET status = ? WHERE id = ?').run(status, esc);
+      const hit = db.listConversationsWithDeadlineDue('2026-09-14').find((r) => r.conversation_id === cid);
+      // The deadline is still surfaced (the escalation fallback reads any
+      // status), it is just labelled as having nothing to approve.
+      expect(hit).toBeTruthy();
+      expect(hit.has_open_escalation).toBe(false);
+    });
+
+  // Round-6 K6: the row used to carry `escalation_id` with a comment claiming the
+  // 🕰 section deduped on it. It never did — the dedupe is by conversation — so
+  // the field was dead weight that invited exactly that misreading.
+  it('the due row exposes no escalation_id', () => {
+    const cid = db.createConversation({ kommun_kod: '0601', kommun_namn: 'Fält', role: 'central', contact_email: 'f@f.se', scheduled_send_at: '2026-08-01T08:00:00Z' });
+    db.recordEscalation({ conversation_id: cid, reason: 'r', respond_by: '2026-09-13' });
+    const hit = db.listConversationsWithDeadlineDue('2026-09-14').find((r) => r.conversation_id === cid);
+    expect(Object.keys(hit).sort()).toEqual(['conversation_id', 'has_open_escalation', 'kommun_namn', 'respond_by', 'role']);
+  });
+
   it('listConversationsWithDeadlineDue sorts soonest first and excludes dates past the window', () => {
     const mk = (kod, namn, date) => {
       const cid = db.createConversation({ kommun_kod: kod, kommun_namn: namn, role: 'central', contact_email: `${kod}@d.se`, scheduled_send_at: '2026-08-01T08:00:00Z' });
@@ -819,7 +856,7 @@ describe('queue hygiene queries (2026-09-12 design)', () => {
     };
     mk('0201', 'Sen', '2026-09-14', null);
     mk('0202', 'Tidig', null, '2026-09-10');
-    expect(db.listOpenEscalationsWithDeadlineDue('2026-09-14').map((e) => e.kommun_namn))
+    expect(db.listConversationsWithDeadlineDue('2026-09-14').map((r) => r.kommun_namn))
       .toEqual(['Tidig', 'Sen']);
   });
 });

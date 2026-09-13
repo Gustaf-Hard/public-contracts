@@ -216,6 +216,21 @@ listing three sections:
    belongs to list 3 only (round-3 G2). `buildActionQueue` is unchanged — the
    dashboard queue stays "escalations + NEEDS_HUMAN" by design; ⏰ is the
    surface that must never lose a date.
+
+   **Round-6 K6.** Both older queries are now GONE:
+   `listOpenEscalationsWithDeadlineDue` had no caller left, and
+   `listNeedsHumanWithoutOpenEscalation` is inlined into its only caller,
+   `listOrphanNeedsHuman`. `has_open_escalation` reads
+   `ACTIVE_ESCALATION_STATUSES` rather than `status='open'`: a parked send
+   (`send_failed`, `send_unconfirmed`) or one in flight (`sending`) is the most
+   urgent artefact in the system, not a case "utan utkast". The row carries no
+   `escalation_id` — the 🕰/🧭 dedupe is by conversation, never by escalation —
+   and the ⏰ label names `kommun/role`, like every other digest line.
+
+   **Round-6 K4: the dedupe runs against what ⏰ PRINTS.** ⏰ is capped at
+   `DIGEST_MAX_LINES`, so deduping 🕰/🧭 against the whole due list dropped a
+   case past the cap from ⏰ (the "…och N till" tail names nobody) and suppressed
+   it in 🧭 as well: named nowhere in the digest at all.
 2. **🕰 Äldre än 7 dagar** — open escalations with `created_at` older than
    7 days: count + the oldest up to `DIGEST_MAX_LINES` (20, tick.js) as
    `kommun (N dagar)`, with an "…och N till" tail when the list is longer

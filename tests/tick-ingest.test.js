@@ -524,7 +524,7 @@ describe('runTick — a voided draft does not take the deadline with it (F2)', (
     expect(open).toHaveLength(1);
     expect(open[0].respond_by).toBe('2026-09-15');
     expect(buildActionQueue(db).find((r) => r.conv_id === id).respond_by).toBe('2026-09-15');
-    expect(db.listOpenEscalationsWithDeadlineDue('2026-09-16').map((e) => e.conversation_id)).toContain(id);
+    expect(db.listConversationsWithDeadlineDue('2026-09-16').map((r) => r.conversation_id)).toContain(id);
   });
 });
 

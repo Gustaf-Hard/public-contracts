@@ -398,6 +398,19 @@ function userPromptFor(ctx, body) {
   // record, which drafting rule 5 tells the model it may reuse as OUR
   // commitment. Every character survives, only line-leading Markdown markers
   // lose their position.
+  //
+  // Two side effects of reusing neutralizeOwnBody here, both intended and
+  // neither lossy (round-6 K6):
+  //   - LINE ENDINGS ARE NORMALIZED. The helper splits on every break a reader
+  //     or tokenizer honours (CRLF, CR, LF, VT, FF, NEL, U+2028, U+2029) and
+  //     rejoins on \n, so a kommun's CRLF mail reaches the model as LF. That is
+  //     the point of the broad splitter, not an accident: a separator-borne '#'
+  //     is a heading to a tokenizer too.
+  //   - THE KOMMUN'S OWN QUOTE LINES GAIN AN INDENT. A reply that quotes our
+  //     earlier mail back arrives with '> ' lines, and those get the same four
+  //     spaces a forged marker does (round-6 K2). The text is byte-for-byte
+  //     intact and still reads as a quote to a human; it simply no longer opens
+  //     a CommonMark block quote inside our prompt.
   lines.push(neutralizeOwnBody(body.trim()));
   lines.push('---');
   if (ctx.thread_context) {

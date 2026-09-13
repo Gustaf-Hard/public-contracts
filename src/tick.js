@@ -1459,7 +1459,10 @@ export async function runDailyFollowup(deps) {
     const orphans = db.listOrphanNeedsHuman().filter((c) => !namedConvIds.has(c.id));
     const deadlineItems = includedDue.map((d) => ({
       respond_by: d.respond_by,
-      label: `${d.kommun_namn} (senast ${d.respond_by}${d.has_open_escalation ? '' : ', utan utkast'})`,
+      // kommun/role, the way every other digest line and log line in this file
+      // names a conversation (round-6 K6): one kommun can hold several
+      // conversations, so the name alone does not say which case is due.
+      label: `${d.kommun_namn}/${d.role} (senast ${d.respond_by}${d.has_open_escalation ? '' : ', utan utkast'})`,
     }));
     if ((due.length > 0 || aged.length > 0 || orphans.length > 0) && deps.slackOps?.postAlert && deps.env?.SLACK_CHANNEL_ID) {
       const ageDays = (iso) => Math.floor((now.getTime() - new Date(iso.replace(' ', 'T') + 'Z').getTime()) / 86400000);

@@ -772,8 +772,9 @@ describe('queue hygiene digest (2026-09-12 design)', () => {
     const digest = slackOps.alerts.find((t) => t.includes('Köhälsa'));
     expect(digest).toBeTruthy();
     const deadlineSection = digest.split('🧭')[0];
-    expect(deadlineSection).toContain('Karlstad');
-    expect(deadlineSection).toContain('utan utkast');
+    // Round-6 K6: the ⏰ label names kommun/role, the way every other digest
+    // and log line in this file does — one kommun can hold several conversations.
+    expect(deadlineSection).toContain('Karlstad/central (senast 2026-09-13, utan utkast)');
     expect(deadlineSection).toContain('2026-09-13');
     // listed exactly once in the whole digest (round-5 J4)
     expect(digest.match(/Karlstad/g)).toHaveLength(1);
@@ -803,7 +804,7 @@ describe('queue hygiene digest (2026-09-12 design)', () => {
     await runDailyFollowup(deps({ slackOps, now: new Date('2026-09-12T09:00:00Z') }));
     const digest = slackOps.alerts.find((t) => t.includes('Köhälsa'));
     expect(digest).toBeTruthy();
-    expect(digest.split('🕰')[0]).toContain('Tystnad (senast 2026-09-13, utan utkast)');
+    expect(digest.split('🕰')[0]).toContain('Tystnad/central (senast 2026-09-13, utan utkast)');
   });
 
   // Round-3 G2 (Codex R2 #2): the deadline section sourced its draftless rows
@@ -828,7 +829,7 @@ describe('queue hygiene digest (2026-09-12 design)', () => {
     const digest = slackOps.alerts.find((t) => t.includes('Köhälsa'));
     expect(digest).toBeTruthy();
     const deadlineSection = digest.split('🧭')[0];
-    expect(deadlineSection).toContain('Hänvisad (senast 2026-09-13, utan utkast)');
+    expect(deadlineSection).toContain('Hänvisad/central (senast 2026-09-13, utan utkast)');
     // The 🧭 list keeps its handoff exclusion (spec section C, list 3), and it is
     // the only candidate, so there is no 🧭 section at all (round-6 K6: the
     // assertion used to sit behind `if (digest.includes('🧭'))`).
@@ -855,9 +856,9 @@ describe('queue hygiene digest (2026-09-12 design)', () => {
     const digest = slackOps.alerts.find((t) => t.includes('Köhälsa'));
     expect(digest).toBeTruthy();
     const deadlineSection = digest.split('🕰')[0].split('🧭')[0];
-    expect(deadlineSection).toContain('Odaterad (senast 2026-09-13)');
+    expect(deadlineSection).toContain('Odaterad/central (senast 2026-09-13)');
     // There IS a draft to approve, so it must not be labelled draftless...
-    expect(deadlineSection).not.toContain('Odaterad (senast 2026-09-13, utan utkast)');
+    expect(deadlineSection).not.toContain('Odaterad/central (senast 2026-09-13, utan utkast)');
     // ...and it is named exactly once.
     expect(digest.match(/Odaterad/g)).toHaveLength(1);
   });
@@ -880,7 +881,7 @@ describe('queue hygiene digest (2026-09-12 design)', () => {
     const deadlineSection = digest.slice(digest.indexOf('⏰'), digest.indexOf('🕰') === -1 ? undefined : digest.indexOf('🕰'));
     expect(deadlineSection).toContain('(25)');
     expect(deadlineSection).toContain('…och 5 till');
-    expect(deadlineSection).toContain('Frist0 (senast 2026-09-13)');
+    expect(deadlineSection).toContain('Frist0/central (senast 2026-09-13)');
     expect(deadlineSection).not.toContain('Frist24');
   });
 
@@ -923,7 +924,7 @@ describe('queue hygiene digest (2026-09-12 design)', () => {
     // All 25 are counted and 20 are printed, same cap and tail as always.
     expect(deadlineSection).toContain('(25)');
     expect(deadlineSection).toContain('…och 5 till');
-    expect(deadlineSection).toContain('Kapad00 (senast 2026-09-13, utan utkast)');
+    expect(deadlineSection).toContain('Kapad00/central (senast 2026-09-13, utan utkast)');
     expect(deadlineSection).not.toContain('Kapad20');
 
     // The five the cap dropped are named here instead of nowhere.
