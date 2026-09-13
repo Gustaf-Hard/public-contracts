@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { openDb } from '../src/storage.js';
-import { createDashboardApp, buildActionQueue, buildWaiting, applyFilter, buildOverviewRows, contentDisposition, escalationActionLabel } from '../src/dashboard.js';
+import { createDashboardApp, buildActionQueue, buildWaiting, applyFilter, buildOverviewRows, contentDisposition, escalationActionLabel, caseTooltip } from '../src/dashboard.js';
 import { layout, renderEscalationForm, renderOverview, renderArenden } from '../src/dashboard-views.js';
 
 let tmp, db, dbPath, muniPath;
@@ -1222,6 +1222,36 @@ describe('home buckets', () => {
     expect(malaIdx).toBeGreaterThan(-1);
     expect(stangdaIdx).toBeGreaterThan(-1);
     expect(malaIdx).toBeGreaterThan(stangdaIdx); // in Stängda, not Behöver dig
+  });
+});
+
+// Round-13 R2 (Codex R12 #2, adversarial R12 #2): caseTooltip only consulted
+// the active escalation when state === NEEDS_HUMAN. A parked send on any other
+// non-terminal state (ACK_RECEIVED, DELIVERING, ...) fell straight through to
+// the follow-up narrative, so the tooltip told the operator to keep watching
+// a case that actually needs them.
+describe('caseTooltip: active escalation outside NEEDS_HUMAN (round-13 R2)', () => {
+  it('ACK_RECEIVED with a parked escalation leads with the action, not the follow-up narrative', () => {
+    const conv = { state: 'ACK_RECEIVED', last_outbound_at: '2026-09-01T08:00:00Z' };
+    const openEsc = { status: 'send_failed' };
+    const tip = caseTooltip(conv, null, { date: '2026-09-20', source: 'our_followup' }, openEsc);
+    expect(tip).toContain('Nästa: du måste agera — Skickning parkerad (send_failed): se ärendet');
+    expect(tip).not.toContain('bevakar');
+  });
+
+  it('DELIVERING with a parked escalation also leads with the action', () => {
+    const conv = { state: 'DELIVERING', last_outbound_at: '2026-09-01T08:00:00Z' };
+    const openEsc = { status: 'send_unconfirmed' };
+    const tip = caseTooltip(conv, null, { date: null }, openEsc);
+    expect(tip).toContain('Nästa: du måste agera — Skickning parkerad (send_unconfirmed): se ärendet');
+    expect(tip).not.toContain('bevakar');
+  });
+
+  it('still shows the follow-up narrative when there is no active escalation (unchanged)', () => {
+    const conv = { state: 'ACK_RECEIVED', last_outbound_at: '2026-09-01T08:00:00Z' };
+    const tip = caseTooltip(conv, null, { date: '2026-09-20', source: 'our_followup' }, undefined);
+    expect(tip).toContain('bevakar');
+    expect(tip).not.toContain('du måste agera');
   });
 });
 

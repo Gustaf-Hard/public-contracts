@@ -186,6 +186,13 @@ export function caseTooltip(conv, latestInbound, follow_up, openEsc) {
     next = `Nästa: du måste agera — ${escalationActionLabel(openEsc)}`;
   } else if (TERMINAL_STATES.has(conv.state)) {
     next = conv.state === 'DONE' ? 'Nästa: ärendet är stängt' : 'Nästa: återvändsgränd';
+  } else if (openEsc) {
+    // Round-13 R2 (Codex R12 #2, adversarial R12 #2): an active escalation
+    // (a parked send included — ACTIVE_ESCALATION_STATUSES, not status='open'
+    // alone) is exactly as actionable outside NEEDS_HUMAN as inside it, so it
+    // must drive the tooltip before the follow-up narrative bevakar-narrates
+    // over it.
+    next = `Nästa: du måste agera — ${escalationActionLabel(openEsc)}`;
   } else if (follow_up?.date) {
     const d = daysUntilIso(follow_up.date);
     const tag = follow_up.source === 'kommun_promise' ? ' (kommunen utlovade datum)' : ' (standardpåminnelse)';
