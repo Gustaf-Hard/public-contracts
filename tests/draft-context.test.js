@@ -28,6 +28,9 @@ function seedMsg({ dir = 'inbound', gmailId, body, at, analysis = null, cls = nu
   });
 }
 
+// Mirrors MAX_INBOUND_CHARS in src/draft-context.js (spec section A).
+const MAX_INBOUND_CHARS_FOR_TEST = 300;
+
 const conv = () => db.getConversation(convId);
 const noAtts = { attachments: [] };
 
@@ -74,16 +77,41 @@ describe('buildDraftContext', () => {
     expect(out).not.toContain('Är detta samtliga avtal ni har?');
   });
 
-  it('the 300-char cap applies to the visible text, not the body including its quoted tail', () => {
+  // Round-5 J6: this fixture used to put 500 X before the quote header, so the
+  // raw body's first 300 characters were all X and slicing BEFORE stripping
+  // would have passed too — the test could not tell the two orders apart.
+  //
+  // Putting the quoted TAIL inside the first 300 characters does not fix that:
+  // splitQuotedText cuts at the marker LINE wherever it sits, so as long as any
+  // Q is inside the window the whole marker is too, it is recognized, and both
+  // orders agree. The one boundary where they differ is the marker STRADDLING
+  // the cap: slicing first leaves a truncated attribution line that no longer
+  // matches, and our own "Den 20 augusti … skrev Gustaf" header leaks into the
+  // block as if the kommun had written it — which is the bug this test exists
+  // for. 270 X puts the cap inside that header.
+  it('the quoted tail is stripped BEFORE the 300-char cap is applied, not after', () => {
     seedMsg({ dir: 'outbound', gmailId: 'o1', body: 'Begäran.', at: '2026-08-17T14:45:24Z' });
-    seedMsg({
-      gmailId: 'i1', at: '2026-08-21T09:00:00Z',
-      body: `${'X'.repeat(500)}\nDen 20 augusti 2026 kl. 10:00 skrev Gustaf <g@x.se>:\n${'Q'.repeat(500)}`,
-    });
+    const visible = 'X'.repeat(270);
+    const marker = 'Den 20 augusti 2026 kl. 10:00 skrev Gustaf <g@x.se>:';
+    const body = `${visible}\n${marker}\n${'Q'.repeat(300)}`;
+    // The hazard the fixture has to reproduce: the cap falls inside the marker,
+    // so only a stripper that runs on the WHOLE body can still see it.
+    const cut = body.slice(0, MAX_INBOUND_CHARS_FOR_TEST);
+    expect(cut).toContain('Den 20 augusti');
+    expect(cut).not.toContain(marker);
+    seedMsg({ gmailId: 'i1', at: '2026-08-21T09:00:00Z', body });
     const out = buildDraftContext(db, conv(), noAtts);
-    expect(out).toContain('X'.repeat(300));
-    expect(out).not.toContain('X'.repeat(301));
-    expect(out).not.toContain('Q');
+    expect(out).toContain(visible);
+    expect(out).not.toContain('Den 20 augusti'); // our own attribution line
+    expect(out).not.toContain('Q');              // our own quoted question
+  });
+
+  it('the 300-char cap applies to a long unquoted body', () => {
+    seedMsg({ dir: 'outbound', gmailId: 'o1', body: 'Begäran.', at: '2026-08-17T14:45:24Z' });
+    seedMsg({ gmailId: 'i1', at: '2026-08-21T09:00:00Z', body: 'X'.repeat(500) });
+    const out = buildDraftContext(db, conv(), noAtts);
+    expect(out).toContain('X'.repeat(MAX_INBOUND_CHARS_FOR_TEST));
+    expect(out).not.toContain('X'.repeat(MAX_INBOUND_CHARS_FOR_TEST + 1));
   });
 
   it('an empty stored summary falls back to the body prefix instead of rendering blank (finding 6)', () => {
