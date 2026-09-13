@@ -200,8 +200,14 @@ hardcode a name or address into a prompt.
 **`escalations.respond_by` is the kommun-imposed reply deadline** (extracted as
 `respond_by_date` by the analysis, ISO date or NULL). It sorts Behöver dig
 deadline-first, renders the ⏰ line in Slack escalations, and feeds the daily
-Köhälsa digest. It is advisory surfacing only — no guard or automation keys
-off it.
+Köhälsa digest. It is advisory surfacing only — no guard, FSM transition or
+auto-send rule keys off it. **Only an OPERATOR send discharges it**
+(`latestRespondByForConversation` in storage.js takes its boundary from
+`listOperatorDecisionTimes`: `approve_unmodified` and `edit`). Never
+`conversations.last_outbound_at` — every send stamps that, so the three
+unattended templates would silently delete a deadline nobody answered; an
+automatic ack is not an answer, and `skip`/`closed` sent nothing at all. With no
+operator send in the conversation, nothing is discharged.
 
 **Polite scraping is enforced in `src/http.js`** (Phase 1). Every outbound
 HTTP call must go through `politeFetch` (1 req/sec/host, retry on 429/503,

@@ -235,8 +235,9 @@ async function escalateWithDraft({ conv, parsedInbound, messageId = null, classi
   // what the first two miss: after the void path supersedes a dated escalation
   // and opens none, the NEXT inbound has nothing to inherit from and the
   // recovered deadline disappeared again. latestRespondByForConversation is
-  // discharge-aware (only rows after last_outbound_at count), so a deadline we
-  // have already answered cannot resurrect here.
+  // discharge-aware (only rows after the latest OPERATOR send count, round-4
+  // H1), so a deadline we have already answered cannot resurrect here, and an
+  // unattended ack cannot make one disappear.
   const effectiveRespondBy = respondBy ?? inheritedRespondBy
     ?? db.latestRespondByForConversation?.(conv.id) ?? null;
 

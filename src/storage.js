@@ -810,6 +810,19 @@ export function openDb(path) {
     return Date.parse(s.includes('T') ? s : `${s.replace(' ', 'T')}Z`);
   }
 
+  // The latest time a HUMAN actually sent mail in this conversation, in ms, or
+  // NaN when there is none. This is the discharge boundary for a kommun-imposed
+  // reply deadline (round-4 H1), and `listOperatorDecisionTimes` is the only
+  // source that can tell an operator send from a machine one.
+  function latestOperatorSendMs(conversationId) {
+    let max = NaN;
+    for (const t of listOperatorDecisionTimes(conversationId)) {
+      const ms = timestampMs(t);
+      if (!Number.isNaN(ms) && (Number.isNaN(max) || ms > max)) max = ms;
+    }
+    return max;
+  }
+
   // The newest OUTSTANDING reply deadline for a conversation, independent of the
   // escalation lifecycle (round-2 finding F2). The void path in tick.js
   // supersedes the open escalation and creates no replacement, so every reader
@@ -817,19 +830,28 @@ export function openDb(path) {
   // newest first; otherwise the most recent escalation row of ANY status.
   // json_valid() keeps a half-written or non-JSON analysis_json from throwing.
   //
-  // DISCHARGE RULE (round-3 G1): a kommun-imposed deadline is a demand on US, so
-  // it stands until WE reply and OUR reply is what discharges it. Only rows that
-  // arrived/were created strictly after the conversation's `last_outbound_at`
-  // are considered; a NULL last_outbound_at (nothing sent yet) considers
-  // everything. This is what lets escalateWithDraft carry the frist onto every
-  // escalation minted while it is outstanding without ever resurrecting a
-  // deadline we already answered. A timestamp we cannot parse is considered
-  // rather than dropped: showing an operator one date too many is recoverable,
-  // silently hiding a live frist is the failure this helper exists to prevent.
+  // DISCHARGE RULE (round-3 G1, tightened round-4 H1): a kommun-imposed deadline
+  // is a demand on US, so it stands until WE reply and OUR reply is what
+  // discharges it. The boundary is the latest OPERATOR send from the decisions
+  // ledger (`listOperatorDecisionTimes`: 'approve_unmodified' and 'edit' only),
+  // NOT `conversations.last_outbound_at`.
+  //
+  // Why not last_outbound_at: sendApprovedReply stamps it for EVERY send,
+  // including the three unattended templates (T_DELAY_ACK, T_FOLLOWUP_NUDGE,
+  // T_FOLLOWUP_CLOSE, decision 'auto_send'). An automatic ack is not an answer:
+  // "vi återkommer" says nothing about the invoice details the kommun asked for
+  // by the 14th, so letting it discharge the frist would delete the deadline
+  // from the dashboard and the digest with nobody having replied. `skip` and
+  // `closed` are excluded for the same reason the lazy-conversation rule
+  // excludes them: they resolve an escalation with nothing sent at all.
+  //
+  // No operator send in the conversation means nothing is discharged (consider
+  // everything). A timestamp we cannot parse is likewise considered rather than
+  // dropped: showing an operator one date too many is recoverable, silently
+  // hiding a live frist is the failure this helper exists to prevent.
   // Read-only surfacing: no guard or automation keys off this.
   function latestRespondByForConversation(conversationId) {
-    const conv = db.prepare('SELECT last_outbound_at FROM conversations WHERE id = ?').get(conversationId);
-    const dischargedAtMs = timestampMs(conv?.last_outbound_at);
+    const dischargedAtMs = latestOperatorSendMs(conversationId);
     const outstanding = (at) => {
       if (Number.isNaN(dischargedAtMs)) return true;
       const ms = timestampMs(at);

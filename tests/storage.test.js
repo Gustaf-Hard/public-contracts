@@ -749,32 +749,82 @@ describe('latestRespondByForConversation (round-2 finding F2)', () => {
     expect(db.latestRespondByForConversation(id)).toBeNull();
   });
 
-  // Round-3 G1: a kommun-imposed deadline is OUTSTANDING until WE reply. Our
-  // reply discharges it, so anything dated before last_outbound_at is spent and
-  // must not resurrect on a later undated escalation.
-  it('ignores a dated inbound older than our last reply (we already answered it)', () => {
-    const id = seed();
-    inbound(id, { at: '2026-09-05T08:00:00Z', respondBy: '2026-09-10' });
-    db.raw.prepare('UPDATE conversations SET last_outbound_at = ? WHERE id = ?').run('2026-09-06T09:00:00Z', id);
-    expect(db.latestRespondByForConversation(id)).toBeNull();
-  });
+  // Round-4 H1 (critical): the discharge boundary is an OPERATOR send, read
+  // from the decisions ledger — never conversations.last_outbound_at, which
+  // every machine send stamps too. An auto-sent ack is not an answer.
+  describe('discharge boundary is the latest OPERATOR send (round-4 H1)', () => {
+    function decide(convId, decision, decidedAt) {
+      const escId = db.recordEscalation({ conversation_id: convId, reason: 'r' });
+      const did = db.recordDecision({
+        escalation_id: escId, conversation_id: convId, conversation_state: 'NEEDS_HUMAN',
+        draft_body: 'b', decision,
+      });
+      db.raw.prepare('UPDATE decisions SET decided_at = ? WHERE id = ?').run(decidedAt, did);
+      // The carrier escalation is deliberately undated, so it never enters the
+      // escalation fallback below and the test asserts the ledger alone.
+      return did;
+    }
 
-  it('keeps a dated inbound newer than our last reply (still outstanding)', () => {
-    const id = seed();
-    inbound(id, { at: '2026-09-05T08:00:00Z', respondBy: '2026-09-10' });
-    db.raw.prepare('UPDATE conversations SET last_outbound_at = ? WHERE id = ?').run('2026-09-06T09:00:00Z', id);
-    inbound(id, { at: '2026-09-07T08:00:00Z', respondBy: '2026-09-14' });
-    expect(db.latestRespondByForConversation(id)).toBe('2026-09-14');
-  });
+    it('an auto_send after the deadline does NOT discharge it', () => {
+      const id = seed();
+      inbound(id, { at: '2026-09-05T08:00:00Z', respondBy: '2026-09-14' });
+      db.raw.prepare('UPDATE conversations SET last_outbound_at = ? WHERE id = ?').run('2026-09-06T09:00:00Z', id);
+      decide(id, 'auto_send', '2026-09-06 09:00:00');
+      expect(db.latestRespondByForConversation(id)).toBe('2026-09-14');
+    });
 
-  it('ignores an escalation row created before our last reply, keeps one created after', () => {
-    const id = seed();
-    const spent = db.recordEscalation({ conversation_id: id, reason: 'r', respond_by: '2026-09-10' });
-    db.raw.prepare('UPDATE escalations SET created_at = ? WHERE id = ?').run('2026-09-05 08:00:00', spent);
-    db.raw.prepare('UPDATE conversations SET last_outbound_at = ? WHERE id = ?').run('2026-09-06T09:00:00Z', id);
-    expect(db.latestRespondByForConversation(id)).toBeNull();
-    const live = db.recordEscalation({ conversation_id: id, reason: 'r', respond_by: '2026-09-18' });
-    db.raw.prepare('UPDATE escalations SET created_at = ? WHERE id = ?').run('2026-09-07 08:00:00', live);
-    expect(db.latestRespondByForConversation(id)).toBe('2026-09-18');
+    it('an approve_unmodified after the deadline discharges it', () => {
+      const id = seed();
+      inbound(id, { at: '2026-09-05T08:00:00Z', respondBy: '2026-09-14' });
+      decide(id, 'approve_unmodified', '2026-09-06 09:00:00');
+      expect(db.latestRespondByForConversation(id)).toBeNull();
+    });
+
+    it('an edit after the deadline discharges it', () => {
+      const id = seed();
+      inbound(id, { at: '2026-09-05T08:00:00Z', respondBy: '2026-09-14' });
+      decide(id, 'edit', '2026-09-06 09:00:00');
+      expect(db.latestRespondByForConversation(id)).toBeNull();
+    });
+
+    it('a skip after the deadline does NOT discharge it (nothing was sent)', () => {
+      const id = seed();
+      inbound(id, { at: '2026-09-05T08:00:00Z', respondBy: '2026-09-14' });
+      decide(id, 'skip', '2026-09-06 09:00:00');
+      expect(db.latestRespondByForConversation(id)).toBe('2026-09-14');
+    });
+
+    it('an operator send BEFORE the deadline mail leaves it outstanding', () => {
+      const id = seed();
+      decide(id, 'edit', '2026-09-04 09:00:00');
+      inbound(id, { at: '2026-09-05T08:00:00Z', respondBy: '2026-09-14' });
+      expect(db.latestRespondByForConversation(id)).toBe('2026-09-14');
+    });
+
+    it('the LATEST operator send is the boundary, not the first', () => {
+      const id = seed();
+      decide(id, 'edit', '2026-09-04 09:00:00');
+      inbound(id, { at: '2026-09-05T08:00:00Z', respondBy: '2026-09-14' });
+      decide(id, 'approve_unmodified', '2026-09-06 09:00:00');
+      expect(db.latestRespondByForConversation(id)).toBeNull();
+    });
+
+    it('no operator send at all discharges nothing, whatever last_outbound_at says', () => {
+      const id = seed();
+      inbound(id, { at: '2026-09-05T08:00:00Z', respondBy: '2026-09-10' });
+      db.raw.prepare('UPDATE conversations SET last_outbound_at = ? WHERE id = ?').run('2026-09-09T09:00:00Z', id);
+      expect(db.latestRespondByForConversation(id)).toBe('2026-09-10');
+    });
+
+    it('ignores an undated escalation row created before the operator send, keeps one created after', () => {
+      const id = seed();
+      const spent = db.recordEscalation({ conversation_id: id, reason: 'r', respond_by: '2026-09-10' });
+      db.raw.prepare('UPDATE escalations SET created_at = ? WHERE id = ?').run('2026-09-05 08:00:00', spent);
+      decide(id, 'edit', '2026-09-06 09:00:00');
+      expect(db.latestRespondByForConversation(id)).toBeNull();
+      const live = db.recordEscalation({ conversation_id: id, reason: 'r', respond_by: '2026-09-18' });
+      db.raw.prepare('UPDATE escalations SET created_at = ? WHERE id = ?').run('2026-09-07 08:00:00', live);
+      expect(db.latestRespondByForConversation(id)).toBe('2026-09-18');
+    });
   });
 });

@@ -256,6 +256,34 @@ describe('runDailyFollowup delay-ack sweep', () => {
     expect(d.draft_template).toBe('T_DELAY_ACK');
   });
 
+  // Round-4 H1 (critical), end to end: the auto-sent ack stamps
+  // conversations.last_outbound_at exactly like an operator send, so the old
+  // discharge boundary deleted the kommun's frist with nobody having answered
+  // it. The deadline must survive a machine send and only fall to an operator
+  // one.
+  it('an auto-sent T_DELAY_ACK does not discharge the frist an earlier inbound set', async () => {
+    writeSwitch({ auto_send_templates: ['T_DELAY_ACK'] });
+    const id = seedConv({ state: 'ACK_RECEIVED', stateChangedAt: '2026-08-19T00:00:00Z' });
+    // Inbound 1: the kommun demands invoice details by the 25th.
+    const dated = seedInbound(id, { classification: 'clarification', receivedAt: '2026-08-19T06:00:00Z', bodyText: 'Vilka fakturauppgifter behöver ni? Svara senast 2026-08-25.' });
+    db.raw.prepare('UPDATE messages SET analysis_json = ? WHERE id = ?')
+      .run(JSON.stringify({ extracted: { respond_by_date: '2026-08-25' } }), dated);
+    // Inbound 2 (newest): a bare delay promise, which is what the machine acks.
+    const msgId = seedInbound(id, {
+      classification: 'delay_promise', receivedAt: '2026-08-20T06:00:00Z',
+      bodyText: 'Hej,\nVi återkommer så snart underlaget är klart.\nMvh',
+    });
+    seedDelayAckEscalation(id, msgId);
+    const gmail = fakeGmail();
+    await runDailyFollowup(deps({ gmail, now: new Date('2026-08-20T09:00:00Z') }));
+    // The machine did send, and it did stamp last_outbound_at.
+    expect(gmail.sent).toHaveLength(1);
+    expect(db.listDecisions().find((x) => x.decision === 'auto_send')).toBeTruthy();
+    expect(db.getConversation(id).last_outbound_at).toBeTruthy();
+    // ...and the frist nobody answered is still outstanding.
+    expect(db.latestRespondByForConversation(id)).toBe('2026-08-25');
+  });
+
   it('switch off / nudge-only switch → draft stays open, nothing sent', async () => {
     writeSwitch({ auto_send_templates: ['T_FOLLOWUP_NUDGE'] });
     const id = seedConv({ state: 'ACK_RECEIVED', stateChangedAt: '2026-08-19T00:00:00Z' });
