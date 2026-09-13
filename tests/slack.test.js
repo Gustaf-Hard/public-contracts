@@ -4,6 +4,7 @@ import {
   verifySlackSignature,
   parseInteractivityPayload,
   updateEscalationResolved,
+  postAlert,
 } from '../src/slack.js';
 import crypto from 'node:crypto';
 
@@ -155,5 +156,74 @@ describe('updateEscalationResolved labels agency honestly', () => {
       status: 'send_failed', decision: 'auto_send', detail: 'socket hang up',
     });
     expect(slack.calls[0].text).toContain('Sändning misslyckades');
+  });
+});
+
+// Round-9 N1 (critical): a Slack `section` block's text is capped at 3000
+// characters, and the Köhälsa digest concatenates three sections of up to 20
+// kommun/role labels each into ONE block. Codex reproduced 3009 characters at
+// the worst case; over the cap Slack rejects the WHOLE message, and the digest's
+// catch only logs it, so the operator is told nothing. One fix in one place: the
+// single place every digest and every operational alert goes through.
+describe('postAlert block budget', () => {
+  function fakeSlack() {
+    const calls = [];
+    return { calls, chat: { postMessage: async (args) => { calls.push(args); return { ts: 't-1', channel: args.channel }; } } };
+  }
+  const LIMIT = 2900;
+  const blockTexts = (slack) => slack.calls[0].blocks.map((b) => b.text.text);
+
+  it('keeps a short alert in one block and posts it unchanged', async () => {
+    const slack = fakeSlack();
+    const res = await postAlert(slack, { channel: 'C1', text: '🧹 *Köhälsa:*\nallt lugnt' });
+    expect(slack.calls).toHaveLength(1);
+    expect(slack.calls[0].blocks).toHaveLength(1);
+    expect(slack.calls[0].blocks[0]).toEqual({ type: 'section', text: { type: 'mrkdwn', text: '🧹 *Köhälsa:*\nallt lugnt' } });
+    expect(slack.calls[0].text).toBe('🧹 *Köhälsa:*\nallt lugnt'); // fallback/notification text untouched
+    expect(res).toEqual({ ts: 't-1', channel: 'C1' });
+  });
+
+  it('splits a 7000-character multi-line alert into consecutive blocks, never inside a line', async () => {
+    const lines = Array.from({ length: 70 }, (_, i) => `${String(i).padStart(2, '0')} ${'x'.repeat(97)}`);
+    const text = lines.join('\n');
+    expect(text.length).toBeGreaterThan(6900);
+    const slack = fakeSlack();
+    await postAlert(slack, { channel: 'C1', text });
+
+    expect(slack.calls).toHaveLength(1); // still ONE message
+    const texts = blockTexts(slack);
+    expect(texts).toHaveLength(3);
+    for (const t of texts) expect(t.length).toBeLessThanOrEqual(LIMIT);
+    for (const b of slack.calls[0].blocks) expect(b).toMatchObject({ type: 'section', text: { type: 'mrkdwn' } });
+    // Nothing lost, nothing reordered, and every line survives whole.
+    expect(texts.join('\n')).toBe(text);
+    for (const t of texts) for (const line of t.split('\n')) expect(lines).toContain(line);
+  });
+
+  it('hard-splits a single line that is longer than the budget', async () => {
+    const text = 'y'.repeat(7000);
+    const slack = fakeSlack();
+    await postAlert(slack, { channel: 'C1', text });
+    const texts = blockTexts(slack);
+    expect(texts).toHaveLength(3);
+    for (const t of texts) expect(t.length).toBeLessThanOrEqual(LIMIT);
+    expect(texts.join('')).toBe(text);
+  });
+
+  it('caps at 50 blocks and says what it cut rather than letting Slack reject the message', async () => {
+    const text = Array.from({ length: 1000 }, (_, i) => `rad ${i} ${'z'.repeat(200)}`).join('\n');
+    const slack = fakeSlack();
+    await postAlert(slack, { channel: 'C1', text });
+    const texts = blockTexts(slack);
+    expect(texts).toHaveLength(50);
+    for (const t of texts) expect(t.length).toBeLessThanOrEqual(LIMIT);
+    expect(texts[49]).toMatch(/avkortat/);
+  });
+
+  it('still threads a split alert under an existing escalation message', async () => {
+    const slack = fakeSlack();
+    await postAlert(slack, { channel: 'C1', text: 'a'.repeat(4000), thread_ts: 's-9' });
+    expect(slack.calls[0].thread_ts).toBe('s-9');
+    expect(slack.calls[0].blocks.length).toBeGreaterThan(1);
   });
 });

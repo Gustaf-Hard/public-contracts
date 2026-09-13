@@ -194,7 +194,12 @@ guard, FSM transition or auto-send rule reads it.
 
 One new digest in `runDailyFollowup`, same shape as the hänvisning nag
 digest (c99daec): a single Slack message, posted only when non-empty,
-listing three sections:
+listing three sections. (Round-9 N1: three full sections of 20 kommun/role
+labels do not fit in one Slack `section` block, and Slack rejects the whole
+message when they overflow it, so `postAlert` splits its text across consecutive
+section blocks at line boundaries inside ONE `chat.postMessage`. Every digest and
+alert in the codebase goes through that one function, so none of them has to
+budget characters itself.)
 
 1. **⏰ Deadline inom 2 dagar eller passerad** — every live conversation whose
    EFFECTIVE deadline is `<= today+2`, sorted soonest first, one row per

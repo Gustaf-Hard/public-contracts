@@ -11,6 +11,7 @@ import { effectiveFollowUp, nudgeJitterDays } from '../src/conversation.js';
 import { stripQuotedText, isCloserText } from '../src/classifier.js';
 import { storeContractAnalysis } from '../src/analyse-contract.js';
 import * as analyseMod from '../src/analyse-message.js';
+import { postAlert as realPostAlert } from '../src/slack.js';
 
 let tmp, db, contractsDir;
 beforeEach(() => {
@@ -744,6 +745,61 @@ describe('queue hygiene digest (2026-09-12 design)', () => {
     await runDailyFollowup(deps({ slackOps, now: new Date('2026-09-12T09:00:00Z') }));
     const digest = slackOps.alerts.find((t) => t.includes('Köhälsa'));
     expect(digest.split('🧭')[1]).toContain('Frist/central (senast 2026-10-20)');
+  });
+
+  // Round-9 N1 (critical): the worst case is all three sections full — 20 + 20 +
+  // 20 kommun/role labels — and that text does not fit in ONE Slack `section`
+  // block (3000 chars), which makes Slack reject the ENTIRE message. The digest's
+  // catch only logs, so the operator hears nothing at all about a queue that is
+  // by definition in its worst state. postAlert now splits the text across
+  // consecutive section blocks in one message; this test drives the real
+  // postAlert with a fake Slack client so the assertion is on the blocks that
+  // would actually go over the wire.
+  it('posts a full three-section digest as one message whose every block fits the Slack limit', async () => {
+    const nn = (i) => `Storstadskommunen Nummer ${String(i).padStart(2, '0')}`;
+    const role = 'utbildningsforvaltning';
+    for (let i = 0; i < 20; i += 1) {
+      // ⏰: a dated draft, due today.
+      const due = db.createConversation({ kommun_kod: String(6100 + i), kommun_namn: `Frist ${nn(i)}`, role, contact_email: `d${i}@d.se`, scheduled_send_at: '2026-08-01T08:00:00Z' });
+      db.recordEscalation({ conversation_id: due, reason: 'r', draft_template: 'free_form', draft_body: 'b', respond_by: '2026-09-13' });
+      // 🕰: an undated draft older than 7 days (never due, so it stays in its own section).
+      const aged = db.createConversation({ kommun_kod: String(6200 + i), kommun_namn: `Gammal ${nn(i)}`, role, contact_email: `g${i}@g.se`, scheduled_send_at: '2026-08-01T08:00:00Z' });
+      const escId = db.recordEscalation({ conversation_id: aged, reason: 'r', draft_template: 'free_form', draft_body: 'b' });
+      db.raw.prepare("UPDATE escalations SET created_at = datetime('now', '-9 days') WHERE id = ?").run(escId);
+      // 🧭: NEEDS_HUMAN with nothing to approve and no deadline.
+      const orphan = db.createConversation({ kommun_kod: String(6300 + i), kommun_namn: `Ensam ${nn(i)}`, role, contact_email: `o${i}@o.se`, scheduled_send_at: '2026-08-01T08:00:00Z' });
+      db.updateConversationState(orphan, 'NEEDS_HUMAN');
+    }
+
+    const posted = [];
+    const slackOps = {
+      ...fakeSlackOps(),
+      postAlert: vi.fn(async (slack, args) => realPostAlert(
+        { chat: { postMessage: async (m) => { posted.push(m); return { ts: 'a', channel: m.channel }; } } },
+        args,
+      )),
+    };
+    await runDailyFollowup(deps({ slackOps, now: new Date('2026-09-12T09:00:00Z') }));
+
+    const digest = posted.find((m) => m.text.includes('Köhälsa'));
+    expect(digest).toBeTruthy();
+    expect(posted.filter((m) => m.text.includes('Köhälsa'))).toHaveLength(1); // ONE message
+    // The worst case really does exceed one block — otherwise this test proves nothing.
+    expect(digest.text.length).toBeGreaterThan(2900);
+    expect(digest.blocks.length).toBeGreaterThan(1);
+    expect(digest.blocks.length).toBeLessThanOrEqual(50);
+    for (const b of digest.blocks) {
+      expect(b.type).toBe('section');
+      expect(b.text.text.length).toBeLessThanOrEqual(2900);
+    }
+    // Nothing is lost, and no label is cut in half: every section's own lines
+    // survive intact inside some block.
+    const joined = digest.blocks.map((b) => b.text.text).join('\n');
+    expect(joined).toBe(digest.text);
+    for (const marker of ['⏰', '🕰', '🧭']) expect(joined).toContain(marker);
+    for (const label of [`Frist ${nn(0)}/${role} (senast 2026-09-13)`, `Ensam ${nn(0)}/${role}`]) {
+      expect(digest.blocks.some((b) => b.text.text.includes(label))).toBe(true);
+    }
   });
 
   it('posts nothing when the queue is healthy', async () => {
