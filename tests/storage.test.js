@@ -245,6 +245,45 @@ describe('decisions', () => {
     expect(list[0].classifier_class).toBe('clarification');
   });
 
+  // Round-7 L1: the ledger's `decided_at` is the boundary that discharges a
+  // kommun-imposed frist, and the send path needs it to be the moment the send
+  // STARTED, not the moment the row was written (Slack cleanup + Gmail archive
+  // sit in between). The column keeps its datetime('now') default for every
+  // caller that has nothing better to say (skip/closed resolve nothing sent).
+  describe('decided_at (round-7 L1)', () => {
+    function seedFor() {
+      const cid = db.createConversation({ kommun_kod: '9998', kommun_namn: 'Stämpel', role: 'central', contact_email: 'a@x.se', scheduled_send_at: '2026-05-19T10:00:00Z' });
+      const eid = db.recordEscalation({ conversation_id: cid, reason: 'r', draft_body: 'body' });
+      return { cid, eid };
+    }
+    const base = (cid, eid) => ({
+      escalation_id: eid, conversation_id: cid, conversation_state: 'SENT',
+      draft_body: 'body', decision: 'edit', final_body: 'body',
+    });
+    const read = (id) => db.raw.prepare('SELECT decided_at FROM decisions WHERE id = ?').get(id).decided_at;
+
+    it('stores an explicit decided_at verbatim', () => {
+      const { cid, eid } = seedFor();
+      const did = db.recordDecision({ ...base(cid, eid), decided_at: '2026-09-12 10:00:00' });
+      expect(read(did)).toBe('2026-09-12 10:00:00');
+    });
+
+    it('falls back to the SQLite clock when decided_at is omitted', () => {
+      const { cid, eid } = seedFor();
+      const did = db.recordDecision(base(cid, eid));
+      expect(read(did)).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+      expect(Math.abs(Date.parse(`${read(did).replace(' ', 'T')}Z`) - Date.now())).toBeLessThan(5000);
+    });
+
+    it('treats null/undefined decided_at as "use the default"', () => {
+      const { cid, eid } = seedFor();
+      for (const v of [null, undefined]) {
+        const did = db.recordDecision({ ...base(cid, eid), decided_at: v });
+        expect(read(did)).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+      }
+    });
+  });
+
   describe('listEditDecisions', () => {
     function seedDecision({ kommun_kod, kommun_namn, role, decision, decided_at, draft = 'draft text', final = 'final text' }) {
       const cid = db.createConversation({

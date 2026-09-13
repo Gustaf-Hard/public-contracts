@@ -210,7 +210,10 @@ automatic ack is not an answer, and `skip`/`closed` sent nothing at all. With no
 operator send in the conversation, nothing is discharged. **The discharge clock
 is INGEST time, not delivery time**: `messages.ingested_at` (stamped by
 `recordMessage` with SQLite `datetime('now')`, the same clock and format as
-`decisions.decided_at`) is the one boundary, because an operator answers what
+`decisions.decided_at`, which `sendApprovedReply` stamps with the moment the
+send STARTED, not the moment the ledger row was written seconds later on the far
+side of the Slack cleanup and the Gmail archive, round-7 L1) is the one boundary,
+because an operator answers what
 ingest has put in front of them, not what Gmail happened to deliver. An inbound
 is outstanding iff it was ingested *at or after* the latest operator send, so a
 mail delivered 09:50 but ingested 10:05 survives a 10:00 send, and a SAME-SECOND

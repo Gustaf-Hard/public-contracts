@@ -21,6 +21,14 @@ export function parseDbTime(s) {
   return Number.isNaN(t.getTime()) ? null : t;
 }
 
+// `new Date()` in the shape SQLite's datetime('now') writes: 'YYYY-MM-DD
+// HH:MM:SS', UTC, no zone marker. Used for the ledger's `decided_at` (round-7
+// L1) so the stamp is comparable to `messages.ingested_at` byte-for-byte, in any
+// process timezone.
+export function sqliteNow(d = new Date()) {
+  return d.toISOString().slice(0, 19).replace('T', ' ');
+}
+
 function errWithCode(message, code) {
   const e = new Error(message);
   e.code = code;
@@ -229,6 +237,16 @@ export async function sendApprovedReply({ db, gmail, env, conv, esc, finalBody, 
   // A bounce resend goes to a BRAND-NEW thread (like a refresh): never reply into
   // the bounce thread, so no threadId → no In-Reply-To/References to the NDR.
   const threadId = (isRefreshSend || isBounceResend) ? undefined : (resolved.threadId ?? conv.gmail_thread_id);
+  // THE discharge boundary for a kommun-imposed reply deadline (round-7 L1).
+  // Captured HERE, before Gmail, because the decision row is written at the very
+  // end of this function — after the Slack cleanup and the Gmail archive — and
+  // datetime('now') at that point is seconds after the mail left. A concurrent
+  // tick (ticks are exclusive with each other, not with a Slack or dashboard
+  // send) ingesting a kommun mail in that window would get an `ingested_at`
+  // before the decision and its frist would read as answered. Nothing else about
+  // the send changes: the decision is still persisted only after Gmail accepted,
+  // and every failure branch below still parks without writing one.
+  const sendStartedAt = sqliteNow();
   let sent;
   try {
     sent = await gmailSendImpl(gmail, {
@@ -337,6 +355,7 @@ export async function sendApprovedReply({ db, gmail, env, conv, esc, finalBody, 
     draft_body: esc.draft_body,
     decision,
     final_body: finalBody,
+    decided_at: sendStartedAt,
   });
   return { ...sent, pending_handoffs: pendingHandoffs };
 }

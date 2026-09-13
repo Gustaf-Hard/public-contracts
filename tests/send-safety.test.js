@@ -90,6 +90,65 @@ describe('sendApprovedReply — atomic claim (C1/H7)', () => {
   });
 });
 
+// Round-7 L1 (critical): the discharge boundary that decides whether a kommun's
+// frist was answered is `decisions.decided_at`, and it used to be the moment the
+// ROW was written — after the Slack cleanup and the Gmail archive, seconds after
+// the mail actually left. A concurrent tick (ticks are exclusive with each other,
+// not with a Slack or dashboard send) ingesting a kommun mail in that window got
+// an `ingested_at` BEFORE the decision and its deadline read as answered. The
+// boundary is the moment the send STARTED.
+describe('sendApprovedReply — decided_at is the moment the send started (round-7 L1)', () => {
+  const SQLITE_TS = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
+
+  it('stamps the decision before the post-send cleanup, so a mail ingested during it stays outstanding', async () => {
+    const { conv, esc, convId, escId } = seedConvWithEscalation();
+    const slackClient = fakeSlackClient();
+    // The post-send cleanup takes longer than one whole second: with the old
+    // default the decision row landed on the far side of it.
+    const slow = () => new Promise((r) => setTimeout(r, 1100));
+    slackClient.chat.update = vi.fn(async () => { await slow(); return { ok: true }; });
+    const archive = vi.fn(async () => { await slow(); });
+    const send = vi.fn(async () => ({ id: 'out-1', threadId: 'thr-orig' }));
+
+    await sendApprovedReply({
+      db, gmail: {}, env, conv, esc, finalBody: 'tack', decision: 'edit',
+      gmailSendImpl: send, archiveThreadImpl: archive, slackClient,
+    });
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(archive).toHaveBeenCalledTimes(1);
+
+    const decidedAt = db.raw.prepare('SELECT decided_at FROM decisions WHERE escalation_id = ?').get(escId).decided_at;
+    const outbound = db.raw.prepare("SELECT ingested_at FROM messages WHERE direction='outbound'").get();
+    expect(decidedAt).toMatch(SQLITE_TS);
+    expect(outbound.ingested_at).toMatch(SQLITE_TS);
+    // The outbound row is written immediately after Gmail accepted, i.e. still
+    // inside the send: the decision cannot be stamped later than it.
+    expect(decidedAt <= outbound.ingested_at).toBe(true);
+    // And an inbound a concurrent tick ingests during the cleanup is AFTER the
+    // boundary, so its frist is still outstanding.
+    const mid = db.recordMessage({
+      conversation_id: convId, gmail_message_id: 'in-race', direction: 'inbound',
+      from_email: 'a@arboga.se', to_email: 'me@x.se', subject: 's', body_text: 'nytt',
+      received_at: new Date().toISOString(), attachment_count: 0,
+      analysis_json: JSON.stringify({ extracted: { respond_by_date: '2026-12-01' } }),
+    });
+    expect(mid).toBeGreaterThan(0);
+    expect(db.latestRespondByForConversation(convId)).toBe('2026-12-01');
+  }, 15000);
+
+  // The ordering and every failure branch are untouched: a Gmail throw still
+  // parks and writes NO decision row, so nothing about the stamp can leak a
+  // decision for a send that did not happen.
+  it('writes no decision row at all when Gmail throws', async () => {
+    const { conv, esc, escId } = seedConvWithEscalation();
+    const send = vi.fn(async () => { throw new Error('boom'); });
+    await expect(
+      sendApprovedReply({ db, gmail: {}, env, conv, esc, finalBody: 'tack', decision: 'edit', gmailSendImpl: send })
+    ).rejects.toThrow('boom');
+    expect(db.raw.prepare('SELECT COUNT(*) n FROM decisions WHERE escalation_id = ?').get(escId).n).toBe(0);
+  });
+});
+
 describe('sendApprovedReply — two-phase send (C2)', () => {
   it('a Gmail failure parks the escalation as send_failed — never back to open, no outbound row', async () => {
     const { conv, esc, escId, convId } = seedConvWithEscalation();

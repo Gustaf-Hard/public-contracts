@@ -615,17 +615,27 @@ export function openDb(path) {
     return Number(r.lastInsertRowid);
   }
 
+  // `decided_at` is OPTIONAL and normally left to the column's datetime('now')
+  // default. The send path passes it (round-7 L1) because this stamp is the
+  // boundary that discharges a kommun-imposed frist, and the row is written on
+  // the far side of the Slack cleanup and the Gmail archive — seconds after the
+  // mail actually left. A concurrent tick ingesting a kommun mail in that window
+  // would otherwise land BEFORE the decision and read as answered. Callers that
+  // sent nothing (skip/closed) have nothing better to say and keep the default.
+  // COALESCE, not two statements, so the default stays one definition in the
+  // schema; null/undefined means "use it".
   function recordDecision(d) {
     const r = db.prepare(`
       INSERT INTO decisions (
         escalation_id, conversation_id, conversation_state,
         classifier_class, classifier_confidence,
-        draft_template, draft_body, decision, final_body
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        draft_template, draft_body, decision, final_body, decided_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')))
     `).run(
       d.escalation_id, d.conversation_id, d.conversation_state,
       d.classifier_class ?? null, d.classifier_confidence ?? null,
-      d.draft_template ?? null, d.draft_body, d.decision, d.final_body ?? null
+      d.draft_template ?? null, d.draft_body, d.decision, d.final_body ?? null,
+      d.decided_at ?? null
     );
     return Number(r.lastInsertRowid);
   }
