@@ -425,7 +425,10 @@ function userPromptFor(ctx, body) {
   //     earlier mail back arrives with '> ' lines, and those get the same four
   //     spaces a forged marker does (round-6 K2). The text is byte-for-byte
   //     intact and still reads as a quote to a human; it simply no longer opens
-  //     a CommonMark block quote inside our prompt.
+  //     a CommonMark block quote inside our prompt. Round-8 M4 extends this to
+  //     every line-leading structure character, so a kommun's bullet list and
+  //     its signature separator gain the same indent, for the same reason and at
+  //     the same (zero) cost to the text.
   lines.push(neutralizeOwnBody(body.trim()));
   lines.push('');
   lines.push('---');

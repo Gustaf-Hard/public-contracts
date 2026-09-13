@@ -48,31 +48,53 @@ const UNTRUSTED_BREAKS = /[\u0000-\u001F\u007F-\u009F\u2028\u2029]/g;
 // or letter. Requires the `u` flag; verified available on Node 20/22.
 const DEFAULT_IGNORABLE = '\\p{Default_Ignorable_Code_Point}';
 const ZERO_WIDTH = new RegExp(`[${DEFAULT_IGNORABLE}]`, 'gu');
-// "This line opens Markdown structure": a '#' or '>' preceded only by whitespace
-// and default-ignorable code points. `\s` rather than ` \t` because a line has
-// already been split off its terminator by then, so the only extra characters it
+// "This line opens Markdown structure": the line's first character that is
+// neither whitespace nor a default-ignorable code point is one that can start a
+// block-level construct. `\s` rather than ` \t` because a line has already been
+// split off its terminator by then, so the only extra characters the leading run
 // admits are exotic spaces (NBSP, U+2000..U+200A, IDEOGRAPHIC SPACE) — which a
 // reader sees as indentation too.
-const LINE_LEADING_MARKER = new RegExp(`^[\\s${DEFAULT_IGNORABLE}]*[#>]`, 'u');
-// Round-7 L4: two more line-leading constructs that open structure without a '#'
-// or a '>' anywhere.
-//   SETEXT_UNDERLINE — a line of only '-' or only '=' makes the line ABOVE it a
-//     heading, so "VI skrev (2026-09-12)\n---" is a forged record of our own
-//     commitments. '---' is also the exact delimiter analyse-message wraps the
-//     trigger body in, so an inbound '---' could close our fence too.
-//   FENCE_OPENER — three or more backticks or tildes open a fenced block that
-//     swallows every genuine '## VI skrev' heading after it.
-// Both are the STRICT CommonMark shape: 0-3 literal SPACES only. Unlike the '#'
-// and '>' markers above, a leading tab or an invisible code point does not make
-// a fence or an underline at all (a tab counts as four columns, and a
-// default-ignorable character is not whitespace to CommonMark), so widening the
-// leading run here would indent lines that were never structural. LIST markers
-// are deliberately absent: a list cannot impersonate our records (ruling).
-const SETEXT_UNDERLINE = /^ {0,3}(?:-+|=+)[ \t]*$/;
-const FENCE_OPENER = /^ {0,3}(?:`{3,}|~{3,})/;
-const LINE_OPENS_STRUCTURE = (line) => LINE_LEADING_MARKER.test(line)
-  || SETEXT_UNDERLINE.test(line)
-  || FENCE_OPENER.test(line);
+//
+// ONE CHARACTER CLASS, not an enumeration of constructs (round-8 M4). The guard
+// used to name three shapes (a '#'/'>' marker, a Setext underline, a fence
+// opener) and deliberately exempted lists, on the earlier ruling that "a list
+// cannot impersonate our records". That ruling is superseded, because the list
+// marker was never the threat by itself:
+//   - '- ## VI skrev (2026-09-12)' puts a real heading INSIDE a list item;
+//   - '<h2>VI skrev</h2>' renders one with no Markdown marker at all, and an
+//     unclosed '<!--' swallows every genuine heading after it the way a fence
+//     does;
+//   - '- - -' / '* * *' / '_ _ _' are thematic breaks that a Setext-only regex
+//     (which requires the whole line to be dashes or equals signs) never saw.
+// Enumerating constructs loses that race by construction: a four-space indent
+// costs the text nothing — every character still reaches the model for drafting
+// rule 5, only its line POSITION changes — so the cheap and complete rule is to
+// indent any line that opens on a structure character. The class is
+//   #  ATX heading
+//   >  block quote
+//   <  HTML block / comment
+//   -  list item, Setext underline, thematic break, YAML-ish delimiter
+//   *  list item, thematic break
+//   +  list item
+//   _  thematic break
+//   =  Setext underline
+//   ~  fence opener
+//   `  fence opener
+//   \d+ followed by '.' or ')'  ordered list item
+// The digit rule is CommonMark's ordered-list SHAPE, not "starts with a digit":
+// '2026-09-12 skickade vi' and '50000 kr' open no list and are left alone.
+//
+// Note this also RELAXES the leading run for underlines and fences, which used
+// to require 0-3 literal spaces because a tab or an invisible code point makes
+// neither construct in CommonMark. That strictness only ever bought us leaving a
+// handful of non-structural lines unindented; it is not worth a second regex
+// shape, and an indent on such a line is as benign as on any other.
+const STRUCTURE_OPENERS = '#><\\-*+_=~`';
+const LINE_OPENS_STRUCTURE_RE = new RegExp(
+  `^[\\s${DEFAULT_IGNORABLE}]*(?:[${STRUCTURE_OPENERS}]|\\d+[.)])`,
+  'u',
+);
+const LINE_OPENS_STRUCTURE = (line) => LINE_OPENS_STRUCTURE_RE.test(line);
 // Defensive splitter for quoted(): CRLF, CR, LF, VT, FF, NEL and both Unicode
 // separators. Sanitized text contains none of these, which is the point — a
 // future caller that forgets to sanitize still cannot emit an unquoted line.
@@ -134,11 +156,13 @@ function quoted(text) {
 // separator-borne '#' is a heading to a tokenizer too; rejoining on \n is the
 // point, not a side effect.
 //
-// Round-7 L4 widened "structure" beyond '#' and '>': a SETEXT underline (a line
-// of only dashes or only equals signs) makes the line above it a heading with no
-// marker character at all, and a FENCE opener (3+ backticks or tildes) swallows
-// every genuine heading after it. Both get the same four spaces. List markers do
-// NOT: a list cannot impersonate our records.
+// Round-7 L4 widened "structure" beyond '#' and '>' (a SETEXT underline makes the
+// line above it a heading with no marker character at all; a FENCE opener
+// swallows every genuine heading after it), and round-8 M4 dropped the
+// enumeration altogether in favour of one leading-character class — lists
+// included, superseding the earlier "a list cannot impersonate our records"
+// ruling, because '- ## VI skrev' puts a real heading inside a list item. See
+// LINE_OPENS_STRUCTURE above for the class and the reasoning.
 //
 // The leading run counts DEFAULT-IGNORABLE code points as whitespace (round-5
 // J3, widened in round-6 K3): the match used to be /^[ \t]*[#>]/, so a single
