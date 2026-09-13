@@ -97,7 +97,7 @@ ISO-datum (YYYY-MM-DD) när boten ska kolla tillbaka om inget hörs av kommunen.
 
 # respond_by_date
 
-ISO-datum (YYYY-MM-DD) när KOMMUNEN kräver svar av OSS ("svara inom 7 dagar annars stängs ärendet", "återkom senast 2026-09-02 med faktureringsuppgifter"). Skilj från promised_response_date (kommunens löfte till oss). Anges dagar (t.ex. "inom 7 dagar"): räkna från datumet mejlet togs emot (Mejlet togs emot), INTE från Dagens datum. Mejlet kan ha legat obehandlat några dagar, och fristen löper från kommunens avsändning. Ett datum som ligger före mottagningsdatumet är ett fel: sätt null. null när ingen frist ställs.
+ISO-datum (YYYY-MM-DD) när KOMMUNEN kräver svar av OSS ("svara inom 7 dagar annars stängs ärendet", "återkom senast 2026-09-02 med faktureringsuppgifter"). Skilj från promised_response_date (kommunens löfte till oss). Anges dagar (t.ex. "inom 7 dagar"): räkna från datumet mejlet togs emot (Mejlet togs emot), INTE från Dagens datum. Mejlet kan ha legat obehandlat några dagar, och fristen löper från kommunens avsändning. Om kommunen uttryckligen nämner en frist som redan passerat, ange det datumet ändå. null när ingen frist ställs.
 
 # mentioned_vendors och reseller_relations
 
@@ -326,13 +326,21 @@ export function normaliseDelayAnalysis(analysis, todayIso) {
   return analysis;
 }
 
-// Kommun-imposed reply deadline (2026-09-12 design). Fails closed: anything
-// that is not a real ISO date, or lies more than a day before the ANCHOR date,
-// becomes null rather than sorting the queue on garbage. The anchor is the date
-// the trigger mail was RECEIVED (Gmail internalDate), not the processing day
-// (round-2 finding F1): a deadline before the mail even arrived is a
-// hallucination, while a deadline after receipt but before processing is real
-// and overdue, which is exactly what must sort first.
+// How far before the receipt date a stated deadline may still be real. The
+// guard exists to catch hallucinated or garbled dates, which are typically far
+// off (wrong month or wrong year). A frist that passed a few days ago is the
+// opposite of a hallucination: "Fristen var den 10 september, svar saknas
+// fortfarande" is real, and MORE urgent (round-3 addendum G5).
+const RESPOND_BY_FLOOR_DAYS = 30;
+
+// Kommun-imposed reply deadline (2026-09-12 design, floor revised by round-3
+// addendum G5). Fails closed: anything that is not a real ISO date, or lies more
+// than RESPOND_BY_FLOOR_DAYS before the ANCHOR date, becomes null rather than
+// sorting the queue on garbage. The anchor is the date the trigger mail was
+// RECEIVED (Gmail internalDate), not the processing day (round-2 finding F1).
+// A deadline within the 30 days before receipt is kept: an explicitly stated
+// frist that has already passed sorts first as overdue, which is the intent.
+// Only a date far outside that window reads as a hallucination.
 export function normaliseRespondBy(analysis, anchorIso) {
   const ex = analysis?.extracted;
   if (!ex || ex.respond_by_date == null) return analysis;
@@ -340,7 +348,8 @@ export function normaliseRespondBy(analysis, anchorIso) {
   if (typeof v !== 'string' || !ISO_DATE_RE.test(v)) { ex.respond_by_date = null; return analysis; }
   const [y, mo, d] = v.split('-').map(Number);
   if (!isRealDate(y, mo, d)) { ex.respond_by_date = null; return analysis; }
-  const floor = anchorIso && ISO_DATE_RE.test(anchorIso) ? addDaysIso(anchorIso, -1) : null;
+  const floor = anchorIso && ISO_DATE_RE.test(anchorIso)
+    ? addDaysIso(anchorIso, -RESPOND_BY_FLOOR_DAYS) : null;
   if (floor && v < floor) ex.respond_by_date = null;
   return analysis;
 }

@@ -122,10 +122,18 @@ the guard are anchored to the date the trigger mail was RECEIVED (Gmail
 computes the ISO date from `Mejlet togs emot` plus those days, so a mail
 ingested late in an outage backlog keeps the frist the kommun actually set.
 `normaliseDelayAnalysis`'s helpers are reused for a `normaliseRespondBy`
-guard: ISO validity, and not more than one day before the receipt date. A
-deadline before the mail even arrived is a hallucination and becomes null; a
-deadline after receipt but before processing is real and overdue, which is
-exactly what must sort first. (Delay promises keep their existing
+guard: ISO validity, and not more than 30 days before the receipt date
+(`RESPOND_BY_FLOOR_DAYS`). The guard's job is catching hallucinated or garbled
+dates, which are typically far off (wrong month or wrong year) — NOT dates that
+have merely passed. A frist the kommun states explicitly and that expired a few
+days ago ("Fristen var den 10 september, svar saknas fortfarande") is real and
+more urgent than a future one, so it is kept and sorts first as overdue; only a
+date outside the 30-day window becomes null. The prompt says so too: instead of
+"a date before the receipt date is an error, set null" it instructs
+"Om kommunen uttryckligen nämner en frist som redan passerat, ange det datumet
+ändå." (Round-3 addendum G5 revised this paragraph; the original rule nulled
+anything more than one day pre-receipt and so erased exactly the overdue
+deadlines the queue most needs to show.) (Delay promises keep their existing
 `Dagens datum` anchor: pre-existing behaviour, ledgered as follow-up.)
 
 ### Storage

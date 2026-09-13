@@ -588,10 +588,20 @@ describe('respond_by_date (2026-09-12 design)', () => {
     const a = { extracted: { respond_by_date: '2026-02-31' } };
     expect(normaliseRespondBy(a, '2026-01-01').extracted.respond_by_date).toBeNull();
   });
-  it('normaliseRespondBy nulls a deadline more than a day in the past (hallucinated or stale), keeps yesterday and today', () => {
-    expect(normaliseRespondBy({ extracted: { respond_by_date: '2026-09-01' } }, '2026-09-12').extracted.respond_by_date).toBeNull();
+  // Round-3 addendum G5: the floor is receipt minus 30 days, not receipt minus
+  // one day. An explicitly stated frist that passed a few days ago is real and
+  // MORE urgent; only a date far off (wrong month or year) is a hallucination.
+  it('normaliseRespondBy nulls a deadline more than 30 days before receipt, keeps recent past and future', () => {
+    expect(normaliseRespondBy({ extracted: { respond_by_date: '2026-07-01' } }, '2026-09-13').extracted.respond_by_date).toBeNull();
+    expect(normaliseRespondBy({ extracted: { respond_by_date: '2026-09-10' } }, '2026-09-13').extracted.respond_by_date).toBe('2026-09-10');
+    expect(normaliseRespondBy({ extracted: { respond_by_date: '2026-09-01' } }, '2026-09-12').extracted.respond_by_date).toBe('2026-09-01');
     expect(normaliseRespondBy({ extracted: { respond_by_date: '2026-09-11' } }, '2026-09-12').extracted.respond_by_date).toBe('2026-09-11');
     expect(normaliseRespondBy({ extracted: { respond_by_date: '2026-09-19' } }, '2026-09-12').extracted.respond_by_date).toBe('2026-09-19');
+  });
+
+  it('normaliseRespondBy keeps exactly the 30-day edge and nulls the day before it', () => {
+    expect(normaliseRespondBy({ extracted: { respond_by_date: '2026-08-14' } }, '2026-09-13').extracted.respond_by_date).toBe('2026-08-14');
+    expect(normaliseRespondBy({ extracted: { respond_by_date: '2026-08-13' } }, '2026-09-13').extracted.respond_by_date).toBeNull();
   });
   it('prompts with the receipt date when ctx.received_iso is given, so relative fristen anchor to delivery', async () => {
     const client = fakeClientReturning({ intent: 'clarification', confidence: 0.9, summary: 's', extracted: { respond_by_date: null }, suggested_action: 'send_precision', is_final_delivery: false, draft_reply: 'd', follow_up_at: null });
@@ -616,15 +626,33 @@ describe('respond_by_date (2026-09-12 design)', () => {
     expect(r.extracted.respond_by_date).toBe('2026-09-08');
   });
 
-  it('a deadline before the mail even arrived is nulled (hallucination)', async () => {
-    const expected = { intent: 'clarification', confidence: 0.9, summary: 's', extracted: { arendenummer: null, promised_response_days: null, promised_response_date: null, respond_by_date: '2026-08-30', handoff_to_email: null, handoff_to_forvaltning: null, questions: null, mentioned_vendors: null, reseller_relations: null }, suggested_action: 'send_precision', is_final_delivery: false, draft_reply: 'd', follow_up_at: null };
+  it('a deadline far before the mail arrived is nulled (hallucination: wrong month or year)', async () => {
+    const expected = { intent: 'clarification', confidence: 0.9, summary: 's', extracted: { arendenummer: null, promised_response_days: null, promised_response_date: null, respond_by_date: '2025-08-30', handoff_to_email: null, handoff_to_forvaltning: null, questions: null, mentioned_vendors: null, reseller_relations: null }, suggested_action: 'send_precision', is_final_delivery: false, draft_reply: 'd', follow_up_at: null };
     const r = await analyseMessage('Svara snarast.', { ...baseCtx, today_iso: '2026-09-10', received_iso: '2026-09-01' }, { env: { ANTHROPIC_API_KEY: 'k' }, client: fakeClientReturning(expected) });
     expect(r.extracted.respond_by_date).toBeNull();
   });
 
+  // Round-3 addendum G5 (astra R2 #2): "Fristen var den 10 september, svar
+  // saknas fortfarande" received 2026-09-13. The stated frist passed three days
+  // ago, which makes it urgent, not hallucinated — it must survive and sort
+  // first as overdue.
+  it('an explicitly stated frist that passed days before receipt survives as overdue', async () => {
+    const expected = { intent: 'clarification', confidence: 0.9, summary: 's', extracted: { arendenummer: null, promised_response_days: null, promised_response_date: null, respond_by_date: '2026-09-10', handoff_to_email: null, handoff_to_forvaltning: null, questions: null, mentioned_vendors: null, reseller_relations: null }, suggested_action: 'send_precision', is_final_delivery: false, draft_reply: 'd', follow_up_at: null };
+    const r = await analyseMessage('Fristen var den 10 september, svar saknas fortfarande.', { ...baseCtx, today_iso: '2026-09-13', received_iso: '2026-09-13' }, { env: { ANTHROPIC_API_KEY: 'k' }, client: fakeClientReturning(expected) });
+    expect(r.extracted.respond_by_date).toBe('2026-09-10');
+  });
+
   it('normaliseRespondBy keeps a date after the anchor even when it is already overdue today', () => {
     expect(normaliseRespondBy({ extracted: { respond_by_date: '2026-09-08' } }, '2026-09-01').extracted.respond_by_date).toBe('2026-09-08');
-    expect(normaliseRespondBy({ extracted: { respond_by_date: '2026-08-30' } }, '2026-09-01').extracted.respond_by_date).toBeNull();
+    expect(normaliseRespondBy({ extracted: { respond_by_date: '2026-07-01' } }, '2026-09-01').extracted.respond_by_date).toBeNull();
+  });
+
+  it('the prompt tells the model to keep an explicitly stated frist that already passed', async () => {
+    const client = fakeClientReturning({ intent: 'auto_ack', confidence: 0.9, summary: 's', extracted: {}, suggested_action: 'wait', is_final_delivery: false, draft_reply: '', follow_up_at: null });
+    await analyseMessage('Tack.', baseCtx, { env: { ANTHROPIC_API_KEY: 'k' }, client });
+    const sys = client.messages.create.mock.calls[0][0].system[0].text;
+    expect(sys).toContain('Om kommunen uttryckligen nämner en frist som redan passerat, ange det datumet ändå.');
+    expect(sys).not.toContain('Ett datum som ligger före mottagningsdatumet är ett fel');
   });
 
   it('normaliseRespondBy tolerates a missing extracted block', () => {
