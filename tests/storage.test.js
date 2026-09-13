@@ -682,6 +682,28 @@ describe('queue hygiene queries (2026-09-12 design)', () => {
     expect(orphans).toContain('Föräldralös');
     expect(orphans).not.toContain('Gammal'); // has an open escalation
   });
+
+  // Round-3 G2 (Codex R2 #2): listOrphanNeedsHuman excludes any conversation
+  // whose kommun has a pending handoff task, which is right for the "utan
+  // utkast" list but wrong for the deadline section — a pending referral does
+  // not discharge a reply deadline. The two lists now come from one query so
+  // they cannot drift.
+  it('listNeedsHumanWithoutOpenEscalation keeps a handoff-bearing case that listOrphanNeedsHuman drops', () => {
+    const cid = db.createConversation({ kommun_kod: '0042', kommun_namn: 'Hänvisad', role: 'central', contact_email: 'h@h.se', scheduled_send_at: '2026-08-01T08:00:00Z' });
+    const mid = db.recordMessage({
+      conversation_id: cid, gmail_message_id: 'g-h', direction: 'inbound',
+      from_email: 'h@h.se', to_email: 'x', subject: 's', body_text: 'b',
+      received_at: '2026-09-11T08:00:00Z', attachment_count: 0,
+      analysis_json: JSON.stringify({ extracted: { respond_by_date: '2026-09-13' } }),
+    });
+    db.updateConversationState(cid, 'NEEDS_HUMAN');
+    db.upsertHandoffTask({ kommun_kod: '0042', source_conversation_id: cid, source_message_id: mid, address: 'annan@h.se', forvaltning: null, same_domain: 1 });
+
+    const without = db.listNeedsHumanWithoutOpenEscalation();
+    expect(without.map((c) => c.kommun_namn)).toContain('Hänvisad');
+    expect(without.find((c) => c.id === cid).respond_by).toBe('2026-09-13');
+    expect(db.listOrphanNeedsHuman().map((c) => c.kommun_namn)).not.toContain('Hänvisad');
+  });
 });
 
 // Round-2 finding F2: the void path (kommun replied after a draft was written)

@@ -854,23 +854,38 @@ export function openDb(path) {
     return esc?.respond_by ?? null;
   }
 
-  // NEEDS_HUMAN with nothing actionable: no open escalation AND no pending
-  // handoff task. The void path in tick.js legitimately produces this state
+  // NEEDS_HUMAN with no draft to approve: state NEEDS_HUMAN and no OPEN
+  // escalation. The void path in tick.js legitimately produces this state
   // (kommun replied after a draft, reply warranted no new draft) — the digest
   // is what stops it from being invisible (Karlstad/Avesta, 2026-09-12 review).
-  // Each row carries respond_by (finding F2): an orphan is exactly the case
+  // Each row carries respond_by (finding F2): such a case is exactly the one
   // whose deadline no escalation holds any more, so the digest would otherwise
   // name the kommun with no date.
-  function listOrphanNeedsHuman() {
+  //
+  // Deliberately WITHOUT the pending-handoff exclusion (round-3 G2): a pending
+  // hänvisning is other work, it does not discharge a reply deadline, so the
+  // digest's ⏰ section reads from here. listOrphanNeedsHuman below is this list
+  // plus that exclusion, so the two cannot drift apart.
+  function listNeedsHumanWithoutOpenEscalation() {
     const rows = db.prepare(`
-      SELECT c.id, c.kommun_namn, c.role, c.state_changed_at
+      SELECT c.id, c.kommun_kod, c.kommun_namn, c.role, c.state_changed_at
       FROM conversations c
       WHERE c.state = 'NEEDS_HUMAN'
         AND NOT EXISTS (SELECT 1 FROM escalations e WHERE e.conversation_id = c.id AND e.status = 'open')
-        AND NOT EXISTS (SELECT 1 FROM handoff_tasks t WHERE t.kommun_kod = c.kommun_kod AND t.status = 'pending')
       ORDER BY c.state_changed_at
     `).all();
     return rows.map((r) => ({ ...r, respond_by: latestRespondByForConversation(r.id) }));
+  }
+
+  // NEEDS_HUMAN with nothing actionable at all: the list above minus every
+  // conversation whose kommun already has a pending handoff task (spec §C list
+  // 3 — the operator has a click waiting there, so the case is not orphaned).
+  function listOrphanNeedsHuman() {
+    const pending = db.prepare(
+      "SELECT 1 FROM handoff_tasks WHERE kommun_kod = ? AND status = 'pending' LIMIT 1"
+    );
+    return listNeedsHumanWithoutOpenEscalation()
+      .filter((r) => pending.get(r.kommun_kod) == null);
   }
 
   const activeStatusPlaceholders = ACTIVE_ESCALATION_STATUSES.map(() => '?').join(', ');
@@ -1749,6 +1764,7 @@ export function openDb(path) {
     listOpenEscalationsAgedDays,
     listOpenEscalationsWithDeadlineDue,
     listOrphanNeedsHuman,
+    listNeedsHumanWithoutOpenEscalation,
     latestRespondByForConversation,
     listActiveEscalationsForConversation,
     hasActiveEscalation,

@@ -760,6 +760,35 @@ describe('queue hygiene digest (2026-09-12 design)', () => {
     expect(orphanSection).toContain('Karlstad (senast 2026-09-13)');
   });
 
+  // Round-3 G2 (Codex R2 #2): the deadline section sourced its draftless rows
+  // from listOrphanNeedsHuman, which excludes any conversation whose kommun has
+  // a pending handoff task. A pending referral does not discharge a reply
+  // deadline, so the ⏰ alert vanished for exactly the cases carrying both.
+  it('a dated draftless case whose kommun has a pending handoff still raises the deadline alert', async () => {
+    const cid = db.createConversation({ kommun_kod: '0011', kommun_namn: 'Hänvisad', role: 'central', contact_email: 'h@h.se', scheduled_send_at: '2026-08-01T08:00:00Z' });
+    const mid = db.recordMessage({
+      conversation_id: cid, gmail_message_id: 'g-h', direction: 'inbound',
+      from_email: 'h@h.se', to_email: 'x', subject: 's', body_text: 'b',
+      received_at: '2026-09-11T08:00:00Z', attachment_count: 0,
+      analysis_json: JSON.stringify({ extracted: { respond_by_date: '2026-09-13' } }),
+    });
+    db.updateConversationState(cid, 'NEEDS_HUMAN');
+    db.upsertHandoffTask({
+      kommun_kod: '0011', source_conversation_id: cid, source_message_id: mid,
+      address: 'annan@h.se', forvaltning: null, same_domain: 1,
+    });
+    const slackOps = fakeSlackOps();
+    await runDailyFollowup(deps({ slackOps, now: new Date('2026-09-12T09:00:00Z') }));
+    const digest = slackOps.alerts.find((t) => t.includes('Köhälsa'));
+    expect(digest).toBeTruthy();
+    const deadlineSection = digest.split('🧭')[0];
+    expect(deadlineSection).toContain('Hänvisad (senast 2026-09-13, utan utkast)');
+    // The 🧭 list keeps its handoff exclusion (spec section C, list 3).
+    if (digest.includes('🧭')) {
+      expect(digest.slice(digest.indexOf('🧭'))).not.toContain('Hänvisad');
+    }
+  });
+
   it('an orphan with no deadline is named without a date and stays out of the deadline section', async () => {
     const cid = db.createConversation({ kommun_kod: '0010', kommun_namn: 'Avesta', role: 'central', contact_email: 'a@a.se', scheduled_send_at: '2026-08-01T08:00:00Z' });
     db.updateConversationState(cid, 'NEEDS_HUMAN');

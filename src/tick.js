@@ -1422,9 +1422,15 @@ export async function runDailyFollowup(deps) {
     const dueIds = new Set(due.map((e) => e.id));
     const aged = (db.listOpenEscalationsAgedDays?.(7) ?? []).filter((e) => !dueIds.has(e.id));
     const orphans = db.listOrphanNeedsHuman?.() ?? [];
+    // The ⏰ section's draftless source deliberately does NOT carry the
+    // pending-handoff exclusion that shapes the 🧭 list (round-3 G2): a pending
+    // hänvisning is other work, it does not discharge a reply deadline, and a
+    // referral on one conversation was silencing the deadline alert on another.
+    const draftless = db.listNeedsHumanWithoutOpenEscalation?.() ?? orphans;
     // A voided draft leaves the deadline on the message analysis only (round-2
-    // finding F2), so the deadline section is escalations PLUS orphans whose
-    // frist is due, marked so the operator knows there is nothing to approve.
+    // finding F2), so the deadline section is escalations PLUS draftless
+    // NEEDS_HUMAN cases whose frist is due, marked so the operator knows there
+    // is nothing to approve.
     // Dedup by conversation: one case is named once in this section.
     const deadlineItems = [];
     const seenConvIds = new Set();
@@ -1433,7 +1439,7 @@ export async function runDailyFollowup(deps) {
       seenConvIds.add(e.conversation_id);
       deadlineItems.push({ respond_by: e.respond_by, label: `${e.kommun_namn} (senast ${e.respond_by})` });
     }
-    for (const c of orphans) {
+    for (const c of draftless) {
       if (!c.respond_by || c.respond_by > dueBy || seenConvIds.has(c.id)) continue;
       seenConvIds.add(c.id);
       deadlineItems.push({ respond_by: c.respond_by, label: `${c.kommun_namn} (senast ${c.respond_by}, utan utkast)` });

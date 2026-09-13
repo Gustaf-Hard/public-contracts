@@ -162,7 +162,13 @@ listing three sections:
 
 1. **⏰ Deadline inom 2 dagar eller passerad** — open escalations with
    `respond_by <= today+2`, sorted soonest first. Repeats daily until
-   resolved; for a hard external deadline the repeat is the feature.
+   resolved; for a hard external deadline the repeat is the feature. Plus the
+   draftless cases carrying a due frist, marked "utan utkast" because there is
+   nothing to approve (round-2 finding F2). Those come from
+   `listNeedsHumanWithoutOpenEscalation`, NOT from `listOrphanNeedsHuman`: a
+   pending handoff task does not discharge a reply deadline, so the
+   handoff exclusion belongs to list 3 only (round-3 G2). Deduped by
+   conversation.
 2. **🕰 Äldre än 7 dagar** — open escalations with `created_at` older than
    7 days: count + the 10 oldest as `kommun (N dagar)`. Daily repetition is
    acceptable because the list only shrinks when the operator acts, and the
