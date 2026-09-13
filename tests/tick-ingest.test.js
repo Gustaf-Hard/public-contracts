@@ -843,4 +843,34 @@ describe('runTick — draft context wiring (2026-09-12 draft-context design)', (
     expect(ctx.thread_context).toContain('# Bilagor i det inkommande mejlet');
     spy.mockRestore();
   });
+
+  // Final-review finding 4 (2026-09-12): a context-build failure must degrade
+  // gracefully, never hold the message hostage across ticks.
+  it('a buildDraftContext failure still ingests the message, with thread_context undefined', async () => {
+    const id = seedConv();
+    db.recordMessage({
+      conversation_id: id, gmail_message_id: 'out-1', direction: 'outbound',
+      from_email: 'gustaf@mediagraf.se', to_email: 'kansli@ale.se', subject: 'Begäran',
+      body_text: 'Begäran.', classification: null, classification_confidence: null,
+      received_at: '2026-06-10T10:00:00Z', attachment_count: 0,
+    });
+    db.listAttachmentsForConversation = () => { throw new Error('boom'); };
+
+    const spy = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue(null);
+    const gmail = fakeGmail({
+      listResult: [{ id: 'm1' }],
+      getResult: { 'm1': mkMsg('m1', 'thr-a', 'Registrator <kansli@ale.se>', 'Se bifogat avtal.') },
+    });
+    const lines = [];
+    await runTick({ ...deps({ gmail }), log: (l) => lines.push(l) });
+    expect(spy).toHaveBeenCalled();
+    const ctx = spy.mock.calls[0][1];
+    expect(ctx.thread_context).toBeUndefined();
+    spy.mockRestore();
+
+    // The message was still ingested despite the context failure.
+    const msgs = db.listMessages(id);
+    expect(msgs.some((m) => m.gmail_message_id === 'm1')).toBe(true);
+    expect(lines.some((l) => l.includes('draft context'))).toBe(true);
+  });
 });

@@ -362,7 +362,7 @@ async function archiveIngestedThreadBestEffort({ threadId, deps }) {
 // attachments, thread, FSM state) committed together. The heavy per-PDF
 // contract analysis and the escalation dispatch happen AFTER ingest (M6).
 async function ingestMessage({ conv, item, deps }) {
-  const { db, gmailClient, gmailOps, env, now } = deps;
+  const { db, gmailClient, gmailOps, env, now, log } = deps;
   const { full, parsed } = item;
   // Gmail's internalDate is the delivery time; processing time would corrupt
   // follow-up math and thread ordering for post-outage backlogs (review M2).
@@ -374,13 +374,21 @@ async function ingestMessage({ conv, item, deps }) {
   const daysSinceLastOutbound = lastOutboundMs != null
     ? Math.floor((now.getTime() - lastOutboundMs) / (1000 * 60 * 60 * 24))
     : null;
+  // A context-build failure must degrade to no context, never hold the
+  // message hostage across ticks (final-review finding 4, 2026-09-12).
+  let threadContext;
+  try {
+    threadContext = buildDraftContext(db, conv, parsed);
+  } catch (e) {
+    log?.(`draft context build failed for conv ${conv.id}: ${e.message} — analysing without thread_context`);
+  }
   const analysis = await analyseMessage(parsed.body, {
     kommun_namn: conv.kommun_namn,
     role: conv.role,
     conversation_state: conv.state,
     days_since_last_outbound: daysSinceLastOutbound,
     today_iso: now.toISOString().slice(0, 10),
-    thread_context: buildDraftContext(db, conv, parsed),
+    thread_context: threadContext,
   }, { env });
   const classification = analysis
     ? analysisToLegacyClassification(analysis)
