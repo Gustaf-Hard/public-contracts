@@ -54,6 +54,25 @@ const ZERO_WIDTH = new RegExp(`[${DEFAULT_IGNORABLE}]`, 'gu');
 // admits are exotic spaces (NBSP, U+2000..U+200A, IDEOGRAPHIC SPACE) — which a
 // reader sees as indentation too.
 const LINE_LEADING_MARKER = new RegExp(`^[\\s${DEFAULT_IGNORABLE}]*[#>]`, 'u');
+// Round-7 L4: two more line-leading constructs that open structure without a '#'
+// or a '>' anywhere.
+//   SETEXT_UNDERLINE — a line of only '-' or only '=' makes the line ABOVE it a
+//     heading, so "VI skrev (2026-09-12)\n---" is a forged record of our own
+//     commitments. '---' is also the exact delimiter analyse-message wraps the
+//     trigger body in, so an inbound '---' could close our fence too.
+//   FENCE_OPENER — three or more backticks or tildes open a fenced block that
+//     swallows every genuine '## VI skrev' heading after it.
+// Both are the STRICT CommonMark shape: 0-3 literal SPACES only. Unlike the '#'
+// and '>' markers above, a leading tab or an invisible code point does not make
+// a fence or an underline at all (a tab counts as four columns, and a
+// default-ignorable character is not whitespace to CommonMark), so widening the
+// leading run here would indent lines that were never structural. LIST markers
+// are deliberately absent: a list cannot impersonate our records (ruling).
+const SETEXT_UNDERLINE = /^ {0,3}(?:-+|=+)[ \t]*$/;
+const FENCE_OPENER = /^ {0,3}(?:`{3,}|~{3,})/;
+const LINE_OPENS_STRUCTURE = (line) => LINE_LEADING_MARKER.test(line)
+  || SETEXT_UNDERLINE.test(line)
+  || FENCE_OPENER.test(line);
 // Defensive splitter for quoted(): CRLF, CR, LF, VT, FF, NEL and both Unicode
 // separators. Sanitized text contains none of these, which is the point — a
 // future caller that forgets to sanitize still cannot emit an unquoted line.
@@ -115,6 +134,12 @@ function quoted(text) {
 // separator-borne '#' is a heading to a tokenizer too; rejoining on \n is the
 // point, not a side effect.
 //
+// Round-7 L4 widened "structure" beyond '#' and '>': a SETEXT underline (a line
+// of only dashes or only equals signs) makes the line above it a heading with no
+// marker character at all, and a FENCE opener (3+ backticks or tildes) swallows
+// every genuine heading after it. Both get the same four spaces. List markers do
+// NOT: a list cannot impersonate our records.
+//
 // The leading run counts DEFAULT-IGNORABLE code points as whitespace (round-5
 // J3, widened in round-6 K3): the match used to be /^[ \t]*[#>]/, so a single
 // U+200B (or SOFT HYPHEN, or a bidi mark, or any of the sixteen the enumerated
@@ -125,7 +150,7 @@ function quoted(text) {
 export function neutralizeOwnBody(text) {
   return String(text)
     .split(ANY_LINE_BREAK)
-    .map((line) => (LINE_LEADING_MARKER.test(line) ? `    ${line}` : line))
+    .map((line) => (LINE_OPENS_STRUCTURE(line) ? `    ${line}` : line))
     .join('\n');
 }
 
