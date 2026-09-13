@@ -32,8 +32,17 @@ const MAX_FILENAME_CHARS = 120;
 // control character belongs in a source file.
 const UNTRUSTED_BREAKS = /[\u0000-\u001F\u007F-\u009F\u2028\u2029]/g;
 // Invisible characters are removed, not spaced: they carry no information and
-// their only use here is hiding a leading '#' from the strip below.
-const ZERO_WIDTH = /[\u200B\u200C\u200D\uFEFF]/g;
+// their only use here is hiding a leading '#' from the strip below. The set is
+// every code point that renders as nothing yet is not \s, so neither
+// `/\s+/` nor `/^[#>\s]+/` can see past it: the zero-width quartet, SOFT
+// HYPHEN, the bidi marks and embeddings/overrides, and WORD JOINER (round-5 J3).
+// Written as escape sequences on purpose: no literal invisible character
+// belongs in a source file, where it would be unreviewable.
+const INVISIBLE = '\\u00AD\\u200B-\\u200F\\u202A-\\u202E\\u2060\\uFEFF';
+const ZERO_WIDTH = new RegExp(`[${INVISIBLE}]`, 'gu');
+// "This line opens Markdown structure": a '#' or '>' preceded only by spaces,
+// tabs and invisible code points.
+const LINE_LEADING_MARKER = new RegExp(`^[ \\t${INVISIBLE}]*[#>]`, 'u');
 // Defensive splitter for quoted(): CRLF, CR, LF, VT, FF, NEL and both Unicode
 // separators. Sanitized text contains none of these, which is the point — a
 // future caller that forgets to sanitize still cannot emit an unquoted line.
@@ -87,10 +96,17 @@ function quoted(text) {
 // JS itself treats U+2028/U+2029 as line terminators under the m flag, so a
 // separator-borne '#' is a heading to a tokenizer too; rejoining on \n is the
 // point, not a side effect.
-function neutralizeOwnBody(text) {
+//
+// The leading run counts INVISIBLE code points as whitespace (round-5 J3): the
+// match used to be /^[ \t]*[#>]/, so a single U+200B (or SOFT HYPHEN, or a bidi
+// mark) in front of the '#' walked straight past the guard while a reader and a
+// tokenizer both still saw a heading. Unlike sanitizeUntrusted these characters
+// are NOT removed here — rule 5 needs our copy byte-for-byte — they only stop
+// shielding the marker.
+export function neutralizeOwnBody(text) {
   return String(text)
     .split(ANY_LINE_BREAK)
-    .map((line) => (/^[ \t]*[#>]/.test(line) ? ` ${line}` : line))
+    .map((line) => (LINE_LEADING_MARKER.test(line) ? ` ${line}` : line))
     .join('\n');
 }
 

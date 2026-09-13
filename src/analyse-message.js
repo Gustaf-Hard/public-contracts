@@ -12,6 +12,9 @@
 // unset or the API call fails — that keeps the daemon working offline.
 
 import Anthropic from '@anthropic-ai/sdk';
+// Shared with the context block so the trigger body and our own outbound
+// bodies cannot differ about what counts as line-leading structure (round-5 J3).
+import { neutralizeOwnBody } from './draft-context.js';
 
 const DEFAULT_MODEL = 'claude-haiku-4-5';
 
@@ -388,7 +391,14 @@ function userPromptFor(ctx, body) {
   lines.push('');
   lines.push('Inkommande svar från registratorn:');
   lines.push('---');
-  lines.push(body.trim());
+  // The trigger body is the most directly sender-controlled string in this
+  // message, pushed in raw between two fences. Neutralized with the SAME helper
+  // the context block uses on our own outbound bodies (round-5 J3, round-3 #7):
+  // otherwise an inbound mail can close the fence and open a "## VI skrev"
+  // record, which drafting rule 5 tells the model it may reuse as OUR
+  // commitment. Every character survives, only line-leading Markdown markers
+  // lose their position.
+  lines.push(neutralizeOwnBody(body.trim()));
   lines.push('---');
   if (ctx.thread_context) {
     lines.push('');
