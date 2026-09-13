@@ -16,6 +16,22 @@ const MAX_OUTBOUND_CHARS = 1500;
 const MAX_INBOUND_CHARS = 300;
 const MAX_FILENAME_CHARS = 120;
 
+// Every character that can end a line for a reader or a tokenizer: the C0
+// controls (CR, LF, TAB, VT U+000B, FF U+000C and the rest), the C1 range
+// (which contains NEL U+0085), and U+2028 LINE SEPARATOR / U+2029 PARAGRAPH
+// SEPARATOR. JS itself treats U+2028/U+2029 as line terminators for ^ under the
+// m flag, so leaving them in let a filename open a heading of its own
+// (round-3 addendum G7). Written as escape sequences on purpose: no literal
+// control character belongs in a source file.
+const UNTRUSTED_BREAKS = /[\u0000-\u001F\u007F-\u009F\u2028\u2029]/g;
+// Invisible characters are removed, not spaced: they carry no information and
+// their only use here is hiding a leading '#' from the strip below.
+const ZERO_WIDTH = /[\u200B\u200C\u200D\uFEFF]/g;
+// Defensive splitter for quoted(): CRLF, CR, LF, VT, FF, NEL and both Unicode
+// separators. Sanitized text contains none of these, which is the point — a
+// future caller that forgets to sanitize still cannot emit an unquoted line.
+const ANY_LINE_BREAK = /\u000D\u000A|[\u000A\u000B\u000C\u000D\u0085\u2028\u2029]/;
+
 // Municipality-controlled text (attachment filenames, stored summaries, raw
 // body prefixes) shares this block with records of OUR OWN commitments, and
 // drafting rule 4 tells the model that a commitment under "VI skrev" stands. A
@@ -24,11 +40,17 @@ const MAX_FILENAME_CHARS = 120;
 // every line break and strip the Markdown structure characters so untrusted
 // text can never open a section of its own. `max` is optional: callers that
 // already have a cap (body prefixes) pass it, the rest keep their length.
+//
+// Order matters: break characters become spaces first, zero-width characters
+// disappear, runs of whitespace collapse, and only THEN is the leading
+// '#'/'>'/whitespace run stripped — otherwise an invisible or control character
+// in front of "## " would shield the hash from the strip (G7).
 export function sanitizeUntrusted(text, max = null) {
   if (text == null) return '';
   const flat = String(text)
-    .replace(/[\r\n\t]+/g, ' ')
-    .replace(/\s{2,}/g, ' ')
+    .replace(UNTRUSTED_BREAKS, ' ')
+    .replace(ZERO_WIDTH, '')
+    .replace(/\s+/g, ' ')
     .replace(/^[#>\s]+/, '')
     .trim();
   return max != null && flat.length > max ? flat.slice(0, max) : flat;
@@ -36,8 +58,10 @@ export function sanitizeUntrusted(text, max = null) {
 
 // Everything kommun-derived is rendered as a quoted block, so even text that
 // survives sanitisation sits visibly at the data level, never at the document's.
+// Only ever fed sanitized text (keep it that way); the broad splitter is the
+// belt to sanitizeUntrusted's braces.
 function quoted(text) {
-  return String(text).split('\n').map((line) => `> ${line}`).join('\n');
+  return String(text).split(ANY_LINE_BREAK).map((line) => `> ${line}`).join('\n');
 }
 
 export function buildDraftContext(db, conv, parsed) {
