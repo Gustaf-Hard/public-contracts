@@ -129,7 +129,7 @@ async function archiveThreadBestEffort({ archiveThreadImpl, gmail, threadId, log
 //  - If Gmail throws after the claim, the escalation is parked as
 //    'send_failed' (never back to 'open') so nothing auto-retries an
 //    ambiguous send; the operator verifies in Gmail Sent first.
-export async function sendApprovedReply({ db, gmail, env, conv, esc, finalBody, finalSubject, finalTo, decision, gmailSendImpl = gmailSend, archiveThreadImpl = archiveThread, slackClient = null, log = null }) {
+export async function sendApprovedReply({ db, gmail, env, conv, esc, finalBody, finalSubject, finalTo, decision, gmailSendImpl = gmailSend, archiveThreadImpl = archiveThread, slackClient = null, log = null, clock = () => new Date() }) {
   const subject = finalSubject ?? esc.draft_subject ?? 'Re: Begäran om allmänna handlingar';
   const triggeringMessage = esc.message_id ? db.getMessageById(esc.message_id) : null;
 
@@ -246,7 +246,13 @@ export async function sendApprovedReply({ db, gmail, env, conv, esc, finalBody, 
   // before the decision and its frist would read as answered. Nothing else about
   // the send changes: the decision is still persisted only after Gmail accepted,
   // and every failure branch below still parks without writing one.
-  const sendStartedAt = sqliteNow();
+  //
+  // `clock` is a TEST SEAM (round-8 M3) and nothing else: it defaults to the real
+  // clock, it is read exactly once, and it is read here. Its only purpose is to
+  // let a test advance time INSIDE the Gmail and archive fakes, which is what
+  // pins this capture to the pre-Gmail instant — with a real clock and an
+  // instant fake, a capture taken anywhere later in the function looks identical.
+  const sendStartedAt = sqliteNow(clock());
   let sent;
   try {
     sent = await gmailSendImpl(gmail, {

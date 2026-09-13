@@ -8,7 +8,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { openDb } from '../src/storage.js';
-import { sendApprovedReply, sendInitial, parseDbTime } from '../src/send-reply.js';
+import { sendApprovedReply, sendInitial, parseDbTime, sqliteNow } from '../src/send-reply.js';
 import { runTick } from '../src/tick.js';
 
 const env = {
@@ -135,6 +135,66 @@ describe('sendApprovedReply — decided_at is the moment the send started (round
     expect(mid).toBeGreaterThan(0);
     expect(db.latestRespondByForConversation(convId)).toBe('2026-12-01');
   }, 15000);
+
+  // Round-8 M3: the test above does not actually PIN the boundary. Gmail resolves
+  // immediately there and the racing inbound is inserted after the send has
+  // finished, so a `decided_at` captured AFTER Gmail (the very bug round-7 L1
+  // fixed) would satisfy every assertion in it. An injected clock is what pins
+  // it: it advances 5 s inside the Gmail fake and 5 s more inside the archive
+  // fake, so a capture taken at any later point in the function is a DIFFERENT,
+  // and later, timestamp than the one asserted here.
+  it('stamps decided_at at the exact pre-Gmail instant, with an injected clock advancing mid-send', async () => {
+    const { conv, esc, convId, escId } = seedConvWithEscalation();
+    const slackClient = fakeSlackClient();
+    const t0 = new Date();
+    let current = t0;
+    const clock = vi.fn(() => current);
+    const advance = (seconds) => { current = new Date(current.getTime() + seconds * 1000); };
+
+    const send = vi.fn(async () => { advance(5); return { id: 'out-1', threadId: 'thr-orig' }; });
+    const archive = vi.fn(async () => {
+      advance(5);
+      // A concurrent tick ingesting a kommun mail DURING the cleanup: stamped by
+      // SQLite's own datetime('now'), which cannot be moved by the fake clock.
+      db.recordMessage({
+        conversation_id: convId, gmail_message_id: 'in-race', direction: 'inbound',
+        from_email: 'a@arboga.se', to_email: 'me@x.se', subject: 's', body_text: 'nytt',
+        received_at: new Date().toISOString(), attachment_count: 0,
+        analysis_json: JSON.stringify({ extracted: { respond_by_date: '2026-12-01' } }),
+      });
+    });
+
+    await sendApprovedReply({
+      db, gmail: {}, env, conv, esc, finalBody: 'tack', decision: 'edit',
+      gmailSendImpl: send, archiveThreadImpl: archive, slackClient, clock,
+    });
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(archive).toHaveBeenCalledTimes(1);
+    // ONE read of the clock, and it happened before Gmail was called.
+    expect(clock).toHaveBeenCalledTimes(1);
+
+    const decidedAt = db.raw.prepare('SELECT decided_at FROM decisions WHERE escalation_id = ?').get(escId).decided_at;
+    // The exact pre-Gmail instant. Not t0+5s (a capture after Gmail), not t0+10s
+    // (a capture after the archive), not the row-write moment.
+    expect(decidedAt).toBe(sqliteNow(t0));
+    expect(decidedAt).not.toBe(sqliteNow(new Date(t0.getTime() + 5000)));
+    expect(decidedAt).not.toBe(sqliteNow(new Date(t0.getTime() + 10000)));
+    // And the inbound stamped during the cleanup is still OUTSTANDING: had the
+    // decision been captured 5 or 10 fake seconds later it would have read as
+    // answered by a send that started before it arrived.
+    expect(db.latestRespondByForConversation(convId)).toBe('2026-12-01');
+  });
+
+  it('defaults to the real clock when no clock is injected', async () => {
+    const { conv, esc, escId } = seedConvWithEscalation();
+    const before = sqliteNow(new Date());
+    const send = vi.fn(async () => ({ id: 'out-1', threadId: 'thr-orig' }));
+    await sendApprovedReply({ db, gmail: {}, env, conv, esc, finalBody: 'tack', decision: 'edit', gmailSendImpl: send });
+    const after = sqliteNow(new Date());
+    const decidedAt = db.raw.prepare('SELECT decided_at FROM decisions WHERE escalation_id = ?').get(escId).decided_at;
+    expect(decidedAt).toMatch(SQLITE_TS);
+    expect(decidedAt >= before && decidedAt <= after).toBe(true);
+  });
 
   // The ordering and every failure branch are untouched: a Gmail throw still
   // parks and writes NO decision row, so nothing about the stamp can leak a
