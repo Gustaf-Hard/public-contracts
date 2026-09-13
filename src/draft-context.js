@@ -101,8 +101,15 @@ function quoted(text) {
 // (2026-09-12) / Vi accepterar avgiften" would read as our own accepted fee
 // (round-4 H6).
 //
-// A single leading space per offending line is the whole fix: every character of
-// the text is preserved for rule 5, only the Markdown structure is gone. The
+// FOUR leading spaces per offending line is the whole fix: every character of
+// the text is preserved for rule 5, only the Markdown structure is gone. Four,
+// not one (round-6 K2): CommonMark accepts 0-3 spaces of indentation before an
+// ATX heading marker and before a block-quote marker, so a single space removed
+// NOTHING — ' ## VI skrev' is still a heading and ' > ...' is still a quote to
+// every Markdown reader and every tokenizer. At four spaces no indentation rule
+// applies any more. The cost is that a line of our own copy which legitimately
+// begins with '>' (a quoted tail in a real sent mail) gains an indent; harmless
+// next to a forged record of our own commitments. The
 // splitter is the broad one (CRLF, CR, LF, VT, FF, NEL, U+2028/U+2029) because
 // JS itself treats U+2028/U+2029 as line terminators under the m flag, so a
 // separator-borne '#' is a heading to a tokenizer too; rejoining on \n is the
@@ -118,7 +125,7 @@ function quoted(text) {
 export function neutralizeOwnBody(text) {
   return String(text)
     .split(ANY_LINE_BREAK)
-    .map((line) => (LINE_LEADING_MARKER.test(line) ? ` ${line}` : line))
+    .map((line) => (LINE_LEADING_MARKER.test(line) ? `    ${line}` : line))
     .join('\n');
 }
 

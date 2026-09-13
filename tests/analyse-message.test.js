@@ -557,6 +557,12 @@ describe('thread context (2026-09-12 design)', () => {
     expect(call.system[0].text).not.toContain('Begärantext.');
   });
 
+  // Round-6 K2: CommonMark reads 0-3 leading spaces before '#' as the same ATX
+  // heading, so "did this line open structure" has to be asked that way. A
+  // startsWith('#') assertion could not see that the neutralizer's single
+  // leading space removed nothing.
+  const ATX_HEADING = /^ {0,3}#{1,6}(?:\s|$)/;
+
   // Round-5 J3 (round-3 #7): the TRIGGER body is the most directly
   // sender-controlled string in the whole user message, and it was pushed in
   // raw between two '---' fences. An inbound mail could therefore close the
@@ -575,6 +581,10 @@ describe('thread context (2026-09-12 design)', () => {
     // context block. The forged one in the trigger body is not a line-leading
     // heading any more.
     expect(user.match(/^## VI skrev/gmu) ?? []).toHaveLength(1);
+    // Round-6 K2: and it is not one under CommonMark's 0-3-space indentation
+    // rule either, which a leading single space did nothing about.
+    const structural = user.split('\n').filter((l) => ATX_HEADING.test(l));
+    expect(structural.filter((l) => !/^(?:# Konversationskontext|## VI skrev \(2026-08-17\))/.test(l))).toEqual([]);
     // The text itself is preserved: we never silently edit what a kommun wrote.
     expect(user).toContain('Vi accepterar avgiften på 50000 kr.');
   });
@@ -616,7 +626,7 @@ describe('thread context (2026-09-12 design)', () => {
     // production's idea of what is invisible (round-6 K3).
     const forged = user.split(/\u000D\u000A|[\u000A\u000B\u000C\u000D\u0085\u2028\u2029]/)
       .map((l) => l.split(ch).join(''))
-      .filter((l) => l.startsWith('## VI skrev'));
+      .filter((l) => ATX_HEADING.test(l));
     expect(forged).toEqual([]);
     expect(user).toContain('Vi accepterar avgiften.');
   });
