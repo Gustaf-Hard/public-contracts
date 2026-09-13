@@ -956,10 +956,17 @@ export function openDb(path) {
   // keys off this.
   function latestRespondByForConversation(conversationId) {
     const dischargedAtMs = latestOperatorSendMs(conversationId);
+    // `>=`, not `>` (round-7 L2): both stamps are SQLite second-resolution, so a
+    // tie carries no ordering. A strict `>` read "same second" as "ingested
+    // before the send" and silently discharged a mail that may never have been
+    // on screen; with the decision stamped at the moment the send STARTED
+    // (round-7 L1) a same-second ingest is genuinely ambiguous, and this helper
+    // fails OPEN everywhere else for the same reason. Showing one date too many
+    // is recoverable; hiding a live frist is what it exists to prevent.
     const outstanding = (ingestedAt) => {
       if (Number.isNaN(dischargedAtMs)) return true;
       const ms = timestampMs(ingestedAt);
-      return Number.isNaN(ms) ? true : ms > dischargedAtMs;
+      return Number.isNaN(ms) ? true : ms >= dischargedAtMs;
     };
     const fromMessages = db.prepare(`
       SELECT m.id AS id, m.ingested_at AS ingested_at,

@@ -212,8 +212,10 @@ is INGEST time, not delivery time**: `messages.ingested_at` (stamped by
 `recordMessage` with SQLite `datetime('now')`, the same clock and format as
 `decisions.decided_at`) is the one boundary, because an operator answers what
 ingest has put in front of them, not what Gmail happened to deliver. An inbound
-is outstanding iff it was ingested *after* the latest operator send, so a mail
-delivered 09:50 but ingested 10:05 survives a 10:00 send. The escalation
+is outstanding iff it was ingested *at or after* the latest operator send, so a
+mail delivered 09:50 but ingested 10:05 survives a 10:00 send, and a SAME-SECOND
+tie survives too (round-7 L2: both stamps are second-resolution, so a tie
+carries no ordering and the conservative reading is "not seen"). The escalation
 fallback reads the same clock: its trigger mail's `ingested_at` when
 `message_id` is set, the escalation's own `created_at` when it is not. Nothing
 keys on `messages.id`, which is why there is no boundary that can get stuck at

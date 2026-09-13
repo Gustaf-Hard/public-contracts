@@ -1018,6 +1018,38 @@ describe('latestRespondByForConversation (round-2 finding F2)', () => {
       expect(db.latestRespondByForConversation(id)).toBe('2026-09-18');
     });
 
+    // Round-7 L2 (critical): both clocks are SECOND-resolution, so "same second"
+    // carries no ordering at all. A strict `>` read a tie as "ingested before the
+    // send" and discharged a mail the operator may never have seen — with L1 the
+    // decision stamp is the moment the send STARTED, so a same-second ingest is
+    // genuinely ambiguous and the conservative reading is "not seen". Ties are
+    // OUTSTANDING, in the ledger path and in the escalation fallback alike.
+    it('an inbound ingested in the SAME second as the operator send stays outstanding (ties fail open)', () => {
+      const id = seed();
+      decide(id, 'edit', '2026-09-06 10:00:00');
+      inbound(id, { at: '2026-09-06T09:59:00Z', respondBy: '2026-09-20', ingestedAt: '2026-09-06 10:00:00' });
+      expect(db.latestRespondByForConversation(id)).toBe('2026-09-20');
+    });
+
+    it('an escalation whose trigger mail was ingested in the same second as the send keeps its deadline', () => {
+      const id = seed();
+      decide(id, 'edit', '2026-09-06 10:00:00');
+      const tie = inbound(id, { at: '2026-09-06T09:59:00Z', respondBy: null, ingestedAt: '2026-09-06 10:00:00' });
+      const esc = db.recordEscalation({ conversation_id: id, message_id: tie, reason: 'r', respond_by: '2026-09-21' });
+      db.raw.prepare('UPDATE escalations SET created_at = ? WHERE id = ?').run('2026-09-06 10:00:00', esc);
+      expect(db.latestRespondByForConversation(id)).toBe('2026-09-21');
+    });
+
+    // The same tie on an escalation that names NO trigger mail: the boundary is
+    // the row's own created_at, and it must fail open the same way.
+    it('an undated-trigger escalation created in the same second as the send keeps its deadline', () => {
+      const id = seed();
+      decide(id, 'edit', '2026-09-06 10:00:00');
+      const esc = db.recordEscalation({ conversation_id: id, reason: 'r', respond_by: '2026-09-22' });
+      db.raw.prepare('UPDATE escalations SET created_at = ? WHERE id = ?').run('2026-09-06 10:00:00', esc);
+      expect(db.latestRespondByForConversation(id)).toBe('2026-09-22');
+    });
+
     // Round-4 H2: an escalation created AFTER the operator reply can still
     // carry a deadline copied from an inbound the reply already answered
     // (delayed ingest, or a superseded copy). The escalation's own
