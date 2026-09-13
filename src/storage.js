@@ -301,11 +301,24 @@ export function openDb(path) {
     // backfilled from received_at, ISO with T/Z stripped to SQLite's
     // 'YYYY-MM-DD HH:MM:SS': an APPROXIMATION that says "ingested when
     // delivered", which is exactly what the old delivery-time rule already
-    // assumed, so no pre-migration case gets worse. Runs once, inside the probe.
-    if (!msgCols.includes('ingested_at')) {
-      db.exec('ALTER TABLE messages ADD COLUMN ingested_at TEXT');
-      db.exec("UPDATE messages SET ingested_at = COALESCE(ingested_at, replace(substr(received_at,1,19),'T',' '))");
-    }
+    // assumed, so no pre-migration case gets worse.
+    //
+    // ONE TRANSACTION, and SELF-HEALING (round-7 L3). The ALTER and the backfill
+    // used to be two statements inside the probe, so a process that died between
+    // them left a DB where the probe sees the column and the backfill never ran
+    // again: every legacy row stuck on NULL for ever, which the discharge helper
+    // reads as outstanding and which nags the kommun daily. The transaction makes
+    // the pair atomic, and running the UPDATE unconditionally on every migrate()
+    // heals a DB that already got into that state. The WHERE clause makes it
+    // free when there is nothing to do (and it never touches a row that already
+    // has a stamp, nor one with no received_at to derive it from).
+    db.transaction(() => {
+      const cols = db.prepare("PRAGMA table_info(messages)").all().map((r) => r.name);
+      if (!cols.includes('ingested_at')) {
+        db.exec('ALTER TABLE messages ADD COLUMN ingested_at TEXT');
+      }
+      db.exec("UPDATE messages SET ingested_at = replace(substr(received_at,1,19),'T',' ') WHERE ingested_at IS NULL AND received_at IS NOT NULL");
+    })();
     const hbCols = db.prepare("PRAGMA table_info(daemon_heartbeat)").all().map((r) => r.name);
     if (!hbCols.includes('last_success_at')) {
       db.exec('ALTER TABLE daemon_heartbeat ADD COLUMN last_success_at TEXT');

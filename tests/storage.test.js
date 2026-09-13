@@ -1292,6 +1292,34 @@ describe('messages.ingested_at migration (round-6 K1)', () => {
     migDb.close();
   });
 
+  // Round-7 L3: the ALTER and the backfill must be ONE unit, and the backfill
+  // must be self-healing. A process that died between the two statements left a
+  // DB where the probe sees the column and the old "runs once, inside the probe"
+  // backfill never ran again — every legacy row stuck on NULL for ever, which
+  // the discharge helper reads as outstanding and nags the kommun about daily.
+  it('backfills NULL ingested_at on a LATER migrate(), not only on the run that added the column', () => {
+    const migDb = openDb(':memory:');
+    migDb.migrate();
+    const cid = migDb.createConversation({ kommun_kod: '0502', kommun_namn: 'Halv', role: 'central', contact_email: 'h@h.se', scheduled_send_at: '2026-08-01T08:00:00Z' });
+    // The exact post-crash shape: column present, values NULL.
+    const insert = migDb.raw.prepare(`INSERT INTO messages (conversation_id, gmail_message_id, direction, received_at, attachment_count, ingested_at)
+      VALUES (?, ?, ?, ?, 0, NULL)`);
+    insert.run(cid, 'half-migrated-1', 'inbound', '2026-08-19T14:15:00Z');
+    insert.run(cid, 'half-migrated-2', 'outbound', '2026-08-20T06:00:00Z');
+    const read = (gid) => migDb.raw.prepare('SELECT ingested_at FROM messages WHERE gmail_message_id = ?').get(gid).ingested_at;
+    expect(read('half-migrated-1')).toBeNull();
+
+    migDb.migrate();
+    expect(read('half-migrated-1')).toBe('2026-08-19 14:15:00');
+    expect(read('half-migrated-2')).toBe('2026-08-20 06:00:00');
+
+    // Idempotent, and it never overwrites a stamp that is already there.
+    migDb.raw.prepare("UPDATE messages SET ingested_at = '2026-08-19 20:00:00' WHERE gmail_message_id = 'half-migrated-1'").run();
+    migDb.migrate();
+    expect(read('half-migrated-1')).toBe('2026-08-19 20:00:00');
+    migDb.close();
+  });
+
   it('recordMessage stamps ingested_at with the SQLite clock', () => {
     const cid = db.createConversation({ kommun_kod: '0501', kommun_namn: 'Stämpel', role: 'central', contact_email: 's@s.se', scheduled_send_at: '2026-08-01T08:00:00Z' });
     const mid = db.recordMessage({
