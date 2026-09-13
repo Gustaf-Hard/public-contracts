@@ -390,7 +390,22 @@ function userPromptFor(ctx, body) {
   }
   lines.push('');
   lines.push('Inkommande svar från registratorn:');
+  // BLANK LINES AROUND EACH DELIMITER (round-8 M2). The delimiters used to sit
+  // flush against the text on both sides, and in CommonMark a line of dashes
+  // directly under a paragraph is that paragraph's SETEXT UNDERLINE, not a
+  // thematic break. Two forgeries followed, neither of which neutralizeOwnBody
+  // can touch because the underline is OURS, not the kommun's:
+  //   - the closing '---' turned the trigger body's LAST line into a heading, so
+  //     a mail ending on 'VI skrev (2026-09-12)' became exactly the '## VI
+  //     skrev' record drafting rule 5 tells the model it may reuse as our own
+  //     commitment;
+  //   - the opening '---' did the same to our own label line above it.
+  // A blank line is what separates a paragraph from an underline, so each
+  // delimiter gets one above it (and the opening one below as well, which leaves
+  // it an unambiguous thematic break). Still EXACTLY two delimiter lines.
+  lines.push('');
   lines.push('---');
+  lines.push('');
   // The trigger body is the most directly sender-controlled string in this
   // message, pushed in raw between two fences. Neutralized with the SAME helper
   // the context block uses on our own outbound bodies (round-5 J3, round-3 #7):
@@ -412,6 +427,7 @@ function userPromptFor(ctx, body) {
   //     intact and still reads as a quote to a human; it simply no longer opens
   //     a CommonMark block quote inside our prompt.
   lines.push(neutralizeOwnBody(body.trim()));
+  lines.push('');
   lines.push('---');
   if (ctx.thread_context) {
     lines.push('');

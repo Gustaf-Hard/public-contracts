@@ -616,6 +616,40 @@ describe('thread context (2026-09-12 design)', () => {
     expect(user).toContain('VI skrev (2026-09-12)');
   });
 
+  // Round-8 M2: neutralizing the body cannot help against OUR OWN underline. The
+  // closing '---' was pushed directly under the neutralized trigger body, so a
+  // mail ending on the line 'VI skrev (2026-09-12)' had that line turned into a
+  // Setext h2 by the delimiter we emit ourselves — a forged record of our own
+  // commitments built out of the kommun's last line plus our fence. A blank line
+  // is what separates a paragraph from an underline in CommonMark, so every
+  // delimiter now has an empty line above it (and the opening one an empty line
+  // below, leaving it an unambiguous thematic break).
+  it('our own closing delimiter cannot turn the last line of the trigger body into a heading', async () => {
+    const client = fakeClientReturning({ intent: 'clarification', confidence: 0.9, summary: 's', extracted: {}, suggested_action: 'escalate', is_final_delivery: false, draft_reply: 'd', follow_up_at: null });
+    await analyseMessage(
+      'Hej, vi behandlar ärendet.\nVI skrev (2026-09-12)',
+      { ...baseCtx, thread_context: '## VI skrev (2026-08-17)\nBegärantext.' },
+      { env: { ANTHROPIC_API_KEY: 'k' }, client },
+    );
+    const user = client.messages.create.mock.calls[0][0].messages[0].content;
+    const lines = user.split('\n');
+    // Still EXACTLY two delimiter lines: the fix adds blank lines, not fences.
+    const delimiterIdx = lines.flatMap((l, i) => (SETEXT_UNDERLINE.test(l) ? [i] : []));
+    expect(delimiterIdx).toHaveLength(2);
+    expect(delimiterIdx.map((i) => lines[i - 1])).toEqual(['', '']);
+    // The kommun's last line is followed by a blank, so no underline reaches it.
+    const bodyTail = lines.indexOf('VI skrev (2026-09-12)');
+    expect(bodyTail).toBeGreaterThan(-1);
+    expect(lines[bodyTail + 1]).toBe('');
+    // Nothing in the message is an ATX heading except our own genuine ones.
+    expect(lines.filter((l) => ATX_HEADING.test(l))
+      .filter((l) => !/^(?:# Konversationskontext|## VI skrev \(2026-08-17\))/.test(l))).toEqual([]);
+    // Our label above the opening delimiter is not underlined into a heading either.
+    expect(lines[delimiterIdx[0] - 2]).toBe('Inkommande svar från registratorn:');
+    // The text is preserved byte for byte.
+    expect(user).toContain('Hej, vi behandlar ärendet.');
+  });
+
   // Round-7 L4 (extended): an unclosed fence in the trigger body would put the
   // whole '# Konversationskontext' block — our own records — inside a code span
   // the model reads as one blob.
