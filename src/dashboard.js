@@ -276,7 +276,16 @@ function buildOverviewRows(municipalities, db, vacationConfig = { enabled: false
     let earliestFollowUp = null;
     let earliestFollowUpSource = null;
     for (const c of convs) {
-      openEsc += openEscByConvId.get(c.id) ?? 0;
+      // Round-13 R1 (adversarial R12 #1, Codex R12 #3): a closed case
+      // (DONE/DEAD_END) is never pending work, exactly as buildActionQueue's
+      // own skip — the close route deliberately resolves only status='open'
+      // escalations (see /conversations/:id/close), so a PARKED row can
+      // survive on a case the operator already closed. Excluding terminal
+      // conversations here is what keeps the Esk. column, the needs-attention
+      // filter and the summary tally from re-surfacing that stale artefact.
+      if (c.state !== 'DONE' && c.state !== 'DEAD_END') {
+        openEsc += openEscByConvId.get(c.id) ?? 0;
+      }
       contracts += avtalByConvId.get(c.id) ?? 0;
       const candidate = c.last_outbound_at && c.state_changed_at && c.last_outbound_at > c.state_changed_at
         ? c.last_outbound_at : c.state_changed_at;

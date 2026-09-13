@@ -1778,8 +1778,13 @@ const ARENDEN_BUCKETS = [
 ];
 
 function caseBucket(c) {
-  if (c.state === 'NEEDS_HUMAN' || (c.open_esc ?? 0) > 0) return 'behover_dig';
+  // Round-13 R1 (adversarial R12 #1, Codex R12 #3): terminal FIRST. Closing a
+  // case only resolves status='open' escalations (see /conversations/:id/close
+  // in dashboard.js), so a PARKED row can survive on an otherwise-closed case;
+  // without this ordering that lingering row (or a stale pending-handoff task)
+  // kept re-flipping a DONE/DEAD_END case back into Behöver dig.
   if (CASE_STATUS[c.state]?.terminal) return 'stangda';
+  if (c.state === 'NEEDS_HUMAN' || (c.open_esc ?? 0) > 0) return 'behover_dig';
   // The kommun spoke last and we are not deliberately silent. Keying the queue
   // on open escalations alone hid exactly this: a draft voided because the
   // kommun replied leaves no escalation, and the case would drop out of view

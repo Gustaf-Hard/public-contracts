@@ -1185,6 +1185,44 @@ describe('home buckets', () => {
     const behoverSection = res.text.slice(res.text.indexOf('Behöver dig'), res.text.indexOf('Öppna') === -1 ? undefined : res.text.indexOf('Öppna'));
     expect(behoverSection).toContain('Malå');
   });
+
+  // Round-13 R1 (adversarial R12 #1, Codex R12 #3): closing a case only resolves
+  // status='open' escalations by design (see /conversations/:id/close) — a
+  // send that PARKED survives. A DONE case is never pending work, exactly as
+  // buildActionQueue already treats it, so the parked row must stop counting
+  // toward the overview's open_escalations, the needs-attention filter and the
+  // Ärenden bucket once the case is closed.
+  it('closing a case with a surviving parked escalation drops out of the needs-attention filter and the Behöver dig bucket (round-13 R1)', async () => {
+    const cid = db.createConversation({ kommun_kod: '2418', kommun_namn: 'Malå', role: 'central', contact_email: 'k@mala.se', scheduled_send_at: '2026-05-24T10:00:00Z' });
+    db.updateConversationState(cid, 'ACK_RECEIVED', { last_outbound_at: '2026-09-01T08:00:00Z' });
+    const esc = db.recordEscalation({ conversation_id: cid, reason: 'r', draft_template: 'free_form', draft_body: 'b' });
+    db.raw.prepare("UPDATE escalations SET status = 'send_failed' WHERE id = ?").run(esc);
+
+    const app = appWithFakes();
+    await postForm(app, `/conversations/${cid}/close`, { state: 'DONE', return: '/kommun/2418' });
+    expect(db.getConversation(cid).state).toBe('DONE');
+    // The close route deliberately leaves the parked row alone.
+    expect(db.raw.prepare('SELECT status FROM escalations WHERE id = ?').get(esc).status).toBe('send_failed');
+
+    // Queue/badge already correct (buildActionQueue already excludes DONE).
+    expect(buildActionQueue(db).some((x) => x.conv_id === cid)).toBe(false);
+
+    const munis = JSON.parse(require('node:fs').readFileSync(muniPath, 'utf8'));
+    const rows = buildOverviewRows(munis, db);
+    const row = rows.find((r) => r.kommun_kod === '2418');
+    expect(row.open_escalations).toBe(0); // a DONE case's parked row does not count
+    expect(applyFilter(rows, 'needs-attention').some((r) => r.kommun_kod === '2418')).toBe(false);
+
+    const overview = await get(app, '/?filter=needs-attention');
+    expect(overview.text).not.toContain('Malå');
+
+    const arenden = await get(app, '/arenden');
+    const malaIdx = arenden.text.indexOf('Malå');
+    const stangdaIdx = arenden.text.indexOf('Stängda');
+    expect(malaIdx).toBeGreaterThan(-1);
+    expect(stangdaIdx).toBeGreaterThan(-1);
+    expect(malaIdx).toBeGreaterThan(stangdaIdx); // in Stängda, not Behöver dig
+  });
 });
 
 describe('polish', () => {
