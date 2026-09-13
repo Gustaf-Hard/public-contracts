@@ -399,7 +399,12 @@ async function ingestMessage({ conv, item, deps }) {
     role: conv.role,
     conversation_state: conv.state,
     days_since_last_outbound: daysSinceLastOutbound,
-    today_iso: now.toISOString().slice(0, 10),
+    // Both dates come from localDateStr, i.e. ONE calendar (round-4 H4). A UTC
+    // slice here against a local received_iso below produced the self-
+    // contradictory pair "Dagens datum: 2026-09-13, Mejlet togs emot:
+    // 2026-09-14" for a 22:30Z mail on a Stockholm host, and the prompt asks
+    // the model to reason about the interval between them.
+    today_iso: localDateStr(now),
     // Delivery date, so a frist stated in days ("svara inom 7 dagar") is
     // computed from the kommun's mail and not from a late backlog run
     // (round-2 finding F1). LOCAL calendar date, not a UTC slice (round-3

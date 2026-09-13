@@ -483,6 +483,35 @@ describe('runTick — a voided draft does not take the deadline with it (F2)', (
   });
 });
 
+// Round-4 H4: today_iso was a UTC slice while received_iso was the host's local
+// calendar date, so on a Stockholm host a 22:30Z mail produced the self-
+// contradictory pair "Dagens datum: 2026-09-13, Mejlet togs emot: 2026-09-14".
+// Both lines now come from localDateStr, i.e. one calendar.
+describe('analysis ctx dates share one calendar (round-4 H4)', () => {
+  it('a 22:30Z mail ingested minutes later reports the same date for today_iso and received_iso', async () => {
+    const id = seedConv();
+    const now = new Date('2026-09-13T22:30:00Z');
+    const receivedAt = new Date(now.getTime() - 5 * 60000);
+    let ctx = null;
+    const spy = vi.spyOn(analyseMod, 'analyseMessage').mockImplementation(async (_body, c) => {
+      ctx = c;
+      return null; // fall through to the regex classifier; only ctx matters here
+    });
+    const gmail = fakeGmail({
+      listResult: [{ id: 'late-1' }],
+      getResult: { 'late-1': mkMsg('late-1', 'thr-a', 'K <kansli@ale.se>', 'Tack, vi tittar på det.', { internalDate: String(receivedAt.getTime()) }) },
+    });
+    await runTick(deps({ gmail, now }));
+    spy.mockRestore();
+    expect(ctx).toBeTruthy();
+    expect(ctx.today_iso).toBe(localDateStr(now));
+    expect(ctx.received_iso).toBe(localDateStr(receivedAt));
+    // The actual bug: the two dates disagreed on a non-UTC host.
+    expect(ctx.today_iso).toBe(ctx.received_iso);
+    expect(db.getConversation(id)).toBeTruthy();
+  });
+});
+
 describe('runTick — HTML-only inbound gets a text body (M4)', () => {
   it('parses an HTML-only reply so the classifier sees real text', async () => {
     const spy = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue(null);
