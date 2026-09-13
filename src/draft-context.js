@@ -32,17 +32,28 @@ const MAX_FILENAME_CHARS = 120;
 // control character belongs in a source file.
 const UNTRUSTED_BREAKS = /[\u0000-\u001F\u007F-\u009F\u2028\u2029]/g;
 // Invisible characters are removed, not spaced: they carry no information and
-// their only use here is hiding a leading '#' from the strip below. The set is
-// every code point that renders as nothing yet is not \s, so neither
-// `/\s+/` nor `/^[#>\s]+/` can see past it: the zero-width quartet, SOFT
-// HYPHEN, the bidi marks and embeddings/overrides, and WORD JOINER (round-5 J3).
-// Written as escape sequences on purpose: no literal invisible character
-// belongs in a source file, where it would be unreviewable.
-const INVISIBLE = '\\u00AD\\u200B-\\u200F\\u202A-\\u202E\\u2060\\uFEFF';
-const ZERO_WIDTH = new RegExp(`[${INVISIBLE}]`, 'gu');
-// "This line opens Markdown structure": a '#' or '>' preceded only by spaces,
-// tabs and invisible code points.
-const LINE_LEADING_MARKER = new RegExp(`^[ \\t${INVISIBLE}]*[#>]`, 'u');
+// their only use here is hiding a leading '#' from the strip below.
+//
+// Round-6 K3: stop enumerating. The hand-written list (zero-width quartet, SOFT
+// HYPHEN, bidi marks, embeddings/overrides, WORD JOINER) missed SIXTEEN more
+// code points that render as nothing and are not \s — the invisible math
+// operators U+2061..U+2064, the bidi isolates U+2066..U+2069, U+206A, MONGOLIAN
+// VOWEL SEPARATOR, COMBINING GRAPHEME JOINER, the variation selectors, ARABIC
+// LETTER MARK, the whole U+E0000..U+E007F tag block and HANGUL FILLER — every
+// one of which shielded a '#' end to end. A blocklist of code points is the
+// wrong shape for "renders as nothing": ask Unicode instead. The
+// Default_Ignorable_Code_Point property is exactly that set (Cf plus the
+// variation selectors plus Other_Default_Ignorable, minus White_Space), it is a
+// superset of everything the old list named, and it matches no space, tab, digit
+// or letter. Requires the `u` flag; verified available on Node 20/22.
+const DEFAULT_IGNORABLE = '\\p{Default_Ignorable_Code_Point}';
+const ZERO_WIDTH = new RegExp(`[${DEFAULT_IGNORABLE}]`, 'gu');
+// "This line opens Markdown structure": a '#' or '>' preceded only by whitespace
+// and default-ignorable code points. `\s` rather than ` \t` because a line has
+// already been split off its terminator by then, so the only extra characters it
+// admits are exotic spaces (NBSP, U+2000..U+200A, IDEOGRAPHIC SPACE) — which a
+// reader sees as indentation too.
+const LINE_LEADING_MARKER = new RegExp(`^[\\s${DEFAULT_IGNORABLE}]*[#>]`, 'u');
 // Defensive splitter for quoted(): CRLF, CR, LF, VT, FF, NEL and both Unicode
 // separators. Sanitized text contains none of these, which is the point — a
 // future caller that forgets to sanitize still cannot emit an unquoted line.
@@ -97,12 +108,13 @@ function quoted(text) {
 // separator-borne '#' is a heading to a tokenizer too; rejoining on \n is the
 // point, not a side effect.
 //
-// The leading run counts INVISIBLE code points as whitespace (round-5 J3): the
-// match used to be /^[ \t]*[#>]/, so a single U+200B (or SOFT HYPHEN, or a bidi
-// mark) in front of the '#' walked straight past the guard while a reader and a
-// tokenizer both still saw a heading. Unlike sanitizeUntrusted these characters
-// are NOT removed here — rule 5 needs our copy byte-for-byte — they only stop
-// shielding the marker.
+// The leading run counts DEFAULT-IGNORABLE code points as whitespace (round-5
+// J3, widened in round-6 K3): the match used to be /^[ \t]*[#>]/, so a single
+// U+200B (or SOFT HYPHEN, or a bidi mark, or any of the sixteen the enumerated
+// blocklist missed) in front of the '#' walked straight past the guard while a
+// reader and a tokenizer both still saw a heading. Unlike sanitizeUntrusted these
+// characters are NOT removed here — rule 5 needs our copy byte-for-byte — they
+// only stop shielding the marker.
 export function neutralizeOwnBody(text) {
   return String(text)
     .split(ANY_LINE_BREAK)

@@ -584,6 +584,26 @@ describe('thread context (2026-09-12 design)', () => {
     ['U+00AD SOFT HYPHEN', '\u00AD'],
     ['U+202E RIGHT-TO-LEFT OVERRIDE', '\u202E'],
     ['U+2060 WORD JOINER', '\u2060'],
+    // Round-6 K3: sixteen more code points that render as nothing and are not
+    // \s all shielded a '#' from the enumerated blocklist. Listed here by code
+    // point, independently of production, which now asks Unicode itself.
+    ['U+2061 FUNCTION APPLICATION', '\u2061'],
+    ['U+2062 INVISIBLE TIMES', '\u2062'],
+    ['U+2063 INVISIBLE SEPARATOR', '\u2063'],
+    ['U+2064 INVISIBLE PLUS', '\u2064'],
+    ['U+2066 LEFT-TO-RIGHT ISOLATE', '\u2066'],
+    ['U+2067 RIGHT-TO-LEFT ISOLATE', '\u2067'],
+    ['U+2068 FIRST STRONG ISOLATE', '\u2068'],
+    ['U+2069 POP DIRECTIONAL ISOLATE', '\u2069'],
+    ['U+206A INHIBIT SYMMETRIC SWAPPING', '\u206A'],
+    ['U+180E MONGOLIAN VOWEL SEPARATOR', '\u180E'],
+    ['U+034F COMBINING GRAPHEME JOINER', '\u034F'],
+    ['U+FE00 VARIATION SELECTOR-1', '\uFE00'],
+    ['U+FE0F VARIATION SELECTOR-16', '\uFE0F'],
+    ['U+061C ARABIC LETTER MARK', '\u061C'],
+    ['U+E0001 LANGUAGE TAG', '\u{E0001}'],
+    ['U+E0041 TAG LATIN CAPITAL LETTER A', '\u{E0041}'],
+    ['U+3164 HANGUL FILLER', '\u3164'],
   ])('%s in the trigger body cannot hide a forged heading from the neutralizer', async (_name, ch) => {
     const client = fakeClientReturning({ intent: 'clarification', confidence: 0.9, summary: 's', extracted: {}, suggested_action: 'escalate', is_final_delivery: false, draft_reply: 'd', follow_up_at: null });
     await analyseMessage(
@@ -592,9 +612,10 @@ describe('thread context (2026-09-12 design)', () => {
       { env: { ANTHROPIC_API_KEY: 'k' }, client },
     );
     const user = client.messages.create.mock.calls[0][0].messages[0].content;
-    const INVISIBLE_FOR_TEST = /[\u00AD\u200B-\u200F\u202A-\u202E\u2060\uFEFF]/g;
+    // Strips ONLY the code point under test, so this assertion never borrows
+    // production's idea of what is invisible (round-6 K3).
     const forged = user.split(/\u000D\u000A|[\u000A\u000B\u000C\u000D\u0085\u2028\u2029]/)
-      .map((l) => l.replace(INVISIBLE_FOR_TEST, ''))
+      .map((l) => l.split(ch).join(''))
       .filter((l) => l.startsWith('## VI skrev'));
     expect(forged).toEqual([]);
     expect(user).toContain('Vi accepterar avgiften.');
