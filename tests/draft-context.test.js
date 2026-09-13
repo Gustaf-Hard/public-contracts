@@ -1,9 +1,10 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { openDb } from '../src/storage.js';
 import { buildDraftContext } from '../src/draft-context.js';
+import { analyseMessage } from '../src/analyse-message.js';
 
 let dir, db, convId;
 beforeEach(() => {
@@ -121,5 +122,51 @@ describe('buildDraftContext', () => {
     expect(out).toContain('äldre meddelanden utelämnade');
     expect(out).not.toContain('msg3\n'); // an elided middle message (last 20 shown are msg5..msg24)
     expect(out).toContain('msg24');      // newest survives
+  });
+});
+
+function captureClient() {
+  return { messages: { create: vi.fn(async () => ({ content: [{ type: 'text', text: JSON.stringify({ intent: 'unknown', confidence: 0.5, summary: 's', extracted: {}, suggested_action: 'escalate', is_final_delivery: false, draft_reply: 'd', follow_up_at: null }) }] })) } };
+}
+const baseCtx = { kommun_namn: 'Malmö', role: 'central', conversation_state: 'SENT', days_since_last_outbound: 3, today_iso: '2026-09-12' };
+const env = { ANTHROPIC_API_KEY: 'k' };
+
+describe('live-failure regressions (2026-09-12 queue review)', () => {
+  it('malmö: prompt lists every stored attachment and carries rule 3 (never claim documents are missing)', async () => {
+    seedMsg({ dir: 'outbound', gmailId: 'o1', body: 'Begäran.', at: '2026-08-17T14:45:24Z' });
+    const m = seedMsg({ gmailId: 'i1', body: 'Bifogat finner ni avtalen.', at: '2026-08-19T14:15:00Z', cls: 'delivery', analysis: { summary: 'Levererar avtal.' } });
+    const names = ['NE Avtal.pdf', 'Skolon.pdf', 'Gleerups.pdf', 'Clio.pdf', 'Binogi.pdf', 'Studi.pdf', 'Kunskapsmedia.pdf', 'Liber.pdf', 'Sanoma.pdf', 'Natur&Kultur.pdf', 'Magma.pdf'];
+    for (const [i, f] of names.entries()) db.recordAttachment({ message_id: m, filename: f, saved_path: `/x/${i}.pdf`, mime_type: 'application/pdf', size_bytes: 10 });
+    const client = captureClient();
+    await analyseMessage('Har ni fått allt ni behöver?', { ...baseCtx, thread_context: buildDraftContext(db, conv(), { attachments: [] }) }, { env, client });
+    const call = client.messages.create.mock.calls[0][0];
+    const user = call.messages[0].content;
+    for (const f of names) expect(user).toContain(f);
+    expect(call.system[0].text).toContain('Påstå ALDRIG att handlingar saknas');
+  });
+
+  it('halmstad: our prior outbound with invoice details appears verbatim and rule 4 is present', async () => {
+    seedMsg({ dir: 'outbound', gmailId: 'o1', body: 'Begäran.', at: '2026-08-05T09:00:00Z' });
+    seedMsg({ gmailId: 'i1', body: 'Avgift 4 kr/sida tillkommer. Faktureringsuppgifter?', at: '2026-08-10T09:00:00Z', cls: 'fee_demand', analysis: { summary: 'Kräver avgift och faktureringsuppgifter.' } });
+    const invoice = 'Vi accepterar avgiften. Fakturera Mediagraf i Stockholm AB, org.nr 559000-0000, Box 1, 111 11 Stockholm.';
+    seedMsg({ dir: 'outbound', gmailId: 'o2', body: invoice, at: '2026-08-11T09:00:00Z' });
+    const client = captureClient();
+    await analyseMessage('Vi behöver era faktureringsuppgifter innan vi kan lämna ut.', { ...baseCtx, kommun_namn: 'Halmstad', thread_context: buildDraftContext(db, conv(), { attachments: [] }) }, { env, client });
+    const call = client.messages.create.mock.calls[0][0];
+    expect(call.messages[0].content).toContain(invoice);
+    expect(call.system[0].text).toContain('Upprepa ALDRIG en fråga');
+    expect(call.system[0].text).toContain('står fast');
+  });
+
+  it('luleå: the full original request sits under Ursprunglig begäran and rule 5 is present', async () => {
+    const request = 'Hej,\n\nMed stöd av offentlighetsprincipen begär jag ut kommunens avtal för digitala läromedel och lärplattformar.\n\nMed vänlig hälsning\nGustaf';
+    seedMsg({ dir: 'outbound', gmailId: 'o1', body: request, at: '2026-08-17T14:45:24Z' });
+    const client = captureClient();
+    await analyseMessage('Vi kan inte se att din begäran kommit fram. Skicka den på nytt.', { ...baseCtx, kommun_namn: 'Luleå', thread_context: buildDraftContext(db, conv(), { attachments: [] }) }, { env, client });
+    const call = client.messages.create.mock.calls[0][0];
+    const user = call.messages[0].content;
+    expect(user).toContain('# Ursprunglig begäran');
+    expect(user).toContain(request);
+    expect(call.system[0].text).toContain('begäran aldrig nått dem');
   });
 });
