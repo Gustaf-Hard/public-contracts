@@ -448,10 +448,12 @@ export function buildActionQueue(db) {
       // F2) — otherwise it sorts behind undated drafts. An escalation that DOES
       // exist but carries no respond_by falls back to the same source (round-3
       // G1, belt and braces): escalateWithDraft now inherits the outstanding
-      // frist, but rows written before that fix do not carry it, and the
-      // dashboard must not disagree with the Slack digest about them.
-      respond_by: (openEsc.length > 0 ? openEsc[0].respond_by : null)
-        ?? db.latestRespondByForConversation?.(c.id) ?? null,
+      // frist, but rows written before that fix do not carry it.
+      //
+      // `effectiveRespondBy` is that composition, and the Slack digest's ⏰
+      // section calls the same helper (round-4 H3) — the two surfaces used to
+      // compute it separately and disagreed about exactly this undated-row case.
+      respond_by: db.effectiveRespondBy?.(c.id, openEsc.length > 0 ? openEsc[0].respond_by : null) ?? null,
     });
   }
   // Durable hänvisningar (2026-09-06 design): a pending handoff task is

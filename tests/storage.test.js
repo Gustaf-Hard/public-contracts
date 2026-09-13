@@ -704,6 +704,74 @@ describe('queue hygiene queries (2026-09-12 design)', () => {
     expect(without.find((c) => c.id === cid).respond_by).toBe('2026-09-13');
     expect(db.listOrphanNeedsHuman().map((c) => c.kommun_namn)).not.toContain('Hänvisad');
   });
+
+  // Round-4 H5: buildActionQueue skips DONE/DEAD_END, the digest queries did
+  // not. A lingering open escalation on a closed case nagged daily with nothing
+  // to click.
+  it('a closed conversation with a lingering open escalation is in neither digest list', () => {
+    for (const [kod, namn, state] of [['0101', 'KlarDone', 'DONE'], ['0102', 'KlarDead', 'DEAD_END']]) {
+      const cid = db.createConversation({ kommun_kod: kod, kommun_namn: namn, role: 'central', contact_email: `${kod}@k.se`, scheduled_send_at: '2026-08-01T08:00:00Z' });
+      const esc = db.recordEscalation({ conversation_id: cid, reason: 'r', respond_by: '2026-09-13' });
+      db.raw.prepare("UPDATE escalations SET created_at = datetime('now', '-9 days') WHERE id = ?").run(esc);
+      db.updateConversationState(cid, state);
+    }
+    expect(db.listOpenEscalationsAgedDays(7).map((e) => e.kommun_namn)).not.toContain('KlarDone');
+    expect(db.listOpenEscalationsAgedDays(7).map((e) => e.kommun_namn)).not.toContain('KlarDead');
+    expect(db.listOpenEscalationsWithDeadlineDue('2026-09-14').map((e) => e.kommun_namn)).not.toContain('KlarDone');
+    expect(db.listOpenEscalationsWithDeadlineDue('2026-09-14').map((e) => e.kommun_namn)).not.toContain('KlarDead');
+  });
+
+  // Round-4 H3: one effective-deadline source for the dashboard and the digest.
+  // An UNDATED open escalation (every row written before this branch) over a
+  // conversation whose inbound carries an outstanding frist showed the date on
+  // the dashboard and never in Slack, because the due query required
+  // e.respond_by IS NOT NULL.
+  it('listOpenEscalationsWithDeadlineDue finds an undated open escalation via the conversation frist', () => {
+    const cid = db.createConversation({ kommun_kod: '0103', kommun_namn: 'Odaterad', role: 'central', contact_email: 'o@o.se', scheduled_send_at: '2026-08-01T08:00:00Z' });
+    db.recordMessage({
+      conversation_id: cid, gmail_message_id: 'g-o', direction: 'inbound',
+      from_email: 'o@o.se', to_email: 'x', subject: 's', body_text: 'b',
+      received_at: '2026-09-11T08:00:00Z', attachment_count: 0,
+      analysis_json: JSON.stringify({ extracted: { respond_by_date: '2026-09-13' } }),
+    });
+    db.recordEscalation({ conversation_id: cid, reason: 'r' }); // no respond_by
+    const hit = db.listOpenEscalationsWithDeadlineDue('2026-09-14').find((e) => e.conversation_id === cid);
+    expect(hit).toBeTruthy();
+    expect(hit.respond_by).toBe('2026-09-13'); // the effective deadline, not the row's NULL
+  });
+
+  it('effectiveRespondBy prefers the escalation row and falls back to the conversation', () => {
+    const cid = db.createConversation({ kommun_kod: '0104', kommun_namn: 'Effektiv', role: 'central', contact_email: 'e@e.se', scheduled_send_at: '2026-08-01T08:00:00Z' });
+    db.recordMessage({
+      conversation_id: cid, gmail_message_id: 'g-e', direction: 'inbound',
+      from_email: 'e@e.se', to_email: 'x', subject: 's', body_text: 'b',
+      received_at: '2026-09-11T08:00:00Z', attachment_count: 0,
+      analysis_json: JSON.stringify({ extracted: { respond_by_date: '2026-09-13' } }),
+    });
+    expect(db.effectiveRespondBy(cid, '2026-09-20')).toBe('2026-09-20');
+    expect(db.effectiveRespondBy(cid, null)).toBe('2026-09-13');
+    expect(db.effectiveRespondBy(cid, '')).toBe('2026-09-13');
+  });
+
+  it('the due list is sorted soonest first regardless of where each date came from', () => {
+    const mk = (kod, namn, escDate, msgDate) => {
+      const cid = db.createConversation({ kommun_kod: kod, kommun_namn: namn, role: 'central', contact_email: `${kod}@s.se`, scheduled_send_at: '2026-08-01T08:00:00Z' });
+      if (msgDate) {
+        db.recordMessage({
+          conversation_id: cid, gmail_message_id: `g-${kod}`, direction: 'inbound',
+          from_email: 's@s.se', to_email: 'x', subject: 's', body_text: 'b',
+          received_at: '2026-09-11T08:00:00Z', attachment_count: 0,
+          analysis_json: JSON.stringify({ extracted: { respond_by_date: msgDate } }),
+        });
+      }
+      db.recordEscalation({ conversation_id: cid, reason: 'r', respond_by: escDate });
+      return cid;
+    };
+    mk('0201', 'Sen', '2026-09-14', null);
+    mk('0202', 'Tidig', null, '2026-09-10');
+    expect(db.listOpenEscalationsWithDeadlineDue('2026-09-14').map((e) => e.kommun_namn))
+      .toEqual(['Tidig', 'Sen']);
+  });
 });
 
 // Round-2 finding F2: the void path (kommun replied after a draft was written)
@@ -825,6 +893,19 @@ describe('latestRespondByForConversation (round-2 finding F2)', () => {
       const live = db.recordEscalation({ conversation_id: id, reason: 'r', respond_by: '2026-09-18' });
       db.raw.prepare('UPDATE escalations SET created_at = ? WHERE id = ?').run('2026-09-07 08:00:00', live);
       expect(db.latestRespondByForConversation(id)).toBe('2026-09-18');
+    });
+
+    // Round-4 H2: an escalation created AFTER the operator reply can still
+    // carry a deadline copied from an inbound the reply already answered
+    // (delayed ingest, or a superseded copy). The escalation's own
+    // created_at is not evidence; its originating inbound's receipt is.
+    it('an escalation whose originating inbound predates the operator send does not resurrect the deadline', () => {
+      const id = seed();
+      const mid = inbound(id, { at: '2026-09-05T08:00:00Z', respondBy: '2026-09-10' });
+      decide(id, 'edit', '2026-09-06 09:00:00');
+      const copy = db.recordEscalation({ conversation_id: id, message_id: mid, reason: 'r', respond_by: '2026-09-10' });
+      db.raw.prepare('UPDATE escalations SET created_at = ? WHERE id = ?').run('2026-09-07 08:00:00', copy);
+      expect(db.latestRespondByForConversation(id)).toBeNull();
     });
   });
 });

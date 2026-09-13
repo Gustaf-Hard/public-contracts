@@ -1424,6 +1424,11 @@ export async function runDailyFollowup(deps) {
     // arithmetic below uses the injected `now` (identical in production; tests
     // seed created_at relative to datetime('now') and inject a matching `now`).
     const dueBy = addDaysIso(todayIso, 2);
+    // Open escalations by EFFECTIVE deadline (round-4 H3): the row's own
+    // respond_by when it has one, otherwise the conversation's outstanding
+    // frist — the same helper buildActionQueue reads, so Slack and the
+    // dashboard cannot disagree about an undated row. Closed conversations are
+    // excluded inside the query (round-4 H5).
     const due = db.listOpenEscalationsWithDeadlineDue?.(dueBy) ?? [];
     const dueIds = new Set(due.map((e) => e.id));
     const aged = (db.listOpenEscalationsAgedDays?.(7) ?? []).filter((e) => !dueIds.has(e.id));

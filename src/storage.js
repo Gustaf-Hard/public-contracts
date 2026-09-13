@@ -781,22 +781,45 @@ export function openDb(path) {
   // Queue-hygiene queries (2026-09-12 design) — read-only, feed the daily
   // digest in tick.js. datetime('now', ?) takes the modifier as a bound
   // string ('-N days'), not a literal spliced into the SQL.
+  //
+  // Both lists exclude DONE/DEAD_END conversations (round-4 H5), the same way
+  // buildActionQueue does: a closed case is never pending work, and a stale open
+  // escalation lingering on one (legacy data, or a row opened before the case
+  // was closed) nagged the operator daily with nothing to click.
   function listOpenEscalationsAgedDays(days) {
     return db.prepare(`
       SELECT e.id, e.conversation_id, e.created_at, e.respond_by, c.kommun_namn, c.role
       FROM escalations e JOIN conversations c ON c.id = e.conversation_id
-      WHERE e.status = 'open' AND e.created_at <= datetime('now', ?)
+      WHERE e.status = 'open' AND c.state NOT IN ('DONE', 'DEAD_END')
+        AND e.created_at <= datetime('now', ?)
       ORDER BY e.created_at
     `).all(`-${Math.floor(days)} days`);
   }
 
+  // Open escalations whose EFFECTIVE reply deadline falls on or before
+  // byIsoDate, soonest first (round-4 H3). "Effective" is the point: the query
+  // used to require `e.respond_by IS NOT NULL`, so an undated open escalation --
+  // which is what every row written before escalateWithDraft started inheriting
+  // the frist looks like -- was invisible here while buildActionQueue showed its
+  // date, and the draftless source below could not pick it up either (it
+  // requires NO open escalation). The case fell between the two lists and the
+  // operator saw a date on the dashboard that Slack never mentioned.
+  //
+  // Filtering and sorting happen in JS because the effective deadline is not a
+  // column: effectiveRespondBy reads the conversation's outstanding frist when
+  // the row carries none. Both readers now call the same helper, so they cannot
+  // disagree. `respond_by` on the returned rows is the effective value, which is
+  // what the digest labels.
   function listOpenEscalationsWithDeadlineDue(byIsoDate) {
     return db.prepare(`
       SELECT e.id, e.conversation_id, e.created_at, e.respond_by, c.kommun_namn, c.role
       FROM escalations e JOIN conversations c ON c.id = e.conversation_id
-      WHERE e.status = 'open' AND e.respond_by IS NOT NULL AND e.respond_by <= ?
-      ORDER BY e.respond_by
-    `).all(byIsoDate);
+      WHERE e.status = 'open' AND c.state NOT IN ('DONE', 'DEAD_END')
+      ORDER BY e.id
+    `).all()
+      .map((e) => ({ ...e, respond_by: effectiveRespondBy(e.conversation_id, e.respond_by) }))
+      .filter((e) => e.respond_by != null && e.respond_by <= byIsoDate)
+      .sort((a, b) => a.respond_by.localeCompare(b.respond_by) || a.id - b.id);
   }
 
   // Milliseconds for a stored timestamp in either of the two shapes this schema
@@ -868,12 +891,34 @@ export function openDb(path) {
     const hit = fromMessages.find((r) => typeof r.respond_by === 'string' && r.respond_by.trim() !== ''
       && outstanding(r.received_at));
     if (hit) return hit.respond_by;
+    // Escalation fallback. The row's own created_at is NOT evidence that its
+    // deadline is live (round-4 H2): an escalation minted after our reply can
+    // carry a respond_by copied from an inbound that reply already answered --
+    // delayed ingest, or a superseded copy re-inheriting the frist. So when the
+    // row names its originating inbound, that mail's receipt is what the
+    // boundary is compared against. A NULL message_id (a proactive draft from
+    // the daily follow-up, which has no trigger mail) falls back to created_at.
+    // A message_id pointing at a row we cannot read leaves received_at NULL,
+    // which `outstanding` treats as considered -- fail open, as above.
     const esc = db.prepare(`
-      SELECT created_at, respond_by FROM escalations
-      WHERE conversation_id = ? AND respond_by IS NOT NULL AND respond_by != ''
-      ORDER BY id DESC
-    `).all(conversationId).find((r) => outstanding(r.created_at));
+      SELECT e.created_at AS created_at, e.respond_by AS respond_by,
+             e.message_id AS message_id, m.received_at AS trigger_received_at
+      FROM escalations e LEFT JOIN messages m ON m.id = e.message_id
+      WHERE e.conversation_id = ? AND e.respond_by IS NOT NULL AND e.respond_by != ''
+      ORDER BY e.id DESC
+    `).all(conversationId)
+      .find((r) => outstanding(r.message_id != null ? r.trigger_received_at : r.created_at));
     return esc?.respond_by ?? null;
+  }
+
+  // THE effective reply deadline for a case, and the single source both the
+  // Slack digest and the dashboard's Behöver dig queue read (round-4 H3). The
+  // open escalation's own respond_by wins when it has one; otherwise the
+  // conversation's newest outstanding frist. Advisory surfacing only.
+  function effectiveRespondBy(conversationId, openEscRespondBy = null) {
+    const given = typeof openEscRespondBy === 'string' ? openEscRespondBy.trim() : '';
+    if (given !== '') return given;
+    return latestRespondByForConversation(conversationId);
   }
 
   // NEEDS_HUMAN with no draft to approve: state NEEDS_HUMAN and no OPEN
@@ -1788,6 +1833,7 @@ export function openDb(path) {
     listOrphanNeedsHuman,
     listNeedsHumanWithoutOpenEscalation,
     latestRespondByForConversation,
+    effectiveRespondBy,
     listActiveEscalationsForConversation,
     hasActiveEscalation,
     hasDelayAckForDate,

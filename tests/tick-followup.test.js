@@ -789,6 +789,33 @@ describe('queue hygiene digest (2026-09-12 design)', () => {
     }
   });
 
+  // Round-4 H3: the dashboard and the digest must agree. An UNDATED open
+  // escalation (what every row written before this branch looks like) over a
+  // conversation whose inbound set an outstanding frist showed the date in
+  // Behöver dig and never in Slack: the ⏰ query required e.respond_by IS NOT
+  // NULL, and the draftless source requires NO open escalation, so the case
+  // fell between them. Both now read one effective deadline.
+  it('an undated open escalation over a dated outstanding inbound raises the deadline alert once, with a draft', async () => {
+    const cid = db.createConversation({ kommun_kod: '0012', kommun_namn: 'Odaterad', role: 'central', contact_email: 'o@o.se', scheduled_send_at: '2026-08-01T08:00:00Z' });
+    db.recordMessage({
+      conversation_id: cid, gmail_message_id: 'g-o', direction: 'inbound',
+      from_email: 'o@o.se', to_email: 'x', subject: 's', body_text: 'b',
+      received_at: '2026-09-11T08:00:00Z', attachment_count: 0,
+      analysis_json: JSON.stringify({ extracted: { respond_by_date: '2026-09-13' } }),
+    });
+    db.recordEscalation({ conversation_id: cid, reason: 'r', draft_template: 'free_form', draft_body: 'b' }); // no respond_by
+    const slackOps = fakeSlackOps();
+    await runDailyFollowup(deps({ slackOps, now: new Date('2026-09-12T09:00:00Z') }));
+    const digest = slackOps.alerts.find((t) => t.includes('Köhälsa'));
+    expect(digest).toBeTruthy();
+    const deadlineSection = digest.split('🕰')[0].split('🧭')[0];
+    expect(deadlineSection).toContain('Odaterad (senast 2026-09-13)');
+    // There IS a draft to approve, so it must not be labelled draftless...
+    expect(deadlineSection).not.toContain('Odaterad (senast 2026-09-13, utan utkast)');
+    // ...and it is named exactly once.
+    expect(digest.match(/Odaterad/g)).toHaveLength(1);
+  });
+
   it('an orphan with no deadline is named without a date and stays out of the deadline section', async () => {
     const cid = db.createConversation({ kommun_kod: '0010', kommun_namn: 'Avesta', role: 'central', contact_email: 'a@a.se', scheduled_send_at: '2026-08-01T08:00:00Z' });
     db.updateConversationState(cid, 'NEEDS_HUMAN');
