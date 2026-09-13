@@ -127,6 +127,11 @@ function daysUntilIso(iso, now = new Date()) {
 const PARKED_SEND_STATUSES = new Set(ACTIVE_ESCALATION_STATUSES.filter((st) => st !== 'open'));
 
 export function escalationActionLabel(esc) {
+  // 'sending' is a claim IN PROGRESS (or one a crash orphaned — recoverStuckSends
+  // escalates that case separately), not a parked send: it has not failed or
+  // gone unconfirmed, so "parkerad" overstates it (round-12 Q4). Only
+  // send_failed / send_unconfirmed are genuinely parked.
+  if (esc?.status === 'sending') return 'Skickning pågår: se ärendet';
   if (PARKED_SEND_STATUSES.has(esc?.status)) return `Skickning parkerad (${esc.status}): se ärendet`;
   const labels = {
     free_form: 'fritextsvar krävs',
@@ -474,12 +479,19 @@ export function buildActionQueue(db) {
       role: c.role,
       state: c.state,
       action: driver ? escalationActionLabel(driver) : 'granska och svara',
-      // A parked send's clock is the escalation's own created_at: the case's
-      // state_changed_at / last_outbound_at belong to whatever the conversation
-      // was doing before the send got stuck, which reads as far fresher than the
-      // stuck send actually is. An open draft keeps the case clock as before.
-      since: (!newestOpen && newestParked?.created_at)
-        ? String(newestParked.created_at).replace(' ', 'T')
+      // A parked/in-flight send's clock is the MOMENT IT ENTERED that status
+      // (resolved_at — claimEscalationForSending and resolveEscalation both
+      // stamp it the instant the row moves to sending/send_failed/
+      // send_unconfirmed), not the draft's created_at: a draft can sit open for
+      // days before an operator's click sends it, and dating the stuck send by
+      // when the DRAFT was written reads as far staler than the send actually
+      // is (round-12 Q4). Falls back to created_at for a legacy row that never
+      // went through those helpers. The case's state_changed_at/last_outbound_at
+      // belong to whatever the conversation was doing before the send got
+      // stuck, so they don't apply here either. An open draft keeps the case
+      // clock as before.
+      since: (!newestOpen && newestParked)
+        ? String(newestParked.resolved_at ?? newestParked.created_at).replace(' ', 'T')
         : caseSince(c),
       // A NEEDS_HUMAN case whose draft was voided has no open escalation, so
       // its deadline comes from the message analysis instead (round-2 finding
@@ -538,11 +550,19 @@ const WAITING_STATES = new Set(['INITIAL', 'SENT', 'ACK_RECEIVED', 'AWAITING_PRE
 export function buildWaiting(db) {
   if (!db) return [];
   const out = [];
+  // Round-12 Q2: the same exclusion buildActionQueue's active-escalation check
+  // gets (round-11 P2), for a pending handoff task — buildActionQueue lists its
+  // source conversation as a HANDOFF row, so a conversation with nothing but a
+  // pending handoff must not ALSO show up here as progressing on its own.
+  const pendingHandoffConvIds = new Set(
+    (db.listPendingHandoffTasks?.() ?? []).map((t) => t.source_conversation_id)
+  );
   for (const c of db.listAllConversations()) {
     if (c.state === 'NEEDS_HUMAN' || !WAITING_STATES.has(c.state)) continue;
     // Round-11 P2: the same widening as buildActionQueue, or a parked send would
     // be listed BOTH as needing the operator and as progressing on its own.
     if (db.hasActiveEscalation(c.id)) continue; // belongs in the action queue
+    if (pendingHandoffConvIds.has(c.id)) continue; // ditto — HANDOFF row there
     const fu = effectiveFollowUp(c);
     out.push({
       conv_id: c.id,

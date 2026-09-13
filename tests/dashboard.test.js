@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { openDb } from '../src/storage.js';
-import { createDashboardApp, buildActionQueue, buildWaiting, applyFilter, buildOverviewRows, contentDisposition } from '../src/dashboard.js';
+import { createDashboardApp, buildActionQueue, buildWaiting, applyFilter, buildOverviewRows, contentDisposition, escalationActionLabel } from '../src/dashboard.js';
 import { layout, renderEscalationForm, renderOverview, renderArenden } from '../src/dashboard-views.js';
 
 let tmp, db, dbPath, muniPath;
@@ -554,6 +554,40 @@ describe('handoff tasks (2026-09-06 design)', () => {
     expect(res.text).toContain('skola@mala.se');
   });
 
+  // Round-12 Q2: buildWaiting excluded conversations with an active escalation
+  // (round-11 P2) but not conversations that only have a pending handoff task
+  // — which buildActionQueue lists as a HANDOFF row. Without this exclusion
+  // the same conversation shows up BOTH as needing the operator and as
+  // progressing on its own.
+  it('a conversation with a pending handoff appears only in Behöver dig, not also in Pågår · väntar', async () => {
+    const convId = db.createConversation({
+      kommun_kod: '2418', kommun_namn: 'Malå', role: 'central',
+      contact_email: 'kommun@mala.se', scheduled_send_at: '2026-08-01T08:00:00Z',
+    });
+    db.updateConversationState(convId, 'ACK_RECEIVED', { last_outbound_at: '2026-08-01T08:00:00Z' });
+    const msgId = db.recordMessage({
+      conversation_id: convId, gmail_message_id: 'ho-dash2', direction: 'inbound',
+      from_email: 'kommun@mala.se', to_email: 'x', subject: 'Sv',
+      body_text: 'Kontakta skola@mala.se.', received_at: '2026-08-20T08:00:00Z', attachment_count: 0,
+    });
+    db.upsertHandoffTask({
+      kommun_kod: '2418', address: 'skola@mala.se', forvaltning: 'Skolkontoret', role: 'utbildning',
+      source_conversation_id: convId, source_message_id: msgId, verbatim: 1, same_domain: 1,
+    });
+
+    const queue = buildActionQueue(db);
+    expect(queue.some((r) => r.conv_id === convId && r.state === 'HANDOFF')).toBe(true);
+
+    const waiting = buildWaiting(db);
+    expect(waiting.some((r) => r.conv_id === convId)).toBe(false);
+
+    const overview = await get(appWithFakes(), '/');
+    const waitingSection = overview.text.slice(
+      overview.text.indexOf('Pågår · väntar'), overview.text.indexOf('Alla kommuner')
+    );
+    expect(waitingSection).not.toContain('Malå');
+  });
+
   it('dismiss requires a reason and removes the task from the queue', async () => {
     const { convId, taskId } = seedHandoffTask();
     const app = appWithFakes();
@@ -950,15 +984,40 @@ describe('home buckets', () => {
     expect(buildWaiting(db).some((r) => r.conv_id === cid)).toBe(false);
   });
 
-  it.each(['sending', 'send_unconfirmed'])('buildActionQueue surfaces a %s escalation on a non-NEEDS_HUMAN conversation', (status) => {
+  // Round-12 Q4: 'sending' is a claim IN PROGRESS, not a failed/unconfirmed
+  // send — labelling it "parkerad" overstates it. Only send_failed and
+  // send_unconfirmed are genuinely parked.
+  it.each([
+    ['sending', 'Skickning pågår: se ärendet'],
+    ['send_unconfirmed', 'Skickning parkerad (send_unconfirmed): se ärendet'],
+  ])('buildActionQueue surfaces a %s escalation on a non-NEEDS_HUMAN conversation, labelled "%s"', (status, expectedAction) => {
     const cid = db.createConversation({ kommun_kod: '5557', kommun_namn: 'Ihängande', role: 'central', contact_email: 'i@i.se', scheduled_send_at: '2026-05-24T10:00:00Z' });
     db.updateConversationState(cid, 'DELIVERING', { last_outbound_at: '2026-09-01T08:00:00Z' });
     const esc = db.recordEscalation({ conversation_id: cid, reason: 'r', draft_template: 'free_form', draft_body: 'b' });
     db.raw.prepare('UPDATE escalations SET status = ? WHERE id = ?').run(status, esc);
     const row = buildActionQueue(db).find((r) => r.conv_id === cid);
     expect(row).toBeTruthy();
-    expect(row.action).toBe(`Skickning parkerad (${status}): se ärendet`);
+    expect(row.action).toBe(expectedAction);
     expect(buildWaiting(db).some((r) => r.conv_id === cid)).toBe(false);
+  });
+
+  it('escalationActionLabel: sending is "pågår", send_failed/send_unconfirmed are "parkerad" (round-12 Q4)', () => {
+    expect(escalationActionLabel({ status: 'sending' })).toBe('Skickning pågår: se ärendet');
+    expect(escalationActionLabel({ status: 'send_failed' })).toBe('Skickning parkerad (send_failed): se ärendet');
+    expect(escalationActionLabel({ status: 'send_unconfirmed' })).toBe('Skickning parkerad (send_unconfirmed): se ärendet');
+  });
+
+  it('buildActionQueue dates a parked/in-flight send by resolved_at (the moment it entered that status), not the draft\'s created_at (round-12 Q4)', () => {
+    const cid = db.createConversation({ kommun_kod: '5560', kommun_namn: 'Sent Parkerad', role: 'central', contact_email: 's@s.se', scheduled_send_at: '2026-05-24T10:00:00Z' });
+    db.updateConversationState(cid, 'ACK_RECEIVED', { last_outbound_at: '2026-09-01T08:00:00Z' });
+    const esc = db.recordEscalation({ conversation_id: cid, reason: 'r', draft_template: 'free_form', draft_body: 'b' });
+    // The draft sat open for days (created_at) before it was claimed and then
+    // parked (resolved_at) — the operator cares how long it has been STUCK,
+    // not how old the draft was when written.
+    db.raw.prepare("UPDATE escalations SET status = 'send_failed', created_at = ?, resolved_at = ? WHERE id = ?")
+      .run('2026-09-01 09:00:00', '2026-09-12 07:30:00', esc);
+    const row = buildActionQueue(db).find((r) => r.conv_id === cid);
+    expect(row.since).toBe('2026-09-12T07:30:00');
   });
 
   it('buildActionQueue prefers the open escalation label when one exists alongside a parked one', () => {
