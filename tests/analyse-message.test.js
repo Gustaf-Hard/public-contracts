@@ -504,7 +504,15 @@ describe('respond_by_date (2026-09-12 design)', () => {
   });
   it('normaliseRespondBy nulls a non-ISO value', () => {
     const a = { extracted: { respond_by_date: 'nästa vecka' } };
-    expect(normaliseRespondBy(a).extracted.respond_by_date).toBeNull();
+    expect(normaliseRespondBy(a, '2026-09-12').extracted.respond_by_date).toBeNull();
+  });
+  it('normaliseRespondBy nulls a deadline more than a day in the past (hallucinated or stale), keeps yesterday and today', () => {
+    expect(normaliseRespondBy({ extracted: { respond_by_date: '2026-09-01' } }, '2026-09-12').extracted.respond_by_date).toBeNull();
+    expect(normaliseRespondBy({ extracted: { respond_by_date: '2026-09-11' } }, '2026-09-12').extracted.respond_by_date).toBe('2026-09-11');
+    expect(normaliseRespondBy({ extracted: { respond_by_date: '2026-09-19' } }, '2026-09-12').extracted.respond_by_date).toBe('2026-09-19');
+  });
+  it('normaliseRespondBy tolerates a missing extracted block', () => {
+    expect(normaliseRespondBy({ intent: 'unknown' }, '2026-09-12').intent).toBe('unknown');
   });
   it('schema stays at 10 union-typed params', () => {
     // count anyOf occurrences — the 16-limit guard from memory

@@ -324,15 +324,18 @@ export function normaliseDelayAnalysis(analysis, todayIso) {
   return analysis;
 }
 
-// Deterministic safety net over respond_by_date (pure, exported for tests):
-// the model must emit ISO or null; anything else (Swedish prose, a
-// half-formed date) is nulled rather than trusted downstream. Deliberately
-// does NOT reject a past date — a kommun-imposed deadline that has already
-// passed is still a fact worth surfacing (Task 8 digests overdue dates), and
-// "past by more than a day" guarding is presentation-side, not extraction.
-export function normaliseRespondBy(analysis) {
-  const v = analysis?.extracted?.respond_by_date;
-  if (v != null && !ISO_DATE_RE.test(v)) analysis.extracted.respond_by_date = null;
+// Kommun-imposed reply deadline (2026-09-12 design). Fails closed: anything
+// that is not a real ISO date, or lies more than a day behind today (a
+// hallucinated or already-expired frist), becomes null rather than sorting
+// the queue on garbage. Yesterday is kept: a deadline that expired overnight
+// is exactly what the operator must see first.
+export function normaliseRespondBy(analysis, todayIso) {
+  const ex = analysis?.extracted;
+  if (!ex || ex.respond_by_date == null) return analysis;
+  const v = ex.respond_by_date;
+  if (typeof v !== 'string' || !ISO_DATE_RE.test(v)) { ex.respond_by_date = null; return analysis; }
+  const floor = todayIso && ISO_DATE_RE.test(todayIso) ? addDaysIso(todayIso, -1) : null;
+  if (floor && v < floor) ex.respond_by_date = null;
   return analysis;
 }
 
@@ -409,7 +412,7 @@ export async function analyseMessage(body, ctx, { env = process.env, client = nu
     if (!textBlock || !textBlock.text) return null;
     try {
       const parsed = JSON.parse(textBlock.text);
-      return normaliseRespondBy(normaliseDelayAnalysis(parsed, ctx.today_iso));
+      return normaliseRespondBy(normaliseDelayAnalysis(parsed, ctx.today_iso), ctx.today_iso);
     } catch (e) {
       return null;
     }
