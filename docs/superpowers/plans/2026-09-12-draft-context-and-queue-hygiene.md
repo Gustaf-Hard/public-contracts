@@ -66,7 +66,8 @@ describe('draft-context storage helpers (2026-09-12 design)', () => {
       received_at: '2026-08-19T14:15:00Z', attachment_count: 1,
     });
     const att = db.recordAttachment({ message_id: m, filename: 'oversikt.pdf', saved_path: '/x/3.pdf', mime_type: 'application/pdf', size_bytes: 10 });
-    db.recordContract({ attachment_id: att, vendor_name: null, is_contract: 0, document_type: 'följebrev_sammanställning', summary: 'En översikt.' });
+    // recordContract takes vendor_id (from upsertVendor), never vendor_name — see tests/contracts-storage.test.js:59
+    db.recordContract({ attachment_id: att, vendor_id: null, is_contract: 0, document_type: 'följebrev_sammanställning', summary: 'En översikt.' });
     const rows = db.listContractInfoForConversation(convId);
     expect(rows).toHaveLength(1);
     expect(rows[0].document_type).toBe('följebrev_sammanställning');
@@ -75,7 +76,7 @@ describe('draft-context storage helpers (2026-09-12 design)', () => {
 });
 ```
 
-Note: check `recordContract`'s actual signature in storage.js (~line 975: `INSERT INTO contracts (...)`) before writing — if it takes `vendor_id` resolved from a separate vendor upsert, mirror how `tests/contracts-storage.test.js` seeds a contract row and copy that idiom instead of the call above.
+`recordContract(c)` (storage.js ~line 958) takes `attachment_id`, optional `vendor_id` (resolve with `db.upsertVendor(name).id`), `is_contract`, `document_type`, `summary` and the value columns; all optional fields default to null. `listContractInfoForConversation` currently selects only `is_contract`, `vendor_name`, `analysis_json` (line ~1159).
 
 - [ ] **Step 2: Run to verify failure:** `npx vitest run tests/storage.test.js -t "draft-context storage"` — expect FAIL (`listAttachmentsForConversation is not a function`).
 
@@ -191,8 +192,8 @@ describe('buildDraftContext', () => {
     seedMsg({ dir: 'outbound', gmailId: 'o1', body: 'Begäran.', at: '2026-08-17T14:45:24Z' });
     const m = seedMsg({ gmailId: 'i1', body: 'Bifogat.', at: '2026-08-19T14:15:00Z' });
     const att = db.recordAttachment({ message_id: m, filename: 'oversikt.pdf', saved_path: '/x/1.pdf', mime_type: 'application/pdf', size_bytes: 10 });
-    // seed a contract row exactly as tests/contracts-storage.test.js does
-    db.recordContract({ attachment_id: att, vendor_name: 'NE', is_contract: 1, document_type: 'avtal', summary: 'Avtal med NE.' });
+    const vendor = db.upsertVendor('NE');
+    db.recordContract({ attachment_id: att, vendor_id: vendor.id, is_contract: 1, document_type: 'avtal', summary: 'Avtal med NE.' });
     const out = buildDraftContext(db, conv(), noAtts);
     expect(out).toContain('# Avtal vi redan extraherat');
     expect(out).toContain('NE');
@@ -211,7 +212,6 @@ describe('buildDraftContext', () => {
 });
 ```
 
-(Adjust `db.recordContract` calls to the real seeding idiom from `tests/contracts-storage.test.js`, as in Task 1.)
 
 - [ ] **Step 2: Run to verify failure:** `npx vitest run tests/draft-context.test.js` — FAIL (module missing).
 
@@ -354,7 +354,19 @@ In `buildSystemPrompt`, extend the numbered SKRIVREGLER list (after rule 2) with
 5. Om kommunen uppger att vår begäran aldrig nått dem: draft_reply MÅSTE innehålla den ursprungliga begäran i sin helhet, kopierad ordagrant från "Ursprunglig begäran" i konversationskontexten. Aldrig en sammanfattning, aldrig bara "jag skickar den på nytt".
 ```
 
-Add one few-shot example for rule 5 after the existing few-shots (a short incoming "Vi kan tyvärr inte se att din begäran har kommit fram till oss. Vänligen skicka den på nytt." whose `draft_reply` visibly restates a full mini-request, intent `clarification`, suggested_action `send_precision`).
+Add one few-shot example at the END of the `# Few-shot exempel` section (starts ~line 98; each example is `Inkommande:` quote + `Output:` JSON on one line, copy that exact shape):
+
+```
+Inkommande:
+> Hej, vi kan tyvärr inte se att din begäran har kommit fram till oss. Vänligen skicka den på nytt så registrerar vi den.
+
+Konversationskontext innehåller under "Ursprunglig begäran": "Hej,\n\nMed stöd av offentlighetsprincipen begär jag ut kommunens avtal för digitala läromedel och lärplattformar. [...]"
+
+Output:
+{"intent":"clarification","confidence":0.9,"summary":"Registratorn hittar inte begäran och ber oss skicka den igen.","extracted":{"arendenummer":null,"promised_response_days":null,"promised_response_date":null,"respond_by_date":null,"handoff_to_email":null,"handoff_to_forvaltning":null,"questions":["Skicka begäran på nytt"],"mentioned_vendors":null,"reseller_relations":null},"suggested_action":"send_precision","is_final_delivery":false,"draft_reply":"Hej,\n\nTack för ditt svar. Här kommer begäran i sin helhet igen:\n\nMed stöd av offentlighetsprincipen begär jag ut kommunens avtal för digitala läromedel och lärplattformar. [...]\n\nMed vänlig hälsning\nGustaf Hård af Segerstad","follow_up_at":null}
+```
+
+(Task 6 adds `respond_by_date` to the schema; include it in this example's `extracted` now so the example stays valid once Task 6 lands — it is a plain prompt string, the schema does not validate examples.) The draft in the example must visibly copy the request text, not summarise it.
 
 - [ ] **Step 4: Run to verify pass:** `npx vitest run tests/analyse-message.test.js`
 
@@ -374,20 +386,32 @@ Add one few-shot example for rule 5 after the existing few-shots (a short incomi
 - [ ] **Step 1: Write the failing test** (append to `tests/tick-ingest.test.js`, copying its harness for a matched inbound message; the file already uses `vi.spyOn(analyseMod, 'analyseMessage')`):
 
 ```js
-it('passes thread context (prior outbound + trigger attachments) to analyseMessage', async () => {
-  // seed: one conversation with one outbound, then one inbound gmail message
-  // via the fake gmailOps exactly as the surrounding tests do.
-  const spy = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue(null);
-  await runTick(deps); // harness from this file
-  expect(spy).toHaveBeenCalled();
-  const ctx = spy.mock.calls[0][1];
-  expect(ctx.thread_context).toContain('# Ursprunglig begäran');
-  expect(ctx.thread_context).toContain(SEEDED_OUTBOUND_BODY); // the body seeded above
-  expect(ctx.thread_context).toContain('# Bilagor i det inkommande mejlet');
+describe('runTick — drafting LLM sees the thread (2026-09-12 design)', () => {
+  it('passes thread_context with the original request and the attachment section to analyseMessage', async () => {
+    const spy = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue(null);
+    const convId = seedConv({ thread: 'thr-ctx' }); // SENT, gmail_thread_id thr-ctx
+    db.recordMessage({
+      conversation_id: convId, gmail_message_id: 'out-ctx-1', direction: 'outbound',
+      from_email: 'gustaf.hard@gmail.com', to_email: 'kansli@ale.se', subject: 'Begäran om allmän handling',
+      body_text: 'Hej,\n\nMed stöd av offentlighetsprincipen begär jag ut avtal för digitala läromedel.',
+      received_at: '2026-06-10T10:00:00Z', attachment_count: 0,
+    });
+    const gmail = fakeGmail({
+      listResult: [{ id: 'in-ctx-1' }],
+      getResult: { 'in-ctx-1': mkMsg('in-ctx-1', 'thr-ctx', 'Registrator <registrator@ale.se>', 'Vi hittar inte din begäran, skicka den igen.') },
+    });
+    await runTick(deps({ gmail }));
+    const ctx = spy.mock.calls[0][1];
+    spy.mockRestore();
+    expect(ctx.thread_context).toContain('# Ursprunglig begäran');
+    expect(ctx.thread_context).toContain('begär jag ut avtal för digitala läromedel');
+    expect(ctx.thread_context).toContain('# Bilagor i det inkommande mejlet');
+    expect(ctx.thread_context).toContain('(inga)'); // text/plain fixture carries no attachments
+  });
 });
 ```
 
-(Adapt seeding names to the file's local helpers — the assertion block is the deliverable.)
+`seedConv`, `fakeGmail`, `mkMsg`, `deps` and `db` are the file's own top-level helpers (lines ~32–78); `db.recordMessage` is the same call `tests/storage.test.js` uses. The spy's second argument is the `ctx` object `ingestMessage` builds.
 
 - [ ] **Step 2: Run to verify failure:** `npx vitest run tests/tick-ingest.test.js -t "thread context"`
 
@@ -410,14 +434,79 @@ it('passes thread context (prior outbound + trigger attachments) to analyseMessa
 
 ---
 
-### Task 5: respond_by_date extraction (package B)
+### Task 5: Regression tests named for the live failures (Malmö, Halmstad, Luleå)
+
+**Files:**
+- Test: `tests/draft-context.test.js` (append a describe block; add `analyseMessage` from `../src/analyse-message.js` and `vi` from vitest to the imports)
+
+**Interfaces:**
+- Consumes: `buildDraftContext` (Task 2), `analyseMessage(body, ctx, { env, client })` with `ctx.thread_context` (Task 3).
+- Produces: nothing new; these tests pin what the model is SHOWN end-to-end (seeded DB → context → captured request), since model output cannot be asserted offline (spec §A "Tests").
+
+- [ ] **Step 1: Write the three tests** (append to `tests/draft-context.test.js`; `seedMsg`, `conv`, `db` are the file's helpers from Task 2):
+
+```js
+function captureClient() {
+  return { messages: { create: vi.fn(async () => ({ content: [{ type: 'text', text: JSON.stringify({ intent: 'unknown', confidence: 0.5, summary: 's', extracted: {}, suggested_action: 'escalate', is_final_delivery: false, draft_reply: 'd', follow_up_at: null }) }] })) } };
+}
+const baseCtx = { kommun_namn: 'Malmö', role: 'central', conversation_state: 'SENT', days_since_last_outbound: 3, today_iso: '2026-09-12' };
+const env = { ANTHROPIC_API_KEY: 'k' };
+
+describe('live-failure regressions (2026-09-12 queue review)', () => {
+  it('malmö: prompt lists every stored attachment and carries rule 3 (never claim documents are missing)', async () => {
+    seedMsg({ dir: 'outbound', gmailId: 'o1', body: 'Begäran.', at: '2026-08-17T14:45:24Z' });
+    const m = seedMsg({ gmailId: 'i1', body: 'Bifogat finner ni avtalen.', at: '2026-08-19T14:15:00Z', cls: 'delivery', analysis: { summary: 'Levererar avtal.' } });
+    const names = ['NE Avtal.pdf', 'Skolon.pdf', 'Gleerups.pdf', 'Clio.pdf', 'Binogi.pdf', 'Studi.pdf', 'Kunskapsmedia.pdf', 'Liber.pdf', 'Sanoma.pdf', 'Natur&Kultur.pdf', 'Magma.pdf'];
+    for (const [i, f] of names.entries()) db.recordAttachment({ message_id: m, filename: f, saved_path: `/x/${i}.pdf`, mime_type: 'application/pdf', size_bytes: 10 });
+    const client = captureClient();
+    await analyseMessage('Har ni fått allt ni behöver?', { ...baseCtx, thread_context: buildDraftContext(db, conv(), { attachments: [] }) }, { env, client });
+    const call = client.messages.create.mock.calls[0][0];
+    const user = call.messages[0].content;
+    for (const f of names) expect(user).toContain(f);
+    expect(call.system[0].text).toContain('Påstå ALDRIG att handlingar saknas');
+  });
+
+  it('halmstad: our prior outbound with invoice details appears verbatim and rule 4 is present', async () => {
+    seedMsg({ dir: 'outbound', gmailId: 'o1', body: 'Begäran.', at: '2026-08-05T09:00:00Z' });
+    seedMsg({ gmailId: 'i1', body: 'Avgift 4 kr/sida tillkommer. Faktureringsuppgifter?', at: '2026-08-10T09:00:00Z', cls: 'fee_demand', analysis: { summary: 'Kräver avgift och faktureringsuppgifter.' } });
+    const invoice = 'Vi accepterar avgiften. Fakturera Mediagraf i Stockholm AB, org.nr 559000-0000, Box 1, 111 11 Stockholm.';
+    seedMsg({ dir: 'outbound', gmailId: 'o2', body: invoice, at: '2026-08-11T09:00:00Z' });
+    const client = captureClient();
+    await analyseMessage('Vi behöver era faktureringsuppgifter innan vi kan lämna ut.', { ...baseCtx, kommun_namn: 'Halmstad', thread_context: buildDraftContext(db, conv(), { attachments: [] }) }, { env, client });
+    const call = client.messages.create.mock.calls[0][0];
+    expect(call.messages[0].content).toContain(invoice);
+    expect(call.system[0].text).toContain('Upprepa ALDRIG en fråga');
+    expect(call.system[0].text).toContain('står fast');
+  });
+
+  it('luleå: the full original request sits under Ursprunglig begäran and rule 5 is present', async () => {
+    const request = 'Hej,\n\nMed stöd av offentlighetsprincipen begär jag ut kommunens avtal för digitala läromedel och lärplattformar.\n\nMed vänlig hälsning\nGustaf';
+    seedMsg({ dir: 'outbound', gmailId: 'o1', body: request, at: '2026-08-17T14:45:24Z' });
+    const client = captureClient();
+    await analyseMessage('Vi kan inte se att din begäran kommit fram. Skicka den på nytt.', { ...baseCtx, kommun_namn: 'Luleå', thread_context: buildDraftContext(db, conv(), { attachments: [] }) }, { env, client });
+    const call = client.messages.create.mock.calls[0][0];
+    const user = call.messages[0].content;
+    expect(user).toContain('# Ursprunglig begäran');
+    expect(user).toContain(request);
+    expect(call.system[0].text).toContain('begäran aldrig nått dem');
+  });
+});
+```
+
+- [ ] **Step 2: Run:** `npx vitest run tests/draft-context.test.js -t "live-failure"` — all three PASS immediately if Tasks 2–3 are correct; a failure here means a Task 2/3 gap, fix THERE (these tests are the spec's regression contract, do not loosen them).
+
+- [ ] **Step 3: Commit:** `git add tests/draft-context.test.js && git commit -m "test: regression tests for the Malmö/Halmstad/Luleå draft failures"`
+
+---
+
+### Task 6: respond_by_date extraction (package B)
 
 **Files:**
 - Modify: `src/analyse-message.js` (ANALYSIS_SCHEMA `extracted`; prompt section + few-shot; new `normaliseRespondBy` applied next to `normaliseDelayAnalysis` at line ~372)
 - Test: `tests/analyse-message.test.js` (append)
 
 **Interfaces:**
-- Produces: `analysis.extracted.respond_by_date` (ISO string | null) on every analysis; exported `normaliseRespondBy(analysis)` nulls non-ISO values.
+- Produces: `analysis.extracted.respond_by_date` (ISO string | null) on every analysis; exported `normaliseRespondBy(analysis, todayIso)` nulls non-ISO values and dates more than one day before `todayIso` (spec §B: "ISO validity, not in the past by more than a day").
 
 - [ ] **Step 1: Write the failing tests:**
 
@@ -430,7 +519,15 @@ describe('respond_by_date (2026-09-12 design)', () => {
   });
   it('normaliseRespondBy nulls a non-ISO value', () => {
     const a = { extracted: { respond_by_date: 'nästa vecka' } };
-    expect(normaliseRespondBy(a).extracted.respond_by_date).toBeNull();
+    expect(normaliseRespondBy(a, '2026-09-12').extracted.respond_by_date).toBeNull();
+  });
+  it('normaliseRespondBy nulls a deadline more than a day in the past (hallucinated or stale), keeps yesterday and today', () => {
+    expect(normaliseRespondBy({ extracted: { respond_by_date: '2026-09-01' } }, '2026-09-12').extracted.respond_by_date).toBeNull();
+    expect(normaliseRespondBy({ extracted: { respond_by_date: '2026-09-11' } }, '2026-09-12').extracted.respond_by_date).toBe('2026-09-11');
+    expect(normaliseRespondBy({ extracted: { respond_by_date: '2026-09-19' } }, '2026-09-12').extracted.respond_by_date).toBe('2026-09-19');
+  });
+  it('normaliseRespondBy tolerates a missing extracted block', () => {
+    expect(normaliseRespondBy({ intent: 'unknown' }, '2026-09-12').intent).toBe('unknown');
   });
   it('schema stays at 10 union-typed params', () => {
     // count anyOf occurrences — the 16-limit guard from memory
@@ -455,14 +552,23 @@ ISO-datum (YYYY-MM-DD) när KOMMUNEN kräver svar av OSS ("svara inom 7 dagar an
 Plus one few-shot (komplettering with "Svara på detta mejl inom 7 dagar annars stängs ditt ärende", Dagens datum in ctx, output carries the computed ISO date). Implementation:
 
 ```js
-export function normaliseRespondBy(analysis) {
-  const v = analysis?.extracted?.respond_by_date;
-  if (v != null && !ISO_DATE_RE.test(v)) analysis.extracted.respond_by_date = null;
+// Kommun-imposed reply deadline (2026-09-12 design). Fails closed: anything
+// that is not a real ISO date, or lies more than a day behind today (a
+// hallucinated or already-expired frist), becomes null rather than sorting
+// the queue on garbage. Yesterday is kept: a deadline that expired overnight
+// is exactly what the operator must see first.
+export function normaliseRespondBy(analysis, todayIso) {
+  const ex = analysis?.extracted;
+  if (!ex || ex.respond_by_date == null) return analysis;
+  const v = ex.respond_by_date;
+  if (typeof v !== 'string' || !ISO_DATE_RE.test(v)) { ex.respond_by_date = null; return analysis; }
+  const floor = todayIso && ISO_DATE_RE.test(todayIso) ? addDaysIso(todayIso, -1) : null;
+  if (floor && v < floor) ex.respond_by_date = null;
   return analysis;
 }
 ```
 
-Apply at the parse site: `return normaliseRespondBy(normaliseDelayAnalysis(parsed, ctx.today_iso));`
+(`addDaysIso` and `ISO_DATE_RE` already live in this module, lines ~223–227.) Apply at the parse site (line ~372): `return normaliseRespondBy(normaliseDelayAnalysis(parsed, ctx.today_iso), ctx.today_iso);`
 
 - [ ] **Step 4: Run to verify pass:** `npx vitest run tests/analyse-message.test.js`
 
@@ -470,7 +576,7 @@ Apply at the parse site: `return normaliseRespondBy(normaliseDelayAnalysis(parse
 
 ---
 
-### Task 6: Persist respond_by on escalations + Slack line
+### Task 7: Persist respond_by on escalations + Slack line
 
 **Files:**
 - Modify: `src/storage.js` (SCHEMA escalations table + migrate() probe + `recordEscalation`)
@@ -533,7 +639,7 @@ it('buildEscalationBlocks renders a deadline line when respond_by is set', () =>
 
 ---
 
-### Task 7: Deadline-first queue sorting + dashboard badge
+### Task 8: Deadline-first queue sorting + dashboard badge
 
 **Files:**
 - Modify: `src/dashboard.js` (`buildActionQueue` ~line 427: include `respond_by` in rows, new sort)
@@ -541,7 +647,7 @@ it('buildEscalationBlocks renders a deadline line when respond_by is set', () =>
 - Test: `tests/dashboard.test.js` (append near the existing `buildActionQueue` tests ~line 768)
 
 **Interfaces:**
-- Produces: action-queue rows carry `respond_by` (string | null); deadline rows sort first, soonest first; handoff rows (no respond_by) unaffected.
+- Produces: action-queue rows carry `respond_by` (string | null); deadline rows sort first, soonest first; handoff rows (no respond_by) unaffected. Queue rows ≥7 days old render with class `q-age-old` (red).
 
 - [ ] **Step 1: Write the failing test:**
 
@@ -574,16 +680,45 @@ it('buildActionQueue sorts deadline-bearing escalations first, soonest first', (
 In `dashboard-views.js`, change the actionQueue map callback to:
 
 ```js
-queueRow(a, `<span class="q-action">${a.respond_by ? `<span class="bad">⏰ senast ${escapeHtml(a.respond_by)}</span> · ` : ''}${escapeHtml(a.action)}</span>`)
+queueRow(a, `<span class="q-action">${a.respond_by ? `<span class="q-deadline">⏰ senast ${escapeHtml(a.respond_by)}</span> · ` : ''}${escapeHtml(a.action)}</span>`)
 ```
+
+and make `queueRow` colour the age red at ≥7 days (spec §C "each row additionally shows age in days, red at ≥7"); `fmtAgo` already renders the age text, so only the class changes:
+
+```js
+  const AGE_RED_MS = 7 * 86400000;
+  const isOld = (iso) => iso && (Date.now() - new Date(iso).getTime()) >= AGE_RED_MS;
+  const queueRow = (item, badgeHtml) => `<a class="queue-row" data-pane-link href="/arenden/${item.conv_id}">
+      <span class="q-kommun">${escapeHtml(item.kommun_namn)} <span class="muted">· ${escapeHtml(item.role)}</span></span>
+      <span class="q-mid">${badgeHtml}</span>
+      <span class="q-age ${isOld(item.since) ? 'q-age-old' : 'muted'}" title="${escapeHtml(item.since ?? '')}">${escapeHtml(fmtAgo(item.since))}</span>
+    </a>`;
+```
+
+Add to the inline stylesheet next to the existing `.q-age` rule: `.q-age-old { color: var(--bad); font-weight: 600; } .q-deadline { color: var(--bad); font-weight: 600; }` (`--bad` is the existing red token used by `.stat-card .value.bad`, line ~348). `queueRow` is also used by the Väntar list; an old waiting case turning red is intended (same "silence let it age" problem).
+
+Dashboard test for the red age (append to the same describe as the sort test):
+
+```js
+it('renders a ≥7-day-old Behöver dig row with the q-age-old class', async () => {
+  const cid = db.createConversation({ kommun_kod: '0580', kommun_namn: 'Linköping', role: 'central', contact_email: 'k@l.se', scheduled_send_at: '2026-05-24T10:00:00Z' });
+  db.updateConversationState(cid, 'SENT', { last_outbound_at: '2026-01-01T00:00:00Z' });
+  db.raw.prepare('UPDATE conversations SET state_changed_at = ? WHERE id = ?').run('2026-01-01T00:00:00Z', cid);
+  db.recordEscalation({ conversation_id: cid, reason: 'x', draft_template: 'free_form', draft_body: 'b' });
+  const res = await get(appWithFakes(), '/');
+  expect(res.text).toContain('q-age-old');
+});
+```
+
+(`get` and `appWithFakes` are this test file's existing helpers, see the `/app.js` test ~line 761.)
 
 - [ ] **Step 4: Run to verify pass:** `npx vitest run tests/dashboard.test.js`
 
-- [ ] **Step 5: Commit:** `git add src/dashboard.js src/dashboard-views.js tests/dashboard.test.js && git commit -m "feat(dashboard): deadline-first Behöver dig ordering with ⏰ badge"`
+- [ ] **Step 5: Commit:** `git add src/dashboard.js src/dashboard-views.js tests/dashboard.test.js && git commit -m "feat(dashboard): deadline-first Behöver dig ordering, ⏰ badge, red age at 7 days"`
 
 ---
 
-### Task 8: Queue-hygiene queries + daily digest (package C)
+### Task 9: Queue-hygiene queries + daily digest (package C)
 
 **Files:**
 - Modify: `src/storage.js` (three read-only queries, exported on db)
@@ -607,7 +742,7 @@ describe('queue hygiene queries (2026-09-12 design)', () => {
     const convB = db.createConversation({ kommun_kod: '0002', kommun_namn: 'Frist', role: 'central', contact_email: 'b@b.se', scheduled_send_at: '2026-08-01T08:00:00Z' });
     db.recordEscalation({ conversation_id: convB, reason: 'r', respond_by: '2026-09-13' });
     const convC = db.createConversation({ kommun_kod: '0003', kommun_namn: 'Föräldralös', role: 'central', contact_email: 'c@c.se', scheduled_send_at: '2026-08-01T08:00:00Z' });
-    db.setConversationState(convC, 'NEEDS_HUMAN'); // use the real state-setter name from this file's other tests
+    db.updateConversationState(convC, 'NEEDS_HUMAN', {});
 
     expect(db.listOpenEscalationsAgedDays(7).map((e) => e.kommun_namn)).toContain('Gammal');
     expect(db.listOpenEscalationsAgedDays(7).map((e) => e.kommun_namn)).not.toContain('Frist');
@@ -624,14 +759,28 @@ And the failing digest test in `tests/tick-followup.test.js`:
 ```js
 describe('queue hygiene digest (2026-09-12 design)', () => {
   it('posts one digest naming due deadlines, aged drafts, and orphaned NEEDS_HUMAN', async () => {
-    // seed the three cases exactly as the storage test above, via this file's db
+    const now = new Date('2026-09-12T09:00:00Z');
+    const mk = (kod, namn) => db.createConversation({ kommun_kod: kod, kommun_namn: namn, role: 'central', contact_email: `k@${kod}.se`, scheduled_send_at: '2026-08-01T08:00:00Z' });
+    const convA = mk('0001', 'Gammal');
+    const escA = db.recordEscalation({ conversation_id: convA, reason: 'r', draft_template: 'free_form', draft_body: 'b' });
+    // created_at is stored as 'YYYY-MM-DD HH:MM:SS' (sqlite datetime('now')); seed 9 days before the run's `now`
+    // so the "(9 d)" label is stable regardless of the wall clock. listOpenEscalationsAgedDays compares
+    // against sqlite's real now, so 2026-09-03 is also comfortably older than 7 days on any later date.
+    db.raw.prepare('UPDATE escalations SET created_at = ? WHERE id = ?').run(new Date(now.getTime() - 9 * 86400000).toISOString().replace('T', ' ').slice(0, 19), escA);
+    const convB = mk('0002', 'Frist');
+    db.recordEscalation({ conversation_id: convB, reason: 'r', draft_template: 'free_form', draft_body: 'b', respond_by: '2026-09-13' });
+    const convC = mk('0003', 'Föräldralös');
+    db.updateConversationState(convC, 'NEEDS_HUMAN', {});
     const slackOps = fakeSlackOps();
-    await runDailyFollowup(deps({ slackOps, now: new Date('2026-09-12T09:00:00Z') }));
+    await runDailyFollowup(deps({ slackOps, now }));
     const digest = slackOps.alerts.find((t) => t.includes('Köhälsa'));
     expect(digest).toBeTruthy();
     expect(digest).toContain('⏰');
     expect(digest).toContain('🕰');
     expect(digest).toContain('🧭');
+    expect(digest).toContain('Frist (senast 2026-09-13)');
+    expect(digest).toContain('Gammal (9 d)');
+    expect(digest).toContain('Föräldralös');
   });
   it('posts nothing when the queue is healthy', async () => {
     const slackOps = fakeSlackOps();
@@ -710,7 +859,7 @@ tick.js, after the hänvisning nag digest `try/catch`, same pattern (Gmail-free,
   }
 ```
 
-(`addDaysIso` is already imported in tick.js from analyse-message.js.)
+(`addDaysIso` is already imported in tick.js from analyse-message.js, line 17. The block goes right after the hänvisning nag `try/catch` that ends ~line 1675 and before `db.markFollowupCompleted(...)`. `now` is `runDailyFollowup`'s `now` from deps. `db.recordEscalation` gains `respond_by` in Task 7, so Task 7 must land first.)
 
 - [ ] **Step 4: Run to verify pass:** `npx vitest run tests/storage.test.js tests/tick-followup.test.js`
 
@@ -718,12 +867,12 @@ tick.js, after the hänvisning nag digest `try/catch`, same pattern (Gmail-free,
 
 ---
 
-### Task 9: Full-suite verification + docs
+### Task 10: Full-suite verification + docs
 
 **Files:**
 - Modify: `CLAUDE.md` (pilot architecture notes)
 
-- [ ] **Step 1: Run the full suite:** `npm test` — all ~360+ tests green. Fix anything the integration surfaced (most likely: existing analyse-message prompt-snapshot assertions that now see the new rules — update those fixtures per the "update the fixture first" convention).
+- [ ] **Step 1: Run the full suite:** `npm test` — all ~1100 tests green (suite was 1094 tests / 69 files on 2026-07-31). Fix anything the integration surfaced (most likely: existing analyse-message prompt-snapshot assertions that now see the new rules — update those fixtures per the "update the fixture first" convention).
 
 - [ ] **Step 2: Update CLAUDE.md.** In the pilot architecture tree add one line under `src/analyse-message.js`: `src/draft-context.js — thread/attachment/contract context for the drafting prompt (2026-09-12); the draft LLM must never see less than the operator does`. In the conventions section note that `escalations.respond_by` is the kommun-imposed deadline and sorts Behöver dig.
 
@@ -735,7 +884,8 @@ tick.js, after the hänvisning nag digest `try/catch`, same pattern (Gmail-free,
 
 ## Self-review notes
 
-- Spec §A context block items 1–4 → Tasks 2 (builder) + 4 (wiring); §A rules → Task 3; §A regression intents (malmö/halmstad/luleå) are realised as prompt-content tests in Tasks 2–4 (offline tests pin what the model SEES, not what it says).
-- Spec §B extraction → Task 5; storage/surfacing → Tasks 6–7; §B "due alerting rides C" → Task 8.
-- Spec §C digest → Task 8; dashboard age-red is deliberately dropped from this plan: `fmtAgo` already renders age in every queue row and the ⏰ badge covers urgency — YAGNI (deviation from spec, flagged here on purpose).
+- Spec §A context block items 1–4 → Tasks 2 (builder) + 4 (wiring); §A rules + rule-5 few-shot → Task 3; §A's three named regression tests (malmö/halmstad/luleå) → Task 5 (offline tests pin what the model SEES, not what it says).
+- Spec §B extraction incl. the "not in the past by more than a day" guard → Task 6; storage/surfacing → Tasks 7–8; §B "due alerting rides C" → Task 9.
+- Spec §C digest → Task 9; dashboard age-in-days red at ≥7 → Task 8 (`q-age-old`).
+- 2026-09-13 revision: verified every referenced function/line against the tree at `0d4803d` (recordContract takes vendor_id; state setter is `updateConversationState`; `addDaysIso`/`ISO_DATE_RE` exist in analyse-message.js; `handoff_tasks.kommun_kod` exists; tick-ingest harness helpers are `seedConv`/`fakeGmail`/`mkMsg`/`deps`).
 - Out of scope guarded: no auto-send changes, no approve-time guards, no FSM changes, no re-drafting of the existing backlog.
