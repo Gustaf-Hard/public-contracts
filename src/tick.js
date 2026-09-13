@@ -1444,23 +1444,31 @@ export async function runDailyFollowup(deps) {
     // Called unconditionally (round-5 J6/J5): a surfacing helper must not opt
     // itself out on a db object that lacks the method.
     const due = db.listConversationsWithDeadlineDue(dueBy);
-    const dueConvIds = new Set(due.map((d) => d.conversation_id));
-    const aged = db.listOpenEscalationsAgedDays(7).filter((e) => !dueConvIds.has(e.conversation_id));
-    // Round-5 J4: 🧭 drops whatever ⏰ already named. The ⏰ line for a
+    // Round-5 J4: 🧭 and 🕰 drop whatever ⏰ already named — the ⏰ line for a
     // draftless case says "utan utkast", which is the entire content of the 🧭
     // row, so keeping both named the same kommun twice in one digest.
-    const orphans = db.listOrphanNeedsHuman().filter((c) => !dueConvIds.has(c.id));
-    const deadlineItems = due.map((d) => ({
+    // Round-6 K4: dedupe against the kommuner ⏰ ACTUALLY PRINTS, not against
+    // every due row. ⏰ is capped at DIGEST_MAX_LINES, so deduping on the whole
+    // `due` list meant a case past the cap was dropped from ⏰ (the "…och N till"
+    // tail names nobody) AND suppressed in 🧭 — named nowhere in the digest at
+    // all. Computing the included slice FIRST is what keeps every case visible
+    // somewhere.
+    const includedDue = due.slice(0, DIGEST_MAX_LINES);
+    const namedConvIds = new Set(includedDue.map((d) => d.conversation_id));
+    const aged = db.listOpenEscalationsAgedDays(7).filter((e) => !namedConvIds.has(e.conversation_id));
+    const orphans = db.listOrphanNeedsHuman().filter((c) => !namedConvIds.has(c.id));
+    const deadlineItems = includedDue.map((d) => ({
       respond_by: d.respond_by,
       label: `${d.kommun_namn} (senast ${d.respond_by}${d.has_open_escalation ? '' : ', utan utkast'})`,
     }));
-    if ((deadlineItems.length > 0 || aged.length > 0 || orphans.length > 0) && deps.slackOps?.postAlert && deps.env?.SLACK_CHANNEL_ID) {
+    if ((due.length > 0 || aged.length > 0 || orphans.length > 0) && deps.slackOps?.postAlert && deps.env?.SLACK_CHANNEL_ID) {
       const ageDays = (iso) => Math.floor((now.getTime() - new Date(iso.replace(' ', 'T') + 'Z').getTime()) / 86400000);
       const parts = [];
       if (deadlineItems.length > 0) {
-        const included = deadlineItems.slice(0, DIGEST_MAX_LINES);
-        const rest = deadlineItems.length - included.length;
-        parts.push(`⏰ *Svarsfrist inom 2 dagar eller passerad* (${deadlineItems.length}): ${included.map((i) => i.label).join(', ')}`
+        // deadlineItems IS the capped slice (see above); `due` carries the full
+        // count so the header still says how many cases there are.
+        const rest = due.length - deadlineItems.length;
+        parts.push(`⏰ *Svarsfrist inom 2 dagar eller passerad* (${due.length}): ${deadlineItems.map((i) => i.label).join(', ')}`
           + (rest > 0 ? `\n_…och ${rest} till._` : ''));
       }
       if (aged.length > 0) {
@@ -1479,7 +1487,7 @@ export async function runDailyFollowup(deps) {
         channel: deps.env.SLACK_CHANNEL_ID,
         text: `🧹 *Köhälsa:*\n${parts.join('\n')}`,
       });
-      log?.(`QUEUE HYGIENE digest posted (${deadlineItems.length} due, ${aged.length} aged, ${orphans.length} orphaned)`);
+      log?.(`QUEUE HYGIENE digest posted (${due.length} due, ${aged.length} aged, ${orphans.length} orphaned)`);
     }
   } catch (e) {
     log?.(`queue hygiene digest failed: ${e.message} — will retry on a later run`);
@@ -1493,7 +1501,12 @@ export async function runDailyFollowup(deps) {
   // dashboard pill and the send-side STALE_INGEST guard. runTick (real
   // inbound) and runRefreshScan (T_UPDATE) are untouched — neither claims to
   // know that nothing arrived.
-  const health = db.getTickHealth?.({ now }) ?? null;
+  // Called UNCONDITIONALLY (round-6 K5). `db.getTickHealth?.({ now }) ?? null`
+  // scored a db object without the method as health === null, i.e. "not blind",
+  // and the run sailed past the one check that stops it claiming silence it has
+  // not verified. send-reply.js's STALE_INGEST guard has been unconditional for
+  // the same reason: a safety check must not opt itself out.
+  const health = db.getTickHealth({ now });
   if (health?.stale) {
     const since = health.ever
       ? `senaste lyckade bearbetning ${health.last_success_at} (${health.stale_minutes} min sedan)`

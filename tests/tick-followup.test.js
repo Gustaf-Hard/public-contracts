@@ -661,6 +661,25 @@ describe('hänvisning nag digest (2026-09-06 design)', () => {
   });
 });
 
+// Round-6 K5: the ingest gate read `db.getTickHealth?.({ now }) ?? null`, so a
+// db object without the method scored health === null and the follow-up sailed
+// straight past the one check that stops it claiming silence it has not
+// verified. CLAUDE.md states this call is unconditional and send-reply.js's
+// STALE_INGEST guard already is: a safety check must not opt itself out on a db
+// that lacks the method.
+describe('the ingest gate calls getTickHealth unconditionally (round-6 K5)', () => {
+  it('a db without getTickHealth fails the run instead of skipping the gate', async () => {
+    const convId = seedConv({ stateChangedAt: '2026-06-01T00:00:00Z' }); // far past the nudge threshold
+    const d = deps({});
+    const blindDb = { ...db };
+    delete blindDb.getTickHealth;
+    await expect(runDailyFollowup({ ...d, db: blindDb })).rejects.toThrow(/getTickHealth/);
+    // Fail closed: no staleness nudge was drafted for a conversation that would
+    // otherwise have got one.
+    expect(db.listOpenEscalationsForConversation(convId)).toHaveLength(0);
+  });
+});
+
 describe('queue hygiene digest (2026-09-12 design)', () => {
   function seedQueueHygieneCases() {
     const convA = db.createConversation({ kommun_kod: '0001', kommun_namn: 'Gammal', role: 'central', contact_email: 'a@a.se', scheduled_send_at: '2026-08-01T08:00:00Z' });
@@ -758,9 +777,11 @@ describe('queue hygiene digest (2026-09-12 design)', () => {
     expect(deadlineSection).toContain('2026-09-13');
     // listed exactly once in the whole digest (round-5 J4)
     expect(digest.match(/Karlstad/g)).toHaveLength(1);
-    if (digest.includes('🧭')) {
-      expect(digest.slice(digest.indexOf('🧭'))).not.toContain('Karlstad');
-    }
+    // Round-6 K6: this used to sit behind `if (digest.includes('🧭'))`, which
+    // disables itself precisely when the dedupe works — and slice(-1) when it
+    // does not. The case is the ONLY orphan, so ⏰ naming it leaves the 🧭
+    // section empty and therefore absent from the digest altogether.
+    expect(digest).not.toContain('🧭');
   });
 
   // Round-5 J2: a frist stated by a mail that warranted no draft at all (an
@@ -808,10 +829,10 @@ describe('queue hygiene digest (2026-09-12 design)', () => {
     expect(digest).toBeTruthy();
     const deadlineSection = digest.split('🧭')[0];
     expect(deadlineSection).toContain('Hänvisad (senast 2026-09-13, utan utkast)');
-    // The 🧭 list keeps its handoff exclusion (spec section C, list 3).
-    if (digest.includes('🧭')) {
-      expect(digest.slice(digest.indexOf('🧭'))).not.toContain('Hänvisad');
-    }
+    // The 🧭 list keeps its handoff exclusion (spec section C, list 3), and it is
+    // the only candidate, so there is no 🧭 section at all (round-6 K6: the
+    // assertion used to sit behind `if (digest.includes('🧭'))`).
+    expect(digest).not.toContain('🧭');
   });
 
   // Round-4 H3: the dashboard and the digest must agree. An UNDATED open
@@ -872,6 +893,50 @@ describe('queue hygiene digest (2026-09-12 design)', () => {
     expect(digest).toContain('Avesta');
     expect(digest).not.toContain('Avesta (senast');
     expect(digest).not.toContain('⏰');
+  });
+
+  // Round-6 K4: 🧭 and 🕰 deduped against ALL of `due`, but ⏰ prints only
+  // DIGEST_MAX_LINES of it. A dated draftless case past the cap was therefore
+  // dropped from ⏰ ("…och 5 till" names nobody) AND suppressed in 🧭 — named
+  // nowhere in the digest at all. The dedupe now runs against the INCLUDED set.
+  it('a dated draftless case past the deadline cap is still named, in the orphan section', async () => {
+    for (let i = 0; i < 25; i += 1) {
+      const cid = db.createConversation({
+        kommun_kod: String(7000 + i), kommun_namn: `Kapad${String(i).padStart(2, '0')}`, role: 'central',
+        contact_email: `k${i}@k.se`, scheduled_send_at: '2026-08-01T08:00:00Z',
+      });
+      db.recordMessage({
+        conversation_id: cid, gmail_message_id: `g-cap-${i}`, direction: 'inbound',
+        from_email: 'k@k.se', to_email: 'x', subject: 's', body_text: 'b',
+        received_at: '2026-09-11T08:00:00Z', attachment_count: 0,
+        analysis_json: JSON.stringify({ extracted: { respond_by_date: '2026-09-13' } }),
+      });
+      db.updateConversationState(cid, 'NEEDS_HUMAN');
+    }
+    const slackOps = fakeSlackOps();
+    await runDailyFollowup(deps({ slackOps, now: new Date('2026-09-12T09:00:00Z') }));
+    const digest = slackOps.alerts.find((t) => t.includes('Köhälsa'));
+    expect(digest).toBeTruthy();
+    const deadlineSection = digest.slice(digest.indexOf('⏰'), digest.indexOf('🧭'));
+    const orphanSection = digest.slice(digest.indexOf('🧭'));
+
+    // All 25 are counted and 20 are printed, same cap and tail as always.
+    expect(deadlineSection).toContain('(25)');
+    expect(deadlineSection).toContain('…och 5 till');
+    expect(deadlineSection).toContain('Kapad00 (senast 2026-09-13, utan utkast)');
+    expect(deadlineSection).not.toContain('Kapad20');
+
+    // The five the cap dropped are named here instead of nowhere.
+    expect(orphanSection).toContain('(5)');
+    for (const n of ['Kapad20', 'Kapad21', 'Kapad22', 'Kapad23', 'Kapad24']) {
+      expect(orphanSection).toContain(n);
+    }
+    expect(orphanSection).not.toContain('Kapad00');
+
+    // 20 + 5 = every kommun named exactly once across the whole digest.
+    const named = digest.match(/Kapad\d\d/g) ?? [];
+    expect(named).toHaveLength(25);
+    expect(new Set(named).size).toBe(25);
   });
 
   // Final-review finding 2 (2026-09-12): due/orphans were the only two lists
