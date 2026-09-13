@@ -1483,7 +1483,10 @@ export async function runDailyFollowup(deps) {
       if (orphans.length > 0) {
         const included = orphans.slice(0, DIGEST_MAX_LINES);
         const rest = orphans.length - included.length;
-        parts.push(`🧭 *Behöver dig utan utkast* (${orphans.length}): ${included.map((c) => (c.respond_by ? `${c.kommun_namn} (senast ${c.respond_by})` : c.kommun_namn)).join(', ')}`
+        // kommun/role, exactly as ⏰ names a case above (round-7 L7): one kommun
+        // can hold several conversations, so the name alone does not say which
+        // one needs a human.
+        parts.push(`🧭 *Behöver dig utan utkast* (${orphans.length}): ${included.map((c) => (c.respond_by ? `${c.kommun_namn}/${c.role} (senast ${c.respond_by})` : `${c.kommun_namn}/${c.role}`)).join(', ')}`
           + (rest > 0 ? `\n_…och ${rest} till._` : ''));
       }
       await deps.slackOps.postAlert(deps.slackClient, {

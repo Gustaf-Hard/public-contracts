@@ -702,6 +702,34 @@ describe('queue hygiene digest (2026-09-12 design)', () => {
     expect(digest).toContain('🧭');
   });
 
+  // Round-7 L7: ⏰ names a case 'kommun/role' because one kommun can hold several
+  // conversations (central, utbildning, ...), so the name alone does not say
+  // which one needs a human. 🧭 printed the bare name.
+  it('names the 🧭 cases kommun/role, the way ⏰ does', async () => {
+    const convC = db.createConversation({ kommun_kod: '0003', kommun_namn: 'Föräldralös', role: 'utbildning', contact_email: 'c@c.se', scheduled_send_at: '2026-08-01T08:00:00Z' });
+    db.updateConversationState(convC, 'NEEDS_HUMAN');
+    const slackOps = fakeSlackOps();
+    await runDailyFollowup(deps({ slackOps, now: new Date('2026-09-12T09:00:00Z') }));
+    const digest = slackOps.alerts.find((t) => t.includes('Köhälsa'));
+    expect(digest).toContain('🧭');
+    expect(digest.split('🧭')[1]).toContain('Föräldralös/utbildning');
+  });
+
+  it('keeps the deadline suffix on a 🧭 case that carries one', async () => {
+    const cid = db.createConversation({ kommun_kod: '0004', kommun_namn: 'Frist', role: 'central', contact_email: 'd@d.se', scheduled_send_at: '2026-08-01T08:00:00Z' });
+    db.recordMessage({
+      conversation_id: cid, gmail_message_id: 'g-frist', direction: 'inbound',
+      from_email: 'd@d.se', to_email: 'x', subject: 's', body_text: 'b',
+      received_at: '2026-10-01T08:00:00Z', attachment_count: 0,
+      analysis_json: JSON.stringify({ extracted: { respond_by_date: '2026-10-20' } }),
+    });
+    db.updateConversationState(cid, 'NEEDS_HUMAN');
+    const slackOps = fakeSlackOps();
+    await runDailyFollowup(deps({ slackOps, now: new Date('2026-09-12T09:00:00Z') }));
+    const digest = slackOps.alerts.find((t) => t.includes('Köhälsa'));
+    expect(digest.split('🧭')[1]).toContain('Frist/central (senast 2026-10-20)');
+  });
+
   it('posts nothing when the queue is healthy', async () => {
     const slackOps = fakeSlackOps();
     await runDailyFollowup(deps({ slackOps, now: new Date('2026-09-12T09:00:00Z') }));

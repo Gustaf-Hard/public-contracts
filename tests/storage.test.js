@@ -744,6 +744,30 @@ describe('queue hygiene queries (2026-09-12 design)', () => {
     expect(db.listOrphanNeedsHuman().map((c) => c.kommun_namn)).not.toContain('Hänvisad');
   });
 
+  // Round-7 L5: the same reasoning as has_open_escalation above, applied to the
+  // OTHER half. listOrphanNeedsHuman excluded only status='open', so a
+  // conversation whose only escalation is in flight ('sending') or PARKED
+  // ('send_failed' / 'send_unconfirmed' — a mail that may already have gone out)
+  // was reported to Slack as "Behöver dig utan utkast". That is exactly
+  // backwards: a parked send is the most urgent artefact in the system, and
+  // telling the operator there is nothing to approve hides it.
+  it.each(ACTIVE_ESCALATION_STATUSES)('listOrphanNeedsHuman excludes a case whose escalation is %s', (status) => {
+    const cid = db.createConversation({ kommun_kod: `07${status.length}`, kommun_namn: `Parkerad-${status}`, role: 'central', contact_email: 'p@p.se', scheduled_send_at: '2026-08-01T08:00:00Z' });
+    const esc = db.recordEscalation({ conversation_id: cid, reason: 'r' });
+    db.raw.prepare('UPDATE escalations SET status = ? WHERE id = ?').run(status, esc);
+    db.updateConversationState(cid, 'NEEDS_HUMAN');
+    expect(db.listOrphanNeedsHuman().map((c) => c.kommun_namn)).not.toContain(`Parkerad-${status}`);
+  });
+
+  it.each(['resolved_send', 'resolved_edit', 'resolved_skip', 'resolved_closed', 'superseded'])(
+    'listOrphanNeedsHuman still reports a case whose only escalation is terminal (%s)', (status) => {
+      const cid = db.createConversation({ kommun_kod: `08${status.length}`, kommun_namn: `Klarad-${status}`, role: 'central', contact_email: 'q@q.se', scheduled_send_at: '2026-08-01T08:00:00Z' });
+      const esc = db.recordEscalation({ conversation_id: cid, reason: 'r' });
+      db.raw.prepare('UPDATE escalations SET status = ? WHERE id = ?').run(status, esc);
+      db.updateConversationState(cid, 'NEEDS_HUMAN');
+      expect(db.listOrphanNeedsHuman().map((c) => c.kommun_namn)).toContain(`Klarad-${status}`);
+    });
+
   // Round-4 H5: buildActionQueue skips DONE/DEAD_END, the digest queries did
   // not. A lingering open escalation on a closed case nagged daily with nothing
   // to click.

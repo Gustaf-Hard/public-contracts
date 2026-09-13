@@ -1049,6 +1049,14 @@ export function openDb(path) {
   // (`listConversationsWithDeadlineDue`, which deliberately carries NO
   // pending-handoff exclusion, round-3 G2), after which nothing but this
   // function called it. Inlined rather than left as a one-caller indirection.
+  // Round-7 L5: the exclusion reads ACTIVE_ESCALATION_STATUSES, not status='open'
+  // alone — the same widening has_open_escalation already got (round-6 K6), for
+  // the same reason. A case whose only escalation is in flight ('sending') or
+  // PARKED ('send_failed' / 'send_unconfirmed', a mail that MAY already have gone
+  // out) has the most urgent artefact in the system attached to it; reporting it
+  // to Slack as "Behöver dig utan utkast" is exactly backwards and buries it.
+  // Terminal statuses (resolved_*, superseded) still count as nothing to
+  // approve, which is what this list is for.
   function listOrphanNeedsHuman() {
     const pending = db.prepare(
       "SELECT 1 FROM handoff_tasks WHERE kommun_kod = ? AND status = 'pending' LIMIT 1"
@@ -1057,9 +1065,13 @@ export function openDb(path) {
       SELECT c.id, c.kommun_kod, c.kommun_namn, c.role, c.state_changed_at
       FROM conversations c
       WHERE c.state = 'NEEDS_HUMAN'
-        AND NOT EXISTS (SELECT 1 FROM escalations e WHERE e.conversation_id = c.id AND e.status = 'open')
+        AND NOT EXISTS (
+          SELECT 1 FROM escalations e
+          WHERE e.conversation_id = c.id
+            AND e.status IN (${ACTIVE_ESCALATION_STATUSES.map(() => '?').join(', ')})
+        )
       ORDER BY c.state_changed_at
-    `).all()
+    `).all(...ACTIVE_ESCALATION_STATUSES)
       .filter((r) => pending.get(r.kommun_kod) == null)
       .map((r) => ({ ...r, respond_by: latestRespondByForConversation(r.id) }));
   }
