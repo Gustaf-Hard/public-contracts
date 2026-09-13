@@ -98,6 +98,36 @@ describe('analyseMessage', () => {
     expect(r).toBeNull();
   });
 
+  // Final-review finding 3 (2026-09-12): rule 5 requires the full original
+  // request verbatim in draft_reply. A ~1425-char stored T-INITIAL body plus
+  // summary/extracted can overflow a 1024-token cap, truncating the JSON
+  // mid-stream; JSON.parse throws and this silently falls back to the regex
+  // classifier on exactly the resend case.
+  it('requests max_tokens: 2048', async () => {
+    const client = fakeClientReturning({
+      intent: 'auto_ack', confidence: 0.9, summary: 's', extracted: {},
+      suggested_action: 'wait', draft_reply: '', is_final_delivery: false, follow_up_at: null,
+    });
+    await analyseMessage('Test body', baseCtx, { env: { ANTHROPIC_API_KEY: 'k' }, client });
+    expect(client.messages.create.mock.calls[0][0].max_tokens).toBe(2048);
+  });
+
+  it('returns null and logs a named truncation warning when the response was cut off mid-JSON', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const client = {
+      messages: {
+        create: vi.fn(async () => ({
+          stop_reason: 'max_tokens',
+          content: [{ type: 'text', text: '{"intent": "delivery", "draft_reply": "Hej, här kommer avta' }],
+        })),
+      },
+    };
+    const r = await analyseMessage('Test body', baseCtx, { env: { ANTHROPIC_API_KEY: 'k' }, client });
+    expect(r).toBeNull();
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('truncat'));
+    warn.mockRestore();
+  });
+
   it('carries the reseller_relations array through when the model returns it', async () => {
     const expected = {
       intent: 'delivery', confidence: 0.85,

@@ -396,7 +396,12 @@ export async function analyseMessage(body, ctx, { env = process.env, client = nu
   try {
     const response = await sdkClient.messages.create({
       model,
-      max_tokens: 1024,
+      // 2048 (final-review finding 3, 2026-09-12): rule 5 requires the full
+      // original request verbatim in draft_reply. A stored T-INITIAL body of
+      // ~1425 chars (~410 output tokens, more once JSON-escaped) plus
+      // summary/extracted could overflow the previous 1024 cap and truncate
+      // mid-JSON on exactly the resend case.
+      max_tokens: 2048,
       system: [
         { type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } },
       ],
@@ -414,6 +419,11 @@ export async function analyseMessage(body, ctx, { env = process.env, client = nu
       const parsed = JSON.parse(textBlock.text);
       return normaliseRespondBy(normaliseDelayAnalysis(parsed, ctx.today_iso), ctx.today_iso);
     } catch (e) {
+      // stop_reason is never inspected elsewhere — a truncated response looks
+      // like any other malformed-JSON fallback unless named here.
+      if (response.stop_reason === 'max_tokens') {
+        console.warn(`[analyse-message] response truncated at max_tokens, JSON.parse failed: ${e.message}`);
+      }
       return null;
     }
   } catch (e) {
