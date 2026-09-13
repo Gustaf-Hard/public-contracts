@@ -111,6 +111,11 @@ Phase-1 pipeline: `scripts/01|02|03 → src/seed.js|crawl.js|verify.js → data/
   (T_RECEIPT, T_PRECISION, T_CROSSCHECK, bounce resends, T_UPDATE) are
   unaffected. A follow-up skipped by the gate is not marked complete, and the
   next healthy tick past the cron hour re-runs it (`followupCatchUpDue`).
+  The Köhälsa queue-hygiene digest in `runDailyFollowup` (`src/tick.js`,
+  commit e427bbf) deliberately runs ABOVE this gate: it asserts nothing about
+  kommun silence, only the state of our own queue (deadlines, aged drafts,
+  orphaned NEEDS_HUMAN), so it is Gmail-free and DB-only and must post even
+  while ingest is blind — do not move it back below the gate.
 - **Extraction failures are bounded and loud.** A failed contract analysis
   books an attempt on the attachment row (`analysis_attempts`,
   `last_analysis_error` as `permanent:…`/`transient:…`/`backoff:…`). Permanent

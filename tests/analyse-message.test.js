@@ -536,6 +536,10 @@ describe('respond_by_date (2026-09-12 design)', () => {
     const a = { extracted: { respond_by_date: 'nästa vecka' } };
     expect(normaliseRespondBy(a, '2026-09-12').extracted.respond_by_date).toBeNull();
   });
+  it('normaliseRespondBy nulls a calendar-invalid ISO-shaped date (finding 5)', () => {
+    const a = { extracted: { respond_by_date: '2026-02-31' } };
+    expect(normaliseRespondBy(a, '2026-01-01').extracted.respond_by_date).toBeNull();
+  });
   it('normaliseRespondBy nulls a deadline more than a day in the past (hallucinated or stale), keeps yesterday and today', () => {
     expect(normaliseRespondBy({ extracted: { respond_by_date: '2026-09-01' } }, '2026-09-12').extracted.respond_by_date).toBeNull();
     expect(normaliseRespondBy({ extracted: { respond_by_date: '2026-09-11' } }, '2026-09-12').extracted.respond_by_date).toBe('2026-09-11');

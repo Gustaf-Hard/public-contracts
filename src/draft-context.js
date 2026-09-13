@@ -49,7 +49,9 @@ export function buildDraftContext(db, conv, parsed) {
     } else {
       let summary = null;
       try { summary = JSON.parse(m.analysis_json ?? 'null')?.summary ?? null; } catch { /* unparsable */ }
-      const text = summary ?? (m.body_text ?? '').trim().slice(0, MAX_INBOUND_CHARS);
+      // An empty stored summary ('') must fall back too, not render a blank
+      // inbound line (finding 6, 2026-09-12 review).
+      const text = summary?.trim() || (m.body_text ?? '').trim().slice(0, MAX_INBOUND_CHARS);
       lines.push(`## KOMMUNEN skrev (${date}, klassning: ${m.classification ?? 'okänd'})${fileNote}`);
       lines.push(text);
     }

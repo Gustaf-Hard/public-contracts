@@ -334,6 +334,8 @@ export function normaliseRespondBy(analysis, todayIso) {
   if (!ex || ex.respond_by_date == null) return analysis;
   const v = ex.respond_by_date;
   if (typeof v !== 'string' || !ISO_DATE_RE.test(v)) { ex.respond_by_date = null; return analysis; }
+  const [y, mo, d] = v.split('-').map(Number);
+  if (!isRealDate(y, mo, d)) { ex.respond_by_date = null; return analysis; }
   const floor = todayIso && ISO_DATE_RE.test(todayIso) ? addDaysIso(todayIso, -1) : null;
   if (floor && v < floor) ex.respond_by_date = null;
   return analysis;

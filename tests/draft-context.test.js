@@ -58,6 +58,13 @@ describe('buildDraftContext', () => {
     expect(out).not.toContain('X'.repeat(301));
   });
 
+  it('an empty stored summary falls back to the body prefix instead of rendering blank (finding 6)', () => {
+    seedMsg({ dir: 'outbound', gmailId: 'o1', body: 'Begäran.', at: '2026-08-17T14:45:24Z' });
+    seedMsg({ gmailId: 'i1', body: 'Kommunens fullständiga svar.', at: '2026-08-21T09:00:00Z', analysis: { summary: '' } });
+    const out = buildDraftContext(db, conv(), noAtts);
+    expect(out).toContain('Kommunens fullständiga svar.');
+  });
+
   it('lists stored attachment filenames on prior messages and the trigger mail', () => {
     seedMsg({ dir: 'outbound', gmailId: 'o1', body: 'Begäran.', at: '2026-08-17T14:45:24Z' });
     const m = seedMsg({ gmailId: 'i1', body: 'Här kommer avtalen.', at: '2026-08-19T14:15:00Z', analysis: { summary: 'Levererar avtal.' } });
