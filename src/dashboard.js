@@ -6,7 +6,7 @@
 import express from 'express';
 import path from 'node:path';
 import { readFileSync, existsSync } from 'node:fs';
-import { openDb } from './storage.js';
+import { openDb, ACTIVE_ESCALATION_STATUSES } from './storage.js';
 import { buildVelocityFacts } from './collection-velocity.js';
 import { buildPipeline, kommunStage } from './pipeline.js';
 import { effectiveFollowUp, TERMINAL_STATES } from './conversation.js';
@@ -119,7 +119,15 @@ function daysUntilIso(iso, now = new Date()) {
 // Translate an open escalation into a plain-Swedish action so the overview
 // tooltip can say *how* a "Behöver dig" kommun needs the operator. Keyed on the
 // queued draft template (the FSM picks the template per situation).
+// Round-11 P2: an escalation in an ACTIVE-but-not-open status is a send that
+// PARKED — 'sending' is a claim whose process died, 'send_failed' /
+// 'send_unconfirmed' a mail that may or may not have reached the kommun. There
+// is nothing to approve, so the draft template says nothing useful; what the
+// operator needs to know is that a send is stuck and which one.
+const PARKED_SEND_STATUSES = new Set(ACTIVE_ESCALATION_STATUSES.filter((st) => st !== 'open'));
+
 export function escalationActionLabel(esc) {
+  if (PARKED_SEND_STATUSES.has(esc?.status)) return `Skickning parkerad (${esc.status}): se ärendet`;
   const labels = {
     free_form: 'fritextsvar krävs',
     T_FOLLOWUP_NUDGE: 'skicka påminnelse',
@@ -431,18 +439,35 @@ export function buildActionQueue(db) {
     // A closed case is never pending work — skip it even if a stale escalation
     // lingers (e.g. legacy data, or one created before the case was closed).
     if (c.state === 'DONE' || c.state === 'DEAD_END') continue;
-    const openEsc = db.raw
-      .prepare("SELECT * FROM escalations WHERE conversation_id = ? AND status = 'open' ORDER BY id DESC")
-      .all(c.id);
-    if (c.state !== 'NEEDS_HUMAN' && openEsc.length === 0) continue;
+    // Round-11 P2 (critical): membership is state NEEDS_HUMAN OR any escalation
+    // in an ACTIVE status, not status='open' alone. A send that parked
+    // ('sending' / 'send_failed' / 'send_unconfirmed') leaves no open row and
+    // does not move the conversation to NEEDS_HUMAN, so the queue used to render
+    // "Inget kräver din uppmärksamhet" over a mail that may already have gone
+    // out, while the daily Slack digest listed its deadline. Same set as
+    // has_open_escalation, listOrphanNeedsHuman and effectiveRespondBy.
+    const activeEsc = db.listActiveEscalationsForConversation(c.id); // ORDER BY id ASC
+    const openEsc = activeEsc.filter((e) => e.status === 'open');
+    if (c.state !== 'NEEDS_HUMAN' && activeEsc.length === 0) continue;
+    // Newest of each: the open row is the one with something to approve, so it
+    // wins the label whenever both exist.
+    const newestOpen = openEsc[openEsc.length - 1];
+    const newestParked = activeEsc.filter((e) => PARKED_SEND_STATUSES.has(e.status)).pop();
+    const driver = newestOpen ?? newestParked;
     out.push({
       conv_id: c.id,
       kommun_kod: c.kommun_kod,
       kommun_namn: c.kommun_namn,
       role: c.role,
       state: c.state,
-      action: openEsc.length > 0 ? escalationActionLabel(openEsc[0]) : 'granska och svara',
-      since: caseSince(c),
+      action: driver ? escalationActionLabel(driver) : 'granska och svara',
+      // A parked send's clock is the escalation's own created_at: the case's
+      // state_changed_at / last_outbound_at belong to whatever the conversation
+      // was doing before the send got stuck, which reads as far fresher than the
+      // stuck send actually is. An open draft keeps the case clock as before.
+      since: (!newestOpen && newestParked?.created_at)
+        ? String(newestParked.created_at).replace(' ', 'T')
+        : caseSince(c),
       // A NEEDS_HUMAN case whose draft was voided has no open escalation, so
       // its deadline comes from the message analysis instead (round-2 finding
       // F2) — otherwise it sorts behind undated drafts. An escalation that DOES
@@ -502,10 +527,9 @@ export function buildWaiting(db) {
   const out = [];
   for (const c of db.listAllConversations()) {
     if (c.state === 'NEEDS_HUMAN' || !WAITING_STATES.has(c.state)) continue;
-    const openEsc = db.raw
-      .prepare("SELECT COUNT(*) n FROM escalations WHERE conversation_id = ? AND status = 'open'")
-      .get(c.id).n;
-    if (openEsc > 0) continue; // belongs in the action queue
+    // Round-11 P2: the same widening as buildActionQueue, or a parked send would
+    // be listed BOTH as needing the operator and as progressing on its own.
+    if (db.hasActiveEscalation(c.id)) continue; // belongs in the action queue
     const fu = effectiveFollowUp(c);
     out.push({
       conv_id: c.id,

@@ -238,6 +238,20 @@ pass no `messageId`, and when one did, the MAX pinned the boundary for ever and
 the kommun was nagged daily). Fails open: no operator send discharges nothing,
 and an unreadable or NULL `ingested_at` is considered outstanding.
 
+**"Behöver dig" membership is ACTIVE_ESCALATION_STATUSES, not `status='open'`.**
+`buildActionQueue` (dashboard.js) lists a conversation when its state is
+NEEDS_HUMAN **or** it has any escalation whose status is in
+`ACTIVE_ESCALATION_STATUSES` — the same set `hasActiveEscalation`,
+`listOrphanNeedsHuman`, `listConversationsWithDeadlineDue` and
+`effectiveRespondBy` read. A send that PARKED (`sending` / `send_failed` /
+`send_unconfirmed`) leaves no open row and does not move the conversation to
+NEEDS_HUMAN, so the round-11 P2 bug was a mail that may already have gone out
+rendering as "Inget kräver din uppmärksamhet" while the Köhälsa digest listed its
+deadline. A parked row's `action` says `Skickning parkerad (<status>): se ärendet`
+(via `escalationActionLabel`) and its `since` is the escalation's own `created_at`,
+not the case clock. `buildWaiting` excludes the same set, or a parked send would
+be listed both as needing the operator and as progressing on its own.
+
 **Polite scraping is enforced in `src/http.js`** (Phase 1). Every outbound
 HTTP call must go through `politeFetch` (1 req/sec/host, retry on 429/503,
 contactable User-Agent). Do not call `undici`/`fetch` directly.

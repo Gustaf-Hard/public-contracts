@@ -794,6 +794,14 @@ describe('home buckets', () => {
     expect(w.some((x) => x.conv_id === escId)).toBe(false); // in the action queue instead
   });
 
+  // Mirror of dashboard.js's private caseSince(), so the "open escalation keeps
+  // the case clock" assertion above does not hardcode a timestamp.
+  const caseSinceOf = (cid) => {
+    const c = db.listAllConversations().find((x) => x.id === cid);
+    return c.last_outbound_at && c.state_changed_at && c.last_outbound_at > c.state_changed_at
+      ? c.last_outbound_at : c.state_changed_at;
+  };
+
   let testKommunCounter = 1000;
   const seedConvWithOpenEscalation = ({ kommun = 'TestKommun', respond_by = null } = {}) => {
     const code = String(testKommunCounter++).padStart(4, '0');
@@ -915,6 +923,74 @@ describe('home buckets', () => {
     // The Slack digest reads the same helper through the same conversation.
     expect(db.listConversationsWithDeadlineDue('2026-09-30').find((r) => r.conversation_id === cid).respond_by)
       .toBe('2026-09-14');
+  });
+
+  // Round-11 P2 (critical, adversarial R9 #2): membership used to be
+  // state === 'NEEDS_HUMAN' OR a status='open' escalation. A send that PARKED
+  // (send_failed / send_unconfirmed / a stuck 'sending' claim) leaves no open
+  // escalation and does NOT move the conversation to NEEDS_HUMAN, so the most
+  // urgent artefact in the system — a mail that may or may not have gone out —
+  // rendered as "Inget kräver din uppmärksamhet" while the daily Slack digest
+  // listed its deadline. The N2 test above only passed because it forced
+  // NEEDS_HUMAN; this one does not.
+  it('buildActionQueue surfaces a parked send on a non-NEEDS_HUMAN conversation, with a parked label', () => {
+    const cid = db.createConversation({ kommun_kod: '5556', kommun_namn: 'Parkerad Ack', role: 'central', contact_email: 'p@p.se', scheduled_send_at: '2026-05-24T10:00:00Z' });
+    db.updateConversationState(cid, 'ACK_RECEIVED', { last_outbound_at: '2026-09-01T08:00:00Z' });
+    const esc = db.recordEscalation({ conversation_id: cid, reason: 'r', draft_template: 'free_form', draft_body: 'b', respond_by: '2026-09-14' });
+    db.raw.prepare("UPDATE escalations SET status = 'send_failed', created_at = ? WHERE id = ?").run('2026-09-12 07:30:00', esc);
+
+    const row = buildActionQueue(db).find((r) => r.conv_id === cid);
+    expect(row).toBeTruthy();
+    expect(row.state).toBe('ACK_RECEIVED');
+    expect(row.action).toBe('Skickning parkerad (send_failed): se ärendet');
+    expect(row.action).not.toContain('—');
+    expect(row.respond_by).toBe('2026-09-14'); // the deadline the digest shows
+    expect(row.since).toBe('2026-09-12T07:30:00'); // the parked escalation's created_at
+    // ... and it is not ALSO reported as progressing on its own.
+    expect(buildWaiting(db).some((r) => r.conv_id === cid)).toBe(false);
+  });
+
+  it.each(['sending', 'send_unconfirmed'])('buildActionQueue surfaces a %s escalation on a non-NEEDS_HUMAN conversation', (status) => {
+    const cid = db.createConversation({ kommun_kod: '5557', kommun_namn: 'Ihängande', role: 'central', contact_email: 'i@i.se', scheduled_send_at: '2026-05-24T10:00:00Z' });
+    db.updateConversationState(cid, 'DELIVERING', { last_outbound_at: '2026-09-01T08:00:00Z' });
+    const esc = db.recordEscalation({ conversation_id: cid, reason: 'r', draft_template: 'free_form', draft_body: 'b' });
+    db.raw.prepare('UPDATE escalations SET status = ? WHERE id = ?').run(status, esc);
+    const row = buildActionQueue(db).find((r) => r.conv_id === cid);
+    expect(row).toBeTruthy();
+    expect(row.action).toBe(`Skickning parkerad (${status}): se ärendet`);
+    expect(buildWaiting(db).some((r) => r.conv_id === cid)).toBe(false);
+  });
+
+  it('buildActionQueue prefers the open escalation label when one exists alongside a parked one', () => {
+    const cid = db.createConversation({ kommun_kod: '5558', kommun_namn: 'Både', role: 'central', contact_email: 'b@b.se', scheduled_send_at: '2026-05-24T10:00:00Z' });
+    db.updateConversationState(cid, 'ACK_RECEIVED', { last_outbound_at: '2026-09-01T08:00:00Z' });
+    const parked = db.recordEscalation({ conversation_id: cid, reason: 'r', draft_template: 'free_form', draft_body: 'b' });
+    db.raw.prepare("UPDATE escalations SET status = 'send_failed' WHERE id = ?").run(parked);
+    db.recordEscalation({ conversation_id: cid, reason: 'r', draft_template: 'T_RECEIPT', draft_body: 'b' });
+    const row = buildActionQueue(db).find((r) => r.conv_id === cid);
+    expect(row.action).toBe('skicka mottagningskvitto');
+    expect(row.since).toBe(caseSinceOf(cid)); // the open draft keeps the case clock
+  });
+
+  it('buildActionQueue still ignores a terminal-status escalation on a quiet conversation', () => {
+    const cid = db.createConversation({ kommun_kod: '5559', kommun_namn: 'Klar Nog', role: 'central', contact_email: 'q@q.se', scheduled_send_at: '2026-05-24T10:00:00Z' });
+    db.updateConversationState(cid, 'SENT', { last_outbound_at: '2026-09-01T08:00:00Z' });
+    const esc = db.recordEscalation({ conversation_id: cid, reason: 'r', draft_template: 'free_form', draft_body: 'b' });
+    db.raw.prepare("UPDATE escalations SET status = 'resolved_send' WHERE id = ?").run(esc);
+    expect(buildActionQueue(db).some((r) => r.conv_id === cid)).toBe(false);
+    expect(buildWaiting(db).some((r) => r.conv_id === cid)).toBe(true);
+  });
+
+  it('renders the parked send in Behöver dig instead of "Inget kräver din uppmärksamhet"', async () => {
+    const cid = db.createConversation({ kommun_kod: '2418', kommun_namn: 'Malå', role: 'central', contact_email: 'k@mala.se', scheduled_send_at: '2026-05-24T10:00:00Z' });
+    db.updateConversationState(cid, 'ACK_RECEIVED', { last_outbound_at: '2026-09-01T08:00:00Z' });
+    const esc = db.recordEscalation({ conversation_id: cid, reason: 'r', draft_template: 'free_form', draft_body: 'b', respond_by: '2026-09-14' });
+    db.raw.prepare("UPDATE escalations SET status = 'send_failed' WHERE id = ?").run(esc);
+    const res = await get(appWithFakes(), '/');
+    const actionSection = res.text.slice(res.text.indexOf('Behöver dig'), res.text.indexOf('Pågår · väntar'));
+    expect(actionSection).toContain('Malå');
+    expect(actionSection).toContain('Skickning parkerad (send_failed): se ärendet');
+    expect(actionSection).toContain('⏰ senast 2026-09-14');
   });
 
   // Round-4 H7: buildActionQueue carrying respond_by was asserted, the RENDER

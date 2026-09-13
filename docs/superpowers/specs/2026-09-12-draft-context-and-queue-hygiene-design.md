@@ -266,6 +266,22 @@ no dedupe marker is needed — idempotent content, daily cadence.
 Dashboard: the Behöver dig list already sorts oldest-first; each row
 additionally shows age in days, red at ≥7.
 
+**Round-11 P2: Behöver dig membership is `ACTIVE_ESCALATION_STATUSES`.** A
+conversation belongs in the queue when its state is NEEDS_HUMAN **or** it carries
+any escalation in an active status — the same set the digest's ⏰/🧭 sections
+already read. Membership used to be `status='open'` alone, so a send that parked
+(`sending` / `send_failed` / `send_unconfirmed`) was invisible on the dashboard
+("Inget kräver din uppmärksamhet") while the digest named its deadline: the two
+surfaces disagreed about the most urgent artefact in the system, a mail that may
+or may not have reached the kommun. A parked row's action label says
+`Skickning parkerad (<status>): se ärendet` (there is nothing to approve, so the
+draft template says nothing useful) and its `since` is that escalation's
+`created_at`, since the case's own clock belongs to whatever it was doing before
+the send got stuck. An open escalation alongside a parked one still wins the
+label and keeps the case clock. `buildWaiting` excludes the same widened set, so
+a parked send is never listed both as needing the operator and as progressing on
+its own.
+
 ---
 
 ## Explicitly out of scope
