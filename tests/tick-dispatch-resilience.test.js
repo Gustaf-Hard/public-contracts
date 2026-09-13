@@ -272,7 +272,7 @@ describe('retryUnpostedEscalations — bounds', () => {
     expect(db.raw.prepare('SELECT slack_ts FROM escalations WHERE id = ?').get(escId).slack_ts).toBe('s-1');
   });
 
-  it('a re-posted orphan carries its stored respond_by deadline into the Slack blocks (2026-09-12 design)', async () => {
+  it('a re-posted orphan carries its (here, still-matching) effective deadline into the Slack blocks', async () => {
     const id = seedConv();
     db.recordEscalation({
       conversation_id: id, reason: 'slack was down', draft_template: 'T_RECEIPT',
@@ -287,6 +287,40 @@ describe('retryUnpostedEscalations — bounds', () => {
     const texts = slackOps.posts[0].map((b) => b.text?.text ?? '').join('\n');
     expect(texts).toContain('⏰');
     expect(texts).toContain('2026-09-20');
+  });
+
+  // Round-12 Q1: the retry must render db.effectiveRespondBy, not the row's
+  // own stale respond_by column. Here the orphan's snapshot (2026-09-20) has
+  // been overtaken by a later, still-outstanding inbound naming an earlier
+  // date (2026-09-14) that never touched this escalation (it never superseded
+  // it, so the row's own column is untouched) — exactly the "card says one
+  // date, the queue says another" bug reported in round-10/11.
+  it('a re-posted orphan renders the LIVE effective deadline, not its own stale snapshot (round-12 Q1)', async () => {
+    const id = seedConv();
+    const escId = db.recordEscalation({
+      conversation_id: id, reason: 'slack was down', draft_template: 'T_RECEIPT',
+      draft_subject: 'Re: Svar', draft_body: 'Tack för handlingarna.',
+      respond_by: '2026-09-20',
+    });
+    db.recordMessage({
+      conversation_id: id, gmail_message_id: 'later-ack', direction: 'inbound',
+      from_email: 'kansli@ale.se', to_email: 'gustaf@mediagraf.se',
+      subject: 'Kvitto', body_text: 'Tack, ärendenummer K1, svar innan 2026-09-14.',
+      classification: 'auto_ack', classification_confidence: 0.9,
+      received_at: '2026-06-25T09:00:00Z', attachment_count: 0,
+      analysis_json: { extracted: { respond_by_date: '2026-09-14' } },
+    });
+    expect(db.effectiveRespondBy(id)).toBe('2026-09-14');
+
+    const slackOps = fakeSlackOps();
+    await runTick(mkDeps(slackOps));
+
+    expect(slackOps.posts).toHaveLength(1);
+    const texts = slackOps.posts[0].map((b) => b.text?.text ?? '').join('\n');
+    expect(texts).toContain('2026-09-14');
+    expect(texts).not.toContain('2026-09-20');
+    // The row's own column is untouched — only the rendered card changes.
+    expect(db.raw.prepare('SELECT respond_by FROM escalations WHERE id = ?').get(escId).respond_by).toBe('2026-09-20');
   });
 
   it('the per-tick cap bounds Slack API calls, not successes — a ts-less response cannot flood', async () => {

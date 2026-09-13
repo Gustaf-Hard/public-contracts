@@ -256,6 +256,14 @@ async function escalateWithDraft({ conv, parsedInbound, messageId = null, classi
   });
 
   if (slackOps && env.SLACK_CHANNEL_ID) {
+    // The ⏰ line renders db.effectiveRespondBy(conv.id), not the row's own
+    // snapshot (2026-09-12 review round-12 Q1): the escalation just recorded
+    // above stores whatever this call site computed (possibly an inherited,
+    // stale supersede snapshot), but the LIVE deadline can be earlier — e.g. a
+    // machine-traffic message in between restated an earlier still-outstanding
+    // date without ever touching the escalation chain. Read AFTER
+    // recordEscalation so the row just inserted is itself a candidate.
+    const cardRespondBy = db.effectiveRespondBy(conv.id);
     const blocks = buildEscalationBlocks({
       escalation_id: escId,
       kommun_namn: conv.kommun_namn,
@@ -264,7 +272,7 @@ async function escalateWithDraft({ conv, parsedInbound, messageId = null, classi
       draft_reply: `Subject: ${subject}\n\n${body}`,
       gmail_thread_id: conv.gmail_thread_id ?? '(no thread)',
       watchlist_vendors: watchlistVendors,
-      respond_by: effectiveRespondBy,
+      respond_by: cardRespondBy,
     });
     // The ONLY unguarded Slack call used to live here — and it sits AFTER
     // recordEscalation, so a Slack outage threw with the row already written:
@@ -938,7 +946,10 @@ async function retryUnpostedEscalations(deps) {
       draft_reply: `Subject: ${esc.draft_subject ?? ''}\n\n${esc.draft_body ?? ''}`,
       gmail_thread_id: conv.gmail_thread_id ?? '(no thread)',
       watchlist_vendors: watchlistVendors,
-      respond_by: esc.respond_by,
+      // The live deadline, not the row's own snapshot (round-12 Q1) — a
+      // conversation can move on (an earlier restated frist, an operator
+      // send) while this row sits unposted waiting for a Slack outage to heal.
+      respond_by: db.effectiveRespondBy(esc.conversation_id),
     });
     try {
       attempts += 1;

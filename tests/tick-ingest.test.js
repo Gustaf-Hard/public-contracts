@@ -992,6 +992,73 @@ describe('runTick — soft internal-forward ingest (2026-07-20 §5)', () => {
     expect(escB[0].respond_by).toBe('2026-09-20'); // inherited — the kommun's deadline still stands
   });
 
+  it('the Slack card renders db.effectiveRespondBy, not the escalation row\'s own snapshot (round-12 Q1)', async () => {
+    const spy = vi.spyOn(analyseMod, 'analyseMessage');
+    // Tick 1: a handoff names 2026-09-20 — escalation A opens with that snapshot.
+    spy.mockResolvedValueOnce({
+      intent: 'handoff', confidence: 0.95, summary: 'Hänvisas externt, svar 2026-09-20.',
+      extracted: { arendenummer: null, promised_response_days: null, promised_response_date: null, respond_by_date: '2026-09-20', handoff_to_email: 'registrator@stadsledningen.se', handoff_to_forvaltning: 'stadsledningen', questions: null, mentioned_vendors: null, reseller_relations: null },
+      suggested_action: 'escalate', is_final_delivery: false, draft_reply: 'Hej, jag kontaktar dem separat.', follow_up_at: null,
+    });
+    const id = seedConv({ email: 'kansli@ale.se', thread: 'thr-a' });
+    const slackOps = fakeSlackOps();
+    const gmail1 = fakeGmail({
+      listResult: [{ id: 'q1-a' }],
+      getResult: { 'q1-a': mkMsg('q1-a', 'thr-a', 'K <kansli@ale.se>', 'Hänvisas externt, svara innan 2026-09-20.') },
+    });
+    await runTick(deps({ gmail: gmail1, slackOps, now: new Date('2026-06-24T12:00:00Z') }));
+
+    const escA = db.raw.prepare("SELECT * FROM escalations WHERE conversation_id=? AND status='open'").all(id);
+    expect(escA).toHaveLength(1);
+    expect(escA[0].respond_by).toBe('2026-09-20');
+
+    // Tick 2: a diariesystem auto-ack restates an EARLIER, still-outstanding
+    // date (2026-09-14). It is machine traffic — no draft, escalation A is
+    // left untouched — but the date lands in the message's own analysis_json,
+    // where latestRespondByForConversation can see it.
+    spy.mockResolvedValueOnce({
+      intent: 'auto_ack', confidence: 0.95, summary: 'Automatiskt mottagningskvitto.',
+      extracted: { arendenummer: 'K1', promised_response_days: null, promised_response_date: null, respond_by_date: '2026-09-14', handoff_to_email: null, handoff_to_forvaltning: null, questions: null, mentioned_vendors: null, reseller_relations: null },
+      suggested_action: 'wait', is_final_delivery: false, draft_reply: '', follow_up_at: null,
+    });
+    const gmail2 = fakeGmail({
+      listResult: [{ id: 'q1-b' }],
+      getResult: { 'q1-b': mkMsg('q1-b', 'thr-a', 'K <kansli@ale.se>', 'Tack, ärendenummer K1, svar innan 2026-09-14.') },
+    });
+    await runTick(deps({ gmail: gmail2, slackOps, now: new Date('2026-06-25T12:00:00Z') }));
+
+    const stillA = db.raw.prepare("SELECT * FROM escalations WHERE conversation_id=? AND status='open'").all(id);
+    expect(stillA).toHaveLength(1);
+    expect(stillA[0].id).toBe(escA[0].id); // untouched by the machine traffic
+    expect(db.effectiveRespondBy(id)).toBe('2026-09-14'); // the queue already agrees
+
+    // Tick 3: a second handoff with NO date of its own supersedes A, inheriting
+    // its STALE 2026-09-20 snapshot into the new row B — but the card posted
+    // for B must render the live effective deadline (2026-09-14), not B's own
+    // inherited snapshot.
+    spy.mockResolvedValueOnce({
+      intent: 'handoff', confidence: 0.9, summary: 'Ytterligare hänvisning, inget nytt datum nämnt.',
+      extracted: { arendenummer: null, promised_response_days: null, promised_response_date: null, respond_by_date: null, handoff_to_email: 'registrator@stadsledningen.se', handoff_to_forvaltning: 'stadsledningen', questions: null, mentioned_vendors: null, reseller_relations: null },
+      suggested_action: 'escalate', is_final_delivery: false, draft_reply: 'Hej, jag kontaktar dem separat igen.', follow_up_at: null,
+    });
+    const gmail3 = fakeGmail({
+      listResult: [{ id: 'q1-c' }],
+      getResult: { 'q1-c': mkMsg('q1-c', 'thr-a', 'K <kansli@ale.se>', 'Ytterligare hänvisning, inget nytt datum.') },
+    });
+    await runTick(deps({ gmail: gmail3, slackOps, now: new Date('2026-06-26T12:00:00Z') }));
+    spy.mockRestore();
+
+    const escB = db.raw.prepare("SELECT * FROM escalations WHERE conversation_id=? AND status='open'").all(id);
+    expect(escB).toHaveLength(1);
+    expect(escB[0].respond_by).toBe('2026-09-20'); // the row keeps its own inherited snapshot
+    expect(db.effectiveRespondBy(id)).toBe('2026-09-14'); // but the live deadline is still 09-14
+
+    const lastPost = slackOps.posts.at(-1);
+    const deadlineBlock = lastPost.find((b) => b.text?.text?.includes('Kommunens svarsfrist'));
+    expect(deadlineBlock.text.text).toContain('2026-09-14');
+    expect(deadlineBlock.text.text).not.toContain('2026-09-20');
+  });
+
   it('PRECISION (offline): an external redirect naming an address escalates, not handoff_internal', async () => {
     const spy = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue(null);
     const id = seedConv({ email: 'kansli@ale.se', thread: 'thr-a' });
