@@ -715,6 +715,22 @@ describe('queue hygiene digest (2026-09-12 design)', () => {
     expect(digest.split('🧭')[1]).toContain('Föräldralös/utbildning');
   });
 
+  // Round-8 M5: 🕰 printed the bare kommun name while ⏰ and 🧭 both print
+  // kommun/role. One kommun can hold several conversations (central,
+  // utbildning, ...), so the name alone does not say which aged draft is meant.
+  it('names the 🕰 cases kommun/role, the way ⏰ and 🧭 do', async () => {
+    const cid = db.createConversation({ kommun_kod: '0005', kommun_namn: 'Gammal', role: 'utbildning', contact_email: 'g@g.se', scheduled_send_at: '2026-08-01T08:00:00Z' });
+    const escId = db.recordEscalation({ conversation_id: cid, reason: 'r', draft_template: 'free_form', draft_body: 'b' });
+    db.raw.prepare("UPDATE escalations SET created_at = datetime('now', '-9 days') WHERE id = ?").run(escId);
+    const slackOps = fakeSlackOps();
+    await runDailyFollowup(deps({ slackOps, now: new Date('2026-09-12T09:00:00Z') }));
+    const digest = slackOps.alerts.find((t) => t.includes('Köhälsa'));
+    expect(digest).toContain('🕰');
+    // The age in days is relative to the real clock (created_at is seeded with
+    // SQLite's datetime('now')), so the label shape is what matters here.
+    expect(digest.split('🕰')[1]).toMatch(/Gammal\/utbildning \(\d+ d\)/);
+  });
+
   it('keeps the deadline suffix on a 🧭 case that carries one', async () => {
     const cid = db.createConversation({ kommun_kod: '0004', kommun_namn: 'Frist', role: 'central', contact_email: 'd@d.se', scheduled_send_at: '2026-08-01T08:00:00Z' });
     db.recordMessage({
@@ -776,7 +792,7 @@ describe('queue hygiene digest (2026-09-12 design)', () => {
     expect(agedSection).toContain('…och 5 till');
     // Age digits are not asserted: the query filters on SQLite datetime('now')
     // while the display math uses the injected `now` (see the comment in tick.js).
-    expect(agedSection).toContain('Aged0 (');
+    expect(agedSection).toContain('Aged0/central (');
     expect(agedSection).not.toContain('Aged24');
   });
 

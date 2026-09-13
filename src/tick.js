@@ -1479,7 +1479,10 @@ export async function runDailyFollowup(deps) {
       if (aged.length > 0) {
         const included = aged.slice(0, DIGEST_MAX_LINES);
         const rest = aged.length - included.length;
-        parts.push(`🕰 *Öppna utkast äldre än 7 dagar* (${aged.length}): ${included.map((e) => `${e.kommun_namn} (${ageDays(e.created_at)} d)`).join(', ')}`
+        // kommun/role, exactly as ⏰ and 🧭 name a case (round-8 M5): one kommun
+        // can hold several conversations, so the name alone does not say which
+        // aged draft is meant.
+        parts.push(`🕰 *Öppna utkast äldre än 7 dagar* (${aged.length}): ${included.map((e) => `${e.kommun_namn}/${e.role} (${ageDays(e.created_at)} d)`).join(', ')}`
           + (rest > 0 ? `\n_…och ${rest} till._` : ''));
       }
       if (orphans.length > 0) {

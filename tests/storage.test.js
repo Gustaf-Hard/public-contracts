@@ -20,6 +20,53 @@ describe('migrate', () => {
     expect(() => db.migrate()).not.toThrow();
     expect(() => db.migrate()).not.toThrow();
   });
+
+  // Round-8 M5: the ingested_at probe + ALTER + backfill is one transaction
+  // (round-7 L3), and it has to be an IMMEDIATE one. A deferred transaction takes
+  // its write lock only when the first WRITE runs, so it starts as a reader: a
+  // concurrent ingest can commit between the PRAGMA read the branch is decided on
+  // and the ALTER/UPDATE that acts on it, and the upgrade then either fails or
+  // acts on a premise that no longer holds. BEGIN IMMEDIATE takes the write lock
+  // up front, so the read and the write see one state.
+  it('runs the ingested_at probe + ALTER + backfill in an IMMEDIATE transaction', () => {
+    const modes = [];
+    const original = db.raw.transaction;
+    db.raw.transaction = (fn) => {
+      const t = original.call(db.raw, fn);
+      const spy = (...a) => { modes.push('default'); return t(...a); };
+      spy.deferred = (...a) => { modes.push('deferred'); return t.deferred(...a); };
+      spy.immediate = (...a) => { modes.push('immediate'); return t.immediate(...a); };
+      spy.exclusive = (...a) => { modes.push('exclusive'); return t.exclusive(...a); };
+      return spy;
+    };
+    try {
+      db.migrate();
+    } finally {
+      db.raw.transaction = original;
+    }
+    expect(modes).toEqual(['immediate']);
+  });
+
+  // Round-7 L3, re-pinned here because M5 changes how that transaction begins:
+  // the backfill runs UNCONDITIONALLY on every migrate(), so a DB that died
+  // between the old two-statement ALTER and UPDATE (column present, every legacy
+  // row stuck on NULL for ever, every frist reading as outstanding) heals itself
+  // on the next daemon start.
+  it('the unconditional backfill heals a DB whose ingested_at was left NULL', () => {
+    const id = db.createConversation({
+      kommun_kod: '4242', kommun_namn: 'Heal', role: 'central',
+      contact_email: 'h@h.se', scheduled_send_at: '2026-09-01T08:00:00Z',
+    });
+    const mid = db.recordMessage({
+      conversation_id: id, gmail_message_id: 'g-heal', direction: 'inbound',
+      from_email: 'h@h.se', to_email: 'x', subject: 's', body_text: 'b',
+      received_at: '2026-09-11T08:00:00Z', attachment_count: 0,
+    });
+    db.raw.prepare('UPDATE messages SET ingested_at = NULL WHERE id = ?').run(mid);
+    db.migrate();
+    expect(db.raw.prepare('SELECT ingested_at FROM messages WHERE id = ?').get(mid).ingested_at)
+      .toBe('2026-09-11 08:00:00');
+  });
 });
 
 describe('conversations', () => {

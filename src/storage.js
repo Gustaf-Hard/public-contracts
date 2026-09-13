@@ -312,13 +312,22 @@ export function openDb(path) {
     // heals a DB that already got into that state. The WHERE clause makes it
     // free when there is nothing to do (and it never touches a row that already
     // has a stamp, nor one with no received_at to derive it from).
+    //
+    // IMMEDIATE, not the default deferred (round-8 M5). A deferred transaction
+    // starts as a READER and takes the write lock only when its first write runs,
+    // so a concurrent ingest could commit between the PRAGMA read that decides
+    // the branch and the ALTER/UPDATE that acts on it -- the upgrade then either
+    // fails on the lock upgrade or acts on a premise that no longer holds. BEGIN
+    // IMMEDIATE takes the write lock up front, so the read and the write see one
+    // state. migrate() runs once per daemon start, so the cost of holding the
+    // write lock for one PRAGMA is nothing.
     db.transaction(() => {
       const cols = db.prepare("PRAGMA table_info(messages)").all().map((r) => r.name);
       if (!cols.includes('ingested_at')) {
         db.exec('ALTER TABLE messages ADD COLUMN ingested_at TEXT');
       }
       db.exec("UPDATE messages SET ingested_at = replace(substr(received_at,1,19),'T',' ') WHERE ingested_at IS NULL AND received_at IS NOT NULL");
-    })();
+    }).immediate();
     const hbCols = db.prepare("PRAGMA table_info(daemon_heartbeat)").all().map((r) => r.name);
     if (!hbCols.includes('last_success_at')) {
       db.exec('ALTER TABLE daemon_heartbeat ADD COLUMN last_success_at TEXT');
