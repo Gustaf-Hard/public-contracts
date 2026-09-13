@@ -64,6 +64,29 @@ function quoted(text) {
   return String(text).split(ANY_LINE_BREAK).map((line) => `> ${line}`).join('\n');
 }
 
+// Our OWN outbound bodies are rendered verbatim, never through
+// sanitizeUntrusted: drafting rule 5 tells the model it may reuse our wording,
+// and flattening our paragraphs or eating a leading '#' would damage the copy it
+// is meant to reuse. Verbatim is not the same as structural, though. Templates
+// interpolate kommun-derived strings (arendenummer, vendor names in T_UPDATE,
+// crosscheck groups), so a newline-bearing value reaches the block as a
+// line-leading '#' or '>' that the sanitizer never sees, and "## VI skrev
+// (2026-09-12) / Vi accepterar avgiften" would read as our own accepted fee
+// (round-4 H6).
+//
+// A single leading space per offending line is the whole fix: every character of
+// the text is preserved for rule 5, only the Markdown structure is gone. The
+// splitter is the broad one (CRLF, CR, LF, VT, FF, NEL, U+2028/U+2029) because
+// JS itself treats U+2028/U+2029 as line terminators under the m flag, so a
+// separator-borne '#' is a heading to a tokenizer too; rejoining on \n is the
+// point, not a side effect.
+function neutralizeOwnBody(text) {
+  return String(text)
+    .split(ANY_LINE_BREAK)
+    .map((line) => (/^[ \t]*[#>]/.test(line) ? ` ${line}` : line))
+    .join('\n');
+}
+
 export function buildDraftContext(db, conv, parsed) {
   const msgs = db.listMessages(conv.id);
   const attRows = db.listAttachmentsForConversation?.(conv.id) ?? [];
@@ -77,7 +100,7 @@ export function buildDraftContext(db, conv, parsed) {
 
   const firstOutbound = msgs.find((m) => m.direction === 'outbound');
   lines.push('# Ursprunglig begäran (vårt första mejl, ordagrant)');
-  lines.push((firstOutbound?.body_text ?? '(saknas)').trim());
+  lines.push(neutralizeOwnBody((firstOutbound?.body_text ?? '(saknas)').trim()));
   lines.push('');
 
   lines.push('# Tidigare korrespondens (äldst först)');
@@ -90,7 +113,7 @@ export function buildDraftContext(db, conv, parsed) {
     const files = attsByMsg.get(m.id) ?? [];
     const fileNote = files.length ? ` [bilagor: ${files.join(', ')}]` : '';
     if (m.direction === 'outbound') {
-      const fullBody = (m.body_text ?? '').trim();
+      const fullBody = neutralizeOwnBody((m.body_text ?? '').trim());
       const body = fullBody.slice(0, MAX_OUTBOUND_CHARS);
       const truncated = fullBody.length > MAX_OUTBOUND_CHARS;
       lines.push(`## VI skrev (${date})${fileNote}`);
