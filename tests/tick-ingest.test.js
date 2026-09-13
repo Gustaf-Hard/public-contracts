@@ -278,6 +278,55 @@ describe('runTick — unmatched inbound is surfaced once (H5, L5)', () => {
     for (const p of posted.slice(1)) expect(p.thread_ts).toBe('t-1');
     spy.mockRestore();
   });
+
+  // Round-12 Q5 (adversarial): slack.test.js proves postAlert itself throws on
+  // a page-2 failure, but that unit test never calls a real booking caller —
+  // digestUnmatched's seenUnmatched cache is what the throw is FOR. Prove it
+  // end to end: a page-1-success/page-2-failure batch must book NOTHING (not
+  // even page 1's items — booking a subset the operator never fully saw would
+  // silently drop the rest), and a subsequent healthy tick must re-digest and
+  // book the WHOLE batch.
+  it('a page-2 Slack failure books nothing in seenUnmatched; the retry books the whole batch', async () => {
+    const spy = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue(null);
+    seedConv();
+    const seenUnmatched = new Map();
+    const ids = Array.from({ length: 20 }, (_, i) => `um-fail-${i}`);
+    const getResult = Object.fromEntries(ids.map((id) => [
+      id,
+      mkMsg(id, `thr-${id}`, `Okänd <${id}@kommunalforbund.se>`, 'Svar', {
+        subject: `AKT ${id} ${'q'.repeat(8000)}`,
+      }),
+    ]));
+    const gmail = fakeGmail({ listResult: ids.map((id) => ({ id })), getResult });
+
+    let calls = 0;
+    const failingClient = {
+      chat: {
+        postMessage: async (args) => {
+          calls += 1;
+          if (calls === 2) throw new Error('simulated Slack failure on page 2');
+          return { ts: `t-${calls}`, channel: args.channel };
+        },
+      },
+    };
+    const slackOpsDown = { postEscalation: vi.fn(async () => ({ ts: 's-1', channel: 'C1' })), postAlert: realPostAlert };
+    await runTick({ ...deps({ gmail, slackOps: slackOpsDown, seenUnmatched }), slackClient: failingClient });
+    expect(calls).toBe(2); // page 2 was attempted and failed
+    expect(seenUnmatched.size).toBe(0); // NOTHING booked, not even page 1's items
+
+    const posted = [];
+    const healthyClient = {
+      chat: {
+        postMessage: async (args) => { posted.push(args); return { ts: `h-${posted.length}`, channel: args.channel }; },
+      },
+    };
+    const slackOpsUp = { postEscalation: vi.fn(async () => ({ ts: 's-1', channel: 'C1' })), postAlert: realPostAlert };
+    await runTick({ ...deps({ gmail, slackOps: slackOpsUp, seenUnmatched }), slackClient: healthyClient });
+    expect(posted.length).toBeGreaterThan(1); // still paginated on the retry
+    expect(seenUnmatched.size).toBe(20); // the WHOLE batch, not just what fit before the failure
+    for (const id of ids) expect(seenUnmatched.has(id)).toBe(true);
+    spy.mockRestore();
+  });
 });
 
 describe('runTick — previously-unmatched inbound is re-matched every tick (finding 4)', () => {

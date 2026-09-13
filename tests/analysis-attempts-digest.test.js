@@ -16,6 +16,7 @@ import { openDb, MAX_ANALYSIS_ATTEMPTS } from '../src/storage.js';
 import { analysePendingContracts, classifyAnalysisFailure } from '../src/analyse-contract.js';
 import { runTick } from '../src/tick.js';
 import { attachmentAnalysisNote } from '../src/dashboard-views.js';
+import { postAlert as realPostAlert } from '../src/slack.js';
 import * as analyseMod from '../src/analyse-message.js';
 
 let tmp, dbPath, db, contractsDir;
@@ -521,6 +522,53 @@ describe('parked-analysis digest', () => {
     expect(slackOps.alerts).toHaveLength(2);
     expect(slackOps.alerts[1]).toContain('Doc22.pdf');
     expect(ids.every((id) => attRow(db, id).analysis_parked_alerted_at)).toBe(true);
+  });
+
+  // Round-12 Q5 (adversarial): the mocked-postAlert test above proves nothing
+  // is marked when Slack fails outright, but it never drives the REAL
+  // paginating postAlert, so it cannot prove the digest survives a failure on
+  // page 2 specifically (a page-1-success/page-2-failure run must mark NOTHING
+  // — not even the attachments named on the page that did post — or a subset
+  // would be silently dropped from the retry). slack.test.js already proves
+  // postAlert itself throws on a page-2 failure; this proves the booking
+  // caller (markParkedAnalysesAlerted) actually behaves as that throw assumes.
+  it('a page-2 Slack failure marks nothing; the retry marks the whole batch', async () => {
+    const ids = [];
+    for (let i = 0; i < 20; i += 1) {
+      // A long KOMMUN name (not part of any filesystem path, unlike filename)
+      // pads each digest line past Slack's per-block budget so the batch
+      // spans multiple pages, the same technique the unmatched-digest test
+      // above uses via an oversized subject.
+      const { attId } = seedAttachment(db, { filename: `Doc${i}.pdf`, kommun: `${'Q'.repeat(8000)}-K${i}`, kod: String(1000 + i) });
+      db.recordAnalysisFailure(attId, { reason: 'permanent:file_missing', permanent: true });
+      ids.push(attId);
+    }
+
+    let calls = 0;
+    const failingClient = {
+      chat: {
+        postMessage: async (args) => {
+          calls += 1;
+          if (calls === 2) throw new Error('simulated Slack failure on page 2');
+          return { ts: `t-${calls}`, channel: args.channel };
+        },
+      },
+    };
+    const slackOpsDown = { postEscalation: vi.fn(async () => ({ ts: 's-1', channel: 'C1' })), postAlert: realPostAlert };
+    await runTick({ ...tickDeps(db, { slackOps: slackOpsDown }), slackClient: failingClient });
+    expect(calls).toBe(2); // page 2 was attempted and failed
+    expect(ids.every((id) => attRow(db, id).analysis_parked_alerted_at == null)).toBe(true);
+
+    const posted = [];
+    const healthyClient = {
+      chat: {
+        postMessage: async (args) => { posted.push(args); return { ts: `h-${posted.length}`, channel: args.channel }; },
+      },
+    };
+    const slackOpsUp = { postEscalation: vi.fn(async () => ({ ts: 's-1', channel: 'C1' })), postAlert: realPostAlert };
+    await runTick({ ...tickDeps(db, { slackOps: slackOpsUp }), slackClient: healthyClient });
+    expect(posted.length).toBeGreaterThan(1); // still paginated on the retry
+    expect(ids.every((id) => attRow(db, id).analysis_parked_alerted_at != null)).toBe(true);
   });
 });
 
