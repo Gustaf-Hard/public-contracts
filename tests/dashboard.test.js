@@ -865,6 +865,58 @@ describe('home buckets', () => {
     expect(q.find((r) => r.conv_id === plain).respond_by).toBeNull();
   });
 
+  // Round-9 N3 (adversarial): the queue used to read the open escalation's
+  // respond_by off the row and hand it to effectiveRespondBy unchecked, so a
+  // draft dispatched seconds AFTER the operator's reply resurrected the date
+  // that reply already answered. The helper now reads and discharge-checks its
+  // own escalation candidate, so this row carries no deadline at all.
+  it('buildActionQueue drops a deadline an escalation minted after the operator reply inherited', () => {
+    const cid = db.createConversation({ kommun_kod: '4444', kommun_namn: 'Uppstånden', role: 'central', contact_email: 'u@u.se', scheduled_send_at: '2026-05-24T10:00:00Z' });
+    const mid = db.recordMessage({
+      conversation_id: cid, gmail_message_id: 'g-late', direction: 'inbound',
+      from_email: 'u@u.se', to_email: 'x', subject: 's', body_text: 'b',
+      received_at: '2026-09-13T09:31:00Z', attachment_count: 0,
+      analysis_json: JSON.stringify({ extracted: { respond_by_date: '2026-09-14' } }),
+    });
+    db.raw.prepare('UPDATE messages SET ingested_at = ? WHERE id = ?').run('2026-09-13 09:31:57', mid);
+    const answered = db.recordEscalation({ conversation_id: cid, reason: 'r' });
+    const did = db.recordDecision({
+      escalation_id: answered, conversation_id: cid, conversation_state: 'NEEDS_HUMAN',
+      draft_body: 'b', decision: 'edit',
+    });
+    db.raw.prepare('UPDATE decisions SET decided_at = ? WHERE id = ?').run('2026-09-13 09:31:58', did);
+    db.raw.prepare("UPDATE escalations SET status = 'resolved_edit' WHERE id = ?").run(answered);
+    const late = db.recordEscalation({ conversation_id: cid, message_id: mid, reason: 'r', draft_template: 'free_form', draft_body: 'b', respond_by: '2026-09-14' });
+    db.raw.prepare('UPDATE escalations SET created_at = ? WHERE id = ?').run('2026-09-13 09:32:10', late);
+
+    const row = buildActionQueue(db).find((r) => r.conv_id === cid);
+    expect(row).toBeTruthy();          // still pending work: there is a draft to approve
+    expect(row.respond_by).toBeNull(); // but the answered frist is not resurrected
+  });
+
+  // Round-9 N2: the queue read status='open' while the Slack digest read every
+  // ACTIVE status, so a PARKED send dated 2026-09-14 over a newer inbound dated
+  // 2026-09-20 showed 09-20 here and 09-14 in Slack. One helper, one answer.
+  it('buildActionQueue shows the parked escalation date the digest shows, not the later inbound one', () => {
+    const cid = db.createConversation({ kommun_kod: '5555', kommun_namn: 'Parkerad', role: 'central', contact_email: 'p@p.se', scheduled_send_at: '2026-05-24T10:00:00Z' });
+    const esc = db.recordEscalation({ conversation_id: cid, reason: 'r', draft_template: 'free_form', draft_body: 'b', respond_by: '2026-09-14' });
+    db.raw.prepare("UPDATE escalations SET status = 'send_failed' WHERE id = ?").run(esc);
+    db.recordMessage({
+      conversation_id: cid, gmail_message_id: 'g-parked', direction: 'inbound',
+      from_email: 'p@p.se', to_email: 'x', subject: 's', body_text: 'b',
+      received_at: '2026-09-13T08:00:00Z', attachment_count: 0,
+      analysis_json: JSON.stringify({ extracted: { respond_by_date: '2026-09-20' } }),
+    });
+    db.updateConversationState(cid, 'NEEDS_HUMAN');
+
+    const q = buildActionQueue(db);
+    expect(q.find((r) => r.conv_id === cid).respond_by).toBe('2026-09-14');
+    expect(q[0].conv_id).toBe(cid); // soonest deadline sorts first
+    // The Slack digest reads the same helper through the same conversation.
+    expect(db.listConversationsWithDeadlineDue('2026-09-30').find((r) => r.conversation_id === cid).respond_by)
+      .toBe('2026-09-14');
+  });
+
   // Round-4 H7: buildActionQueue carrying respond_by was asserted, the RENDER
   // of it was not — the ⏰ badge could disappear from the template with every
   // queue test still green.

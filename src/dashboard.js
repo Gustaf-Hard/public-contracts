@@ -457,10 +457,18 @@ export function buildActionQueue(db) {
       // (round-8 M1): the row's date is a snapshot from when the draft was
       // minted, so letting it win outright hid a newer inbound frist that falls
       // earlier.
+      // Round-9 N3/N2: the conversation id is the WHOLE input. The escalation
+      // candidate used to be read here off `openEsc` and handed in, which was
+      // wrong twice: it was the status='open' row only (the digest read every
+      // ACTIVE status, so a parked send's earlier date showed in Slack and not
+      // here) and it was never discharge-checked (a draft minted after the
+      // operator's reply resurrected the date that reply answered). The helper
+      // reads and checks its own candidate; `openEsc` below is the action label
+      // and the "utan utkast" semantics only.
       // Called unconditionally (round-5 J5, matching the getTickHealth pattern
       // in CLAUDE.md): a deadline-surfacing helper must not opt itself out on a
       // db object that happens to lack the method.
-      respond_by: db.effectiveRespondBy(c.id, openEsc.length > 0 ? openEsc[0].respond_by : null) ?? null,
+      respond_by: db.effectiveRespondBy(c.id) ?? null,
     });
   }
   // Durable hänvisningar (2026-09-06 design): a pending handoff task is

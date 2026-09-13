@@ -199,11 +199,16 @@ hardcode a name or address into a prompt.
 
 **`escalations.respond_by` is the kommun-imposed reply deadline** (extracted as
 `respond_by_date` by the analysis, ISO date or NULL). The one reader of it is
-`effectiveRespondBy`, which returns the **SOONEST** of the active escalation's
-own `respond_by` and `latestRespondByForConversation` (round-8 M1): an
-escalation row is a snapshot of what was known when the draft was minted, and a
-parked one sits there for days, so letting it win outright masked a newer
-inbound frist falling earlier. It sorts Behöver dig
+`effectiveRespondBy(conversationId)`, which returns the **SOONEST OUTSTANDING**
+date across the active escalation and the inbound history (round-8 M1,
+round-9 N3): an escalation row is a snapshot of what was known when the draft was
+minted, and a parked one sits there for days, so letting it win outright masked a
+newer inbound frist falling earlier. It takes the conversation id and nothing
+else. It reads the newest escalation whose status is in
+`ACTIVE_ESCALATION_STATUSES` itself (never the caller's `status='open'` row, or
+the dashboard and the digest disagree about a parked date) and discharge-checks
+that candidate by the same rule as the fallback below, or a draft minted after
+the operator's reply resurrects the date that reply answered. It sorts Behöver dig
 deadline-first, renders the ⏰ line in Slack escalations, and feeds the daily
 Köhälsa digest. It is advisory surfacing only — no guard, FSM transition or
 auto-send rule keys off it. **Only an OPERATOR send discharges it**

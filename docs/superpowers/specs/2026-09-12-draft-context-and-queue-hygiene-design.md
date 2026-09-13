@@ -198,7 +198,15 @@ listing three sections:
 
 1. **⏰ Deadline inom 2 dagar eller passerad** — every live conversation whose
    EFFECTIVE deadline is `<= today+2`, sorted soonest first, one row per
-   conversation. Repeats daily until resolved; for a hard external deadline the
+   conversation. **EFFECTIVE** (round-8 M1, tightened in round-9 N3) means the
+   soonest still-OUTSTANDING date across two candidates: the newest escalation
+   whose status is in `ACTIVE_ESCALATION_STATUSES`, and the conversation's
+   inbound history (`latestRespondByForConversation`). Both are discharge-checked
+   against the same boundary, the latest operator send, so an escalation minted
+   after that send cannot resurrect a date the send already answered.
+   `effectiveRespondBy(conversationId)` takes the conversation id and nothing
+   else: it reads its own escalation candidate, which is why the dashboard and
+   the digest cannot disagree about which row or which status set it came from. Repeats daily until resolved; for a hard external deadline the
    repeat is the feature. A case with no open escalation is marked "utan utkast"
    because there is nothing to approve (round-2 finding F2).
 

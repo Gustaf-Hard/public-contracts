@@ -858,24 +858,34 @@ describe('queue hygiene queries (2026-09-12 design)', () => {
   // An escalation row is a SNAPSHOT taken when the draft was minted, so it is
   // never newer than the conversation's inbound history. Both dates are
   // outstanding; the actionable one is the SOONEST.
+  // Round-9 N3: `effectiveRespondBy(conversationId)` takes no escalation date
+  // from its caller any more — it reads the newest ACTIVE escalation itself and
+  // discharge-checks it — so these cases seed a real escalation row instead of
+  // handing the date in as an argument.
   it('effectiveRespondBy returns the soonest outstanding deadline, not the escalation row', () => {
-    const cid = db.createConversation({ kommun_kod: '0104', kommun_namn: 'Effektiv', role: 'central', contact_email: 'e@e.se', scheduled_send_at: '2026-08-01T08:00:00Z' });
-    db.recordMessage({
-      conversation_id: cid, gmail_message_id: 'g-e', direction: 'inbound',
-      from_email: 'e@e.se', to_email: 'x', subject: 's', body_text: 'b',
-      received_at: '2026-09-11T08:00:00Z', attachment_count: 0,
-      analysis_json: JSON.stringify({ extracted: { respond_by_date: '2026-09-14' } }),
-    });
+    let kod = 1040;
+    const seed = (escRespondBy) => {
+      const cid = db.createConversation({ kommun_kod: String(kod++), kommun_namn: 'Effektiv', role: 'central', contact_email: 'e@e.se', scheduled_send_at: '2026-08-01T08:00:00Z' });
+      db.recordMessage({
+        conversation_id: cid, gmail_message_id: `g-e-${cid}`, direction: 'inbound',
+        from_email: 'e@e.se', to_email: 'x', subject: 's', body_text: 'b',
+        received_at: '2026-09-11T08:00:00Z', attachment_count: 0,
+        analysis_json: JSON.stringify({ extracted: { respond_by_date: '2026-09-14' } }),
+      });
+      if (escRespondBy !== undefined) db.recordEscalation({ conversation_id: cid, reason: 'r', respond_by: escRespondBy });
+      return cid;
+    };
     // The escalation snapshot is LATER than the newer inbound frist: the inbound wins.
-    expect(db.effectiveRespondBy(cid, '2026-09-20')).toBe('2026-09-14');
+    expect(db.effectiveRespondBy(seed('2026-09-20'))).toBe('2026-09-14');
     // The escalation snapshot is SOONER: it wins, the inbound does not hide it.
-    expect(db.effectiveRespondBy(cid, '2026-09-10')).toBe('2026-09-10');
+    expect(db.effectiveRespondBy(seed('2026-09-10'))).toBe('2026-09-10');
     // Equal dates collapse to the one date.
-    expect(db.effectiveRespondBy(cid, '2026-09-14')).toBe('2026-09-14');
+    expect(db.effectiveRespondBy(seed('2026-09-14'))).toBe('2026-09-14');
     // Only one side non-null -> that one.
-    expect(db.effectiveRespondBy(cid, null)).toBe('2026-09-14');
-    expect(db.effectiveRespondBy(cid, '')).toBe('2026-09-14');
-    expect(db.effectiveRespondBy(cid, 'i morgon')).toBe('2026-09-14'); // junk is not a deadline
+    expect(db.effectiveRespondBy(seed(null))).toBe('2026-09-14');
+    expect(db.effectiveRespondBy(seed(''))).toBe('2026-09-14');
+    expect(db.effectiveRespondBy(seed('i morgon'))).toBe('2026-09-14'); // junk is not a deadline
+    expect(db.effectiveRespondBy(seed(undefined))).toBe('2026-09-14'); // no escalation at all
   });
 
   it('effectiveRespondBy returns the escalation date alone when the conversation carries none, and null when neither does', () => {
@@ -886,9 +896,9 @@ describe('queue hygiene queries (2026-09-12 design)', () => {
       received_at: '2026-09-11T08:00:00Z', attachment_count: 0,
       analysis_json: JSON.stringify({ extracted: { respond_by_date: null } }),
     });
-    expect(db.effectiveRespondBy(cid, '2026-09-20')).toBe('2026-09-20');
-    expect(db.effectiveRespondBy(cid, null)).toBeNull();
     expect(db.effectiveRespondBy(cid)).toBeNull();
+    db.recordEscalation({ conversation_id: cid, reason: 'r', respond_by: '2026-09-20' });
+    expect(db.effectiveRespondBy(cid)).toBe('2026-09-20');
   });
 
   // The same masking seen through the ONE source the digest and the dashboard
@@ -1458,4 +1468,116 @@ describe('messages.ingested_at migration (round-6 K1)', () => {
   function migRead(id) {
     return db.raw.prepare('SELECT ingested_at FROM messages WHERE id = ?').get(id);
   }
+});
+
+// Round-9 N3 (adversarial, VERIFIED): the escalation candidate that
+// effectiveRespondBy mins in was never discharge-checked. Its callers read the
+// newest active escalation's respond_by straight off the row and passed it in,
+// so a draft minted AFTER the operator's reply — delayed ingest dispatch, or a
+// superseded copy re-inheriting the frist — resurrected an already-answered
+// date on both surfaces for as long as that draft stayed active, while
+// latestRespondByForConversation correctly returned null for the same
+// conversation. The escalation candidate now lives INSIDE the helper and is
+// checked against the same boundary as the fallback (the trigger mail's
+// ingested_at when message_id is set, the row's own created_at when it is not).
+//
+// Round-9 N2 comes out in the wash: one helper reads the escalation, so the
+// dashboard cannot key on status='open' while the digest keys on
+// ACTIVE_ESCALATION_STATUSES. Advisory surfacing only.
+describe('effectiveRespondBy discharge-checks its own escalation candidate (round-9 N3)', () => {
+  let kod = 9000;
+  function seed(namn) {
+    return db.createConversation({
+      kommun_kod: String(kod++), kommun_namn: namn, role: 'central',
+      contact_email: 'n@n.se', scheduled_send_at: '2026-09-01T08:00:00Z',
+    });
+  }
+  function inbound(convId, { at, respondBy = null, ingestedAt }) {
+    const id = db.recordMessage({
+      conversation_id: convId, gmail_message_id: `g-n3-${convId}-${at}`, direction: 'inbound',
+      from_email: 'n@n.se', to_email: 'x', subject: 's', body_text: 'b',
+      received_at: at, attachment_count: 0,
+      analysis_json: JSON.stringify({ extracted: { respond_by_date: respondBy } }),
+    });
+    db.raw.prepare('UPDATE messages SET ingested_at = ? WHERE id = ?')
+      .run(ingestedAt ?? at.replace('T', ' ').replace('Z', ''), id);
+    return id;
+  }
+  function operatorSend(convId, decidedAt, { decision = 'edit' } = {}) {
+    const escId = db.recordEscalation({ conversation_id: convId, reason: 'r' });
+    const did = db.recordDecision({
+      escalation_id: escId, conversation_id: convId, conversation_state: 'NEEDS_HUMAN',
+      draft_body: 'b', decision,
+    });
+    db.raw.prepare('UPDATE decisions SET decided_at = ? WHERE id = ?').run(decidedAt, did);
+    db.raw.prepare("UPDATE escalations SET status = 'resolved_edit' WHERE id = ?").run(escId);
+    return escId;
+  }
+  // The escalation that got minted after the answer, naming the mail the answer
+  // already covered. `status` is what varies: 'open' is the delayed-dispatch
+  // case, a parked copy sits there for days.
+  function lateCopy(convId, { messageId, respondBy, createdAt, status }) {
+    const esc = db.recordEscalation({ conversation_id: convId, message_id: messageId, reason: 'r', respond_by: respondBy });
+    db.raw.prepare('UPDATE escalations SET created_at = ?, status = ? WHERE id = ?').run(createdAt, status, esc);
+    return esc;
+  }
+  const dueRow = (cid, by = '2026-09-30') =>
+    db.listConversationsWithDeadlineDue(by).find((r) => r.conversation_id === cid);
+
+  // The adversarial repro, to the second: ingest 09:31:57, operator edit-send
+  // 09:31:58, and the draft dispatched a few seconds later inherits 2026-09-14
+  // from the mail that send answered.
+  it.each(['open', 'send_failed'])('an escalation (%s) minted after the answer does not resurrect the answered date', (status) => {
+    const cid = seed(`Uppstånden-${status}`);
+    const mid = inbound(cid, { at: '2026-09-13T09:31:00Z', respondBy: '2026-09-14', ingestedAt: '2026-09-13 09:31:57' });
+    operatorSend(cid, '2026-09-13 09:31:58');
+    lateCopy(cid, { messageId: mid, respondBy: '2026-09-14', createdAt: '2026-09-13 09:32:10', status });
+
+    expect(db.latestRespondByForConversation(cid)).toBeNull(); // already correct
+    expect(db.effectiveRespondBy(cid)).toBeNull();             // now agrees
+    expect(dueRow(cid)).toBeUndefined();                       // and so does the digest
+  });
+
+  // The other half of the ruling: an ACTIVE escalation with no trigger mail,
+  // created after the last operator send, is a live obligation and keeps its
+  // date even though no inbound analysis carries one.
+  it('an escalation-only deadline created after the last operator send survives', () => {
+    const cid = seed('Egen frist');
+    operatorSend(cid, '2026-09-10 10:00:00');
+    const esc = db.recordEscalation({ conversation_id: cid, reason: 'r', respond_by: '2026-09-14' });
+    db.raw.prepare('UPDATE escalations SET created_at = ? WHERE id = ?').run('2026-09-11 08:00:00', esc);
+    expect(db.effectiveRespondBy(cid)).toBe('2026-09-14');
+    expect(dueRow(cid).respond_by).toBe('2026-09-14');
+    expect(dueRow(cid).has_open_escalation).toBe(true);
+  });
+
+  // Round-9 N2: a PARKED escalation dated 09-14 over a newer inbound dated
+  // 09-20. Both surfaces must name 09-14 — the dashboard used to read
+  // status='open' only, see no escalation, and print the later inbound date
+  // while Slack printed the earlier one.
+  it('a parked escalation date beats a later inbound frist on both surfaces', () => {
+    const cid = seed('Parkerad frist');
+    const esc = db.recordEscalation({ conversation_id: cid, reason: 'r', respond_by: '2026-09-14' });
+    db.raw.prepare("UPDATE escalations SET status = 'send_failed' WHERE id = ?").run(esc);
+    inbound(cid, { at: '2026-09-13T08:00:00Z', respondBy: '2026-09-20' });
+    expect(db.effectiveRespondBy(cid)).toBe('2026-09-14');
+    expect(dueRow(cid).respond_by).toBe('2026-09-14');
+  });
+
+  // Only the NEWEST active escalation is the candidate (step 1 of the ruling).
+  // An older parked row's stale snapshot is not a live obligation; if its date
+  // still matters it reaches the reader through the fallback, which scans every
+  // status.
+  it('an answered date on the newest active row does not hide behind an older one', () => {
+    const cid = seed('Nyast');
+    const mid = inbound(cid, { at: '2026-09-13T09:00:00Z', respondBy: null, ingestedAt: '2026-09-13 09:00:10' });
+    const older = db.recordEscalation({ conversation_id: cid, reason: 'r', respond_by: '2026-09-14' });
+    db.raw.prepare("UPDATE escalations SET status = 'send_failed', created_at = '2026-09-13 09:00:20' WHERE id = ?").run(older);
+    operatorSend(cid, '2026-09-13 09:30:00');
+    lateCopy(cid, { messageId: mid, respondBy: '2026-09-14', createdAt: '2026-09-13 09:30:05', status: 'open' });
+    // The newest active row is discharged, and so is the older row's fallback
+    // copy (its trigger-less created_at predates the send).
+    expect(db.effectiveRespondBy(cid)).toBeNull();
+    expect(dueRow(cid)).toBeUndefined();
+  });
 });

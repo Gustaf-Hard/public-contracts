@@ -878,19 +878,20 @@ export function openDb(path) {
       SELECT c.id AS conversation_id, c.kommun_namn, c.role,
              (SELECT e.id FROM escalations e
                 WHERE e.conversation_id = c.id AND e.status IN (${activeStatusPlaceholders})
-                ORDER BY e.id DESC LIMIT 1) AS active_escalation_id,
-             (SELECT e.respond_by FROM escalations e
-                WHERE e.conversation_id = c.id AND e.status IN (${activeStatusPlaceholders})
-                ORDER BY e.id DESC LIMIT 1) AS open_respond_by
+                ORDER BY e.id DESC LIMIT 1) AS active_escalation_id
       FROM conversations c
       WHERE c.state NOT IN ('DONE', 'DEAD_END')
       ORDER BY c.id
-    `).all(...ACTIVE_ESCALATION_STATUSES, ...ACTIVE_ESCALATION_STATUSES)
+    `).all(...ACTIVE_ESCALATION_STATUSES)
       .map((r) => ({
         conversation_id: r.conversation_id,
         kommun_namn: r.kommun_namn,
         role: r.role,
-        respond_by: effectiveRespondBy(r.conversation_id, r.open_respond_by),
+        // Round-9 N3: the escalation candidate is effectiveRespondBy's own
+        // business now (it has to discharge-check it), so this query no longer
+        // reads a respond_by to pass in. The active_escalation_id above is only
+        // the "utan utkast" label.
+        respond_by: effectiveRespondBy(r.conversation_id),
         has_open_escalation: r.active_escalation_id != null,
       }))
       .filter((r) => r.respond_by != null && r.respond_by <= byIsoDate)
@@ -986,20 +987,31 @@ export function openDb(path) {
   // recoverable; silently hiding a live frist is the failure this helper exists
   // to prevent. Read-only surfacing: no guard, FSM transition or automation
   // keys off this.
-  function latestRespondByForConversation(conversationId) {
+  // THE discharge test for one conversation, as a closure over that
+  // conversation's operator-send boundary: "was this artefact's stamp at or
+  // after the latest operator send?", i.e. is the obligation it carries still
+  // outstanding. Lifted out of latestRespondByForConversation in round-9 N3 so
+  // that the escalation candidate inside effectiveRespondBy is checked by the
+  // SAME rule as the fallback rather than by no rule at all.
+  //
+  // `>=`, not `>` (round-7 L2): both stamps are SQLite second-resolution, so a
+  // tie carries no ordering. A strict `>` read "same second" as "ingested
+  // before the send" and silently discharged a mail that may never have been
+  // on screen; with the decision stamped at the moment the send STARTED
+  // (round-7 L1) a same-second ingest is genuinely ambiguous, and this helper
+  // fails OPEN everywhere else for the same reason. Showing one date too many
+  // is recoverable; hiding a live frist is what it exists to prevent.
+  function outstandingCheckFor(conversationId) {
     const dischargedAtMs = latestOperatorSendMs(conversationId);
-    // `>=`, not `>` (round-7 L2): both stamps are SQLite second-resolution, so a
-    // tie carries no ordering. A strict `>` read "same second" as "ingested
-    // before the send" and silently discharged a mail that may never have been
-    // on screen; with the decision stamped at the moment the send STARTED
-    // (round-7 L1) a same-second ingest is genuinely ambiguous, and this helper
-    // fails OPEN everywhere else for the same reason. Showing one date too many
-    // is recoverable; hiding a live frist is what it exists to prevent.
-    const outstanding = (ingestedAt) => {
+    return (stampedAt) => {
       if (Number.isNaN(dischargedAtMs)) return true;
-      const ms = timestampMs(ingestedAt);
+      const ms = timestampMs(stampedAt);
       return Number.isNaN(ms) ? true : ms >= dischargedAtMs;
     };
+  }
+
+  function latestRespondByForConversation(conversationId) {
+    const outstanding = outstandingCheckFor(conversationId);
     const fromMessages = db.prepare(`
       SELECT m.id AS id, m.ingested_at AS ingested_at,
              json_extract(m.analysis_json, '$.extracted.respond_by_date') AS respond_by
@@ -1053,9 +1065,50 @@ export function openDb(path) {
   // already rejected everything that is not YYYY-MM-DD, so there is no shape
   // here for which that is untrue). A NULL/junk side drops out and the other one
   // stands alone; neither side leaves null, as before.
-  function effectiveRespondBy(conversationId, openEscRespondBy = null) {
-    const candidates = [asIsoDate(openEscRespondBy), latestRespondByForConversation(conversationId)]
-      .filter((d) => d != null);
+  //
+  // Round-9 N3: the escalation candidate is read HERE, not handed in by the
+  // caller. The signature takes a conversation id and nothing else, so no
+  // surface can pass a different (or unchecked) escalation date than another.
+  // The active escalation's own candidate date, DISCHARGE-CHECKED (round-9 N3).
+  // Step 1 is the newest escalation whose status is in
+  // ACTIVE_ESCALATION_STATUSES — the same set has_open_escalation and every
+  // draft guard read, so the dashboard cannot key on status='open' while the
+  // digest keys on the wider set (round-9 N2: a parked row dated 09-14 over a
+  // newer inbound dated 09-20 printed 09-20 on the dashboard and 09-14 in
+  // Slack). Only the NEWEST active row is a candidate: an older parked row's
+  // snapshot is not a live obligation, and if its date still matters it reaches
+  // the reader through latestRespondByForConversation's fallback, which scans
+  // every status.
+  //
+  // Step 2 is the discharge check the callers never did. An escalation created
+  // AFTER the operator's reply can inherit a date that reply already answered
+  // (delayed ingest dispatch, or a superseded copy re-inheriting the frist), so
+  // the row's mere existence is not evidence its deadline is live (the same
+  // round-4 H2 reasoning the fallback already applies). The boundary is the same
+  // one, read off the same clock: the trigger mail's `ingested_at` when
+  // `message_id` names one, the escalation's own `created_at` when it does not.
+  // A message_id pointing at a row we cannot read leaves ingested_at NULL, which
+  // `outstanding` treats as considered — fail open, as everywhere else here.
+  function activeEscalationRespondBy(conversationId, outstanding) {
+    const row = db.prepare(`
+      SELECT e.respond_by AS respond_by, e.created_at AS created_at,
+             e.message_id AS message_id, m.ingested_at AS trigger_ingested_at
+      FROM escalations e LEFT JOIN messages m ON m.id = e.message_id
+      WHERE e.conversation_id = ? AND e.status IN (${activeStatusPlaceholders})
+      ORDER BY e.id DESC LIMIT 1
+    `).get(conversationId, ...ACTIVE_ESCALATION_STATUSES);
+    if (!row) return null;
+    const date = asIsoDate(row.respond_by);
+    if (date == null) return null;
+    return outstanding(row.message_id != null ? row.trigger_ingested_at : row.created_at) ? date : null;
+  }
+
+  function effectiveRespondBy(conversationId) {
+    const outstanding = outstandingCheckFor(conversationId);
+    const candidates = [
+      activeEscalationRespondBy(conversationId, outstanding),
+      latestRespondByForConversation(conversationId),
+    ].filter((d) => d != null);
     if (candidates.length === 0) return null;
     return candidates.reduce((soonest, d) => (d < soonest ? d : soonest));
   }
