@@ -710,4 +710,25 @@ describe('queue hygiene digest (2026-09-12 design)', () => {
     // Existing behavior preserved: a blind tick still drafts no staleness nudge.
     expect(db.listOpenEscalationsForConversation(nudgeConvId)).toHaveLength(0);
   });
+
+  // Final-review finding 2 (2026-09-12): due/orphans were the only two lists
+  // in this digest NOT capped at DIGEST_MAX_LINES. postAlert puts the whole
+  // text in one Slack section block (3000-char cap); an uncapped list can
+  // overflow it, Slack rejects with invalid_blocks, and the try/catch
+  // swallows it silently.
+  it('caps orphans at DIGEST_MAX_LINES and reports the full count plus an "…och N till" tail', async () => {
+    for (let i = 0; i < 25; i++) {
+      const cid = db.createConversation({
+        kommun_kod: String(1000 + i), kommun_namn: `Orphan${i}`, role: 'central',
+        contact_email: `o${i}@o.se`, scheduled_send_at: '2026-08-01T08:00:00Z',
+      });
+      db.updateConversationState(cid, 'NEEDS_HUMAN');
+    }
+    const slackOps = fakeSlackOps();
+    await runDailyFollowup(deps({ slackOps, now: new Date('2026-09-12T09:00:00Z') }));
+    const digest = slackOps.alerts.find((t) => t.includes('Köhälsa'));
+    expect(digest).toBeTruthy();
+    expect(digest).toContain('(25)');
+    expect(digest).toContain('…och 5 till');
+  });
 });

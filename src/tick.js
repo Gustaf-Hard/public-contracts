@@ -1392,12 +1392,22 @@ export async function runDailyFollowup(deps) {
     if ((due.length > 0 || aged.length > 0 || orphans.length > 0) && deps.slackOps?.postAlert && deps.env?.SLACK_CHANNEL_ID) {
       const ageDays = (iso) => Math.floor((now.getTime() - new Date(iso.replace(' ', 'T') + 'Z').getTime()) / 86400000);
       const parts = [];
-      if (due.length > 0) parts.push(`⏰ *Svarsfrist inom 2 dagar eller passerad:* ${due.map((e) => `${e.kommun_namn} (senast ${e.respond_by})`).join(', ')}`);
+      if (due.length > 0) {
+        const included = due.slice(0, DIGEST_MAX_LINES);
+        const rest = due.length - included.length;
+        parts.push(`⏰ *Svarsfrist inom 2 dagar eller passerad* (${due.length}): ${included.map((e) => `${e.kommun_namn} (senast ${e.respond_by})`).join(', ')}`
+          + (rest > 0 ? `\n_…och ${rest} till._` : ''));
+      }
       if (aged.length > 0) {
         const top = aged.slice(0, 10).map((e) => `${e.kommun_namn} (${ageDays(e.created_at)} d)`).join(', ');
         parts.push(`🕰 *Öppna utkast äldre än 7 dagar:* ${aged.length} st: ${top}${aged.length > 10 ? ', …' : ''}`);
       }
-      if (orphans.length > 0) parts.push(`🧭 *Behöver dig utan utkast:* ${orphans.map((c) => c.kommun_namn).join(', ')}`);
+      if (orphans.length > 0) {
+        const included = orphans.slice(0, DIGEST_MAX_LINES);
+        const rest = orphans.length - included.length;
+        parts.push(`🧭 *Behöver dig utan utkast* (${orphans.length}): ${included.map((c) => c.kommun_namn).join(', ')}`
+          + (rest > 0 ? `\n_…och ${rest} till._` : ''));
+      }
       await deps.slackOps.postAlert(deps.slackClient, {
         channel: deps.env.SLACK_CHANNEL_ID,
         text: `🧹 *Köhälsa:*\n${parts.join('\n')}`,
