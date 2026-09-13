@@ -799,12 +799,40 @@ export function openDb(path) {
     `).all(byIsoDate);
   }
 
+  // The newest reply deadline we know of for a conversation, independent of the
+  // escalation lifecycle (round-2 finding F2). The void path in tick.js
+  // supersedes the open escalation and creates no replacement, so every reader
+  // keyed on status='open' loses the frist the kommun set. Inbound analyses win,
+  // newest first; otherwise the most recent escalation row of ANY status.
+  // json_valid() keeps a half-written or non-JSON analysis_json from throwing.
+  // Read-only surfacing: no guard or automation keys off this.
+  function latestRespondByForConversation(conversationId) {
+    const fromMessages = db.prepare(`
+      SELECT json_extract(m.analysis_json, '$.extracted.respond_by_date') AS respond_by
+      FROM messages m
+      WHERE m.conversation_id = ? AND m.direction = 'inbound'
+        AND m.analysis_json IS NOT NULL AND json_valid(m.analysis_json)
+      ORDER BY m.received_at DESC, m.id DESC
+    `).all(conversationId);
+    const hit = fromMessages.find((r) => typeof r.respond_by === 'string' && r.respond_by.trim() !== '');
+    if (hit) return hit.respond_by;
+    const esc = db.prepare(`
+      SELECT respond_by FROM escalations
+      WHERE conversation_id = ? AND respond_by IS NOT NULL AND respond_by != ''
+      ORDER BY id DESC LIMIT 1
+    `).get(conversationId);
+    return esc?.respond_by ?? null;
+  }
+
   // NEEDS_HUMAN with nothing actionable: no open escalation AND no pending
   // handoff task. The void path in tick.js legitimately produces this state
   // (kommun replied after a draft, reply warranted no new draft) — the digest
   // is what stops it from being invisible (Karlstad/Avesta, 2026-09-12 review).
+  // Each row carries respond_by (finding F2): an orphan is exactly the case
+  // whose deadline no escalation holds any more, so the digest would otherwise
+  // name the kommun with no date.
   function listOrphanNeedsHuman() {
-    return db.prepare(`
+    const rows = db.prepare(`
       SELECT c.id, c.kommun_namn, c.role, c.state_changed_at
       FROM conversations c
       WHERE c.state = 'NEEDS_HUMAN'
@@ -812,6 +840,7 @@ export function openDb(path) {
         AND NOT EXISTS (SELECT 1 FROM handoff_tasks t WHERE t.kommun_kod = c.kommun_kod AND t.status = 'pending')
       ORDER BY c.state_changed_at
     `).all();
+    return rows.map((r) => ({ ...r, respond_by: latestRespondByForConversation(r.id) }));
   }
 
   const activeStatusPlaceholders = ACTIVE_ESCALATION_STATUSES.map(() => '?').join(', ');
@@ -1690,6 +1719,7 @@ export function openDb(path) {
     listOpenEscalationsAgedDays,
     listOpenEscalationsWithDeadlineDue,
     listOrphanNeedsHuman,
+    latestRespondByForConversation,
     listActiveEscalationsForConversation,
     hasActiveEscalation,
     hasDelayAckForDate,

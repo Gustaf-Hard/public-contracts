@@ -798,6 +798,12 @@ async function dispatchEscalationForIngest(pending, deps) {
       });
       deps.log?.(`VOIDED escalation ${stale.id} for ${updated.kommun_namn}/${updated.role} — kommun replied after the draft`);
     }
+    // The deadline does not die with the draft: it lives on the message
+    // analysis and is surfaced by latestRespondByForConversation (finding F2).
+    const keptDeadline = analysis?.extracted?.respond_by_date ?? null;
+    if (keptDeadline) {
+      deps.log?.(`VOID kept deadline ${keptDeadline} in message analysis for ${updated.kommun_namn}`);
+    }
   }
 
   // Durable handoff task (2026-09-06 design): the extracted address must
@@ -1397,17 +1403,35 @@ export async function runDailyFollowup(deps) {
   // must not silence it too (2026-09-12 review finding 1).
   try {
     const todayIso = now.toISOString().slice(0, 10);
-    const due = db.listOpenEscalationsWithDeadlineDue?.(addDaysIso(todayIso, 2)) ?? [];
+    const dueBy = addDaysIso(todayIso, 2);
+    const due = db.listOpenEscalationsWithDeadlineDue?.(dueBy) ?? [];
     const dueIds = new Set(due.map((e) => e.id));
     const aged = (db.listOpenEscalationsAgedDays?.(7) ?? []).filter((e) => !dueIds.has(e.id));
     const orphans = db.listOrphanNeedsHuman?.() ?? [];
-    if ((due.length > 0 || aged.length > 0 || orphans.length > 0) && deps.slackOps?.postAlert && deps.env?.SLACK_CHANNEL_ID) {
+    // A voided draft leaves the deadline on the message analysis only (round-2
+    // finding F2), so the deadline section is escalations PLUS orphans whose
+    // frist is due, marked so the operator knows there is nothing to approve.
+    // Dedup by conversation: one case is named once in this section.
+    const deadlineItems = [];
+    const seenConvIds = new Set();
+    for (const e of due) {
+      if (seenConvIds.has(e.conversation_id)) continue;
+      seenConvIds.add(e.conversation_id);
+      deadlineItems.push({ respond_by: e.respond_by, label: `${e.kommun_namn} (senast ${e.respond_by})` });
+    }
+    for (const c of orphans) {
+      if (!c.respond_by || c.respond_by > dueBy || seenConvIds.has(c.id)) continue;
+      seenConvIds.add(c.id);
+      deadlineItems.push({ respond_by: c.respond_by, label: `${c.kommun_namn} (senast ${c.respond_by}, utan utkast)` });
+    }
+    deadlineItems.sort((a, b) => a.respond_by.localeCompare(b.respond_by));
+    if ((deadlineItems.length > 0 || aged.length > 0 || orphans.length > 0) && deps.slackOps?.postAlert && deps.env?.SLACK_CHANNEL_ID) {
       const ageDays = (iso) => Math.floor((now.getTime() - new Date(iso.replace(' ', 'T') + 'Z').getTime()) / 86400000);
       const parts = [];
-      if (due.length > 0) {
-        const included = due.slice(0, DIGEST_MAX_LINES);
-        const rest = due.length - included.length;
-        parts.push(`⏰ *Svarsfrist inom 2 dagar eller passerad* (${due.length}): ${included.map((e) => `${e.kommun_namn} (senast ${e.respond_by})`).join(', ')}`
+      if (deadlineItems.length > 0) {
+        const included = deadlineItems.slice(0, DIGEST_MAX_LINES);
+        const rest = deadlineItems.length - included.length;
+        parts.push(`⏰ *Svarsfrist inom 2 dagar eller passerad* (${deadlineItems.length}): ${included.map((i) => i.label).join(', ')}`
           + (rest > 0 ? `\n_…och ${rest} till._` : ''));
       }
       if (aged.length > 0) {
@@ -1417,14 +1441,14 @@ export async function runDailyFollowup(deps) {
       if (orphans.length > 0) {
         const included = orphans.slice(0, DIGEST_MAX_LINES);
         const rest = orphans.length - included.length;
-        parts.push(`🧭 *Behöver dig utan utkast* (${orphans.length}): ${included.map((c) => c.kommun_namn).join(', ')}`
+        parts.push(`🧭 *Behöver dig utan utkast* (${orphans.length}): ${included.map((c) => (c.respond_by ? `${c.kommun_namn} (senast ${c.respond_by})` : c.kommun_namn)).join(', ')}`
           + (rest > 0 ? `\n_…och ${rest} till._` : ''));
       }
       await deps.slackOps.postAlert(deps.slackClient, {
         channel: deps.env.SLACK_CHANNEL_ID,
         text: `🧹 *Köhälsa:*\n${parts.join('\n')}`,
       });
-      log?.(`QUEUE HYGIENE digest posted (${due.length} due, ${aged.length} aged, ${orphans.length} orphaned)`);
+      log?.(`QUEUE HYGIENE digest posted (${deadlineItems.length} due, ${aged.length} aged, ${orphans.length} orphaned)`);
     }
   } catch (e) {
     log?.(`queue hygiene digest failed: ${e.message} — will retry on a later run`);

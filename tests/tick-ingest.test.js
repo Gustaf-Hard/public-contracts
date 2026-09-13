@@ -355,6 +355,33 @@ describe('runTick — received_at comes from Gmail internalDate (M2)', () => {
   });
 });
 
+// Round-2 finding F2 (astra #1): the void path supersedes the open escalation
+// and creates none, so the frist must survive outside the escalation lifecycle.
+describe('runTick — a voided draft does not take the deadline with it (F2)', () => {
+  it('supersedes the open escalation, opens none, and keeps the deadline readable', async () => {
+    const id = seedConv();
+    db.updateConversationState(id, 'NEEDS_HUMAN', {});
+    const oldEsc = db.recordEscalation({ conversation_id: id, reason: 'r', draft_template: 'free_form', draft_body: 'b', respond_by: '2026-09-13' });
+    const spy = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue({
+      intent: 'clarification', confidence: 0.9, summary: 'Frågor om begäran.',
+      extracted: { arendenummer: null, promised_response_days: null, promised_response_date: null, respond_by_date: '2026-09-15', handoff_to_email: null, handoff_to_forvaltning: null, questions: ['Vilken period?'], mentioned_vendors: null, reseller_relations: null },
+      suggested_action: 'send_precision', is_final_delivery: false, draft_reply: 'd', follow_up_at: null,
+    });
+    const gmail = fakeGmail({
+      listResult: [{ id: 'cl-1' }],
+      getResult: { 'cl-1': mkMsg('cl-1', 'thr-a', 'K <kansli@ale.se>', 'Kan du precisera? Svara senast 2026-09-15.', { internalDate: String(Date.parse('2026-09-11T08:00:00Z')) }) },
+    });
+    await runTick(deps({ gmail, now: new Date('2026-09-12T09:00:00Z') }));
+    spy.mockRestore();
+
+    const row = db.raw.prepare('SELECT status, resolved_text FROM escalations WHERE id = ?').get(oldEsc);
+    expect(row.status).toBe('superseded');
+    expect(row.resolved_text).toContain('voided'); // the void path, not a supersede by a fresh draft
+    expect(db.listOpenEscalationsForConversation(id)).toHaveLength(0);
+    expect(db.latestRespondByForConversation(id)).toBe('2026-09-15');
+  });
+});
+
 describe('runTick — HTML-only inbound gets a text body (M4)', () => {
   it('parses an HTML-only reply so the classifier sees real text', async () => {
     const spy = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue(null);

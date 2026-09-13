@@ -443,7 +443,12 @@ export function buildActionQueue(db) {
       state: c.state,
       action: openEsc.length > 0 ? escalationActionLabel(openEsc[0]) : 'granska och svara',
       since: caseSince(c),
-      respond_by: openEsc.length > 0 ? openEsc[0].respond_by ?? null : null,
+      // A NEEDS_HUMAN case whose draft was voided has no open escalation, so
+      // its deadline comes from the message analysis instead (round-2 finding
+      // F2) — otherwise it sorts behind undated drafts.
+      respond_by: openEsc.length > 0
+        ? openEsc[0].respond_by ?? null
+        : db.latestRespondByForConversation?.(c.id) ?? null,
     });
   }
   // Durable hänvisningar (2026-09-06 design): a pending handoff task is

@@ -711,6 +711,44 @@ describe('queue hygiene digest (2026-09-12 design)', () => {
     expect(db.listOpenEscalationsForConversation(nudgeConvId)).toHaveLength(0);
   });
 
+  // Round-2 finding F2: the void path leaves a NEEDS_HUMAN case with no open
+  // escalation, so its frist is invisible to every deadline reader. The digest
+  // must name it in BOTH the deadline section (marked "utan utkast", there is
+  // nothing to approve) and the orphan section (with the date).
+  it('an orphaned NEEDS_HUMAN case with a due deadline appears in both sections, dated', async () => {
+    const cid = db.createConversation({ kommun_kod: '0009', kommun_namn: 'Karlstad', role: 'central', contact_email: 'k@k.se', scheduled_send_at: '2026-08-01T08:00:00Z' });
+    db.recordMessage({
+      conversation_id: cid, gmail_message_id: 'g-1', direction: 'inbound',
+      from_email: 'k@k.se', to_email: 'x', subject: 's', body_text: 'b',
+      received_at: '2026-09-11T08:00:00Z', attachment_count: 0,
+      analysis_json: JSON.stringify({ extracted: { respond_by_date: '2026-09-13' } }),
+    });
+    db.updateConversationState(cid, 'NEEDS_HUMAN');
+    const slackOps = fakeSlackOps();
+    await runDailyFollowup(deps({ slackOps, now: new Date('2026-09-12T09:00:00Z') }));
+    const digest = slackOps.alerts.find((t) => t.includes('Köhälsa'));
+    expect(digest).toBeTruthy();
+    const deadlineSection = digest.split('🧭')[0];
+    expect(deadlineSection).toContain('Karlstad');
+    expect(deadlineSection).toContain('utan utkast');
+    expect(deadlineSection).toContain('2026-09-13');
+    // listed exactly once in the deadline section
+    expect(deadlineSection.match(/Karlstad/g)).toHaveLength(1);
+    const orphanSection = digest.slice(digest.indexOf('🧭'));
+    expect(orphanSection).toContain('Karlstad (senast 2026-09-13)');
+  });
+
+  it('an orphan with no deadline is named without a date and stays out of the deadline section', async () => {
+    const cid = db.createConversation({ kommun_kod: '0010', kommun_namn: 'Avesta', role: 'central', contact_email: 'a@a.se', scheduled_send_at: '2026-08-01T08:00:00Z' });
+    db.updateConversationState(cid, 'NEEDS_HUMAN');
+    const slackOps = fakeSlackOps();
+    await runDailyFollowup(deps({ slackOps, now: new Date('2026-09-12T09:00:00Z') }));
+    const digest = slackOps.alerts.find((t) => t.includes('Köhälsa'));
+    expect(digest).toContain('Avesta');
+    expect(digest).not.toContain('Avesta (senast');
+    expect(digest).not.toContain('⏰');
+  });
+
   // Final-review finding 2 (2026-09-12): due/orphans were the only two lists
   // in this digest NOT capped at DIGEST_MAX_LINES. postAlert puts the whole
   // text in one Slack section block (3000-char cap); an uncapped list can

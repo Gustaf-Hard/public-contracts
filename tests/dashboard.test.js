@@ -824,6 +824,26 @@ describe('home buckets', () => {
     expect(q.find((r) => r.kommun_namn === 'Aneby').respond_by).toBeNull();
   });
 
+  // Round-2 finding F2: a NEEDS_HUMAN case whose draft was voided has no open
+  // escalation, so its deadline has to come from the message analysis or it
+  // sorts behind undated drafts.
+  it('buildActionQueue gives a draftless NEEDS_HUMAN case its deadline and sorts it first', () => {
+    const undated = seedConvWithOpenEscalation({ kommun: 'Undated' });
+    const cid = db.createConversation({ kommun_kod: '2222', kommun_namn: 'Voidad', role: 'central', contact_email: 'v@v.se', scheduled_send_at: '2026-05-24T10:00:00Z' });
+    db.recordMessage({
+      conversation_id: cid, gmail_message_id: 'g-void', direction: 'inbound',
+      from_email: 'v@v.se', to_email: 'x', subject: 's', body_text: 'b',
+      received_at: '2026-09-11T08:00:00Z', attachment_count: 0,
+      analysis_json: JSON.stringify({ extracted: { respond_by_date: '2026-09-13' } }),
+    });
+    db.updateConversationState(cid, 'NEEDS_HUMAN');
+    const q = buildActionQueue(db);
+    const row = q.find((r) => r.conv_id === cid);
+    expect(row.respond_by).toBe('2026-09-13');
+    expect(q[0].conv_id).toBe(cid);
+    expect(q.find((r) => r.conv_id === undated).respond_by).toBeNull();
+  });
+
   it('renders a ≥7-day-old Behöver dig row with the q-age-old class', async () => {
     const cid = db.createConversation({ kommun_kod: '0580', kommun_namn: 'Linköping', role: 'central', contact_email: 'k@l.se', scheduled_send_at: '2026-05-24T10:00:00Z' });
     db.updateConversationState(cid, 'SENT', { last_outbound_at: '2026-01-01T00:00:00Z' });

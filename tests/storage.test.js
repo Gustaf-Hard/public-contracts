@@ -683,3 +683,47 @@ describe('queue hygiene queries (2026-09-12 design)', () => {
     expect(orphans).not.toContain('Gammal'); // has an open escalation
   });
 });
+
+// Round-2 finding F2: the void path (kommun replied after a draft was written)
+// supersedes the open escalation and creates none, so every deadline reader
+// keyed on an OPEN escalation loses the frist. This helper surfaces it again,
+// read-only, independent of the escalation lifecycle.
+describe('latestRespondByForConversation (round-2 finding F2)', () => {
+  function seed() {
+    return db.createConversation({
+      kommun_kod: '7777', kommun_namn: 'Frist', role: 'central',
+      contact_email: 'k@frist.se', scheduled_send_at: '2026-09-01T08:00:00Z',
+    });
+  }
+  function inbound(convId, { at, respondBy, json }) {
+    return db.recordMessage({
+      conversation_id: convId, gmail_message_id: `g-${at}`, direction: 'inbound',
+      from_email: 'k@frist.se', to_email: 'x', subject: 's', body_text: 'b',
+      received_at: at, attachment_count: 0,
+      analysis_json: json !== undefined ? json : JSON.stringify({ extracted: { respond_by_date: respondBy ?? null } }),
+    });
+  }
+
+  it('prefers the newest inbound analysis over an older escalation', () => {
+    const id = seed();
+    db.recordEscalation({ conversation_id: id, reason: 'r', respond_by: '2026-09-20' });
+    inbound(id, { at: '2026-09-05T08:00:00Z', respondBy: '2026-09-10' });
+    inbound(id, { at: '2026-09-08T08:00:00Z', respondBy: '2026-09-15' });
+    expect(db.latestRespondByForConversation(id)).toBe('2026-09-15');
+  });
+
+  it('falls back to the most recent escalation respond_by, whatever its status', () => {
+    const id = seed();
+    const esc = db.recordEscalation({ conversation_id: id, reason: 'r', respond_by: '2026-09-18' });
+    db.resolveEscalation(esc, { status: 'superseded', resolved_text: 'voided' });
+    inbound(id, { at: '2026-09-08T08:00:00Z', respondBy: null });
+    expect(db.latestRespondByForConversation(id)).toBe('2026-09-18');
+  });
+
+  it('returns null when neither side carries a deadline, and survives unparsable analysis_json', () => {
+    const id = seed();
+    inbound(id, { at: '2026-09-08T08:00:00Z', json: 'not json at all' });
+    db.recordEscalation({ conversation_id: id, reason: 'r' });
+    expect(db.latestRespondByForConversation(id)).toBeNull();
+  });
+});
