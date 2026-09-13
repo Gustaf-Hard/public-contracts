@@ -202,21 +202,34 @@ function buildOverviewRows(municipalities, db, vacationConfig = { enabled: false
     convsByKod.get(c.kommun_kod).push(c);
   }
 
-  // Open escalations count per conversation
+  // Active escalations count per conversation. ACTIVE_ESCALATION_STATUSES, not
+  // status='open' alone (round-12 Q3, same widening as buildActionQueue/
+  // effectiveRespondBy/listActiveEscalationsForConversation): a send that
+  // PARKED ('sending' / 'send_failed' / 'send_unconfirmed') leaves no open row
+  // but is the most urgent artefact in the system, and it used to vanish from
+  // the Esk. column, the needs-attention filter and the summary tile alike —
+  // the "Behöver dig (1)" badge (which already reads buildActionQueue) stood
+  // over an overview table that filtered to nothing.
+  const activeEscPlaceholders = ACTIVE_ESCALATION_STATUSES.map(() => '?').join(', ');
   const openEscalations = db
-    ? db.raw.prepare("SELECT conversation_id, count(*) as n FROM escalations WHERE status='open' GROUP BY conversation_id").all()
+    ? db.raw.prepare(
+        `SELECT conversation_id, count(*) as n FROM escalations WHERE status IN (${activeEscPlaceholders}) GROUP BY conversation_id`
+      ).all(...ACTIVE_ESCALATION_STATUSES)
     : [];
   const openEscByConvId = new Map(openEscalations.map((r) => [r.conversation_id, r.n]));
 
-  // Latest open escalation per conversation — feeds the tooltip's "du måste agera — …".
+  // Latest active escalation per conversation — feeds the tooltip's "du måste
+  // agera — …". Same widening: a NEEDS_HUMAN case whose only escalation is
+  // parked must show the parked label, not fall through to the generic
+  // "granska och svara" because the query only ever saw status='open'.
   const latestOpenEsc = db
     ? db.raw.prepare(`
-        SELECT e.conversation_id, e.draft_template
+        SELECT e.conversation_id, e.draft_template, e.status
         FROM escalations e
-        WHERE e.status = 'open'
+        WHERE e.status IN (${activeEscPlaceholders})
           AND e.id = (SELECT MAX(e2.id) FROM escalations e2
-                      WHERE e2.conversation_id = e.conversation_id AND e2.status = 'open')
-      `).all()
+                      WHERE e2.conversation_id = e.conversation_id AND e2.status IN (${activeEscPlaceholders}))
+      `).all(...ACTIVE_ESCALATION_STATUSES, ...ACTIVE_ESCALATION_STATUSES)
     : [];
   const latestOpenEscByConvId = new Map(latestOpenEsc.map((r) => [r.conversation_id, r]));
 
@@ -549,10 +562,14 @@ export function buildWaiting(db) {
 // sender · subject · snippet · date), with the latest message previewed.
 function loadCaseSummaries(db) {
   if (!db) return [];
+  const openEscPlaceholders = ACTIVE_ESCALATION_STATUSES.map(() => '?').join(', ');
   return db.listAllConversations().map((c) => {
+    // ACTIVE_ESCALATION_STATUSES, not status='open' alone (round-12 Q3): this
+    // feeds caseBucket's 'behover_dig' membership, and a parked send is exactly
+    // as urgent as an open draft.
     const open_esc = db.raw
-      .prepare("SELECT COUNT(*) n FROM escalations WHERE conversation_id = ? AND status = 'open'")
-      .get(c.id).n;
+      .prepare(`SELECT COUNT(*) n FROM escalations WHERE conversation_id = ? AND status IN (${openEscPlaceholders})`)
+      .get(c.id, ...ACTIVE_ESCALATION_STATUSES).n;
     const last = db.raw
       .prepare('SELECT subject, body_text, direction, analysis_json FROM messages WHERE conversation_id = ? ORDER BY received_at DESC, id DESC LIMIT 1')
       .get(c.id);

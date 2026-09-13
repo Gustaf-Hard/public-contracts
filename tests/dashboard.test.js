@@ -1065,6 +1065,67 @@ describe('home buckets', () => {
     expect(active.some((r) => r.kommun_kod === '2418')).toBe(true);
     expect(active.some((r) => r.kommun_kod === '0560')).toBe(false);
   });
+
+  // Round-12 Q3: buildOverviewRows counted only status='open' escalations, so a
+  // PARKED send (send_failed / send_unconfirmed / sending) — the same set
+  // buildActionQueue, effectiveRespondBy and listActiveEscalationsForConversation
+  // already treat as active — vanished from the Esk. column, the
+  // needs-attention filter and the case's own tooltip, even though
+  // buildActionQueue (and its "Behöver dig (N)" badge) already counted it.
+  it('a parked send counts toward open_escalations, so the overview surfaces agree with the Behöver dig badge', () => {
+    const cid = db.createConversation({ kommun_kod: '2418', kommun_namn: 'Malå', role: 'central', contact_email: 'k@mala.se', scheduled_send_at: '2026-05-24T10:00:00Z' });
+    db.updateConversationState(cid, 'ACK_RECEIVED', { last_outbound_at: '2026-09-01T08:00:00Z' });
+    const esc = db.recordEscalation({ conversation_id: cid, reason: 'r', draft_template: 'free_form', draft_body: 'b' });
+    db.raw.prepare("UPDATE escalations SET status = 'send_failed' WHERE id = ?").run(esc);
+
+    const munis = JSON.parse(require('node:fs').readFileSync(muniPath, 'utf8'));
+    const rows = buildOverviewRows(munis, db);
+    const row = rows.find((r) => r.kommun_kod === '2418');
+    expect(row.open_escalations).toBe(1); // not 0 — the parked row counts
+
+    const filtered = applyFilter(rows, 'needs-attention');
+    expect(filtered.some((r) => r.kommun_kod === '2418')).toBe(true);
+  });
+
+  it('the needs-attention filtered table renders the parked-send kommun instead of "Inga kommuner matchar filtret." (round-12 Q3)', async () => {
+    const cid = db.createConversation({ kommun_kod: '2418', kommun_namn: 'Malå', role: 'central', contact_email: 'k@mala.se', scheduled_send_at: '2026-05-24T10:00:00Z' });
+    db.updateConversationState(cid, 'ACK_RECEIVED', { last_outbound_at: '2026-09-01T08:00:00Z' });
+    const esc = db.recordEscalation({ conversation_id: cid, reason: 'r', draft_template: 'free_form', draft_body: 'b' });
+    db.raw.prepare("UPDATE escalations SET status = 'send_failed' WHERE id = ?").run(esc);
+
+    const res = await get(appWithFakes(), '/?filter=needs-attention');
+    expect(res.text).toContain('Behöver dig (1)'); // buildActionQueue already agreed
+    expect(res.text).not.toContain('Inga kommuner matchar filtret.');
+    expect(res.text).toContain('Malå');
+    // The Esk. column also shows the parked row, not "0".
+    const tableSection = res.text.slice(res.text.indexOf('Alla kommuner'));
+    expect(tableSection).toMatch(/href="\/escalations" class="danger">1</);
+  });
+
+  it('the tooltip names the parked send, not the generic fallback (round-12 Q3)', async () => {
+    const cid = db.createConversation({ kommun_kod: '2418', kommun_namn: 'Malå', role: 'central', contact_email: 'k@mala.se', scheduled_send_at: '2026-05-24T10:00:00Z' });
+    db.updateConversationState(cid, 'NEEDS_HUMAN', { last_outbound_at: '2026-09-01T08:00:00Z' });
+    const esc = db.recordEscalation({ conversation_id: cid, reason: 'r', draft_template: 'free_form', draft_body: 'b' });
+    db.raw.prepare("UPDATE escalations SET status = 'send_failed' WHERE id = ?").run(esc);
+
+    const munis = JSON.parse(require('node:fs').readFileSync(muniPath, 'utf8'));
+    const rows = buildOverviewRows(munis, db);
+    const row = rows.find((r) => r.kommun_kod === '2418');
+    const tooltip = row.states.find((s) => s.role === 'central').tooltip;
+    expect(tooltip).toContain('Skickning parkerad (send_failed): se ärendet');
+    expect(tooltip).not.toContain('granska och svara'); // the generic fallback
+  });
+
+  it('a parked send lands in the Ärenden "Behöver dig" bucket, not "Öppna" (round-12 Q3)', async () => {
+    const cid = db.createConversation({ kommun_kod: '2418', kommun_namn: 'Malå', role: 'central', contact_email: 'k@mala.se', scheduled_send_at: '2026-05-24T10:00:00Z' });
+    db.updateConversationState(cid, 'ACK_RECEIVED', { last_outbound_at: '2026-09-01T08:00:00Z' });
+    const esc = db.recordEscalation({ conversation_id: cid, reason: 'r', draft_template: 'free_form', draft_body: 'b' });
+    db.raw.prepare("UPDATE escalations SET status = 'send_failed' WHERE id = ?").run(esc);
+
+    const res = await get(appWithFakes(), '/arenden');
+    const behoverSection = res.text.slice(res.text.indexOf('Behöver dig'), res.text.indexOf('Öppna') === -1 ? undefined : res.text.indexOf('Öppna'));
+    expect(behoverSection).toContain('Malå');
+  });
 });
 
 describe('polish', () => {
