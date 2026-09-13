@@ -388,6 +388,10 @@ async function ingestMessage({ conv, item, deps }) {
     conversation_state: conv.state,
     days_since_last_outbound: daysSinceLastOutbound,
     today_iso: now.toISOString().slice(0, 10),
+    // Delivery date, so a frist stated in days ("svara inom 7 dagar") is
+    // computed from the kommun's mail and not from a late backlog run
+    // (round-2 finding F1).
+    received_iso: receivedAt.slice(0, 10),
     thread_context: threadContext,
   }, { env });
   const classification = analysis

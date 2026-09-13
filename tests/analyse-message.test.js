@@ -545,6 +545,40 @@ describe('respond_by_date (2026-09-12 design)', () => {
     expect(normaliseRespondBy({ extracted: { respond_by_date: '2026-09-11' } }, '2026-09-12').extracted.respond_by_date).toBe('2026-09-11');
     expect(normaliseRespondBy({ extracted: { respond_by_date: '2026-09-19' } }, '2026-09-12').extracted.respond_by_date).toBe('2026-09-19');
   });
+  it('prompts with the receipt date when ctx.received_iso is given, so relative fristen anchor to delivery', async () => {
+    const client = fakeClientReturning({ intent: 'clarification', confidence: 0.9, summary: 's', extracted: { respond_by_date: null }, suggested_action: 'send_precision', is_final_delivery: false, draft_reply: 'd', follow_up_at: null });
+    await analyseMessage('Svara inom 7 dagar.', { ...baseCtx, today_iso: '2026-09-10', received_iso: '2026-09-01' }, { env: { ANTHROPIC_API_KEY: 'k' }, client });
+    const user = client.messages.create.mock.calls[0][0].messages[0].content;
+    expect(user).toContain('Dagens datum: 2026-09-10');
+    expect(user).toContain('Mejlet togs emot: 2026-09-01');
+    expect(user.indexOf('Dagens datum')).toBeLessThan(user.indexOf('Mejlet togs emot'));
+  });
+
+  it('the prompt anchors relative fristen to the receipt date, not Dagens datum', async () => {
+    const client = fakeClientReturning({ intent: 'auto_ack', confidence: 0.9, summary: 's', extracted: {}, suggested_action: 'wait', is_final_delivery: false, draft_reply: '', follow_up_at: null });
+    await analyseMessage('Tack.', baseCtx, { env: { ANTHROPIC_API_KEY: 'k' }, client });
+    const sys = client.messages.create.mock.calls[0][0].system[0].text;
+    expect(sys).toContain('räkna från datumet mejlet togs emot');
+    expect(sys).toContain('Mejlet togs emot: 2026-08-26');
+  });
+
+  it('an overdue deadline on a backlog ingest survives: the guard anchors to receipt, not processing day', async () => {
+    const expected = { intent: 'clarification', confidence: 0.9, summary: 's', extracted: { arendenummer: null, promised_response_days: null, promised_response_date: null, respond_by_date: '2026-09-08', handoff_to_email: null, handoff_to_forvaltning: null, questions: null, mentioned_vendors: null, reseller_relations: null }, suggested_action: 'send_precision', is_final_delivery: false, draft_reply: 'd', follow_up_at: null };
+    const r = await analyseMessage('Svara senast 2026-09-08.', { ...baseCtx, today_iso: '2026-09-10', received_iso: '2026-09-01' }, { env: { ANTHROPIC_API_KEY: 'k' }, client: fakeClientReturning(expected) });
+    expect(r.extracted.respond_by_date).toBe('2026-09-08');
+  });
+
+  it('a deadline before the mail even arrived is nulled (hallucination)', async () => {
+    const expected = { intent: 'clarification', confidence: 0.9, summary: 's', extracted: { arendenummer: null, promised_response_days: null, promised_response_date: null, respond_by_date: '2026-08-30', handoff_to_email: null, handoff_to_forvaltning: null, questions: null, mentioned_vendors: null, reseller_relations: null }, suggested_action: 'send_precision', is_final_delivery: false, draft_reply: 'd', follow_up_at: null };
+    const r = await analyseMessage('Svara snarast.', { ...baseCtx, today_iso: '2026-09-10', received_iso: '2026-09-01' }, { env: { ANTHROPIC_API_KEY: 'k' }, client: fakeClientReturning(expected) });
+    expect(r.extracted.respond_by_date).toBeNull();
+  });
+
+  it('normaliseRespondBy keeps a date after the anchor even when it is already overdue today', () => {
+    expect(normaliseRespondBy({ extracted: { respond_by_date: '2026-09-08' } }, '2026-09-01').extracted.respond_by_date).toBe('2026-09-08');
+    expect(normaliseRespondBy({ extracted: { respond_by_date: '2026-08-30' } }, '2026-09-01').extracted.respond_by_date).toBeNull();
+  });
+
   it('normaliseRespondBy tolerates a missing extracted block', () => {
     expect(normaliseRespondBy({ intent: 'unknown' }, '2026-09-12').intent).toBe('unknown');
   });

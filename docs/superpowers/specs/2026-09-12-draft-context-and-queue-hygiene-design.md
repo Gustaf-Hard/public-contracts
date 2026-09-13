@@ -114,11 +114,19 @@ deadline the KOMMUN imposes on US ("svara inom 7 dagar annars stängs
 from `promised_response_date` (their promise to us). Union-param count goes
 9 → 10, safely under the json_schema 16 limit (see
 anthropic-structured-output-union-limit). Prompt gets a definition + one
-few-shot (Linköping-style komplettering with auto-close). When the kommun
-states days rather than a date, the model computes the ISO date from
-`Dagens datum` exactly as delay promises do; `normaliseDelayAnalysis`'s
-helpers are reused for a `normaliseRespondBy` guard (ISO validity, not in
-the past by more than a day).
+few-shot (Linköping-style komplettering with auto-close). Both the computation and
+the guard are anchored to the date the trigger mail was RECEIVED (Gmail
+`internalDate`), never to processing time: `ingestMessage` passes
+`received_iso` in the ctx and `userPromptFor` prints it as
+`Mejlet togs emot`. When the kommun states days rather than a date, the model
+computes the ISO date from `Mejlet togs emot` plus those days, so a mail
+ingested late in an outage backlog keeps the frist the kommun actually set.
+`normaliseDelayAnalysis`'s helpers are reused for a `normaliseRespondBy`
+guard: ISO validity, and not more than one day before the receipt date. A
+deadline before the mail even arrived is a hallucination and becomes null; a
+deadline after receipt but before processing is real and overdue, which is
+exactly what must sort first. (Delay promises keep their existing
+`Dagens datum` anchor: pre-existing behaviour, ledgered as follow-up.)
 
 ### Storage
 

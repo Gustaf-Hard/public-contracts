@@ -95,7 +95,7 @@ ISO-datum (YYYY-MM-DD) när boten ska kolla tillbaka om inget hörs av kommunen.
 
 # respond_by_date
 
-ISO-datum (YYYY-MM-DD) när KOMMUNEN kräver svar av OSS ("svara inom 7 dagar annars stängs ärendet", "återkom senast 2026-09-02 med faktureringsuppgifter"). Skilj från promised_response_date (kommunens löfte till oss). Anges dagar: räkna från Dagens datum. null när ingen frist ställs.
+ISO-datum (YYYY-MM-DD) när KOMMUNEN kräver svar av OSS ("svara inom 7 dagar annars stängs ärendet", "återkom senast 2026-09-02 med faktureringsuppgifter"). Skilj från promised_response_date (kommunens löfte till oss). Anges dagar (t.ex. "inom 7 dagar"): räkna från datumet mejlet togs emot (Mejlet togs emot), INTE från Dagens datum. Mejlet kan ha legat obehandlat några dagar, och fristen löper från kommunens avsändning. Ett datum som ligger före mottagningsdatumet är ett fel: sätt null. null när ingen frist ställs.
 
 # mentioned_vendors och reseller_relations
 
@@ -158,7 +158,7 @@ Inkommande (begäran uppges aldrig ha kommit fram, se SKRIVREGEL 5):
 Output:
 {"intent":"clarification","confidence":0.9,"summary":"Kommunen uppger att vår begäran aldrig kommit fram och ber oss skicka den igen.","extracted":{"arendenummer":null,"promised_response_days":null,"promised_response_date":null,"respond_by_date":null,"handoff_to_email":null,"handoff_to_forvaltning":null,"questions":null,"mentioned_vendors":null,"reseller_relations":null},"suggested_action":"send_precision","is_final_delivery":false,"draft_reply":"Hej,\\n\\nTack för beskedet, jag skickar begäran igen i sin helhet:\\n\\nMed stöd av offentlighetsprincipen (2 kap. tryckfrihetsförordningen) begär jag ut samtliga gällande avtal avseende digitala verktyg och läromedel som används inom er utbildningsförvaltning, inklusive lärplattformar, digitala läromedel och administrativa system. Jag önskar de fullständiga avtalshandlingarna i PDF-format.\\n\\nMed vänliga hälsningar,\\n${from_name}\\n${from_email}","follow_up_at":null}
 
-Inkommande (Dagens datum: 2026-08-26, kommunen sätter en egen frist på OSS — beräkna respond_by_date som dagens datum + antal dagar):
+Inkommande (Dagens datum: 2026-08-28, Mejlet togs emot: 2026-08-26, kommunen sätter en egen frist på OSS. Beräkna respond_by_date som mottagningsdatumet + antal dagar, alltså 2026-08-26 + 7 = 2026-09-02, inte dagens datum + 7):
 > Ärende KC-1: Vi behöver en komplettering av din begäran innan vi kan behandla den. Svara på detta mejl inom 7 dagar annars stängs ditt ärende.
 
 Output:
@@ -325,18 +325,20 @@ export function normaliseDelayAnalysis(analysis, todayIso) {
 }
 
 // Kommun-imposed reply deadline (2026-09-12 design). Fails closed: anything
-// that is not a real ISO date, or lies more than a day behind today (a
-// hallucinated or already-expired frist), becomes null rather than sorting
-// the queue on garbage. Yesterday is kept: a deadline that expired overnight
-// is exactly what the operator must see first.
-export function normaliseRespondBy(analysis, todayIso) {
+// that is not a real ISO date, or lies more than a day before the ANCHOR date,
+// becomes null rather than sorting the queue on garbage. The anchor is the date
+// the trigger mail was RECEIVED (Gmail internalDate), not the processing day
+// (round-2 finding F1): a deadline before the mail even arrived is a
+// hallucination, while a deadline after receipt but before processing is real
+// and overdue, which is exactly what must sort first.
+export function normaliseRespondBy(analysis, anchorIso) {
   const ex = analysis?.extracted;
   if (!ex || ex.respond_by_date == null) return analysis;
   const v = ex.respond_by_date;
   if (typeof v !== 'string' || !ISO_DATE_RE.test(v)) { ex.respond_by_date = null; return analysis; }
   const [y, mo, d] = v.split('-').map(Number);
   if (!isRealDate(y, mo, d)) { ex.respond_by_date = null; return analysis; }
-  const floor = todayIso && ISO_DATE_RE.test(todayIso) ? addDaysIso(todayIso, -1) : null;
+  const floor = anchorIso && ISO_DATE_RE.test(anchorIso) ? addDaysIso(anchorIso, -1) : null;
   if (floor && v < floor) ex.respond_by_date = null;
   return analysis;
 }
@@ -365,6 +367,12 @@ function userPromptFor(ctx, body) {
   }
   if (ctx.today_iso) {
     lines.push(`Dagens datum: ${ctx.today_iso}`);
+  }
+  // Gmail internalDate, not processing time: a frist stated in days runs from
+  // the kommun's mail, so a post-outage backlog must not push it forward
+  // (round-2 finding F1).
+  if (ctx.received_iso) {
+    lines.push(`Mejlet togs emot: ${ctx.received_iso}`);
   }
   lines.push('');
   lines.push('Inkommande svar från registratorn:');
@@ -419,7 +427,9 @@ export async function analyseMessage(body, ctx, { env = process.env, client = nu
     if (!textBlock || !textBlock.text) return null;
     try {
       const parsed = JSON.parse(textBlock.text);
-      return normaliseRespondBy(normaliseDelayAnalysis(parsed, ctx.today_iso), ctx.today_iso);
+      // The deadline guard anchors to receipt; delay-promise normalisation keeps
+      // its existing today_iso anchor (out of scope, ledgered).
+      return normaliseRespondBy(normaliseDelayAnalysis(parsed, ctx.today_iso), ctx.received_iso ?? ctx.today_iso);
     } catch (e) {
       // stop_reason is never inspected elsewhere — a truncated response looks
       // like any other malformed-JSON fallback unless named here.

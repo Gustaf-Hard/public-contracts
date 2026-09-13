@@ -336,6 +336,23 @@ describe('runTick — received_at comes from Gmail internalDate (M2)', () => {
     const thread = db.getThread(id, 'thr-a');
     expect(thread.last_inbound_at).toBe('2026-06-11T08:30:00.000Z');
   });
+
+  // 2026-09-12 round-2 finding F1: a kommun-imposed frist stated in days must
+  // be computed from the DELIVERY date, so the analysis ctx carries it.
+  it('passes received_iso (Gmail internalDate) to the analysis, not the processing day', async () => {
+    const spy = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue(null);
+    seedConv();
+    const deliveredMs = Date.parse('2026-06-11T08:30:00Z');
+    const gmail = fakeGmail({
+      listResult: [{ id: 'old-2' }],
+      getResult: { 'old-2': mkMsg('old-2', 'thr-a', 'K <kansli@ale.se>', 'Svara inom 7 dagar.', { internalDate: String(deliveredMs) }) },
+    });
+    await runTick(deps({ gmail, now: new Date('2026-06-24T12:00:00Z') }));
+    const ctx = spy.mock.calls[0][1];
+    spy.mockRestore();
+    expect(ctx.received_iso).toBe('2026-06-11');
+    expect(ctx.today_iso).toBe('2026-06-24');
+  });
 });
 
 describe('runTick — HTML-only inbound gets a text body (M4)', () => {
