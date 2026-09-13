@@ -450,11 +450,11 @@ export async function analyseMessage(body, ctx, { env = process.env, client = nu
       // its existing today_iso anchor (out of scope, ledgered).
       return normaliseRespondBy(normaliseDelayAnalysis(parsed, ctx.today_iso), ctx.received_iso ?? ctx.today_iso);
     } catch (e) {
-      // stop_reason is never inspected elsewhere — a truncated response looks
-      // like any other malformed-JSON fallback unless named here.
-      if (response.stop_reason === 'max_tokens') {
-        console.warn(`[analyse-message] response truncated at max_tokens, JSON.parse failed: ${e.message}`);
-      }
+      // Truncation cannot reach here: the max_tokens guard above returns first
+      // (round-3 G3 removed the dead second check). What lands here is a
+      // COMPLETE response whose text is not the JSON the schema asked for, so
+      // name it as that and fall back to the regex classifier.
+      console.warn(`[analyse-message] malformed JSON in a complete response (${model}), falling back: ${e.message}`);
       return null;
     }
   } catch (e) {

@@ -140,19 +140,32 @@ describe('analyseMessage', () => {
     warn.mockRestore();
   });
 
-  it('returns null and logs a named truncation warning when the response was cut off mid-JSON', async () => {
+  // Round-3 G3: this test used to send stop_reason 'max_tokens', which the
+  // pre-parse guard above returns on, so it never reached the JSON.parse catch
+  // it claimed to cover. A complete response carrying malformed JSON is the
+  // case that actually lands there.
+  it('returns null and logs a named warning when a complete response carries malformed JSON', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const client = {
       messages: {
         create: vi.fn(async () => ({
-          stop_reason: 'max_tokens',
+          stop_reason: 'end_turn',
           content: [{ type: 'text', text: '{"intent": "delivery", "draft_reply": "Hej, här kommer avta' }],
         })),
       },
     };
     const r = await analyseMessage('Test body', baseCtx, { env: { ANTHROPIC_API_KEY: 'k' }, client });
     expect(r).toBeNull();
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining('truncat'));
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('malformed JSON'));
+    warn.mockRestore();
+  });
+
+  it('warns on malformed JSON even when stop_reason is absent', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const client = { messages: { create: vi.fn(async () => ({ content: [{ type: 'text', text: 'not json at all' }] })) } };
+    const r = await analyseMessage('Test body', baseCtx, { env: { ANTHROPIC_API_KEY: 'k' }, client });
+    expect(r).toBeNull();
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('malformed JSON'));
     warn.mockRestore();
   });
 

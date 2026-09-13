@@ -401,8 +401,10 @@ async function ingestMessage({ conv, item, deps }) {
     today_iso: now.toISOString().slice(0, 10),
     // Delivery date, so a frist stated in days ("svara inom 7 dagar") is
     // computed from the kommun's mail and not from a late backlog run
-    // (round-2 finding F1).
-    received_iso: receivedAt.slice(0, 10),
+    // (round-2 finding F1). LOCAL calendar date, not a UTC slice (round-3
+    // addendum G6): a mail delivered 22:30Z is already the next day in
+    // Stockholm, and a frist counted from the wrong day is wrong by a day.
+    received_iso: localDateStr(new Date(receivedAt)),
     thread_context: threadContext,
   }, { env });
   const classification = analysis
@@ -811,7 +813,10 @@ async function dispatchEscalationForIngest(pending, deps) {
     }
     // The deadline does not die with the draft: it lives on the message
     // analysis and is surfaced by latestRespondByForConversation (finding F2).
-    const keptDeadline = analysis?.extracted?.respond_by_date ?? null;
+    // Read it from that same helper rather than from this message's own
+    // analysis (round-3 G4) — an undated reply does not cancel an outstanding
+    // frist, so the log must name the date the queue will actually show.
+    const keptDeadline = db.latestRespondByForConversation?.(updated.id) ?? null;
     if (keptDeadline) {
       deps.log?.(`VOID kept deadline ${keptDeadline} in message analysis for ${updated.kommun_namn}`);
     }

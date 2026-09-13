@@ -6,7 +6,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { openDb } from '../src/storage.js';
-import { runTick, matchInbound, deriveFetchWindowDays } from '../src/tick.js';
+import { runTick, matchInbound, deriveFetchWindowDays, localDateStr } from '../src/tick.js';
 import * as analyseMod from '../src/analyse-message.js';
 import { dedupeFilenames } from '../src/attachments.js';
 import { buildActionQueue } from '../src/dashboard.js';
@@ -354,6 +354,24 @@ describe('runTick — received_at comes from Gmail internalDate (M2)', () => {
     expect(ctx.received_iso).toBe('2026-06-11');
     expect(ctx.today_iso).toBe('2026-06-24');
   });
+
+  // Round-3 addendum G6: the slice was UTC, so a mail delivered at 22:30Z is
+  // dated the previous day in Stockholm and a frist stated in days is computed
+  // from the wrong anchor. Expected value comes from the same helper the
+  // follow-up cron uses, so this test is timezone-independent.
+  it('dates the receipt in local time, not UTC (a late-evening delivery)', async () => {
+    const spy = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue(null);
+    seedConv();
+    const deliveredAt = '2026-06-12T22:30:00Z';
+    const gmail = fakeGmail({
+      listResult: [{ id: 'late-1' }],
+      getResult: { 'late-1': mkMsg('late-1', 'thr-a', 'K <kansli@ale.se>', 'Svara inom 7 dagar.', { internalDate: String(Date.parse(deliveredAt)) }) },
+    });
+    await runTick(deps({ gmail, now: new Date('2026-06-24T12:00:00Z') }));
+    const ctx = spy.mock.calls[0][1];
+    spy.mockRestore();
+    expect(ctx.received_iso).toBe(localDateStr(new Date(deliveredAt)));
+  });
 });
 
 // Round-2 finding F2 (astra #1): the void path supersedes the open escalation
@@ -380,6 +398,38 @@ describe('runTick — a voided draft does not take the deadline with it (F2)', (
     expect(row.resolved_text).toContain('voided'); // the void path, not a supersede by a fresh draft
     expect(db.listOpenEscalationsForConversation(id)).toHaveLength(0);
     expect(db.latestRespondByForConversation(id)).toBe('2026-09-15');
+  });
+
+  // Round-3 G4: the log line read only the TRIGGER message's own deadline, so an
+  // undated reply logged nothing while the queue still showed the earlier frist.
+  it('the void log names the deadline still surfaced, not the trigger message\'s', async () => {
+    const id = seedConv();
+    db.recordMessage({
+      conversation_id: id, gmail_message_id: 'earlier', direction: 'inbound',
+      from_email: 'kansli@ale.se', to_email: 'x', subject: 's', body_text: 'b',
+      received_at: '2026-09-10T08:00:00Z', attachment_count: 0,
+      analysis_json: JSON.stringify({ extracted: { respond_by_date: '2026-09-15' } }),
+    });
+    db.updateConversationState(id, 'NEEDS_HUMAN', {});
+    db.recordEscalation({ conversation_id: id, reason: 'r', draft_template: 'free_form', draft_body: 'b' });
+    const spy = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue({
+      intent: 'clarification', confidence: 0.9, summary: 'Ingen ny frist.',
+      extracted: { arendenummer: null, promised_response_days: null, promised_response_date: null, respond_by_date: null, handoff_to_email: null, handoff_to_forvaltning: null, questions: ['Vilken period?'], mentioned_vendors: null, reseller_relations: null },
+      suggested_action: 'send_precision', is_final_delivery: false, draft_reply: 'd', follow_up_at: null,
+    });
+    const lines = [];
+    await runTick({
+      ...deps({
+        gmail: fakeGmail({
+          listResult: [{ id: 'cl-9' }],
+          getResult: { 'cl-9': mkMsg('cl-9', 'thr-a', 'K <kansli@ale.se>', 'Hmm.', { internalDate: String(Date.parse('2026-09-11T08:00:00Z')) }) },
+        }),
+        now: new Date('2026-09-12T09:00:00Z'),
+      }),
+      log: (l) => lines.push(l),
+    });
+    spy.mockRestore();
+    expect(lines.some((l) => l.includes('VOID kept deadline 2026-09-15'))).toBe(true);
   });
 
   // Round-3 G1 (Codex R2 #1): after the void, the NEXT inbound opens a fresh
