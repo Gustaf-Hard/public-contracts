@@ -1089,6 +1089,48 @@ describe('latestRespondByForConversation (round-2 finding F2)', () => {
       expect(db.latestRespondByForConversation(id)).toBe('2026-09-22');
     });
 
+    // Round-7 L6: these four assert the OUTCOME at explicit, adjacent stamps —
+    // both clocks set by hand, one second apart — rather than trusting a fixture
+    // date to sort the right way. A boundary off by a second, or one that reads
+    // the wrong conversation's ledger, shows up here and nowhere else.
+    describe('the boundary at one-second resolution (round-7 L6)', () => {
+      const SEND_AT = '2026-09-06 10:00:00';
+
+      it('ingested one second AFTER the send is outstanding', () => {
+        const id = seed();
+        decide(id, 'edit', SEND_AT);
+        inbound(id, { at: '2026-09-06T09:00:00Z', respondBy: '2026-09-20', ingestedAt: '2026-09-06 10:00:01' });
+        expect(db.latestRespondByForConversation(id)).toBe('2026-09-20');
+      });
+
+      it('ingested in the SAME second as the send is outstanding (ties fail open, L2)', () => {
+        const id = seed();
+        decide(id, 'edit', SEND_AT);
+        inbound(id, { at: '2026-09-06T09:00:00Z', respondBy: '2026-09-20', ingestedAt: SEND_AT });
+        expect(db.latestRespondByForConversation(id)).toBe('2026-09-20');
+      });
+
+      it('ingested one second BEFORE the send is discharged', () => {
+        const id = seed();
+        decide(id, 'edit', SEND_AT);
+        inbound(id, { at: '2026-09-06T09:00:00Z', respondBy: '2026-09-20', ingestedAt: '2026-09-06 09:59:59' });
+        expect(db.latestRespondByForConversation(id)).toBeNull();
+      });
+
+      // The ledger is read PER CONVERSATION. An operator send in some other
+      // kommun's case discharges nothing here, however much later it is.
+      it('an operator send on a DIFFERENT conversation discharges nothing', () => {
+        const id = seed();
+        const other = db.createConversation({
+          kommun_kod: '7778', kommun_namn: 'Annan', role: 'central',
+          contact_email: 'k@annan.se', scheduled_send_at: '2026-09-01T08:00:00Z',
+        });
+        decide(other, 'edit', '2026-09-09 10:00:00');
+        inbound(id, { at: '2026-09-06T09:00:00Z', respondBy: '2026-09-20', ingestedAt: '2026-09-06 09:00:00' });
+        expect(db.latestRespondByForConversation(id)).toBe('2026-09-20');
+      });
+    });
+
     // Round-4 H2: an escalation created AFTER the operator reply can still
     // carry a deadline copied from an inbound the reply already answered
     // (delayed ingest, or a superseded copy). The escalation's own
@@ -1258,7 +1300,14 @@ describe('messages.ingested_at migration (round-6 K1)', () => {
       received_at: '2026-08-19T14:15:00Z', attachment_count: 0,
     });
     const row = migRead(mid);
+    // Round-7 L6: shape alone is not the claim. The old assertion passed for
+    // '2000-01-01 00:00:00' too, which would silently discharge every frist in
+    // the database. Assert the VALUE: within 5 s of this process's clock, read
+    // as UTC (datetime('now') is UTC, so this holds in any TZ).
     expect(row.ingested_at).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+    const stampedMs = Date.parse(`${row.ingested_at.replace(' ', 'T')}Z`);
+    expect(Number.isNaN(stampedMs)).toBe(false);
+    expect(Math.abs(stampedMs - Date.now())).toBeLessThan(5000);
     // Not the kommun's delivery clock: the two are different by construction.
     expect(row.ingested_at).not.toBe('2026-08-19 14:15:00');
   });
