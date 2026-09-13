@@ -162,15 +162,26 @@ One new digest in `runDailyFollowup`, same shape as the hänvisning nag
 digest (c99daec): a single Slack message, posted only when non-empty,
 listing three sections:
 
-1. **⏰ Deadline inom 2 dagar eller passerad** — open escalations with
-   `respond_by <= today+2`, sorted soonest first. Repeats daily until
-   resolved; for a hard external deadline the repeat is the feature. Plus the
-   draftless cases carrying a due frist, marked "utan utkast" because there is
-   nothing to approve (round-2 finding F2). Those come from
-   `listNeedsHumanWithoutOpenEscalation`, NOT from `listOrphanNeedsHuman`: a
-   pending handoff task does not discharge a reply deadline, so the
-   handoff exclusion belongs to list 3 only (round-3 G2). Deduped by
-   conversation.
+1. **⏰ Deadline inom 2 dagar eller passerad** — every live conversation whose
+   EFFECTIVE deadline is `<= today+2`, sorted soonest first, one row per
+   conversation. Repeats daily until resolved; for a hard external deadline the
+   repeat is the feature. A case with no open escalation is marked "utan utkast"
+   because there is nothing to approve (round-2 finding F2).
+
+   **Round-5 J2: one source, keyed on the conversation.** The section used to
+   merge `listOpenEscalationsWithDeadlineDue` with
+   `listNeedsHumanWithoutOpenEscalation`, and a third shape fits neither: an
+   auto_ack or hänvisning that states "komplettera inom 7 dagar annars avslutas
+   ärendet" warrants no draft and leaves the conversation in SENT/ACK_RECEIVED,
+   so it has no escalation to query and is not NEEDS_HUMAN either — the frist
+   was surfaced nowhere at all. `listConversationsWithDeadlineDue(byIsoDate)`
+   (storage.js) now returns `{ conversation_id, kommun_namn, role, respond_by,
+   has_open_escalation, escalation_id }` for every non-closed conversation and is
+   the ⏰ section's ONLY source. It carries no pending-handoff exclusion: a
+   pending referral does not discharge a reply deadline, so that exclusion
+   belongs to list 3 only (round-3 G2). `buildActionQueue` is unchanged — the
+   dashboard queue stays "escalations + NEEDS_HUMAN" by design; ⏰ is the
+   surface that must never lose a date.
 2. **🕰 Äldre än 7 dagar** — open escalations with `created_at` older than
    7 days: count + the oldest up to `DIGEST_MAX_LINES` (20, tick.js) as
    `kommun (N dagar)`, with an "…och N till" tail when the list is longer
@@ -182,7 +193,9 @@ listing three sections:
 3. **🧭 Behöver dig utan utkast** — conversations in NEEDS_HUMAN with no
    open escalation AND no pending handoff task for their kommun (the state
    the void path in tick.js legitimately produces, Karlstad/Avesta). These
-   need a human decision the queue currently never re-raises.
+   need a human decision the queue currently never re-raises. Round-5 J4: minus
+   every conversation ⏰ already named — that line says "utan utkast" too, so
+   keeping both named the same kommun twice in one digest.
 
 The digest is Gmail-free and therefore allowed in `runDailyFollowup`
 regardless of tick health; it reads only the DB. It never mutates state, so

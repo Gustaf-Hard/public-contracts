@@ -822,6 +822,50 @@ export function openDb(path) {
       .sort((a, b) => a.respond_by.localeCompare(b.respond_by) || a.id - b.id);
   }
 
+  // EVERY live case whose EFFECTIVE reply deadline is due on or before
+  // byIsoDate, one row per conversation, soonest first. This is the Slack
+  // digest's only ⏰ source (round-5 J2).
+  //
+  // Why not the two older sources merged: they were "open escalations" plus
+  // "NEEDS_HUMAN without an open escalation", and a third shape fits neither.
+  // An auto_ack or a hänvisning that says "komplettera inom 7 dagar annars
+  // avslutas ärendet" is extracted and stored, warrants no draft, and leaves the
+  // conversation in SENT/ACK_RECEIVED — no escalation to query, not NEEDS_HUMAN
+  // either — so the frist was surfaced nowhere at all. Keying on the
+  // conversation instead of on the artefact that happens to hold the date is
+  // what closes that gap for good.
+  //
+  // `has_open_escalation` is what the digest labels "utan utkast": there is a
+  // deadline but nothing to approve. `escalation_id` (the newest open row, NULL
+  // when there is none) is carried so the 🕰 aged section can drop what ⏰
+  // already named. Closed cases are excluded here, as in every other digest
+  // query (round-4 H5). Filtering and sorting happen in JS because the effective
+  // deadline is not a column. Advisory surfacing only.
+  function listConversationsWithDeadlineDue(byIsoDate) {
+    return db.prepare(`
+      SELECT c.id AS conversation_id, c.kommun_namn, c.role,
+             (SELECT e.id FROM escalations e
+                WHERE e.conversation_id = c.id AND e.status = 'open'
+                ORDER BY e.id DESC LIMIT 1) AS escalation_id,
+             (SELECT e.respond_by FROM escalations e
+                WHERE e.conversation_id = c.id AND e.status = 'open'
+                ORDER BY e.id DESC LIMIT 1) AS open_respond_by
+      FROM conversations c
+      WHERE c.state NOT IN ('DONE', 'DEAD_END')
+      ORDER BY c.id
+    `).all()
+      .map((r) => ({
+        conversation_id: r.conversation_id,
+        kommun_namn: r.kommun_namn,
+        role: r.role,
+        respond_by: effectiveRespondBy(r.conversation_id, r.open_respond_by),
+        has_open_escalation: r.escalation_id != null,
+        escalation_id: r.escalation_id,
+      }))
+      .filter((r) => r.respond_by != null && r.respond_by <= byIsoDate)
+      .sort((a, b) => a.respond_by.localeCompare(b.respond_by) || a.conversation_id - b.conversation_id);
+  }
+
   // A reply deadline is a calendar DATE and nothing else. The value travels from
   // LLM-written analysis_json through to a ⏰ label, a localeCompare sort key and
   // a `<= byIsoDate` comparison, none of which are meaningful for "snarast" or
@@ -1870,6 +1914,7 @@ export function openDb(path) {
     listOpenEscalationsForConversation,
     listOpenEscalationsAgedDays,
     listOpenEscalationsWithDeadlineDue,
+    listConversationsWithDeadlineDue,
     listOrphanNeedsHuman,
     listNeedsHumanWithoutOpenEscalation,
     latestRespondByForConversation,

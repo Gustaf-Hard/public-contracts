@@ -754,6 +754,55 @@ describe('queue hygiene queries (2026-09-12 design)', () => {
     expect(db.effectiveRespondBy(cid, 'i morgon')).toBe('2026-09-13'); // junk is not a deadline
   });
 
+  // Round-5 J2: a frist can sit on a conversation that is neither NEEDS_HUMAN
+  // nor escalated — an auto_ack/handoff mail stating "komplettera inom 7 dagar
+  // annars avslutas ärendet" on a conversation still in SENT. Neither digest
+  // source could see it: the open-escalation query needs an escalation, the
+  // draftless query needs state NEEDS_HUMAN. One query over every live
+  // conversation is the ⏰ section's single source.
+  it('listConversationsWithDeadlineDue finds a dated SENT conversation with no escalation at all', () => {
+    const cid = db.createConversation({ kommun_kod: '0301', kommun_namn: 'Tyst', role: 'central', contact_email: 't@t.se', scheduled_send_at: '2026-08-01T08:00:00Z' });
+    db.recordMessage({
+      conversation_id: cid, gmail_message_id: 'g-t', direction: 'inbound',
+      from_email: 't@t.se', to_email: 'x', subject: 's', body_text: 'b',
+      received_at: '2026-09-11T08:00:00Z', attachment_count: 0,
+      analysis_json: JSON.stringify({ extracted: { respond_by_date: '2026-09-13' } }),
+    });
+    db.updateConversationState(cid, 'ACK_RECEIVED');
+    const hit = db.listConversationsWithDeadlineDue('2026-09-14').find((r) => r.conversation_id === cid);
+    expect(hit).toBeTruthy();
+    expect(hit.respond_by).toBe('2026-09-13');
+    expect(hit.kommun_namn).toBe('Tyst');
+    expect(hit.role).toBe('central');
+    expect(hit.has_open_escalation).toBe(false);
+  });
+
+  it('listConversationsWithDeadlineDue marks an escalated case, dedupes to one row, and skips closed cases', () => {
+    const withDraft = db.createConversation({ kommun_kod: '0302', kommun_namn: 'MedUtkast', role: 'central', contact_email: 'm@m.se', scheduled_send_at: '2026-08-01T08:00:00Z' });
+    db.recordEscalation({ conversation_id: withDraft, reason: 'r', respond_by: '2026-09-13' });
+    const closed = db.createConversation({ kommun_kod: '0303', kommun_namn: 'Stängd', role: 'central', contact_email: 's@s.se', scheduled_send_at: '2026-08-01T08:00:00Z' });
+    db.recordEscalation({ conversation_id: closed, reason: 'r', respond_by: '2026-09-13' });
+    db.updateConversationState(closed, 'DONE');
+
+    const rows = db.listConversationsWithDeadlineDue('2026-09-14');
+    expect(rows.filter((r) => r.conversation_id === withDraft)).toHaveLength(1);
+    expect(rows.find((r) => r.conversation_id === withDraft).has_open_escalation).toBe(true);
+    expect(rows.map((r) => r.kommun_namn)).not.toContain('Stängd');
+  });
+
+  it('listConversationsWithDeadlineDue sorts soonest first and excludes dates past the window', () => {
+    const mk = (kod, namn, date) => {
+      const cid = db.createConversation({ kommun_kod: kod, kommun_namn: namn, role: 'central', contact_email: `${kod}@d.se`, scheduled_send_at: '2026-08-01T08:00:00Z' });
+      db.recordEscalation({ conversation_id: cid, reason: 'r', respond_by: date });
+      return cid;
+    };
+    mk('0311', 'Sist', '2026-09-14');
+    mk('0312', 'Forst', '2026-09-10');
+    mk('0313', 'Senare', '2026-09-20');
+    const names = db.listConversationsWithDeadlineDue('2026-09-14').map((r) => r.kommun_namn);
+    expect(names).toEqual(['Forst', 'Sist']);
+  });
+
   it('the due list is sorted soonest first regardless of where each date came from', () => {
     const mk = (kod, namn, escDate, msgDate) => {
       const cid = db.createConversation({ kommun_kod: kod, kommun_namn: namn, role: 'central', contact_email: `${kod}@s.se`, scheduled_send_at: '2026-08-01T08:00:00Z' });

@@ -239,7 +239,7 @@ async function escalateWithDraft({ conv, parsedInbound, messageId = null, classi
   // H1), so a deadline we have already answered cannot resurrect here, and an
   // unattended ack cannot make one disappear.
   const effectiveRespondBy = respondBy ?? inheritedRespondBy
-    ?? db.latestRespondByForConversation?.(conv.id) ?? null;
+    ?? db.latestRespondByForConversation(conv.id) ?? null;
 
   const escId = db.recordEscalation({
     conversation_id: conv.id,
@@ -822,7 +822,7 @@ async function dispatchEscalationForIngest(pending, deps) {
     // Read it from that same helper rather than from this message's own
     // analysis (round-3 G4) — an undated reply does not cancel an outstanding
     // frist, so the log must name the date the queue will actually show.
-    const keptDeadline = db.latestRespondByForConversation?.(updated.id) ?? null;
+    const keptDeadline = db.latestRespondByForConversation(updated.id) ?? null;
     if (keptDeadline) {
       deps.log?.(`VOID kept deadline ${keptDeadline} in message analysis for ${updated.kommun_namn}`);
     }
@@ -1429,38 +1429,31 @@ export async function runDailyFollowup(deps) {
     // arithmetic below uses the injected `now` (identical in production; tests
     // seed created_at relative to datetime('now') and inject a matching `now`).
     const dueBy = addDaysIso(todayIso, 2);
-    // Open escalations by EFFECTIVE deadline (round-4 H3): the row's own
-    // respond_by when it has one, otherwise the conversation's outstanding
-    // frist — the same helper buildActionQueue reads, so Slack and the
-    // dashboard cannot disagree about an undated row. Closed conversations are
-    // excluded inside the query (round-4 H5).
-    const due = db.listOpenEscalationsWithDeadlineDue?.(dueBy) ?? [];
-    const dueIds = new Set(due.map((e) => e.id));
-    const aged = (db.listOpenEscalationsAgedDays?.(7) ?? []).filter((e) => !dueIds.has(e.id));
-    const orphans = db.listOrphanNeedsHuman?.() ?? [];
-    // The ⏰ section's draftless source deliberately does NOT carry the
-    // pending-handoff exclusion that shapes the 🧭 list (round-3 G2): a pending
-    // hänvisning is other work, it does not discharge a reply deadline, and a
-    // referral on one conversation was silencing the deadline alert on another.
-    const draftless = db.listNeedsHumanWithoutOpenEscalation?.() ?? orphans;
-    // A voided draft leaves the deadline on the message analysis only (round-2
-    // finding F2), so the deadline section is escalations PLUS draftless
-    // NEEDS_HUMAN cases whose frist is due, marked so the operator knows there
-    // is nothing to approve.
-    // Dedup by conversation: one case is named once in this section.
-    const deadlineItems = [];
-    const seenConvIds = new Set();
-    for (const e of due) {
-      if (seenConvIds.has(e.conversation_id)) continue;
-      seenConvIds.add(e.conversation_id);
-      deadlineItems.push({ respond_by: e.respond_by, label: `${e.kommun_namn} (senast ${e.respond_by})` });
-    }
-    for (const c of draftless) {
-      if (!c.respond_by || c.respond_by > dueBy || seenConvIds.has(c.id)) continue;
-      seenConvIds.add(c.id);
-      deadlineItems.push({ respond_by: c.respond_by, label: `${c.kommun_namn} (senast ${c.respond_by}, utan utkast)` });
-    }
-    deadlineItems.sort((a, b) => a.respond_by.localeCompare(b.respond_by));
+    // ⏰ has ONE source (round-5 J2): every live conversation whose EFFECTIVE
+    // deadline is due, keyed on the conversation rather than on whichever
+    // artefact happens to hold the date. The old merge of "open escalations"
+    // and "NEEDS_HUMAN without one" could see neither half of a third shape —
+    // an auto_ack or hänvisning stating a frist on a conversation still in
+    // SENT/ACK_RECEIVED — so that deadline was surfaced nowhere. "Effective"
+    // still means the open row's own respond_by first, then the conversation's
+    // outstanding frist (round-4 H3), via the same helper buildActionQueue
+    // reads, so Slack and the dashboard cannot disagree. The query excludes
+    // closed cases (round-4 H5) and returns one row per conversation already
+    // sorted soonest first, and it carries no pending-handoff exclusion
+    // (round-3 G2): a hänvisning is other work, it discharges no deadline.
+    // Called unconditionally (round-5 J6/J5): a surfacing helper must not opt
+    // itself out on a db object that lacks the method.
+    const due = db.listConversationsWithDeadlineDue(dueBy);
+    const dueConvIds = new Set(due.map((d) => d.conversation_id));
+    const aged = db.listOpenEscalationsAgedDays(7).filter((e) => !dueConvIds.has(e.conversation_id));
+    // Round-5 J4: 🧭 drops whatever ⏰ already named. The ⏰ line for a
+    // draftless case says "utan utkast", which is the entire content of the 🧭
+    // row, so keeping both named the same kommun twice in one digest.
+    const orphans = db.listOrphanNeedsHuman().filter((c) => !dueConvIds.has(c.id));
+    const deadlineItems = due.map((d) => ({
+      respond_by: d.respond_by,
+      label: `${d.kommun_namn} (senast ${d.respond_by}${d.has_open_escalation ? '' : ', utan utkast'})`,
+    }));
     if ((deadlineItems.length > 0 || aged.length > 0 || orphans.length > 0) && deps.slackOps?.postAlert && deps.env?.SLACK_CHANNEL_ID) {
       const ageDays = (iso) => Math.floor((now.getTime() - new Date(iso.replace(' ', 'T') + 'Z').getTime()) / 86400000);
       const parts = [];

@@ -735,9 +735,11 @@ describe('queue hygiene digest (2026-09-12 design)', () => {
 
   // Round-2 finding F2: the void path leaves a NEEDS_HUMAN case with no open
   // escalation, so its frist is invisible to every deadline reader. The digest
-  // must name it in BOTH the deadline section (marked "utan utkast", there is
-  // nothing to approve) and the orphan section (with the date).
-  it('an orphaned NEEDS_HUMAN case with a due deadline appears in both sections, dated', async () => {
+  // names it in ⏰, marked "utan utkast" because there is nothing to approve.
+  // Round-5 J4: and ONLY there. seenConvIds deduped inside ⏰ but 🧭 ignored it,
+  // so the same kommun was named twice in one digest; the ⏰ line already says
+  // there is no draft, which is the whole content of the 🧭 row.
+  it('an orphaned NEEDS_HUMAN case with a due deadline is named once, in the deadline section only', async () => {
     const cid = db.createConversation({ kommun_kod: '0009', kommun_namn: 'Karlstad', role: 'central', contact_email: 'k@k.se', scheduled_send_at: '2026-08-01T08:00:00Z' });
     db.recordMessage({
       conversation_id: cid, gmail_message_id: 'g-1', direction: 'inbound',
@@ -754,10 +756,33 @@ describe('queue hygiene digest (2026-09-12 design)', () => {
     expect(deadlineSection).toContain('Karlstad');
     expect(deadlineSection).toContain('utan utkast');
     expect(deadlineSection).toContain('2026-09-13');
-    // listed exactly once in the deadline section
-    expect(deadlineSection.match(/Karlstad/g)).toHaveLength(1);
-    const orphanSection = digest.slice(digest.indexOf('🧭'));
-    expect(orphanSection).toContain('Karlstad (senast 2026-09-13)');
+    // listed exactly once in the whole digest (round-5 J4)
+    expect(digest.match(/Karlstad/g)).toHaveLength(1);
+    if (digest.includes('🧭')) {
+      expect(digest.slice(digest.indexOf('🧭'))).not.toContain('Karlstad');
+    }
+  });
+
+  // Round-5 J2: a frist stated by a mail that warranted no draft at all (an
+  // auto_ack or a hänvisning that says "komplettera inom 7 dagar annars
+  // avslutas ärendet") sits on a conversation that is neither NEEDS_HUMAN nor
+  // escalated. The open-escalation source needs an escalation and the draftless
+  // source needs NEEDS_HUMAN, so the deadline was surfaced nowhere.
+  it('a dated conversation that is neither NEEDS_HUMAN nor escalated reaches the deadline section', async () => {
+    const cid = db.createConversation({ kommun_kod: '0013', kommun_namn: 'Tystnad', role: 'central', contact_email: 't@t.se', scheduled_send_at: '2026-08-01T08:00:00Z' });
+    db.recordMessage({
+      conversation_id: cid, gmail_message_id: 'g-t', direction: 'inbound',
+      from_email: 't@t.se', to_email: 'x', subject: 's', body_text: 'b',
+      received_at: '2026-09-11T08:00:00Z', attachment_count: 0,
+      classification: 'auto_ack',
+      analysis_json: JSON.stringify({ extracted: { respond_by_date: '2026-09-13' } }),
+    });
+    db.updateConversationState(cid, 'ACK_RECEIVED');
+    const slackOps = fakeSlackOps();
+    await runDailyFollowup(deps({ slackOps, now: new Date('2026-09-12T09:00:00Z') }));
+    const digest = slackOps.alerts.find((t) => t.includes('Köhälsa'));
+    expect(digest).toBeTruthy();
+    expect(digest.split('🕰')[0]).toContain('Tystnad (senast 2026-09-13, utan utkast)');
   });
 
   // Round-3 G2 (Codex R2 #2): the deadline section sourced its draftless rows

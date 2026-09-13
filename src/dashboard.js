@@ -453,7 +453,10 @@ export function buildActionQueue(db) {
       // `effectiveRespondBy` is that composition, and the Slack digest's ⏰
       // section calls the same helper (round-4 H3) — the two surfaces used to
       // compute it separately and disagreed about exactly this undated-row case.
-      respond_by: db.effectiveRespondBy?.(c.id, openEsc.length > 0 ? openEsc[0].respond_by : null) ?? null,
+      // Called unconditionally (round-5 J5, matching the getTickHealth pattern
+      // in CLAUDE.md): a deadline-surfacing helper must not opt itself out on a
+      // db object that happens to lack the method.
+      respond_by: db.effectiveRespondBy(c.id, openEsc.length > 0 ? openEsc[0].respond_by : null) ?? null,
     });
   }
   // Durable hänvisningar (2026-09-06 design): a pending handoff task is
