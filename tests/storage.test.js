@@ -73,12 +73,37 @@ describe('migrate', () => {
       }
       return originalExec(sql);
     };
+    // Round-11 P3: the assertions above prove the ALTER and the UPDATE are
+    // inside SOME transaction and that one immediate transaction was opened —
+    // they do not prove the PRAGMA READ the branch is decided on is inside it,
+    // which is the whole point of taking the write lock up front. Record
+    // `inTransaction` at the moment each `PRAGMA table_info(messages)` probe
+    // actually executes. migrate() runs two such probes: the older ALTER block's
+    // (deliberately outside, it guards no read-then-write pair) and the
+    // ingested_at one, which must be inside.
+    const probeInTransaction = [];
+    const originalPrepare = migDb.raw.prepare.bind(migDb.raw);
+    migDb.raw.prepare = (sql) => {
+      const stmt = originalPrepare(sql);
+      if (String(sql).trim() !== 'PRAGMA table_info(messages)') return stmt;
+      return new Proxy(stmt, {
+        get(target, prop, receiver) {
+          if (prop !== 'all') return Reflect.get(target, prop, receiver);
+          return (...a) => { probeInTransaction.push(migDb.raw.inTransaction); return target.all(...a); };
+        },
+      });
+    };
     try {
       expect(() => migDb.migrate()).toThrow(/simulated disk I\/O error/);
     } finally {
       migDb.raw.transaction = originalTransaction;
       migDb.raw.exec = originalExec;
+      migDb.raw.prepare = originalPrepare;
     }
+    // The ingested_at probe is the LAST one migrate() runs before it throws, and
+    // it ran with the IMMEDIATE write lock held.
+    expect(probeInTransaction.length).toBeGreaterThanOrEqual(1);
+    expect(probeInTransaction.at(-1)).toBe(true);
     // The statements are INSIDE the transaction that failed, so the ALTER went
     // with it. A test that only read the mode could not see this.
     expect(columns()).not.toContain('ingested_at');
