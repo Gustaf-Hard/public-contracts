@@ -247,10 +247,7 @@ NEEDS_HUMAN **or** it has any escalation whose status is in
 `send_unconfirmed`) leaves no open row and does not move the conversation to
 NEEDS_HUMAN, so the round-11 P2 bug was a mail that may already have gone out
 rendering as "Inget kräver din uppmärksamhet" while the Köhälsa digest listed its
-deadline. A parked row's `action` says `Skickning parkerad (<status>): se ärendet`
-(via `escalationActionLabel`) and its `since` is the escalation's own `created_at`,
-not the case clock. `buildWaiting` excludes the same set, or a parked send would
-be listed both as needing the operator and as progressing on its own.
+deadline. A parked row (send_failed / send_unconfirmed) is labelled `Skickning parkerad (<status>): se ärendet`, an in-flight `sending` row is labelled `Skickning pågår: se ärendet`, and `since` for such rows is the escalation's `resolved_at` (the moment it entered that status) falling back to `created_at` for legacy rows. `buildWaiting` excludes the same set, or a parked send would be listed both as needing the operator and as progressing on its own.
 
 **Polite scraping is enforced in `src/http.js`** (Phase 1). Every outbound
 HTTP call must go through `politeFetch` (1 req/sec/host, retry on 429/503,

@@ -119,11 +119,12 @@ function daysUntilIso(iso, now = new Date()) {
 // Translate an open escalation into a plain-Swedish action so the overview
 // tooltip can say *how* a "Behöver dig" kommun needs the operator. Keyed on the
 // queued draft template (the FSM picks the template per situation).
-// Round-11 P2: an escalation in an ACTIVE-but-not-open status is a send that
-// PARKED — 'sending' is a claim whose process died, 'send_failed' /
-// 'send_unconfirmed' a mail that may or may not have reached the kommun. There
-// is nothing to approve, so the draft template says nothing useful; what the
-// operator needs to know is that a send is stuck and which one.
+// PARKED_SEND_STATUSES lists the statuses labelled "parkerad" — 'send_failed' /
+// 'send_unconfirmed' — a mail that may or may not have reached the kommun.
+// 'sending' is an in-flight claim rendered as "Skickning pågår", handled by
+// recoverStuckSends if the process dies. For parked sends there is nothing to
+// approve, so the draft template says nothing useful; what the operator needs
+// to know is that a send is stuck and which one.
 const PARKED_SEND_STATUSES = new Set(ACTIVE_ESCALATION_STATUSES.filter((st) => st !== 'open'));
 
 export function escalationActionLabel(esc) {
