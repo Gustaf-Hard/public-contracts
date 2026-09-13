@@ -565,10 +565,20 @@ describe('thread context (2026-09-12 design)', () => {
 });
 
 describe('respond_by_date (2026-09-12 design)', () => {
-  it('survives the schema round-trip and normalisation', async () => {
+  // Round-2 finding F5: asserting only the returned value exercised the fake
+  // client, not the request. The field is useless unless the schema the code
+  // actually sends declares it and the prompt tells the model what it is.
+  it('passthrough + schema wiring: the request declares respond_by_date and the prompt defines it', async () => {
     const expected = { intent: 'unknown', confidence: 0.95, summary: 'Komplettering krävs inom 7 dagar.', extracted: { arendenummer: 'KC-1', promised_response_days: null, promised_response_date: null, respond_by_date: '2026-09-02', handoff_to_email: null, handoff_to_forvaltning: null, questions: null, mentioned_vendors: null, reseller_relations: null }, suggested_action: 'escalate', is_final_delivery: false, draft_reply: 'd', follow_up_at: null };
-    const r = await analyseMessage('Svara inom 7 dagar annars stängs ärendet.', baseCtx, { env: { ANTHROPIC_API_KEY: 'k' }, client: fakeClientReturning(expected) });
+    const client = fakeClientReturning(expected);
+    const r = await analyseMessage('Svara inom 7 dagar annars stängs ärendet.', { ...baseCtx, today_iso: '2026-08-26', received_iso: '2026-08-26' }, { env: { ANTHROPIC_API_KEY: 'k' }, client });
     expect(r.extracted.respond_by_date).toBe('2026-09-02');
+    const call = client.messages.create.mock.calls[0][0];
+    const sent = call.output_config.format.schema;
+    expect(call.output_config.format.type).toBe('json_schema');
+    expect(sent.properties.extracted.properties.respond_by_date).toEqual({ anyOf: [{ type: 'string' }, { type: 'null' }] });
+    expect(sent.properties.extracted.required).toContain('respond_by_date');
+    expect(call.system[0].text).toContain('# respond_by_date');
   });
   it('normaliseRespondBy nulls a non-ISO value', () => {
     const a = { extracted: { respond_by_date: 'nästa vecka' } };
