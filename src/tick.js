@@ -229,6 +229,10 @@ async function escalateWithDraft({ conv, parsedInbound, messageId = null, classi
     body = rendered.body;
   }
 
+  // One deadline for both the row and the Slack block: the inbound's own frist
+  // when it restated one, otherwise the superseded escalation's.
+  const effectiveRespondBy = respondBy ?? inheritedRespondBy ?? null;
+
   const escId = db.recordEscalation({
     conversation_id: conv.id,
     message_id: messageId,
@@ -240,7 +244,7 @@ async function escalateWithDraft({ conv, parsedInbound, messageId = null, classi
     classifier_confidence: classification?.confidence ?? null,
     previous_state: previousState ?? null,
     watchlist_vendors: watchlistVendors.length ? JSON.stringify(watchlistVendors) : null,
-    respond_by: respondBy ?? inheritedRespondBy ?? null,
+    respond_by: effectiveRespondBy,
   });
 
   if (slackOps && env.SLACK_CHANNEL_ID) {
@@ -252,7 +256,7 @@ async function escalateWithDraft({ conv, parsedInbound, messageId = null, classi
       draft_reply: `Subject: ${subject}\n\n${body}`,
       gmail_thread_id: conv.gmail_thread_id ?? '(no thread)',
       watchlist_vendors: watchlistVendors,
-      respond_by: respondBy ?? inheritedRespondBy ?? null,
+      respond_by: effectiveRespondBy,
     });
     // The ONLY unguarded Slack call used to live here — and it sits AFTER
     // recordEscalation, so a Slack outage threw with the row already written:
@@ -1403,6 +1407,9 @@ export async function runDailyFollowup(deps) {
   // must not silence it too (2026-09-12 review finding 1).
   try {
     const todayIso = now.toISOString().slice(0, 10);
+    // The aged/due queries filter on SQLite's datetime('now') while the age
+    // arithmetic below uses the injected `now` (identical in production; tests
+    // seed created_at relative to datetime('now') and inject a matching `now`).
     const dueBy = addDaysIso(todayIso, 2);
     const due = db.listOpenEscalationsWithDeadlineDue?.(dueBy) ?? [];
     const dueIds = new Set(due.map((e) => e.id));
@@ -1435,8 +1442,10 @@ export async function runDailyFollowup(deps) {
           + (rest > 0 ? `\n_…och ${rest} till._` : ''));
       }
       if (aged.length > 0) {
-        const top = aged.slice(0, 10).map((e) => `${e.kommun_namn} (${ageDays(e.created_at)} d)`).join(', ');
-        parts.push(`🕰 *Öppna utkast äldre än 7 dagar:* ${aged.length} st: ${top}${aged.length > 10 ? ', …' : ''}`);
+        const included = aged.slice(0, DIGEST_MAX_LINES);
+        const rest = aged.length - included.length;
+        parts.push(`🕰 *Öppna utkast äldre än 7 dagar* (${aged.length}): ${included.map((e) => `${e.kommun_namn} (${ageDays(e.created_at)} d)`).join(', ')}`
+          + (rest > 0 ? `\n_…och ${rest} till._` : ''));
       }
       if (orphans.length > 0) {
         const included = orphans.slice(0, DIGEST_MAX_LINES);

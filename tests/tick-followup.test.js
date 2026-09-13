@@ -711,6 +711,28 @@ describe('queue hygiene digest (2026-09-12 design)', () => {
     expect(db.listOpenEscalationsForConversation(nudgeConvId)).toHaveLength(0);
   });
 
+  // Round-2 finding F6: one cap, one phrasing across all three sections.
+  it('caps the aged-drafts list at DIGEST_MAX_LINES with the same "…och N till" tail', async () => {
+    for (let i = 0; i < 25; i++) {
+      const cid = db.createConversation({
+        kommun_kod: String(3000 + i), kommun_namn: `Aged${i}`, role: 'central',
+        contact_email: `a${i}@a.se`, scheduled_send_at: '2026-08-01T08:00:00Z',
+      });
+      const esc = db.recordEscalation({ conversation_id: cid, reason: 'r' });
+      db.raw.prepare("UPDATE escalations SET created_at = datetime('now', '-9 days') WHERE id = ?").run(esc);
+    }
+    const slackOps = fakeSlackOps();
+    await runDailyFollowup(deps({ slackOps, now: new Date('2026-09-12T09:00:00Z') }));
+    const digest = slackOps.alerts.find((t) => t.includes('Köhälsa'));
+    const agedSection = digest.slice(digest.indexOf('🕰'));
+    expect(agedSection).toContain('(25)');
+    expect(agedSection).toContain('…och 5 till');
+    // Age digits are not asserted: the query filters on SQLite datetime('now')
+    // while the display math uses the injected `now` (see the comment in tick.js).
+    expect(agedSection).toContain('Aged0 (');
+    expect(agedSection).not.toContain('Aged24');
+  });
+
   // Round-2 finding F2: the void path leaves a NEEDS_HUMAN case with no open
   // escalation, so its frist is invisible to every deadline reader. The digest
   // must name it in BOTH the deadline section (marked "utan utkast", there is
