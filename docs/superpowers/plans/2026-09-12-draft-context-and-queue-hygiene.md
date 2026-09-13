@@ -501,6 +501,8 @@ describe('live-failure regressions (2026-09-12 queue review)', () => {
 
 ### Task 6: respond_by_date extraction (package B)
 
+> **Superseded by the round-3 addendum:** the past-date floor below is not the one-day floor described here — it is receipt minus 30 days, and an explicitly stated frist that has already passed is kept.
+
 **Files:**
 - Modify: `src/analyse-message.js` (ANALYSIS_SCHEMA `extracted`; prompt section + few-shot; new `normaliseRespondBy` applied next to `normaliseDelayAnalysis` at line ~372)
 - Test: `tests/analyse-message.test.js` (append)

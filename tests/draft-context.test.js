@@ -58,6 +58,34 @@ describe('buildDraftContext', () => {
     expect(out).not.toContain('X'.repeat(301));
   });
 
+  // Round-4 H7: spec section A promises "first 300 chars of UNQUOTED body", but
+  // the fallback sliced the raw stored body — so a kommun reply quoting our own
+  // T_RECEIPT question fed that question back to the drafting model as if the
+  // kommun had written it. stripQuotedText (src/classifier.js) is the existing
+  // stripper; the 300-char cap now applies to the visible text.
+  it('the inbound body fallback strips the quoted reply tail before slicing', () => {
+    seedMsg({ dir: 'outbound', gmailId: 'o1', body: 'Begäran.', at: '2026-08-17T14:45:24Z' });
+    seedMsg({
+      gmailId: 'i1', at: '2026-08-21T09:00:00Z',
+      body: 'Tack, vi tittar på det.\n\nDen 20 augusti 2026 kl. 10:00 skrev Gustaf <g@x.se>:\n> Är detta samtliga avtal ni har?',
+    });
+    const out = buildDraftContext(db, conv(), noAtts);
+    expect(out).toContain('Tack, vi tittar på det.');
+    expect(out).not.toContain('Är detta samtliga avtal ni har?');
+  });
+
+  it('the 300-char cap applies to the visible text, not the body including its quoted tail', () => {
+    seedMsg({ dir: 'outbound', gmailId: 'o1', body: 'Begäran.', at: '2026-08-17T14:45:24Z' });
+    seedMsg({
+      gmailId: 'i1', at: '2026-08-21T09:00:00Z',
+      body: `${'X'.repeat(500)}\nDen 20 augusti 2026 kl. 10:00 skrev Gustaf <g@x.se>:\n${'Q'.repeat(500)}`,
+    });
+    const out = buildDraftContext(db, conv(), noAtts);
+    expect(out).toContain('X'.repeat(300));
+    expect(out).not.toContain('X'.repeat(301));
+    expect(out).not.toContain('Q');
+  });
+
   it('an empty stored summary falls back to the body prefix instead of rendering blank (finding 6)', () => {
     seedMsg({ dir: 'outbound', gmailId: 'o1', body: 'Begäran.', at: '2026-08-17T14:45:24Z' });
     seedMsg({ gmailId: 'i1', body: 'Kommunens fullständiga svar.', at: '2026-08-21T09:00:00Z', analysis: { summary: '' } });

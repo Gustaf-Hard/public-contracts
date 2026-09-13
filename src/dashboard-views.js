@@ -1014,8 +1014,11 @@ export function renderOverview({ summary, rows, filter, sort, order, totalKommun
   `;
 
   // --- Action-first queues ---
-  const AGE_RED_MS = 7 * 86400000;
-  const isOld = (iso) => iso && (Date.now() - new Date(iso).getTime()) >= AGE_RED_MS;
+  // Expressed through daysAgo, the same function fmtAgo renders with (round-4
+  // H7): a separate millisecond threshold could drift from the displayed age and
+  // paint "6 dagar sedan" red.
+  const AGE_RED_DAYS = 7;
+  const isOld = (iso) => { const d = daysAgo(iso); return d !== null && d >= AGE_RED_DAYS; };
   // ageAlert is opt-in (final-review finding 1, 2026-09-12): the red ≥7-day
   // class belongs to Behöver dig only. queueRow is shared with Pågår · väntar,
   // whose own staleness threshold is 9+jitter days — passing it there would

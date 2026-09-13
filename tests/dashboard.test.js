@@ -865,6 +865,18 @@ describe('home buckets', () => {
     expect(q.find((r) => r.conv_id === plain).respond_by).toBeNull();
   });
 
+  // Round-4 H7: buildActionQueue carrying respond_by was asserted, the RENDER
+  // of it was not — the ⏰ badge could disappear from the template with every
+  // queue test still green.
+  it('renders the ⏰ deadline badge in Behöver dig for a dated row', async () => {
+    const cid = db.createConversation({ kommun_kod: '0580', kommun_namn: 'Linköping', role: 'central', contact_email: 'k@l.se', scheduled_send_at: '2026-05-24T10:00:00Z' });
+    db.recordEscalation({ conversation_id: cid, reason: 'x', draft_template: 'free_form', draft_body: 'b', respond_by: '2026-09-14' });
+    const res = await get(appWithFakes(), '/');
+    const actionSection = res.text.slice(res.text.indexOf('Behöver dig'), res.text.indexOf('Pågår · väntar'));
+    expect(actionSection).toContain('⏰ senast 2026-09-14');
+    expect(actionSection).toContain('Linköping');
+  });
+
   it('renders a ≥7-day-old Behöver dig row with the q-age-old class', async () => {
     const cid = db.createConversation({ kommun_kod: '0580', kommun_namn: 'Linköping', role: 'central', contact_email: 'k@l.se', scheduled_send_at: '2026-05-24T10:00:00Z' });
     db.updateConversationState(cid, 'SENT', { last_outbound_at: '2026-01-01T00:00:00Z' });

@@ -751,6 +751,7 @@ describe('queue hygiene queries (2026-09-12 design)', () => {
     expect(db.effectiveRespondBy(cid, '2026-09-20')).toBe('2026-09-20');
     expect(db.effectiveRespondBy(cid, null)).toBe('2026-09-13');
     expect(db.effectiveRespondBy(cid, '')).toBe('2026-09-13');
+    expect(db.effectiveRespondBy(cid, 'i morgon')).toBe('2026-09-13'); // junk is not a deadline
   });
 
   it('the due list is sorted soonest first regardless of where each date came from', () => {
@@ -815,6 +816,31 @@ describe('latestRespondByForConversation (round-2 finding F2)', () => {
     inbound(id, { at: '2026-09-08T08:00:00Z', json: 'not json at all' });
     db.recordEscalation({ conversation_id: id, reason: 'r' });
     expect(db.latestRespondByForConversation(id)).toBeNull();
+  });
+
+  // Round-4 H7: the value comes out of LLM-written analysis_json, so a
+  // non-ISO string must not reach a ⏰ label or a sort key. Junk is treated as
+  // absent and the helper falls through to the next candidate.
+  it('ignores a non-ISO respond_by_date and falls through to an older valid one', () => {
+    const id = seed();
+    inbound(id, { at: '2026-09-05T08:00:00Z', respondBy: '2026-09-10' });
+    inbound(id, { at: '2026-09-08T08:00:00Z', respondBy: 'snarast möjligt' });
+    expect(db.latestRespondByForConversation(id)).toBe('2026-09-10');
+  });
+
+  it('returns null when the only candidate is junk', () => {
+    const id = seed();
+    inbound(id, { at: '2026-09-08T08:00:00Z', respondBy: '13/9' });
+    expect(db.latestRespondByForConversation(id)).toBeNull();
+  });
+
+  // Round-4 H7: an undated newest inbound must not hide an older outstanding
+  // frist — the `find` walks newest-first past undated rows.
+  it('newest inbound undated, older inbound dated (both after the boundary) → the older date is returned', () => {
+    const id = seed();
+    inbound(id, { at: '2026-09-05T08:00:00Z', respondBy: '2026-09-10' });
+    inbound(id, { at: '2026-09-08T08:00:00Z', respondBy: null });
+    expect(db.latestRespondByForConversation(id)).toBe('2026-09-10');
   });
 
   // Round-4 H1 (critical): the discharge boundary is an OPERATOR send, read

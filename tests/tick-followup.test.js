@@ -816,6 +816,28 @@ describe('queue hygiene digest (2026-09-12 design)', () => {
     expect(digest.match(/Odaterad/g)).toHaveLength(1);
   });
 
+  // Round-4 H7: the aged and orphan sections each had a cap test; the ⏰ section
+  // did not, so a regression in its slice would have gone unnoticed until Slack
+  // rejected the whole digest with invalid_blocks.
+  it('caps the deadline list at DIGEST_MAX_LINES with the same "…och N till" tail', async () => {
+    for (let i = 0; i < 25; i += 1) {
+      const cid = db.createConversation({
+        kommun_kod: String(5000 + i), kommun_namn: `Frist${i}`, role: 'central',
+        contact_email: `f${i}@f.se`, scheduled_send_at: '2026-08-01T08:00:00Z',
+      });
+      db.recordEscalation({ conversation_id: cid, reason: 'r', draft_template: 'free_form', draft_body: 'b', respond_by: '2026-09-13' });
+    }
+    const slackOps = fakeSlackOps();
+    await runDailyFollowup(deps({ slackOps, now: new Date('2026-09-12T09:00:00Z') }));
+    const digest = slackOps.alerts.find((t) => t.includes('Köhälsa'));
+    expect(digest).toBeTruthy();
+    const deadlineSection = digest.slice(digest.indexOf('⏰'), digest.indexOf('🕰') === -1 ? undefined : digest.indexOf('🕰'));
+    expect(deadlineSection).toContain('(25)');
+    expect(deadlineSection).toContain('…och 5 till');
+    expect(deadlineSection).toContain('Frist0 (senast 2026-09-13)');
+    expect(deadlineSection).not.toContain('Frist24');
+  });
+
   it('an orphan with no deadline is named without a date and stays out of the deadline section', async () => {
     const cid = db.createConversation({ kommun_kod: '0010', kommun_namn: 'Avesta', role: 'central', contact_email: 'a@a.se', scheduled_send_at: '2026-08-01T08:00:00Z' });
     db.updateConversationState(cid, 'NEEDS_HUMAN');

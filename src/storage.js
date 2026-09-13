@@ -822,6 +822,18 @@ export function openDb(path) {
       .sort((a, b) => a.respond_by.localeCompare(b.respond_by) || a.id - b.id);
   }
 
+  // A reply deadline is a calendar DATE and nothing else. The value travels from
+  // LLM-written analysis_json through to a ⏰ label, a localeCompare sort key and
+  // a `<= byIsoDate` comparison, none of which are meaningful for "snarast" or
+  // "13/9" (round-4 H7). Non-ISO is treated as absent, so the reader falls
+  // through to the next candidate rather than surfacing a date it cannot order.
+  const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+  function asIsoDate(value) {
+    if (typeof value !== 'string') return null;
+    const t = value.trim();
+    return ISO_DATE_RE.test(t) ? t : null;
+  }
+
   // Milliseconds for a stored timestamp in either of the two shapes this schema
   // uses: ISO-8601 with T and Z (conversations.last_outbound_at,
   // messages.received_at) and SQLite's datetime('now') 'YYYY-MM-DD HH:MM:SS',
@@ -888,9 +900,8 @@ export function openDb(path) {
         AND m.analysis_json IS NOT NULL AND json_valid(m.analysis_json)
       ORDER BY m.received_at DESC, m.id DESC
     `).all(conversationId);
-    const hit = fromMessages.find((r) => typeof r.respond_by === 'string' && r.respond_by.trim() !== ''
-      && outstanding(r.received_at));
-    if (hit) return hit.respond_by;
+    const hit = fromMessages.find((r) => asIsoDate(r.respond_by) != null && outstanding(r.received_at));
+    if (hit) return asIsoDate(hit.respond_by);
     // Escalation fallback. The row's own created_at is NOT evidence that its
     // deadline is live (round-4 H2): an escalation minted after our reply can
     // carry a respond_by copied from an inbound that reply already answered --
@@ -907,8 +918,9 @@ export function openDb(path) {
       WHERE e.conversation_id = ? AND e.respond_by IS NOT NULL AND e.respond_by != ''
       ORDER BY e.id DESC
     `).all(conversationId)
-      .find((r) => outstanding(r.message_id != null ? r.trigger_received_at : r.created_at));
-    return esc?.respond_by ?? null;
+      .find((r) => asIsoDate(r.respond_by) != null
+        && outstanding(r.message_id != null ? r.trigger_received_at : r.created_at));
+    return esc ? asIsoDate(esc.respond_by) : null;
   }
 
   // THE effective reply deadline for a case, and the single source both the
@@ -916,9 +928,7 @@ export function openDb(path) {
   // open escalation's own respond_by wins when it has one; otherwise the
   // conversation's newest outstanding frist. Advisory surfacing only.
   function effectiveRespondBy(conversationId, openEscRespondBy = null) {
-    const given = typeof openEscRespondBy === 'string' ? openEscRespondBy.trim() : '';
-    if (given !== '') return given;
-    return latestRespondByForConversation(conversationId);
+    return asIsoDate(openEscRespondBy) ?? latestRespondByForConversation(conversationId);
   }
 
   // NEEDS_HUMAN with no draft to approve: state NEEDS_HUMAN and no OPEN

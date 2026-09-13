@@ -45,8 +45,10 @@ and `userPromptFor` appends after the incoming body. Content, in order:
      given, questions already asked). Cap 1 500 chars per message as a
      safety valve.
    - Inbound: date + classification + the stored `analysis_json.summary`
-     (fallback: first 300 chars of unquoted body) + stored attachment
-     filenames from the `attachments` table.
+     (fallback: first 300 chars of unquoted body — `stripQuotedText` from
+     `src/classifier.js`, so our own T_RECEIPT question quoted back is never
+     fed to the model as the kommun's words; wired in round-4 H7) + stored
+     attachment filenames from the `attachments` table.
    - Cap the log at the most recent 20 messages; if truncated, say so in the
      block ("…N äldre meddelanden utelämnade") — never silently.
 3. **Bilagor i det inkommande mejlet** — filenames + count from
@@ -170,7 +172,10 @@ listing three sections:
    handoff exclusion belongs to list 3 only (round-3 G2). Deduped by
    conversation.
 2. **🕰 Äldre än 7 dagar** — open escalations with `created_at` older than
-   7 days: count + the 10 oldest as `kommun (N dagar)`. Daily repetition is
+   7 days: count + the oldest up to `DIGEST_MAX_LINES` (20, tick.js) as
+   `kommun (N dagar)`, with an "…och N till" tail when the list is longer
+   (round-4 H7: all three sections share one cap and one phrasing, see
+   round-2 finding F6). Daily repetition is
    acceptable because the list only shrinks when the operator acts, and the
    whole point of this review was that silence let 19 items age past 10
    days.

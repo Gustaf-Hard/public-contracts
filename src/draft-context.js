@@ -10,6 +10,13 @@
 // attachments arrive as parsed metadata only.
 
 import { isTrivialImage } from './attachments.js';
+// The quoted-reply stripper already used by the regex classifier and the
+// delay-ack body gate. Reused here (round-4 H7) so the inbound fallback honours
+// spec section A's "first 300 chars of UNQUOTED body": a kommun reply normally
+// quotes our own T_RECEIPT question back, and slicing the raw body fed that
+// question to the drafting model as if the kommun had asked it. classifier.js
+// imports nothing, so there is no cycle.
+import { stripQuotedText } from './classifier.js';
 
 const MAX_MESSAGES = 20;
 const MAX_OUTBOUND_CHARS = 1500;
@@ -123,7 +130,8 @@ export function buildDraftContext(db, conv, parsed) {
       try { summary = JSON.parse(m.analysis_json ?? 'null')?.summary ?? null; } catch { /* unparsable */ }
       // An empty stored summary ('') must fall back too, not render a blank
       // inbound line (finding 6, 2026-09-12 review).
-      const text = sanitizeUntrusted(summary) || sanitizeUntrusted(m.body_text, MAX_INBOUND_CHARS);
+      const text = sanitizeUntrusted(summary)
+        || sanitizeUntrusted(stripQuotedText(m.body_text ?? ''), MAX_INBOUND_CHARS);
       lines.push(`## KOMMUNEN skrev (${date}, klassning: ${sanitizeUntrusted(m.classification, 40) || 'okänd'})${fileNote}`);
       lines.push(quoted(text));
     }
