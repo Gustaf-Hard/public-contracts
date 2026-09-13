@@ -425,6 +425,14 @@ export async function analyseMessage(body, ctx, { env = process.env, client = nu
       },
     });
 
+    // Checked BEFORE the content is read (round-2 finding F4): a response cut
+    // off at max_tokens whose JSON happens to close still parses, and would be
+    // accepted as a complete analysis with a half-written draft_reply. Fail
+    // closed to the regex classifier instead.
+    if (response.stop_reason === 'max_tokens') {
+      console.warn(`[analyse-message] response truncated at max_tokens (${model}) — discarding the analysis, falling back`);
+      return null;
+    }
     const textBlock = (response.content ?? []).find((b) => b.type === 'text');
     if (!textBlock || !textBlock.text) return null;
     try {

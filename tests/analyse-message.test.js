@@ -112,6 +112,34 @@ describe('analyseMessage', () => {
     expect(client.messages.create.mock.calls[0][0].max_tokens).toBe(2048);
   });
 
+  // Round-2 finding F4: stop_reason was only inspected in the JSON.parse catch,
+  // so a truncated response whose JSON happened to close was accepted as a
+  // complete analysis (a draft_reply cut mid-sentence, fields silently missing).
+  it('returns null and warns when stop_reason is max_tokens even though the JSON parses', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const client = {
+      messages: {
+        create: vi.fn(async () => ({
+          stop_reason: 'max_tokens',
+          content: [{ type: 'text', text: JSON.stringify({ intent: 'delivery', confidence: 0.9, summary: 's', extracted: {}, suggested_action: 'send_receipt', is_final_delivery: false, draft_reply: 'Hej, här kommer', follow_up_at: null }) }],
+        })),
+      },
+    };
+    const r = await analyseMessage('Test body', baseCtx, { env: { ANTHROPIC_API_KEY: 'k' }, client });
+    expect(r).toBeNull();
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('truncat'));
+    warn.mockRestore();
+  });
+
+  it('returns null and warns on a truncated response with no content array at all', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const client = { messages: { create: vi.fn(async () => ({ stop_reason: 'max_tokens' })) } };
+    const r = await analyseMessage('Test body', baseCtx, { env: { ANTHROPIC_API_KEY: 'k' }, client });
+    expect(r).toBeNull();
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('truncat'));
+    warn.mockRestore();
+  });
+
   it('returns null and logs a named truncation warning when the response was cut off mid-JSON', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const client = {
