@@ -142,7 +142,41 @@ deadlines the queue most needs to show.) (Delay promises keep their existing
 
 `escalations` gains `respond_by TEXT` via the append-only
 `PRAGMA table_info` probe pattern. `escalateWithDraft` persists
-`analysis.extracted.respond_by_date` when present. No other schema change.
+`analysis.extracted.respond_by_date` when present.
+
+**Round-6 K1: `messages` gains `ingested_at TEXT`**, same append-only probe plus
+the base SCHEMA string, stamped by `recordMessage` with SQLite `datetime('now')`
+and backfilled for pre-migration rows as
+`replace(substr(received_at,1,19),'T',' ')` (an approximation: "ingested when
+delivered", which is what the old rule already assumed).
+
+### Discharge
+
+A kommun-imposed deadline is a demand on US, so it stands until WE reply, and
+only an OPERATOR send counts: `latestRespondByForConversation` takes its
+boundary from `listOperatorDecisionTimes` (`approve_unmodified` and `edit`),
+never `conversations.last_outbound_at` — every unattended send stamps that too,
+and an automatic ack is not an answer; `skip`/`closed` sent nothing at all.
+
+**The clock is ingest time, and there is only one of it (round-6 K1).** An
+inbound is OUTSTANDING iff its `ingested_at` is later than the latest operator
+send: *ingested before the operator's send = the operator could see it*. Delivery
+time (`received_at`, Gmail `internalDate`) is the kommun's clock and says nothing
+about what was on the operator's screen, so a mail delivered 09:50 but ingested
+10:05 survives a 10:00 send. The escalation fallback reads the same clock: the
+originating inbound's `ingested_at` when `message_id` is set, the escalation's
+own `created_at` when it is not.
+
+This replaced a two-clock OR whose arrival-order half keyed on
+`MAX(escalations.message_id)` over answered escalations. Five of the six
+`escalateWithDraft` call sites pass no `messageId` (T-INITIAL failure,
+`recoverStuckSends`, the bounce resend, the daily staleness follow-up, T_UPDATE),
+so that half was usually NULL and the delivery-time rule ran alone; and when it
+was set, the MAX pinned the boundary at an old row for ever, so a frist answered
+through a later follow-up draft never discharged and the kommun was nagged daily.
+Everything fails open: no operator send discharges nothing, and an unreadable or
+NULL `ingested_at` is considered outstanding. `respond_by` stays advisory — no
+guard, FSM transition or auto-send rule reads it.
 
 ### Surfacing
 

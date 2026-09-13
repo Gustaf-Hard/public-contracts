@@ -207,13 +207,21 @@ auto-send rule keys off it. **Only an OPERATOR send discharges it**
 `conversations.last_outbound_at` — every send stamps that, so the three
 unattended templates would silently delete a deadline nobody answered; an
 automatic ack is not an answer, and `skip`/`closed` sent nothing at all. With no
-operator send in the conversation, nothing is discharged. **Discharge also
-respects ingest ORDER, not delivery time alone**: delivery time
-(`messages.received_at`) and arrival order (`messages.id`) are different clocks,
-and an operator answers what ingest has shown them, so a mail whose id is higher
-than the newest inbound an operator send actually answered (the highest
-`escalations.message_id` behind an `approve_unmodified`/`edit` decision) stays
-outstanding even when it was delivered before that send. Both halves fail open.
+operator send in the conversation, nothing is discharged. **The discharge clock
+is INGEST time, not delivery time**: `messages.ingested_at` (stamped by
+`recordMessage` with SQLite `datetime('now')`, the same clock and format as
+`decisions.decided_at`) is the one boundary, because an operator answers what
+ingest has put in front of them, not what Gmail happened to deliver. An inbound
+is outstanding iff it was ingested *after* the latest operator send, so a mail
+delivered 09:50 but ingested 10:05 survives a 10:00 send. The escalation
+fallback reads the same clock: its trigger mail's `ingested_at` when
+`message_id` is set, the escalation's own `created_at` when it is not. Nothing
+keys on `messages.id`, which is why there is no boundary that can get stuck at
+an old row (round-6 K1 replaced a two-clock OR keyed on
+`MAX(escalations.message_id)`; five of the six `escalateWithDraft` call sites
+pass no `messageId`, and when one did, the MAX pinned the boundary for ever and
+the kommun was nagged daily). Fails open: no operator send discharges nothing,
+and an unreadable or NULL `ingested_at` is considered outstanding.
 
 **Polite scraping is enforced in `src/http.js`** (Phase 1). Every outbound
 HTTP call must go through `politeFetch` (1 req/sec/host, retry on 429/503,

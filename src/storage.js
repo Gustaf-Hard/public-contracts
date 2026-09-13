@@ -79,7 +79,13 @@ CREATE TABLE IF NOT EXISTS messages (
   received_at TEXT NOT NULL,
   attachment_count INTEGER NOT NULL DEFAULT 0,
   signature_extracted TEXT,
-  analysis_json TEXT
+  analysis_json TEXT,
+  -- When WE recorded this mail, SQLite datetime('now') shape, same clock and
+  -- format as decisions.decided_at and escalations.created_at. Distinct from
+  -- received_at (Gmail internalDate, the KOMMUN's delivery clock): the operator
+  -- answers what ingest has put in front of them, so this is the one boundary
+  -- that can say whether an operator send answered a given mail (round-6 K1).
+  ingested_at TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id);
 
@@ -290,6 +296,16 @@ export function openDb(path) {
     if (!msgCols.includes('thread_id')) {
       db.exec('ALTER TABLE messages ADD COLUMN thread_id INTEGER');
     }
+    // Ingest time — the ONE discharge clock for a kommun-imposed reply deadline
+    // (round-6 K1). See latestRespondByForConversation. Legacy rows are
+    // backfilled from received_at, ISO with T/Z stripped to SQLite's
+    // 'YYYY-MM-DD HH:MM:SS': an APPROXIMATION that says "ingested when
+    // delivered", which is exactly what the old delivery-time rule already
+    // assumed, so no pre-migration case gets worse. Runs once, inside the probe.
+    if (!msgCols.includes('ingested_at')) {
+      db.exec('ALTER TABLE messages ADD COLUMN ingested_at TEXT');
+      db.exec("UPDATE messages SET ingested_at = COALESCE(ingested_at, replace(substr(received_at,1,19),'T',' '))");
+    }
     const hbCols = db.prepare("PRAGMA table_info(daemon_heartbeat)").all().map((r) => r.name);
     if (!hbCols.includes('last_success_at')) {
       db.exec('ALTER TABLE daemon_heartbeat ADD COLUMN last_success_at TEXT');
@@ -472,14 +488,18 @@ export function openDb(path) {
     return true;
   }
 
+  // `ingested_at` is stamped here, by SQLite, and is never a caller-supplied
+  // value: it means "the moment this process recorded the mail". A caller could
+  // only get it wrong, and the deadline discharge rule depends on it being the
+  // same clock as decisions.decided_at (round-6 K1).
   function recordMessage(m) {
     const stmt = db.prepare(`
       INSERT INTO messages (
         conversation_id, gmail_message_id, direction, from_email, to_email,
         subject, body_text, classification, classification_confidence,
         received_at, attachment_count, signature_extracted, analysis_json,
-        gmail_thread_id, thread_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        gmail_thread_id, thread_id, ingested_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
     `);
     const sigJson = m.signature_extracted
       ? (typeof m.signature_extracted === 'string' ? m.signature_extracted : JSON.stringify(m.signature_extracted))
@@ -929,71 +949,68 @@ export function openDb(path) {
   // dropped: showing an operator one date too many is recoverable, silently
   // hiding a live frist is the failure this helper exists to prevent.
   //
-  // ARRIVAL ORDER IS THE SECOND CLOCK (round-5 J1). Delivery time
-  // (messages.received_at, Gmail internalDate) and ingest order (messages.id)
-  // are different clocks, and the operator answers what INGEST has shown them.
-  // A mail delivered 09:50 but ingested 10:05 cannot have been answered by a
-  // 10:00 send -- crossing mails, or any ingest outage while the operator keeps
-  // working the queue -- yet the delivery-time rule alone dropped it and the
-  // digest named the kommun with no date. So an inbound is outstanding when it
-  // arrived after the newest inbound an operator send actually answered
-  // (`lastAnsweredMessageId`: the highest messages.id any escalation behind an
-  // 'approve_unmodified'/'edit' decision pointed at) OR when the time rule says
-  // so. Both halves fail open: no answered message id leaves the time rule
-  // alone, no operator decision leaves everything outstanding.
-  // Read-only surfacing: no guard or automation keys off this.
+  // INGEST ORDER IS THE CLOCK (round-6 K1). Delivery time (messages.received_at,
+  // Gmail internalDate) is the KOMMUN's clock; the operator answers what INGEST
+  // has put in front of them. So the rule is one comparison and one clock: an
+  // inbound is OUTSTANDING iff its `ingested_at` is later than the latest
+  // operator send. A mail delivered 09:50 but ingested 10:05 cannot have been
+  // answered by a 10:00 send (crossing mails, or any ingest outage while the
+  // operator keeps working the queue) and stays live; a mail ingested before the
+  // send was on screen and is discharged.
+  //
+  // What this replaces, and why it had to go: the previous version OR-ed the
+  // delivery-time comparison with an arrival-order one whose boundary was
+  // MAX(escalations.message_id) over answered escalations. That boundary was
+  // wrong twice. Five of the six escalateWithDraft call sites pass no messageId
+  // (T-INITIAL failure, recoverStuckSends, the bounce resend, the daily
+  // staleness follow-up, T_UPDATE), so whenever the operator's last answer rode
+  // one of those the MAX() was NULL and the delivery-time rule ran alone — the
+  // original bug. And when it WAS set, MAX() over ALL answered escalations
+  // pinned the boundary at an old id for ever: a frist answered through a later
+  // follow-up draft never discharged and the kommun was nagged daily.
+  //
+  // Fail open, as before: no operator send in the conversation discharges
+  // nothing, and an ingest stamp we cannot read (NULL, or unparsable) is
+  // CONSIDERED rather than dropped. Showing an operator one date too many is
+  // recoverable; silently hiding a live frist is the failure this helper exists
+  // to prevent. Read-only surfacing: no guard, FSM transition or automation
+  // keys off this.
   function latestRespondByForConversation(conversationId) {
     const dischargedAtMs = latestOperatorSendMs(conversationId);
-    // messages.id is ingest order (AUTOINCREMENT rowid), so MAX() over the
-    // answered escalations' trigger mails is "the newest mail a human had in
-    // front of them when they last replied". NULL when no answered escalation
-    // names a message (a proactive draft, or legacy rows).
-    const lastAnsweredMessageId = db.prepare(`
-      SELECT MAX(e.message_id) AS message_id
-      FROM decisions d JOIN escalations e ON e.id = d.escalation_id
-      WHERE d.conversation_id = ? AND d.decision IN ('approve_unmodified', 'edit')
-    `).get(conversationId)?.message_id ?? null;
-    const outstandingByTime = (at) => {
+    const outstanding = (ingestedAt) => {
       if (Number.isNaN(dischargedAtMs)) return true;
-      const ms = timestampMs(at);
+      const ms = timestampMs(ingestedAt);
       return Number.isNaN(ms) ? true : ms > dischargedAtMs;
     };
-    const outstanding = (messageId, at) => (
-      (lastAnsweredMessageId != null && messageId != null && messageId > lastAnsweredMessageId)
-      || outstandingByTime(at)
-    );
     const fromMessages = db.prepare(`
-      SELECT m.id AS id, m.received_at AS received_at,
+      SELECT m.id AS id, m.ingested_at AS ingested_at,
              json_extract(m.analysis_json, '$.extracted.respond_by_date') AS respond_by
       FROM messages m
       WHERE m.conversation_id = ? AND m.direction = 'inbound'
         AND m.analysis_json IS NOT NULL AND json_valid(m.analysis_json)
       ORDER BY m.received_at DESC, m.id DESC
     `).all(conversationId);
-    const hit = fromMessages.find((r) => asIsoDate(r.respond_by) != null && outstanding(r.id, r.received_at));
+    const hit = fromMessages.find((r) => asIsoDate(r.respond_by) != null && outstanding(r.ingested_at));
     if (hit) return asIsoDate(hit.respond_by);
-    // Escalation fallback. The row's own created_at is NOT evidence that its
-    // deadline is live (round-4 H2): an escalation minted after our reply can
-    // carry a respond_by copied from an inbound that reply already answered --
-    // delayed ingest, or a superseded copy re-inheriting the frist. So when the
-    // row names its originating inbound, that mail's receipt is what the
-    // boundary is compared against. A NULL message_id (a proactive draft from
-    // the daily follow-up, which has no trigger mail) falls back to created_at.
-    // A message_id pointing at a row we cannot read leaves received_at NULL,
-    // which `outstanding` treats as considered -- fail open, as above. The
-    // arrival-order half applies here too (round-5 J1): a row whose trigger mail
-    // was ingested after the newest answered one is live whatever its clock says.
+    // Escalation fallback, same clock. The row's own created_at is NOT evidence
+    // that its deadline is live (round-4 H2): an escalation minted after our
+    // reply can carry a respond_by copied from an inbound that reply already
+    // answered -- delayed ingest, or a superseded copy re-inheriting the frist.
+    // So when the row names its originating inbound, that mail's INGEST time is
+    // the boundary. A NULL message_id (a proactive draft from the daily
+    // follow-up, which has no trigger mail) falls back to the escalation's own
+    // created_at, which is the same clock and format. A message_id pointing at a
+    // row we cannot read leaves ingested_at NULL, which `outstanding` treats as
+    // considered -- fail open, as above.
     const esc = db.prepare(`
       SELECT e.created_at AS created_at, e.respond_by AS respond_by,
-             e.message_id AS message_id, m.received_at AS trigger_received_at
+             e.message_id AS message_id, m.ingested_at AS trigger_ingested_at
       FROM escalations e LEFT JOIN messages m ON m.id = e.message_id
       WHERE e.conversation_id = ? AND e.respond_by IS NOT NULL AND e.respond_by != ''
       ORDER BY e.id DESC
     `).all(conversationId)
       .find((r) => asIsoDate(r.respond_by) != null
-        && (r.message_id != null
-          ? outstanding(r.message_id, r.trigger_received_at)
-          : outstandingByTime(r.created_at)));
+        && outstanding(r.message_id != null ? r.trigger_ingested_at : r.created_at));
     return esc ? asIsoDate(esc.respond_by) : null;
   }
 

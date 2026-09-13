@@ -835,13 +835,24 @@ describe('latestRespondByForConversation (round-2 finding F2)', () => {
       contact_email: 'k@frist.se', scheduled_send_at: '2026-09-01T08:00:00Z',
     });
   }
-  function inbound(convId, { at, respondBy, json }) {
-    return db.recordMessage({
+  // ISO-with-Z → the SQLite datetime('now') shape the ledger and ingested_at use.
+  const sqliteTs = (iso) => iso.replace('T', ' ').replace('Z', '');
+
+  // `ingested_at` is THE discharge clock (round-6 K1). recordMessage stamps the
+  // real wall clock, which says nothing in a fixture seeded with 2026-09 dates,
+  // so every seeded inbound gets an explicit value. The default is "ingested
+  // when it was delivered" (the normal case); the crossing-mail tests below set
+  // the two apart on purpose.
+  function inbound(convId, { at, respondBy, json, ingestedAt }) {
+    const id = db.recordMessage({
       conversation_id: convId, gmail_message_id: `g-${at}`, direction: 'inbound',
       from_email: 'k@frist.se', to_email: 'x', subject: 's', body_text: 'b',
       received_at: at, attachment_count: 0,
       analysis_json: json !== undefined ? json : JSON.stringify({ extracted: { respond_by_date: respondBy ?? null } }),
     });
+    db.raw.prepare('UPDATE messages SET ingested_at = ? WHERE id = ?')
+      .run(ingestedAt ?? sqliteTs(at), id);
+    return id;
   }
 
   it('prefers the newest inbound analysis over an older escalation', () => {
@@ -983,15 +994,28 @@ describe('latestRespondByForConversation (round-2 finding F2)', () => {
       expect(db.latestRespondByForConversation(id)).toBeNull();
     });
   });
-  // Round-5 J1 (critical): delivery time and ingest order are different clocks.
-  // A mail DELIVERED before our operator send but INGESTED after it (crossing
-  // mails, or an ingest outage while the operator keeps replying) cannot
-  // possibly have been answered, yet the time rule alone dropped it. The
-  // arrival-order boundary is the highest messages.id any answered escalation
-  // pointed at.
-  describe('arrival-order boundary (round-5 J1)', () => {
-    // An operator decision whose escalation names the inbound it answered.
-    function answerMessage(convId, messageId, decidedAt, decision = 'edit') {
+  // Round-6 K1 (critical): ONE clock, not two. Delivery time (received_at,
+  // Gmail internalDate) is the KOMMUN's clock; the operator answers what INGEST
+  // has put in front of them, so `messages.ingested_at` — the moment WE recorded
+  // the mail, stamped by the same datetime('now') the decisions ledger uses — is
+  // the only boundary that can decide whether an operator send answered a mail.
+  //
+  // The two-clock OR this replaces keyed its arrival-order half on
+  // MAX(escalations.message_id) over answered escalations, and that boundary was
+  // wrong twice over: five of the six escalateWithDraft call sites pass no
+  // messageId at all (T-INITIAL failure, recoverStuckSends, the bounce resend,
+  // the daily staleness follow-up, T_UPDATE), so MAX() was NULL and the
+  // delivery-time rule ran alone; and when it WAS set, MAX() over ALL answered
+  // escalations pinned the boundary at an old id for ever, so a frist answered
+  // through a later follow-up draft never discharged and the kommun was nagged
+  // daily. Advisory surfacing only: no guard, FSM transition or auto-send rule
+  // reads respond_by.
+  describe('discharge is ingest order, one clock (round-6 K1)', () => {
+    // An operator SEND. `messageId` defaults to NULL, which is what a proactive
+    // draft looks like — the daily follow-up, T-INITIAL failure,
+    // recoverStuckSends, the bounce resend and T_UPDATE all write one, and the
+    // old arrival-order half was blind to every single case.
+    function operatorSend(convId, decidedAt, { messageId = null, decision = 'edit' } = {}) {
       const escId = db.recordEscalation({ conversation_id: convId, message_id: messageId, reason: 'r' });
       const did = db.recordDecision({
         escalation_id: escId, conversation_id: convId, conversation_state: 'NEEDS_HUMAN',
@@ -1001,40 +1025,137 @@ describe('latestRespondByForConversation (round-2 finding F2)', () => {
       return escId;
     }
 
-    it('an inbound ingested AFTER the answered one stays outstanding even though it was delivered first', () => {
+    // (a) The original J1 bug, now via the clock that actually exists: the
+    // answer rode a proactive draft, so there is no answered message id at all.
+    it('an inbound ingested after a proactive-draft send stays outstanding', () => {
       const id = seed();
-      const answered = inbound(id, { at: '2026-09-05T08:00:00Z', respondBy: null });
-      answerMessage(id, answered, '2026-09-06 10:00:00');
-      // Delivered 09:50, ingested at 10:05 — a higher row id, an earlier clock.
-      inbound(id, { at: '2026-09-06T09:50:00Z', respondBy: '2026-09-20' });
+      operatorSend(id, '2026-09-06 10:00:00');
+      inbound(id, { at: '2026-09-07T08:00:00Z', respondBy: '2026-09-20' });
       expect(db.latestRespondByForConversation(id)).toBe('2026-09-20');
     });
 
-    it('an inbound that arrived BEFORE the answered one and predates the send is discharged', () => {
+    // (b) The mirror image: ingested before the same send, so the operator could
+    // see it and their reply answered it.
+    it('an inbound ingested before that same send is discharged', () => {
       const id = seed();
-      inbound(id, { at: '2026-09-04T08:00:00Z', respondBy: '2026-09-20' });
-      const answered = inbound(id, { at: '2026-09-05T08:00:00Z', respondBy: null });
-      answerMessage(id, answered, '2026-09-06 10:00:00');
+      inbound(id, { at: '2026-09-05T08:00:00Z', respondBy: '2026-09-20', ingestedAt: '2026-09-05 08:01:00' });
+      operatorSend(id, '2026-09-06 10:00:00');
       expect(db.latestRespondByForConversation(id)).toBeNull();
     });
 
-    it('with no operator decision at all every inbound is outstanding', () => {
+    // (c) The crossing mail: delivered 09:50, ingested 10:05, an operator send
+    // at 10:00 in between. Delivery time says answered, ingest order says it was
+    // never on screen. Ingest order is right.
+    it('a crossing mail delivered before the send but ingested after it stays outstanding', () => {
+      const id = seed();
+      operatorSend(id, '2026-09-06 10:00:00');
+      inbound(id, { at: '2026-09-06T09:50:00Z', respondBy: '2026-09-20', ingestedAt: '2026-09-06 10:05:00' });
+      expect(db.latestRespondByForConversation(id)).toBe('2026-09-20');
+    });
+
+    // (d) The over-nag the id boundary caused (adversarial cases C/C2): the
+    // first frist was answered through an escalation that NAMED its trigger
+    // mail, the second through a proactive follow-up draft that named none.
+    // MAX(message_id) therefore stayed pinned at the FIRST mail and the second,
+    // higher id looked outstanding for ever. One clock cannot get stuck.
+    it('a frist answered through a later follow-up draft discharges anyway', () => {
+      const id = seed();
+      const first = inbound(id, { at: '2026-09-04T08:00:00Z', respondBy: '2026-09-14' });
+      operatorSend(id, '2026-09-05 10:00:00', { messageId: first });
+      inbound(id, { at: '2026-09-06T08:00:00Z', respondBy: '2026-09-20' });
+      operatorSend(id, '2026-09-07 10:00:00'); // proactive follow-up draft: no message_id
+      expect(db.latestRespondByForConversation(id)).toBeNull();
+    });
+
+    it('with no operator send at all every inbound is outstanding', () => {
       const id = seed();
       inbound(id, { at: '2026-09-04T08:00:00Z', respondBy: '2026-09-20' });
       inbound(id, { at: '2026-09-05T08:00:00Z', respondBy: null });
       expect(db.latestRespondByForConversation(id)).toBe('2026-09-20');
     });
 
-    // The escalation fallback gets the same two-part rule: a row whose
-    // originating inbound arrived after the answered one is still live.
-    it('an escalation whose originating inbound arrived after the answered one keeps its deadline', () => {
+    // The escalation fallback reads the SAME clock: its trigger mail's
+    // ingested_at when it names one, its own created_at when it does not.
+    it('an escalation whose trigger mail was ingested after the send keeps its deadline', () => {
       const id = seed();
-      const answered = inbound(id, { at: '2026-09-05T08:00:00Z', respondBy: null });
-      answerMessage(id, answered, '2026-09-06 10:00:00');
-      const later = inbound(id, { at: '2026-09-06T09:50:00Z', respondBy: null });
+      operatorSend(id, '2026-09-06 10:00:00');
+      const later = inbound(id, { at: '2026-09-06T09:50:00Z', respondBy: null, ingestedAt: '2026-09-06 10:05:00' });
       const esc = db.recordEscalation({ conversation_id: id, message_id: later, reason: 'r', respond_by: '2026-09-21' });
-      db.raw.prepare('UPDATE escalations SET created_at = ? WHERE id = ?').run('2026-09-06 10:05:00', esc);
+      db.raw.prepare('UPDATE escalations SET created_at = ? WHERE id = ?').run('2026-09-06 10:06:00', esc);
       expect(db.latestRespondByForConversation(id)).toBe('2026-09-21');
     });
+
+    it('an escalation whose trigger mail was ingested before the send is discharged', () => {
+      const id = seed();
+      const seen = inbound(id, { at: '2026-09-05T08:00:00Z', respondBy: null, ingestedAt: '2026-09-05 08:01:00' });
+      operatorSend(id, '2026-09-06 10:00:00');
+      const esc = db.recordEscalation({ conversation_id: id, message_id: seen, reason: 'r', respond_by: '2026-09-21' });
+      db.raw.prepare('UPDATE escalations SET created_at = ? WHERE id = ?').run('2026-09-06 10:06:00', esc);
+      expect(db.latestRespondByForConversation(id)).toBeNull();
+    });
+
+    // Fail open: an unreadable or missing ingest stamp is CONSIDERED, never
+    // dropped. Showing one date too many is recoverable; hiding a live frist is
+    // the failure this helper exists to prevent.
+    it('a NULL ingested_at is considered outstanding, not discharged', () => {
+      const id = seed();
+      const mid = inbound(id, { at: '2026-09-05T08:00:00Z', respondBy: '2026-09-20', ingestedAt: '2026-09-05 08:01:00' });
+      operatorSend(id, '2026-09-06 10:00:00');
+      expect(db.latestRespondByForConversation(id)).toBeNull();
+      db.raw.prepare('UPDATE messages SET ingested_at = NULL WHERE id = ?').run(mid);
+      expect(db.latestRespondByForConversation(id)).toBe('2026-09-20');
+    });
   });
+});
+
+// Round-6 K1: the new column is append-only, probed with PRAGMA table_info like
+// every other one, and legacy rows are backfilled from received_at (ISO with
+// T/Z, stripped to the SQLite 'YYYY-MM-DD HH:MM:SS' shape). The backfill is an
+// APPROXIMATION for pre-migration rows: it says "ingested when delivered", which
+// is what the old delivery-time rule already assumed, so no case gets worse.
+describe('messages.ingested_at migration (round-6 K1)', () => {
+  it('adds the column, backfills a legacy row from received_at, and is idempotent', () => {
+    const migDb = openDb(':memory:');
+    // Simulate a pre-column DB: messages built by hand, without ingested_at.
+    migDb.raw.exec(`CREATE TABLE messages (
+      id INTEGER PRIMARY KEY,
+      conversation_id INTEGER NOT NULL,
+      gmail_message_id TEXT NOT NULL UNIQUE,
+      direction TEXT NOT NULL,
+      from_email TEXT, to_email TEXT, subject TEXT, body_text TEXT,
+      classification TEXT, classification_confidence REAL,
+      received_at TEXT NOT NULL,
+      attachment_count INTEGER NOT NULL DEFAULT 0,
+      signature_extracted TEXT
+    )`);
+    migDb.raw.prepare(`INSERT INTO messages (conversation_id, gmail_message_id, direction, received_at, attachment_count)
+      VALUES (1, 'legacy-1', 'inbound', '2026-08-19T14:15:00Z', 0)`).run();
+
+    migDb.migrate();
+    const cols = migDb.raw.prepare('PRAGMA table_info(messages)').all().map((r) => r.name);
+    expect(cols).toContain('ingested_at');
+    const read = () => migDb.raw.prepare("SELECT ingested_at FROM messages WHERE gmail_message_id = 'legacy-1'").get().ingested_at;
+    expect(read()).toBe('2026-08-19 14:15:00');
+
+    expect(() => migDb.migrate()).not.toThrow();
+    expect(read()).toBe('2026-08-19 14:15:00');
+    migDb.close();
+  });
+
+  it('recordMessage stamps ingested_at with the SQLite clock', () => {
+    const cid = db.createConversation({ kommun_kod: '0501', kommun_namn: 'Stämpel', role: 'central', contact_email: 's@s.se', scheduled_send_at: '2026-08-01T08:00:00Z' });
+    const mid = db.recordMessage({
+      conversation_id: cid, gmail_message_id: 'stamp-1', direction: 'inbound',
+      from_email: 's@s.se', to_email: 'x', subject: 's', body_text: 'b',
+      received_at: '2026-08-19T14:15:00Z', attachment_count: 0,
+    });
+    const row = migRead(mid);
+    expect(row.ingested_at).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+    // Not the kommun's delivery clock: the two are different by construction.
+    expect(row.ingested_at).not.toBe('2026-08-19 14:15:00');
+  });
+
+  function migRead(id) {
+    return db.raw.prepare('SELECT ingested_at FROM messages WHERE id = ?').get(id);
+  }
 });
