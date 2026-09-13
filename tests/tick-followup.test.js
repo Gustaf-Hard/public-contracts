@@ -772,10 +772,25 @@ describe('queue hygiene digest (2026-09-12 design)', () => {
     }
 
     const posted = [];
+    // Round-10 O1: this fake drives the real postAlert with a low-level
+    // chat.postMessage fake, so it gets the same Slack-shaped limit checks as
+    // tests/slack.test.js's fake client — a regression that reintroduces the
+    // full original string in `text` fails LOUD instead of passing silently.
     const slackOps = {
       ...fakeSlackOps(),
       postAlert: vi.fn(async (slack, args) => realPostAlert(
-        { chat: { postMessage: async (m) => { posted.push(m); return { ts: 'a', channel: m.channel }; } } },
+        {
+          chat: {
+            postMessage: async (m) => {
+              if (m.text.length > 40000) throw new Error(`Slack text field exceeds 40000 chars (${m.text.length})`);
+              for (const b of m.blocks) {
+                if (b.text.text.length > 3000) throw new Error(`Slack section block exceeds 3000 chars (${b.text.text.length})`);
+              }
+              posted.push(m);
+              return { ts: 'a', channel: m.channel };
+            },
+          },
+        },
         args,
       )),
     };
@@ -785,17 +800,19 @@ describe('queue hygiene digest (2026-09-12 design)', () => {
     expect(digest).toBeTruthy();
     expect(posted.filter((m) => m.text.includes('Köhälsa'))).toHaveLength(1); // ONE message
     // The worst case really does exceed one block — otherwise this test proves nothing.
-    expect(digest.text.length).toBeGreaterThan(2900);
     expect(digest.blocks.length).toBeGreaterThan(1);
     expect(digest.blocks.length).toBeLessThanOrEqual(50);
     for (const b of digest.blocks) {
       expect(b.type).toBe('section');
       expect(b.text.text.length).toBeLessThanOrEqual(2900);
     }
+    // O1: the notification fallback is the first block's text, bounded well
+    // under the block cap, not the full multi-block digest.
+    expect(digest.text.length).toBeLessThanOrEqual(2900);
+    expect(digest.text).toBe(digest.blocks[0].text.text);
     // Nothing is lost, and no label is cut in half: every section's own lines
     // survive intact inside some block.
     const joined = digest.blocks.map((b) => b.text.text).join('\n');
-    expect(joined).toBe(digest.text);
     for (const marker of ['⏰', '🕰', '🧭']) expect(joined).toContain(marker);
     for (const label of [`Frist ${nn(0)}/${role} (senast 2026-09-13)`, `Ensam ${nn(0)}/${role}`]) {
       expect(digest.blocks.some((b) => b.text.text.includes(label))).toBe(true);

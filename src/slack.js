@@ -105,11 +105,29 @@ export function splitAlertText(text, max = SECTION_MAX_CHARS) {
   return chunks;
 }
 
+// Round-10 O1 (critical): `splitAlertText` bounds every `blocks` entry, but the
+// call below used to pass the FULL original string as `text` (the notification
+// fallback) — Slack's own `text` field has its own hard limit (40000 chars,
+// undocumented in the block-kit path but real), and the fake Slack client in
+// the tests accepted any length, so a 200 KB digest sailed through the suite.
+// `text` is now the first block's text, itself re-capped at SECTION_MAX_CHARS
+// with a trailing " …" on the rare case that a block ever exceeds that budget
+// (it cannot today, since splitAlertText's own default max is the same
+// SECTION_MAX_CHARS, but the cap here is a second line of defense, not a
+// trust in the caller). Short input that never split still round-trips
+// unchanged, because the first (only) block IS the input.
+function notificationTextFor(firstBlockText) {
+  if (firstBlockText.length <= SECTION_MAX_CHARS) return firstBlockText;
+  const suffix = ' …';
+  return `${firstBlockText.slice(0, SECTION_MAX_CHARS - suffix.length)}${suffix}`;
+}
+
 export async function postAlert(slack, { channel, text, thread_ts = null }) {
+  const blocks = splitAlertText(text).map((t) => ({ type: 'section', text: { type: 'mrkdwn', text: t } }));
   const res = await slack.chat.postMessage({
     channel,
-    text,
-    blocks: splitAlertText(text).map((t) => ({ type: 'section', text: { type: 'mrkdwn', text: t } })),
+    text: notificationTextFor(blocks[0].text.text),
+    blocks,
     ...(thread_ts ? { thread_ts } : {}),
   });
   return { ts: res.ts, channel: res.channel };

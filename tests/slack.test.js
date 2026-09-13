@@ -166,9 +166,27 @@ describe('updateEscalationResolved labels agency honestly', () => {
 // catch only logs it, so the operator is told nothing. One fix in one place: the
 // single place every digest and every operational alert goes through.
 describe('postAlert block budget', () => {
+  // Round-10 O1 (critical): a Slack `text` field (the notification fallback)
+  // has its own hard limit (40000 chars) and a `section` block's own cap is
+  // 3000 chars. Slack itself would reject an over-limit postMessage call; the
+  // fake here does the same, so a regression that reintroduces the full
+  // original string in `text` fails LOUD instead of passing silently the way
+  // the pre-fix suite did.
   function fakeSlack() {
     const calls = [];
-    return { calls, chat: { postMessage: async (args) => { calls.push(args); return { ts: 't-1', channel: args.channel }; } } };
+    return {
+      calls,
+      chat: {
+        postMessage: async (args) => {
+          if (args.text.length > 40000) throw new Error(`Slack text field exceeds 40000 chars (${args.text.length})`);
+          for (const b of args.blocks) {
+            if (b.text.text.length > 3000) throw new Error(`Slack section block exceeds 3000 chars (${b.text.text.length})`);
+          }
+          calls.push(args);
+          return { ts: 't-1', channel: args.channel };
+        },
+      },
+    };
   }
   const LIMIT = 2900;
   const blockTexts = (slack) => slack.calls[0].blocks.map((b) => b.text.text);
@@ -179,7 +197,7 @@ describe('postAlert block budget', () => {
     expect(slack.calls).toHaveLength(1);
     expect(slack.calls[0].blocks).toHaveLength(1);
     expect(slack.calls[0].blocks[0]).toEqual({ type: 'section', text: { type: 'mrkdwn', text: '🧹 *Köhälsa:*\nallt lugnt' } });
-    expect(slack.calls[0].text).toBe('🧹 *Köhälsa:*\nallt lugnt'); // fallback/notification text untouched
+    expect(slack.calls[0].text).toBe('🧹 *Köhälsa:*\nallt lugnt'); // short input: fallback text is unchanged
     expect(res).toEqual({ ts: 't-1', channel: 'C1' });
   });
 
@@ -198,6 +216,10 @@ describe('postAlert block budget', () => {
     // Nothing lost, nothing reordered, and every line survives whole.
     expect(texts.join('\n')).toBe(text);
     for (const t of texts) for (const line of t.split('\n')) expect(lines).toContain(line);
+    // O1: the notification fallback is the first block's text, not the full
+    // (7000+ char) original string.
+    expect(slack.calls[0].text.length).toBeLessThanOrEqual(LIMIT);
+    expect(slack.calls[0].text).toBe(texts[0]);
   });
 
   it('hard-splits a single line that is longer than the budget', async () => {
@@ -208,6 +230,8 @@ describe('postAlert block budget', () => {
     expect(texts).toHaveLength(3);
     for (const t of texts) expect(t.length).toBeLessThanOrEqual(LIMIT);
     expect(texts.join('')).toBe(text);
+    expect(slack.calls[0].text.length).toBeLessThanOrEqual(LIMIT);
+    expect(slack.calls[0].text).toBe(texts[0]);
   });
 
   it('caps at 50 blocks and says what it cut rather than letting Slack reject the message', async () => {
@@ -218,6 +242,9 @@ describe('postAlert block budget', () => {
     expect(texts).toHaveLength(50);
     for (const t of texts) expect(t.length).toBeLessThanOrEqual(LIMIT);
     expect(texts[49]).toMatch(/avkortat/);
+    // O1: even in the overflow case, the fallback text is bounded by LIMIT.
+    expect(slack.calls[0].text.length).toBeLessThanOrEqual(LIMIT);
+    expect(slack.calls[0].text).toBe(texts[0]);
   });
 
   it('still threads a split alert under an existing escalation message', async () => {
