@@ -799,28 +799,58 @@ export function openDb(path) {
     `).all(byIsoDate);
   }
 
-  // The newest reply deadline we know of for a conversation, independent of the
+  // Milliseconds for a stored timestamp in either of the two shapes this schema
+  // uses: ISO-8601 with T and Z (conversations.last_outbound_at,
+  // messages.received_at) and SQLite's datetime('now') 'YYYY-MM-DD HH:MM:SS',
+  // which is UTC without a marker. NaN for anything unreadable.
+  function timestampMs(value) {
+    if (value == null) return NaN;
+    const s = String(value).trim();
+    if (s === '') return NaN;
+    return Date.parse(s.includes('T') ? s : `${s.replace(' ', 'T')}Z`);
+  }
+
+  // The newest OUTSTANDING reply deadline for a conversation, independent of the
   // escalation lifecycle (round-2 finding F2). The void path in tick.js
   // supersedes the open escalation and creates no replacement, so every reader
   // keyed on status='open' loses the frist the kommun set. Inbound analyses win,
   // newest first; otherwise the most recent escalation row of ANY status.
   // json_valid() keeps a half-written or non-JSON analysis_json from throwing.
+  //
+  // DISCHARGE RULE (round-3 G1): a kommun-imposed deadline is a demand on US, so
+  // it stands until WE reply and OUR reply is what discharges it. Only rows that
+  // arrived/were created strictly after the conversation's `last_outbound_at`
+  // are considered; a NULL last_outbound_at (nothing sent yet) considers
+  // everything. This is what lets escalateWithDraft carry the frist onto every
+  // escalation minted while it is outstanding without ever resurrecting a
+  // deadline we already answered. A timestamp we cannot parse is considered
+  // rather than dropped: showing an operator one date too many is recoverable,
+  // silently hiding a live frist is the failure this helper exists to prevent.
   // Read-only surfacing: no guard or automation keys off this.
   function latestRespondByForConversation(conversationId) {
+    const conv = db.prepare('SELECT last_outbound_at FROM conversations WHERE id = ?').get(conversationId);
+    const dischargedAtMs = timestampMs(conv?.last_outbound_at);
+    const outstanding = (at) => {
+      if (Number.isNaN(dischargedAtMs)) return true;
+      const ms = timestampMs(at);
+      return Number.isNaN(ms) ? true : ms > dischargedAtMs;
+    };
     const fromMessages = db.prepare(`
-      SELECT json_extract(m.analysis_json, '$.extracted.respond_by_date') AS respond_by
+      SELECT m.received_at AS received_at,
+             json_extract(m.analysis_json, '$.extracted.respond_by_date') AS respond_by
       FROM messages m
       WHERE m.conversation_id = ? AND m.direction = 'inbound'
         AND m.analysis_json IS NOT NULL AND json_valid(m.analysis_json)
       ORDER BY m.received_at DESC, m.id DESC
     `).all(conversationId);
-    const hit = fromMessages.find((r) => typeof r.respond_by === 'string' && r.respond_by.trim() !== '');
+    const hit = fromMessages.find((r) => typeof r.respond_by === 'string' && r.respond_by.trim() !== ''
+      && outstanding(r.received_at));
     if (hit) return hit.respond_by;
     const esc = db.prepare(`
-      SELECT respond_by FROM escalations
+      SELECT created_at, respond_by FROM escalations
       WHERE conversation_id = ? AND respond_by IS NOT NULL AND respond_by != ''
-      ORDER BY id DESC LIMIT 1
-    `).get(conversationId);
+      ORDER BY id DESC
+    `).all(conversationId).find((r) => outstanding(r.created_at));
     return esc?.respond_by ?? null;
   }
 

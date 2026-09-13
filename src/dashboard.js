@@ -445,10 +445,13 @@ export function buildActionQueue(db) {
       since: caseSince(c),
       // A NEEDS_HUMAN case whose draft was voided has no open escalation, so
       // its deadline comes from the message analysis instead (round-2 finding
-      // F2) — otherwise it sorts behind undated drafts.
-      respond_by: openEsc.length > 0
-        ? openEsc[0].respond_by ?? null
-        : db.latestRespondByForConversation?.(c.id) ?? null,
+      // F2) — otherwise it sorts behind undated drafts. An escalation that DOES
+      // exist but carries no respond_by falls back to the same source (round-3
+      // G1, belt and braces): escalateWithDraft now inherits the outstanding
+      // frist, but rows written before that fix do not carry it, and the
+      // dashboard must not disagree with the Slack digest about them.
+      respond_by: (openEsc.length > 0 ? openEsc[0].respond_by : null)
+        ?? db.latestRespondByForConversation?.(c.id) ?? null,
     });
   }
   // Durable hänvisningar (2026-09-06 design): a pending handoff task is

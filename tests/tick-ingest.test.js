@@ -9,6 +9,7 @@ import { openDb } from '../src/storage.js';
 import { runTick, matchInbound, deriveFetchWindowDays } from '../src/tick.js';
 import * as analyseMod from '../src/analyse-message.js';
 import { dedupeFilenames } from '../src/attachments.js';
+import { buildActionQueue } from '../src/dashboard.js';
 
 let tmp, db, contractsDir;
 beforeEach(() => {
@@ -379,6 +380,56 @@ describe('runTick — a voided draft does not take the deadline with it (F2)', (
     expect(row.resolved_text).toContain('voided'); // the void path, not a supersede by a fresh draft
     expect(db.listOpenEscalationsForConversation(id)).toHaveLength(0);
     expect(db.latestRespondByForConversation(id)).toBe('2026-09-15');
+  });
+
+  // Round-3 G1 (Codex R2 #1): after the void, the NEXT inbound opens a fresh
+  // escalation of its own. It restates no frist, and escalateWithDraft only
+  // inherited from the escalation it was superseding — which by then was
+  // already superseded — so the recovered deadline vanished again and the
+  // conversation appeared in no due list at all. A kommun-imposed deadline is
+  // outstanding until WE reply, so it must ride every escalation created while
+  // it stands.
+  it('a later undated escalation inherits the still-outstanding deadline', async () => {
+    const id = seedConv();
+    db.updateConversationState(id, 'NEEDS_HUMAN', {});
+    db.recordEscalation({ conversation_id: id, reason: 'r', draft_template: 'free_form', draft_body: 'b', respond_by: '2026-09-13' });
+
+    // Tick 1: the kommun states a new frist, the draft is voided, no escalation.
+    const spy1 = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue({
+      intent: 'clarification', confidence: 0.9, summary: 'Frågor om begäran.',
+      extracted: { arendenummer: null, promised_response_days: null, promised_response_date: null, respond_by_date: '2026-09-15', handoff_to_email: null, handoff_to_forvaltning: null, questions: ['Vilken period?'], mentioned_vendors: null, reseller_relations: null },
+      suggested_action: 'send_precision', is_final_delivery: false, draft_reply: 'd', follow_up_at: null,
+    });
+    await runTick(deps({
+      gmail: fakeGmail({
+        listResult: [{ id: 'cl-1' }],
+        getResult: { 'cl-1': mkMsg('cl-1', 'thr-a', 'K <kansli@ale.se>', 'Kan du precisera? Svara senast 2026-09-15.', { internalDate: String(Date.parse('2026-09-11T08:00:00Z')) }) },
+      }),
+      now: new Date('2026-09-12T09:00:00Z'),
+    }));
+    spy1.mockRestore();
+    expect(db.listOpenEscalationsForConversation(id)).toHaveLength(0);
+
+    // Tick 2: an undated 'unknown' reply that does warrant a draft.
+    const spy2 = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue({
+      intent: 'unknown', confidence: 0.4, summary: 'Oklart svar.',
+      extracted: { arendenummer: null, promised_response_days: null, promised_response_date: null, respond_by_date: null, handoff_to_email: null, handoff_to_forvaltning: null, questions: null, mentioned_vendors: null, reseller_relations: null },
+      suggested_action: 'escalate', is_final_delivery: false, draft_reply: 'd2', follow_up_at: null,
+    });
+    await runTick(deps({
+      gmail: fakeGmail({
+        listResult: [{ id: 'cl-2' }],
+        getResult: { 'cl-2': mkMsg('cl-2', 'thr-a', 'K <kansli@ale.se>', 'Hmm.', { internalDate: String(Date.parse('2026-09-12T08:00:00Z')) }) },
+      }),
+      now: new Date('2026-09-12T10:00:00Z'),
+    }));
+    spy2.mockRestore();
+
+    const open = db.listOpenEscalationsForConversation(id);
+    expect(open).toHaveLength(1);
+    expect(open[0].respond_by).toBe('2026-09-15');
+    expect(buildActionQueue(db).find((r) => r.conv_id === id).respond_by).toBe('2026-09-15');
+    expect(db.listOpenEscalationsWithDeadlineDue('2026-09-16').map((e) => e.conversation_id)).toContain(id);
   });
 });
 

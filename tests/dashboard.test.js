@@ -844,6 +844,27 @@ describe('home buckets', () => {
     expect(q.find((r) => r.conv_id === undated).respond_by).toBeNull();
   });
 
+  // Round-3 G1: belt and braces on the dashboard side. An OPEN but undated
+  // escalation on a conversation whose newest post-reply inbound carries a frist
+  // must still sort deadline-first — otherwise the dashboard and the Slack
+  // digest disagree for every escalation created before the inheritance fix.
+  it('buildActionQueue falls back to the conversation deadline for an undated OPEN escalation', () => {
+    const plain = seedConvWithOpenEscalation({ kommun: 'Odaterad' });
+    const cid = db.createConversation({ kommun_kod: '3333', kommun_namn: 'Ärvd', role: 'central', contact_email: 'a@a.se', scheduled_send_at: '2026-05-24T10:00:00Z' });
+    db.recordMessage({
+      conversation_id: cid, gmail_message_id: 'g-inherit', direction: 'inbound',
+      from_email: 'a@a.se', to_email: 'x', subject: 's', body_text: 'b',
+      received_at: '2026-09-11T08:00:00Z', attachment_count: 0,
+      analysis_json: JSON.stringify({ extracted: { respond_by_date: '2026-09-13' } }),
+    });
+    db.updateConversationState(cid, 'SENT', { last_outbound_at: '2026-09-01T08:00:00Z' });
+    db.recordEscalation({ conversation_id: cid, reason: 'test', draft_template: 'free_form', draft_body: 'b' });
+    const q = buildActionQueue(db);
+    expect(q.find((r) => r.conv_id === cid).respond_by).toBe('2026-09-13');
+    expect(q[0].conv_id).toBe(cid);
+    expect(q.find((r) => r.conv_id === plain).respond_by).toBeNull();
+  });
+
   it('renders a ≥7-day-old Behöver dig row with the q-age-old class', async () => {
     const cid = db.createConversation({ kommun_kod: '0580', kommun_namn: 'Linköping', role: 'central', contact_email: 'k@l.se', scheduled_send_at: '2026-05-24T10:00:00Z' });
     db.updateConversationState(cid, 'SENT', { last_outbound_at: '2026-01-01T00:00:00Z' });

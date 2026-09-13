@@ -726,4 +726,33 @@ describe('latestRespondByForConversation (round-2 finding F2)', () => {
     db.recordEscalation({ conversation_id: id, reason: 'r' });
     expect(db.latestRespondByForConversation(id)).toBeNull();
   });
+
+  // Round-3 G1: a kommun-imposed deadline is OUTSTANDING until WE reply. Our
+  // reply discharges it, so anything dated before last_outbound_at is spent and
+  // must not resurrect on a later undated escalation.
+  it('ignores a dated inbound older than our last reply (we already answered it)', () => {
+    const id = seed();
+    inbound(id, { at: '2026-09-05T08:00:00Z', respondBy: '2026-09-10' });
+    db.raw.prepare('UPDATE conversations SET last_outbound_at = ? WHERE id = ?').run('2026-09-06T09:00:00Z', id);
+    expect(db.latestRespondByForConversation(id)).toBeNull();
+  });
+
+  it('keeps a dated inbound newer than our last reply (still outstanding)', () => {
+    const id = seed();
+    inbound(id, { at: '2026-09-05T08:00:00Z', respondBy: '2026-09-10' });
+    db.raw.prepare('UPDATE conversations SET last_outbound_at = ? WHERE id = ?').run('2026-09-06T09:00:00Z', id);
+    inbound(id, { at: '2026-09-07T08:00:00Z', respondBy: '2026-09-14' });
+    expect(db.latestRespondByForConversation(id)).toBe('2026-09-14');
+  });
+
+  it('ignores an escalation row created before our last reply, keeps one created after', () => {
+    const id = seed();
+    const spent = db.recordEscalation({ conversation_id: id, reason: 'r', respond_by: '2026-09-10' });
+    db.raw.prepare('UPDATE escalations SET created_at = ? WHERE id = ?').run('2026-09-05 08:00:00', spent);
+    db.raw.prepare('UPDATE conversations SET last_outbound_at = ? WHERE id = ?').run('2026-09-06T09:00:00Z', id);
+    expect(db.latestRespondByForConversation(id)).toBeNull();
+    const live = db.recordEscalation({ conversation_id: id, reason: 'r', respond_by: '2026-09-18' });
+    db.raw.prepare('UPDATE escalations SET created_at = ? WHERE id = ?').run('2026-09-07 08:00:00', live);
+    expect(db.latestRespondByForConversation(id)).toBe('2026-09-18');
+  });
 });

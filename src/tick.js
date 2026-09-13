@@ -230,8 +230,15 @@ async function escalateWithDraft({ conv, parsedInbound, messageId = null, classi
   }
 
   // One deadline for both the row and the Slack block: the inbound's own frist
-  // when it restated one, otherwise the superseded escalation's.
-  const effectiveRespondBy = respondBy ?? inheritedRespondBy ?? null;
+  // when it restated one, then the escalation we just superseded, then the
+  // conversation's newest OUTSTANDING frist (round-3 G1). The third source is
+  // what the first two miss: after the void path supersedes a dated escalation
+  // and opens none, the NEXT inbound has nothing to inherit from and the
+  // recovered deadline disappeared again. latestRespondByForConversation is
+  // discharge-aware (only rows after last_outbound_at count), so a deadline we
+  // have already answered cannot resurrect here.
+  const effectiveRespondBy = respondBy ?? inheritedRespondBy
+    ?? db.latestRespondByForConversation?.(conv.id) ?? null;
 
   const escId = db.recordEscalation({
     conversation_id: conv.id,
