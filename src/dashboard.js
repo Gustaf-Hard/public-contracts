@@ -275,6 +275,13 @@ function buildOverviewRows(municipalities, db, vacationConfig = { enabled: false
     : [];
   const latestInboundByConvId = new Map(latestInbound.map((r) => [r.conversation_id, r]));
 
+  // Round-13 R3: a conversation whose only pending work is a durable hänvisning
+  // task (no escalation, not NEEDS_HUMAN) — buildActionQueue already lists it
+  // as a HANDOFF row, so the overview's needs-attention filter must agree.
+  const pendingHandoffConvIds = new Set(
+    (db?.listPendingHandoffTasks?.() ?? []).map((t) => t.source_conversation_id)
+  );
+
   return municipalities.map((m) => {
     const convs = convsByKod.get(m.kommun_kod) ?? [];
     let openEsc = 0;
@@ -282,6 +289,7 @@ function buildOverviewRows(municipalities, db, vacationConfig = { enabled: false
     let lastActivityAt = null;
     let earliestFollowUp = null;
     let earliestFollowUpSource = null;
+    let hasPendingHandoff = false;
     for (const c of convs) {
       // Round-13 R1 (adversarial R12 #1, Codex R12 #3): a closed case
       // (DONE/DEAD_END) is never pending work, exactly as buildActionQueue's
@@ -302,6 +310,7 @@ function buildOverviewRows(municipalities, db, vacationConfig = { enabled: false
         earliestFollowUp = fu.date;
         earliestFollowUpSource = fu.source;
       }
+      if (pendingHandoffConvIds.has(c.id)) hasPendingHandoff = true;
     }
     return {
       kommun_kod: m.kommun_kod,
@@ -314,6 +323,10 @@ function buildOverviewRows(municipalities, db, vacationConfig = { enabled: false
         tooltip: caseTooltip(c, latestInboundByConvId.get(c.id), effectiveFollowUp(c, vacationConfig), latestOpenEscByConvId.get(c.id)),
       })),
       open_escalations: openEsc,
+      // Round-13 R3: pending-handoff membership, tracked separately from the
+      // escalation count so the needs-attention filter agrees with
+      // buildActionQueue's HANDOFF rows even when no escalation exists.
+      has_pending_handoff: hasPendingHandoff,
       contracts,
       last_activity_at: lastActivityAt,
       follow_up_at: earliestFollowUp,
@@ -373,7 +386,9 @@ function applyFilter(rows, filter) {
     return rows.filter((r) => r.stage === stage);
   }
   if (filter === 'in-pilot' || filter === 'active') return rows.filter((r) => r.states.length > 0);
-  if (filter === 'needs-attention') return rows.filter((r) => r.states.some((s) => s.state === 'NEEDS_HUMAN') || r.open_escalations > 0);
+  // Round-13 R3: a pending handoff task alone (no escalation, not NEEDS_HUMAN)
+  // is still operator work, mirroring buildActionQueue's HANDOFF rows.
+  if (filter === 'needs-attention') return rows.filter((r) => r.states.some((s) => s.state === 'NEEDS_HUMAN') || r.open_escalations > 0 || r.has_pending_handoff);
   if (filter === 'delivering') return rows.filter((r) => r.states.some((s) => s.state === 'DELIVERING'));
   if (filter === 'done') return rows.filter((r) => r.states.some((s) => s.state === 'DONE'));
   if (filter === 'dead-end') return rows.filter((r) => r.states.some((s) => s.state === 'DEAD_END'));
@@ -600,6 +615,12 @@ export function buildWaiting(db) {
 function loadCaseSummaries(db) {
   if (!db) return [];
   const openEscPlaceholders = ACTIVE_ESCALATION_STATUSES.map(() => '?').join(', ');
+  // Round-13 R3: pending-handoff membership, carried separately from the
+  // escalation count so caseBucket can put a handoff-only case in Behöver dig
+  // (buildActionQueue already lists it as a HANDOFF row).
+  const pendingHandoffConvIds = new Set(
+    (db.listPendingHandoffTasks?.() ?? []).map((t) => t.source_conversation_id)
+  );
   return db.listAllConversations().map((c) => {
     // ACTIVE_ESCALATION_STATUSES, not status='open' alone (round-12 Q3): this
     // feeds caseBucket's 'behover_dig' membership, and a parked send is exactly
@@ -624,6 +645,7 @@ function loadCaseSummaries(db) {
       snippet: (last?.body_text ?? '').replace(/\s+/g, ' ').trim().slice(0, 100),
       last_direction: last?.direction ?? null,
       awaiting_us,
+      has_pending_handoff: pendingHandoffConvIds.has(c.id),
     };
   });
 }

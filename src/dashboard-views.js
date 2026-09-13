@@ -1784,7 +1784,10 @@ function caseBucket(c) {
   // without this ordering that lingering row (or a stale pending-handoff task)
   // kept re-flipping a DONE/DEAD_END case back into Behöver dig.
   if (CASE_STATUS[c.state]?.terminal) return 'stangda';
-  if (c.state === 'NEEDS_HUMAN' || (c.open_esc ?? 0) > 0) return 'behover_dig';
+  // Round-13 R3: a pending hänvisning task is operator work exactly like an
+  // open escalation, carried separately from open_esc so a handoff-only case
+  // (no escalation, not NEEDS_HUMAN) is not invisible here.
+  if (c.state === 'NEEDS_HUMAN' || (c.open_esc ?? 0) > 0 || c.has_pending_handoff) return 'behover_dig';
   // The kommun spoke last and we are not deliberately silent. Keying the queue
   // on open escalations alone hid exactly this: a draft voided because the
   // kommun replied leaves no escalation, and the case would drop out of view

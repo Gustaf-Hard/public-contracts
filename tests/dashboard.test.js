@@ -1223,6 +1223,70 @@ describe('home buckets', () => {
     expect(stangdaIdx).toBeGreaterThan(-1);
     expect(malaIdx).toBeGreaterThan(stangdaIdx); // in Stängda, not Behöver dig
   });
+
+  // Round-13 R3 (Codex R12 #4, adversarial R12 #3): a conversation whose ONLY
+  // pending work is a hänvisning task (no escalation, not NEEDS_HUMAN) was
+  // invisible to the overview's needs-attention filter and the Ärenden bucket,
+  // even though buildActionQueue already lists it as a HANDOFF row.
+  it('a pending handoff task alone puts the kommun in the needs-attention filter and the Behöver dig bucket (round-13 R3)', async () => {
+    const cid = db.createConversation({ kommun_kod: '2418', kommun_namn: 'Malå', role: 'central', contact_email: 'k@mala.se', scheduled_send_at: '2026-05-24T10:00:00Z' });
+    db.updateConversationState(cid, 'ACK_RECEIVED', { last_outbound_at: '2026-09-01T08:00:00Z' });
+    const msgId = db.recordMessage({
+      conversation_id: cid, gmail_message_id: 'ho-r3', direction: 'inbound',
+      from_email: 'k@mala.se', to_email: 'x', subject: 'Sv',
+      body_text: 'Kontakta skola@mala.se.', received_at: '2026-09-05T08:00:00Z', attachment_count: 0,
+    });
+    db.upsertHandoffTask({
+      kommun_kod: '2418', address: 'skola@mala.se', forvaltning: 'Skolkontoret', role: 'utbildning',
+      source_conversation_id: cid, source_message_id: msgId,
+    });
+
+    // No escalation of any kind — the bug this test guards against.
+    expect(db.raw.prepare('SELECT COUNT(*) n FROM escalations WHERE conversation_id = ?').get(cid).n).toBe(0);
+
+    expect(buildActionQueue(db).length).toBe(1); // already correct
+    expect(buildWaiting(db).length).toBe(0);      // already correct
+
+    const munis = JSON.parse(require('node:fs').readFileSync(muniPath, 'utf8'));
+    const rows = buildOverviewRows(munis, db);
+    const row = rows.find((r) => r.kommun_kod === '2418');
+    expect(row.open_escalations).toBe(0);
+    expect(applyFilter(rows, 'needs-attention').some((r) => r.kommun_kod === '2418')).toBe(true);
+
+    const arenden = await get(appWithFakes(), '/arenden');
+    const behoverSection = arenden.text.slice(
+      arenden.text.indexOf('Behöver dig'),
+      arenden.text.indexOf('Öppna') === -1 ? undefined : arenden.text.indexOf('Öppna')
+    );
+    expect(behoverSection).toContain('Malå');
+  });
+
+  // Round-13 R3: the flip side — a pending handoff whose SOURCE conversation is
+  // already DONE stays actionable in the queue (unchanged, buildActionQueue
+  // never filtered handoff rows by conversation state) but must not flip the
+  // closed case's own Ärenden bucket to Behöver dig.
+  it('a pending handoff on a DONE source stays in the queue but does not flip the closed case into Behöver dig (round-13 R3)', async () => {
+    const cid = db.createConversation({ kommun_kod: '2418', kommun_namn: 'Malå', role: 'central', contact_email: 'k@mala.se', scheduled_send_at: '2026-05-24T10:00:00Z' });
+    const msgId = db.recordMessage({
+      conversation_id: cid, gmail_message_id: 'ho-r3-done', direction: 'inbound',
+      from_email: 'k@mala.se', to_email: 'x', subject: 'Sv',
+      body_text: 'Kontakta skola@mala.se.', received_at: '2026-09-05T08:00:00Z', attachment_count: 0,
+    });
+    db.upsertHandoffTask({
+      kommun_kod: '2418', address: 'skola@mala.se', forvaltning: 'Skolkontoret', role: 'utbildning',
+      source_conversation_id: cid, source_message_id: msgId,
+    });
+    db.updateConversationState(cid, 'DONE', {});
+
+    expect(buildActionQueue(db).some((r) => r.conv_id === cid && r.state === 'HANDOFF')).toBe(true); // unchanged
+
+    const arenden = await get(appWithFakes(), '/arenden');
+    const malaIdx = arenden.text.indexOf('Malå');
+    const stangdaIdx = arenden.text.indexOf('Stängda');
+    expect(malaIdx).toBeGreaterThan(-1);
+    expect(stangdaIdx).toBeGreaterThan(-1);
+    expect(malaIdx).toBeGreaterThan(stangdaIdx); // in Stängda, not Behöver dig
+  });
 });
 
 // Round-13 R2 (Codex R12 #2, adversarial R12 #2): caseTooltip only consulted
