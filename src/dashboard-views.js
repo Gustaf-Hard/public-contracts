@@ -1016,10 +1016,14 @@ export function renderOverview({ summary, rows, filter, sort, order, totalKommun
   // --- Action-first queues ---
   const AGE_RED_MS = 7 * 86400000;
   const isOld = (iso) => iso && (Date.now() - new Date(iso).getTime()) >= AGE_RED_MS;
-  const queueRow = (item, badgeHtml) => `<a class="queue-row" data-pane-link href="/arenden/${item.conv_id}">
+  // ageAlert is opt-in (final-review finding 1, 2026-09-12): the red ≥7-day
+  // class belongs to Behöver dig only. queueRow is shared with Pågår · väntar,
+  // whose own staleness threshold is 9+jitter days — passing it there would
+  // turn most of that queue red.
+  const queueRow = (item, badgeHtml, { ageAlert = false } = {}) => `<a class="queue-row" data-pane-link href="/arenden/${item.conv_id}">
       <span class="q-kommun">${escapeHtml(item.kommun_namn)} <span class="muted">· ${escapeHtml(item.role)}</span></span>
       <span class="q-mid">${badgeHtml}</span>
-      <span class="q-age ${isOld(item.since) ? 'q-age-old' : 'muted'}" title="${escapeHtml(item.since ?? '')}">${escapeHtml(fmtAgo(item.since))}</span>
+      <span class="q-age ${ageAlert && isOld(item.since) ? 'q-age-old' : 'muted'}" title="${escapeHtml(item.since ?? '')}">${escapeHtml(fmtAgo(item.since))}</span>
     </a>`;
 
   const actionSection = `
@@ -1028,7 +1032,7 @@ export function renderOverview({ summary, rows, filter, sort, order, totalKommun
       ${actionQueue.length === 0
         ? '<div class="empty-state">Inget kräver din uppmärksamhet just nu. 🎉</div>'
         : `<div class="queue queue-alert">${actionQueue.map((a) =>
-            queueRow(a, `<span class="q-action">${a.respond_by ? `<span class="bad">⏰ senast ${escapeHtml(a.respond_by)}</span> · ` : ''}${escapeHtml(a.action)}</span>`)).join('')}</div>`}
+            queueRow(a, `<span class="q-action">${a.respond_by ? `<span class="bad">⏰ senast ${escapeHtml(a.respond_by)}</span> · ` : ''}${escapeHtml(a.action)}</span>`, { ageAlert: true })).join('')}</div>`}
     </section>`;
 
   // Only the 10 most overdue render here — the full set duplicates the kommun

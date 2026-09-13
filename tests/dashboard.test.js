@@ -833,6 +833,29 @@ describe('home buckets', () => {
     expect(res.text).toContain('q-age-old');
   });
 
+  // Final-review finding 1 (2026-09-12): the red ≥7-day age alert is scoped to
+  // Behöver dig only. A "Pågår · väntar" row is not overdue in the same sense
+  // (that queue's own threshold is 9+jitter days), so it must never turn red.
+  it('a ≥7-day-old Pågår · väntar row does NOT get q-age-old, while Behöver dig still does', async () => {
+    const waitingId = db.createConversation({ kommun_kod: '0581', kommun_namn: 'Norrköping', role: 'central', contact_email: 'k@n.se', scheduled_send_at: '2026-05-24T10:00:00Z' });
+    db.updateConversationState(waitingId, 'SENT', { last_outbound_at: '2026-01-01T00:00:00Z' });
+    db.raw.prepare('UPDATE conversations SET state_changed_at = ? WHERE id = ?').run('2026-01-01T00:00:00Z', waitingId);
+
+    const behoverId = db.createConversation({ kommun_kod: '0580', kommun_namn: 'Linköping', role: 'central', contact_email: 'k@l.se', scheduled_send_at: '2026-05-24T10:00:00Z' });
+    db.updateConversationState(behoverId, 'SENT', { last_outbound_at: '2026-01-01T00:00:00Z' });
+    db.raw.prepare('UPDATE conversations SET state_changed_at = ? WHERE id = ?').run('2026-01-01T00:00:00Z', behoverId);
+    db.recordEscalation({ conversation_id: behoverId, reason: 'x', draft_template: 'free_form', draft_body: 'b' });
+
+    const res = await get(appWithFakes(), '/');
+    // Both rows render; only the Behöver dig one (Linköping) carries q-age-old.
+    const waitingSection = res.text.slice(res.text.indexOf('Pågår · väntar'));
+    expect(waitingSection).toContain('Norrköping');
+    expect(waitingSection).not.toContain('q-age-old');
+    const actionSection = res.text.slice(res.text.indexOf('Behöver dig'), res.text.indexOf('Pågår · väntar'));
+    expect(actionSection).toContain('Linköping');
+    expect(actionSection).toContain('q-age-old');
+  });
+
   it('counts real avtal, not every attachment, for the tile and the column', () => {
     // 3 files on one delivery: 1 avtal, 1 bilaga, 1 unanalysed. Only the avtal
     // is an avtal — the tile used to report all 3.
