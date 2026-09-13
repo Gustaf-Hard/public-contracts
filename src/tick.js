@@ -1435,9 +1435,11 @@ export async function runDailyFollowup(deps) {
     // and "NEEDS_HUMAN without one" could see neither half of a third shape —
     // an auto_ack or hänvisning stating a frist on a conversation still in
     // SENT/ACK_RECEIVED — so that deadline was surfaced nowhere. "Effective"
-    // still means the open row's own respond_by first, then the conversation's
-    // outstanding frist (round-4 H3), via the same helper buildActionQueue
-    // reads, so Slack and the dashboard cannot disagree. The query excludes
+    // means the SOONEST of the active row's own respond_by and the
+    // conversation's outstanding frist (round-4 H3, corrected in round-8 M1: the
+    // row's date used to win outright, so a parked send's stale snapshot masked
+    // a newer inbound demanding an earlier date), via the same helper
+    // buildActionQueue reads, so Slack and the dashboard cannot disagree. The query excludes
     // closed cases (round-4 H5) and returns one row per conversation already
     // sorted soonest first, and it carries no pending-handoff exclusion
     // (round-3 G2): a hänvisning is other work, it discharges no deadline.

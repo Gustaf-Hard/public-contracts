@@ -453,6 +453,10 @@ export function buildActionQueue(db) {
       // `effectiveRespondBy` is that composition, and the Slack digest's ⏰
       // section calls the same helper (round-4 H3) — the two surfaces used to
       // compute it separately and disagreed about exactly this undated-row case.
+      // It returns the SOONEST of the two candidates, not the escalation's
+      // (round-8 M1): the row's date is a snapshot from when the draft was
+      // minted, so letting it win outright hid a newer inbound frist that falls
+      // earlier.
       // Called unconditionally (round-5 J5, matching the getTickHealth pattern
       // in CLAUDE.md): a deadline-surfacing helper must not opt itself out on a
       // db object that happens to lack the method.

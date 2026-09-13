@@ -1024,11 +1024,31 @@ export function openDb(path) {
   }
 
   // THE effective reply deadline for a case, and the single source both the
-  // Slack digest and the dashboard's Behöver dig queue read (round-4 H3). The
-  // open escalation's own respond_by wins when it has one; otherwise the
-  // conversation's newest outstanding frist. Advisory surfacing only.
+  // Slack digest and the dashboard's Behöver dig queue read (round-4 H3).
+  // Advisory surfacing only.
+  //
+  // The SOONEST of the two candidates, not the escalation's (round-8 M1,
+  // critical). The active escalation's respond_by used to win outright whenever
+  // it was non-null, which reads the row as if it were the newer fact. It is
+  // not: an escalation row is a SNAPSHOT of the deadline that was known when the
+  // draft was minted, and it can sit there for days while the kommun writes
+  // again (a parked 'send_failed' / 'send_unconfirmed' row sits there
+  // indefinitely). So a snapshot saying 2026-09-20 MASKED a newer inbound
+  // demanding 2026-09-14: the ⏰ line printed the later date, the `<= dueBy`
+  // comparison in listConversationsWithDeadlineDue failed against it, and the
+  // case surfaced nowhere until the real frist had passed.
+  //
+  // Both dates are outstanding obligations, and the one the operator has to act
+  // on first is the earlier one, so the minimum is the answer. ISO dates compare
+  // lexicographically exactly as they compare chronologically (asIsoDate has
+  // already rejected everything that is not YYYY-MM-DD, so there is no shape
+  // here for which that is untrue). A NULL/junk side drops out and the other one
+  // stands alone; neither side leaves null, as before.
   function effectiveRespondBy(conversationId, openEscRespondBy = null) {
-    return asIsoDate(openEscRespondBy) ?? latestRespondByForConversation(conversationId);
+    const candidates = [asIsoDate(openEscRespondBy), latestRespondByForConversation(conversationId)]
+      .filter((d) => d != null);
+    if (candidates.length === 0) return null;
+    return candidates.reduce((soonest, d) => (d < soonest ? d : soonest));
   }
 
   // NEEDS_HUMAN with nothing actionable at all: state NEEDS_HUMAN, no OPEN

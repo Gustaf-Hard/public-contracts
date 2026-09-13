@@ -804,18 +804,62 @@ describe('queue hygiene queries (2026-09-12 design)', () => {
     expect(hit.has_open_escalation).toBe(true);
   });
 
-  it('effectiveRespondBy prefers the escalation row and falls back to the conversation', () => {
+  // Round-8 M1 (critical): the active escalation's respond_by used to WIN
+  // whenever it was non-null, so a parked send carrying 2026-09-20 masked a
+  // newer inbound demanding 2026-09-14: the digest and the Behöver dig queue
+  // showed the later date and the due list stayed empty until it was too late.
+  // An escalation row is a SNAPSHOT taken when the draft was minted, so it is
+  // never newer than the conversation's inbound history. Both dates are
+  // outstanding; the actionable one is the SOONEST.
+  it('effectiveRespondBy returns the soonest outstanding deadline, not the escalation row', () => {
     const cid = db.createConversation({ kommun_kod: '0104', kommun_namn: 'Effektiv', role: 'central', contact_email: 'e@e.se', scheduled_send_at: '2026-08-01T08:00:00Z' });
     db.recordMessage({
       conversation_id: cid, gmail_message_id: 'g-e', direction: 'inbound',
       from_email: 'e@e.se', to_email: 'x', subject: 's', body_text: 'b',
       received_at: '2026-09-11T08:00:00Z', attachment_count: 0,
-      analysis_json: JSON.stringify({ extracted: { respond_by_date: '2026-09-13' } }),
+      analysis_json: JSON.stringify({ extracted: { respond_by_date: '2026-09-14' } }),
+    });
+    // The escalation snapshot is LATER than the newer inbound frist: the inbound wins.
+    expect(db.effectiveRespondBy(cid, '2026-09-20')).toBe('2026-09-14');
+    // The escalation snapshot is SOONER: it wins, the inbound does not hide it.
+    expect(db.effectiveRespondBy(cid, '2026-09-10')).toBe('2026-09-10');
+    // Equal dates collapse to the one date.
+    expect(db.effectiveRespondBy(cid, '2026-09-14')).toBe('2026-09-14');
+    // Only one side non-null -> that one.
+    expect(db.effectiveRespondBy(cid, null)).toBe('2026-09-14');
+    expect(db.effectiveRespondBy(cid, '')).toBe('2026-09-14');
+    expect(db.effectiveRespondBy(cid, 'i morgon')).toBe('2026-09-14'); // junk is not a deadline
+  });
+
+  it('effectiveRespondBy returns the escalation date alone when the conversation carries none, and null when neither does', () => {
+    const cid = db.createConversation({ kommun_kod: '0105', kommun_namn: 'Odaterad2', role: 'central', contact_email: 'o2@o.se', scheduled_send_at: '2026-08-01T08:00:00Z' });
+    db.recordMessage({
+      conversation_id: cid, gmail_message_id: 'g-o2', direction: 'inbound',
+      from_email: 'o2@o.se', to_email: 'x', subject: 's', body_text: 'b',
+      received_at: '2026-09-11T08:00:00Z', attachment_count: 0,
+      analysis_json: JSON.stringify({ extracted: { respond_by_date: null } }),
     });
     expect(db.effectiveRespondBy(cid, '2026-09-20')).toBe('2026-09-20');
-    expect(db.effectiveRespondBy(cid, null)).toBe('2026-09-13');
-    expect(db.effectiveRespondBy(cid, '')).toBe('2026-09-13');
-    expect(db.effectiveRespondBy(cid, 'i morgon')).toBe('2026-09-13'); // junk is not a deadline
+    expect(db.effectiveRespondBy(cid, null)).toBeNull();
+    expect(db.effectiveRespondBy(cid)).toBeNull();
+  });
+
+  // The same masking seen through the ONE source the digest and the dashboard
+  // read: the case must appear in the due list on the strength of the SOONER
+  // inbound frist, even though the active escalation names a later date.
+  it('the due list surfaces a newer inbound frist that an older escalation date would have masked', () => {
+    const cid = db.createConversation({ kommun_kod: '0106', kommun_namn: 'Maskerad', role: 'central', contact_email: 'm@m.se', scheduled_send_at: '2026-08-01T08:00:00Z' });
+    db.recordEscalation({ conversation_id: cid, reason: 'r', respond_by: '2026-09-20' });
+    db.recordMessage({
+      conversation_id: cid, gmail_message_id: 'g-m', direction: 'inbound',
+      from_email: 'm@m.se', to_email: 'x', subject: 's', body_text: 'b',
+      received_at: '2026-09-12T08:00:00Z', attachment_count: 0,
+      analysis_json: JSON.stringify({ extracted: { respond_by_date: '2026-09-14' } }),
+    });
+    const hit = db.listConversationsWithDeadlineDue('2026-09-15').find((r) => r.conversation_id === cid);
+    expect(hit).toBeTruthy();
+    expect(hit.respond_by).toBe('2026-09-14');
+    expect(hit.has_open_escalation).toBe(true);
   });
 
   // Round-5 J2: a frist can sit on a conversation that is neither NEEDS_HUMAN

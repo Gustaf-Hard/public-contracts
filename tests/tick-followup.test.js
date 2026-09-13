@@ -891,6 +891,31 @@ describe('queue hygiene digest (2026-09-12 design)', () => {
     expect(digest.match(/Odaterad/g)).toHaveLength(1);
   });
 
+  // Round-8 M1 (critical): the active escalation's respond_by used to WIN over
+  // the conversation's frist whenever it was non-null, so a PARKED send carrying
+  // 2026-09-20 masked a newer inbound demanding 2026-09-14: the ⏰ section
+  // printed the later date, the due comparison failed against it, and the case
+  // was named nowhere until the real deadline had passed. Both dates are
+  // outstanding; the soonest is the actionable one.
+  it('a parked escalation dated later does not mask a newer, sooner inbound deadline', async () => {
+    const cid = db.createConversation({ kommun_kod: '0013', kommun_namn: 'Maskerad', role: 'central', contact_email: 'm@m.se', scheduled_send_at: '2026-08-01T08:00:00Z' });
+    const escId = db.recordEscalation({ conversation_id: cid, reason: 'r', draft_template: 'free_form', draft_body: 'b', respond_by: '2026-09-20' });
+    db.resolveEscalation(escId, { status: 'send_failed', resolved_text: 'send error: boom' });
+    db.recordMessage({
+      conversation_id: cid, gmail_message_id: 'g-m', direction: 'inbound',
+      from_email: 'm@m.se', to_email: 'x', subject: 's', body_text: 'b',
+      received_at: '2026-09-12T08:00:00Z', attachment_count: 0,
+      analysis_json: JSON.stringify({ extracted: { respond_by_date: '2026-09-14' } }),
+    });
+    const slackOps = fakeSlackOps();
+    await runDailyFollowup(deps({ slackOps, now: new Date('2026-09-12T09:00:00Z') }));
+    const digest = slackOps.alerts.find((t) => t.includes('Köhälsa'));
+    expect(digest).toBeTruthy();
+    const deadlineSection = digest.split('🕰')[0].split('🧭')[0];
+    expect(deadlineSection).toContain('Maskerad/central (senast 2026-09-14)');
+    expect(deadlineSection).not.toContain('2026-09-20');
+  });
+
   // Round-4 H7: the aged and orphan sections each had a cap test; the ⏰ section
   // did not, so a regression in its slice would have gone unnoticed until Slack
   // rejected the whole digest with invalid_blocks.

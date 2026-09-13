@@ -198,7 +198,12 @@ probes (`PRAGMA table_info`). New *string values* in existing TEXT columns
 hardcode a name or address into a prompt.
 
 **`escalations.respond_by` is the kommun-imposed reply deadline** (extracted as
-`respond_by_date` by the analysis, ISO date or NULL). It sorts Behöver dig
+`respond_by_date` by the analysis, ISO date or NULL). The one reader of it is
+`effectiveRespondBy`, which returns the **SOONEST** of the active escalation's
+own `respond_by` and `latestRespondByForConversation` (round-8 M1): an
+escalation row is a snapshot of what was known when the draft was minted, and a
+parked one sits there for days, so letting it win outright masked a newer
+inbound frist falling earlier. It sorts Behöver dig
 deadline-first, renders the ⏰ line in Slack escalations, and feeds the daily
 Köhälsa digest. It is advisory surfacing only — no guard, FSM transition or
 auto-send rule keys off it. **Only an OPERATOR send discharges it**
