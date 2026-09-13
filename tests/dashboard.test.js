@@ -824,6 +824,15 @@ describe('home buckets', () => {
     expect(q.find((r) => r.kommun_namn === 'Aneby').respond_by).toBeNull();
   });
 
+  it('renders a ≥7-day-old Behöver dig row with the q-age-old class', async () => {
+    const cid = db.createConversation({ kommun_kod: '0580', kommun_namn: 'Linköping', role: 'central', contact_email: 'k@l.se', scheduled_send_at: '2026-05-24T10:00:00Z' });
+    db.updateConversationState(cid, 'SENT', { last_outbound_at: '2026-01-01T00:00:00Z' });
+    db.raw.prepare('UPDATE conversations SET state_changed_at = ? WHERE id = ?').run('2026-01-01T00:00:00Z', cid);
+    db.recordEscalation({ conversation_id: cid, reason: 'x', draft_template: 'free_form', draft_body: 'b' });
+    const res = await get(appWithFakes(), '/');
+    expect(res.text).toContain('q-age-old');
+  });
+
   it('counts real avtal, not every attachment, for the tile and the column', () => {
     // 3 files on one delivery: 1 avtal, 1 bilaga, 1 unanalysed. Only the avtal
     // is an avtal — the tile used to report all 3.

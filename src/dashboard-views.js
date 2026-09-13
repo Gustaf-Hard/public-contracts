@@ -582,6 +582,7 @@ const baseCss = `
   .queue-row .q-action { color: var(--bad); font-size: 13px; font-weight: 500; }
   .q-action .bad { color: var(--bad); font-weight: 500; }
   .queue-row .q-age { font-size: 12px; white-space: nowrap; }
+  .q-age-old { color: var(--bad); font-weight: 600; }
   .empty-state { padding: 20px; text-align: center; color: var(--fg-muted); background: var(--bg-elev); border: 1px dashed var(--border); border-radius: var(--r-2); font-size: 13px; }
   .table-search { margin: 0 0 var(--sp-3); }
   .table-search input[type=search] { width: 320px; max-width: 100%; padding: 8px 12px; font: inherit; background: var(--bg-elev); color: var(--fg); border: 1px solid var(--border); border-radius: var(--r-2); }
@@ -1013,10 +1014,12 @@ export function renderOverview({ summary, rows, filter, sort, order, totalKommun
   `;
 
   // --- Action-first queues ---
+  const AGE_RED_MS = 7 * 86400000;
+  const isOld = (iso) => iso && (Date.now() - new Date(iso).getTime()) >= AGE_RED_MS;
   const queueRow = (item, badgeHtml) => `<a class="queue-row" data-pane-link href="/arenden/${item.conv_id}">
       <span class="q-kommun">${escapeHtml(item.kommun_namn)} <span class="muted">· ${escapeHtml(item.role)}</span></span>
       <span class="q-mid">${badgeHtml}</span>
-      <span class="q-age muted" title="${escapeHtml(item.since ?? '')}">${escapeHtml(fmtAgo(item.since))}</span>
+      <span class="q-age ${isOld(item.since) ? 'q-age-old' : 'muted'}" title="${escapeHtml(item.since ?? '')}">${escapeHtml(fmtAgo(item.since))}</span>
     </a>`;
 
   const actionSection = `
