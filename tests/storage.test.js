@@ -28,23 +28,68 @@ describe('migrate', () => {
   // and the ALTER/UPDATE that acts on it, and the upgrade then either fails or
   // acts on a premise that no longer holds. BEGIN IMMEDIATE takes the write lock
   // up front, so the read and the write see one state.
-  it('runs the ingested_at probe + ALTER + backfill in an IMMEDIATE transaction', () => {
+  //
+  // Round-9 N4: asserting the MODE alone was not enough — an EMPTY immediate
+  // transaction with the ALTER and the UPDATE outside it passed that assertion,
+  // i.e. the test could not tell the fix from the bug. So assert what the
+  // transaction is FOR: fail the backfill UPDATE from inside it on a pre-column
+  // DB and the ALTER must be gone again (the half-migrated shape round-7 L3 is
+  // about can never be committed), then a clean migrate() adds the column and
+  // backfills. The mode is checked on the same run.
+  it('rolls the ingested_at ALTER back when the backfill fails inside the IMMEDIATE transaction', () => {
+    const migDb = openDb(':memory:');
+    // A pre-column DB: messages built by hand, without ingested_at, so the ALTER
+    // is genuinely part of this migrate() run.
+    migDb.raw.exec(`CREATE TABLE messages (
+      id INTEGER PRIMARY KEY,
+      conversation_id INTEGER NOT NULL,
+      gmail_message_id TEXT NOT NULL UNIQUE,
+      direction TEXT NOT NULL,
+      from_email TEXT, to_email TEXT, subject TEXT, body_text TEXT,
+      classification TEXT, classification_confidence REAL,
+      received_at TEXT NOT NULL,
+      attachment_count INTEGER NOT NULL DEFAULT 0,
+      signature_extracted TEXT
+    )`);
+    migDb.raw.prepare(`INSERT INTO messages (conversation_id, gmail_message_id, direction, received_at, attachment_count)
+      VALUES (1, 'legacy-1', 'inbound', '2026-08-19T14:15:00Z', 0)`).run();
+    const columns = () => migDb.raw.prepare('PRAGMA table_info(messages)').all().map((r) => r.name);
+    expect(columns()).not.toContain('ingested_at');
+
     const modes = [];
-    const original = db.raw.transaction;
-    db.raw.transaction = (fn) => {
-      const t = original.call(db.raw, fn);
+    const originalTransaction = migDb.raw.transaction;
+    migDb.raw.transaction = (fn) => {
+      const t = originalTransaction.call(migDb.raw, fn);
       const spy = (...a) => { modes.push('default'); return t(...a); };
       spy.deferred = (...a) => { modes.push('deferred'); return t.deferred(...a); };
       spy.immediate = (...a) => { modes.push('immediate'); return t.immediate(...a); };
       spy.exclusive = (...a) => { modes.push('exclusive'); return t.exclusive(...a); };
       return spy;
     };
+    const originalExec = migDb.raw.exec.bind(migDb.raw);
+    migDb.raw.exec = (sql) => {
+      if (/^UPDATE\s+messages\s+SET\s+ingested_at/i.test(String(sql).trim())) {
+        throw new Error('simulated disk I/O error during backfill');
+      }
+      return originalExec(sql);
+    };
     try {
-      db.migrate();
+      expect(() => migDb.migrate()).toThrow(/simulated disk I\/O error/);
     } finally {
-      db.raw.transaction = original;
+      migDb.raw.transaction = originalTransaction;
+      migDb.raw.exec = originalExec;
     }
+    // The statements are INSIDE the transaction that failed, so the ALTER went
+    // with it. A test that only read the mode could not see this.
+    expect(columns()).not.toContain('ingested_at');
     expect(modes).toEqual(['immediate']);
+
+    // And the pair still applies on a clean run.
+    migDb.migrate();
+    expect(columns()).toContain('ingested_at');
+    expect(migDb.raw.prepare("SELECT ingested_at FROM messages WHERE gmail_message_id = 'legacy-1'").get().ingested_at)
+      .toBe('2026-08-19 14:15:00');
+    migDb.close();
   });
 
   // Round-7 L3, re-pinned here because M5 changes how that transaction begins:
