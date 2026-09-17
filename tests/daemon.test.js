@@ -239,6 +239,54 @@ describe('createInteractivityHandler — approve path', () => {
 // bounce resend with no address) leaves the escalation open and its buttons
 // live — correct, but the operator used to see NOTHING: Approve looked like a
 // dead button and the edit modal just closed, exactly like a successful send.
+describe('createInteractivityHandler — approve + starta ärende (2026-09-17)', () => {
+  it('esc_approve_handoff approves the reply AND asks for every pending hänvisning of the conversation', async () => {
+    const { escId, convId } = seed();
+    const mid = db.recordMessage({
+      conversation_id: convId, gmail_message_id: `in-h-${escId}`, direction: 'inbound',
+      from_email: 'registrator@arboga.se', to_email: 'me@x.se', subject: 'Sv', body_text: 'Kontakta helen.pettersson@amal.se',
+      classification: 'unknown', classification_confidence: 0.9, received_at: '2026-09-01T00:00:00Z', attachment_count: 0,
+    });
+    db.upsertHandoffTask({
+      kommun_kod: '1', address: 'helen.pettersson@amal.se', forvaltning: 'IT', role: 'other',
+      source_conversation_id: convId, source_message_id: mid, verbatim: 1, same_domain: 0,
+    });
+    const send = vi.fn(async () => ({ id: 'out-1', threadId: 'thr-1', pending_handoffs: [], started_handoffs: ['helen.pettersson@amal.se'] }));
+    const handler = createInteractivityHandler({
+      db, slack: fakeSlack(), gmail: {}, env, log: () => {},
+      sendApprovedReplyImpl: send,
+    });
+    const payload = { ...approvePayload(escId), actions: [{ action_id: 'esc_approve_handoff', value: String(escId) }] };
+    const { req, res } = slackRequest(payload);
+    await handler(req, res);
+    expect(res.statusCode).toBe(200);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls[0][0]).toMatchObject({
+      decision: 'approve_unmodified',
+      startHandoffs: ['helen.pettersson@amal.se'],
+    });
+  });
+
+  it('plain esc_approve never starts a handoff', async () => {
+    const { escId, convId } = seed();
+    const mid = db.recordMessage({
+      conversation_id: convId, gmail_message_id: `in-h-${escId}`, direction: 'inbound',
+      from_email: 'registrator@arboga.se', to_email: 'me@x.se', subject: 'Sv', body_text: 'Kontakta helen.pettersson@amal.se',
+      classification: 'unknown', classification_confidence: 0.9, received_at: '2026-09-01T00:00:00Z', attachment_count: 0,
+    });
+    db.upsertHandoffTask({
+      kommun_kod: '1', address: 'helen.pettersson@amal.se', forvaltning: 'IT', role: 'other',
+      source_conversation_id: convId, source_message_id: mid, verbatim: 1, same_domain: 0,
+    });
+    const send = vi.fn(async () => ({ id: 'out-1', threadId: 'thr-1' }));
+    const handler = createInteractivityHandler({ db, slack: fakeSlack(), gmail: {}, env, log: () => {}, sendApprovedReplyImpl: send });
+    const { req, res } = slackRequest(approvePayload(escId));
+    await handler(req, res);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls[0][0].startHandoffs ?? []).toEqual([]);
+  });
+});
+
 describe('createInteractivityHandler — a refused send is visible in Slack', () => {
   function nudgeSeed() {
     const convId = db.createConversation({

@@ -1564,6 +1564,28 @@ describe('closing a case resolves its escalations', () => {
   });
 });
 
+describe('renderEscalationForm start-handoff boxes (2026-09-17)', () => {
+  const esc = { id: 1, recipient: 'a@x.se', draft_subject: 'Re', draft_body: 'x' };
+  it('renders one pre-ticked box per pending handoff target', () => {
+    const html = renderEscalationForm(esc, true, null, {
+      handoffTargets: [{ email: 'helen.pettersson@amal.se', forvaltning: 'IT-enheten i Åmål' }],
+    });
+    expect(html).toMatch(/<input type="checkbox" name="start_handoff" value="helen.pettersson@amal.se" checked/);
+    expect(html).toMatch(/Starta även ärende till <strong>helen.pettersson@amal.se<\/strong>/);
+    expect(html).toMatch(/IT-enheten i Åmål/);
+  });
+  it('renders no box when there is no pending handoff', () => {
+    const html = renderEscalationForm(esc, true);
+    expect(html).not.toMatch(/start_handoff/);
+  });
+  it('a bounce resend form never offers handoff boxes', () => {
+    const html = renderEscalationForm({ ...esc, classifier_class: 'bounce' }, true, null, {
+      handoffTargets: [{ email: 'helen.pettersson@amal.se' }],
+    });
+    expect(html).not.toMatch(/start_handoff/);
+  });
+});
+
 describe('renderEscalationForm watchlist banner', () => {
   it('shows the banner when watchlist_vendors is set', () => {
     const html = renderEscalationForm({ id: 1, recipient: 'a@x.se', draft_subject: 'Re', draft_body: '', watchlist_vendors: JSON.stringify(['Binogi']) }, true);
@@ -1837,6 +1859,53 @@ describe('handoff suggested ärenden', () => {
       const res = await postForm(appGmail(), `/arenden/${convId}/handoff-start`, { email: 'angripare@example.com' });
       expect(res.status).toBe(400);
       expect(spy).not.toHaveBeenCalled();   // nothing may be mailed
+    } finally { spy.mockRestore(); }
+  });
+
+  // One click covers both sends (2026-09-17): the approve form carries a
+  // pre-ticked "starta även ärende till X" box per pending hänvisning.
+  it('the approve form on a handoff ärende offers a pre-ticked start-handoff box per pending address', async () => {
+    const convId = seedHandoff();
+    db.recordEscalation({ conversation_id: convId, message_id: null, reason: 'r',
+      draft_template: 'free_form', draft_subject: 'Re: SV', draft_body: 'tack' });
+    const res = await get(appG(), `/arenden/${convId}`);
+    expect(res.text).toMatch(/name="start_handoff" value="info@educ.goteborg.se" checked/);
+    expect(res.text).toMatch(/name="start_handoff" value="grundskola@grundskola.goteborg.se" checked/);
+    expect(res.text).toMatch(/Starta även ärende till/);
+  });
+
+  it('approving with start_handoff ticked sends the reply AND the T-INITIAL to that address', async () => {
+    const convId = seedHandoff();
+    const escId = db.recordEscalation({ conversation_id: convId, message_id: null, reason: 'r',
+      draft_template: 'free_form', draft_subject: 'Re: SV', draft_body: 'tack' });
+    const spy = vi.spyOn(gmailMod, 'sendMessage').mockImplementation(async (_g, { to }) => (
+      to === 'info@educ.goteborg.se' ? { id: 'm-h', threadId: 't-h' } : { id: 'm9', threadId: 't9' }));
+    try {
+      const res = await postForm(appGmail(), `/escalations/${escId}`, {
+        action: 'send', start_handoff: 'info@educ.goteborg.se',
+      });
+      expect(res.status).toBe(302);
+      expect(spy).toHaveBeenCalledTimes(2);
+      expect(spy.mock.calls[1][1].to).toBe('info@educ.goteborg.se');
+      const started = db.raw.prepare("SELECT * FROM conversations WHERE contact_email = 'info@educ.goteborg.se'").get();
+      expect(started?.state).toBe('SENT');
+      // The other hänvisning was not ticked and stays pending.
+      const tasks = db.listHandoffTasksForConversation(convId);
+      expect(tasks.find((t) => t.address === 'info@educ.goteborg.se').status).toBe('started');
+      expect(tasks.find((t) => t.address === 'grundskola@grundskola.goteborg.se').status).toBe('pending');
+    } finally { spy.mockRestore(); }
+  });
+
+  it('approving with the box unticked sends only the reply', async () => {
+    const convId = seedHandoff();
+    const escId = db.recordEscalation({ conversation_id: convId, message_id: null, reason: 'r',
+      draft_template: 'free_form', draft_subject: 'Re: SV', draft_body: 'tack' });
+    const spy = vi.spyOn(gmailMod, 'sendMessage').mockResolvedValue({ id: 'm9', threadId: 't9' });
+    try {
+      const res = await postForm(appGmail(), `/escalations/${escId}`, { action: 'send' });
+      expect(res.status).toBe(302);
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(db.listHandoffTasksForConversation(convId).every((t) => t.status === 'pending')).toBe(true);
     } finally { spy.mockRestore(); }
   });
 });

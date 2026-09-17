@@ -85,6 +85,14 @@ Phase-1 pipeline: `scripts/01|02|03 → src/seed.js|crawl.js|verify.js → data/
   send path that bypasses this.
 - **At most one open escalation per conversation.** `escalateWithDraft`
   supersedes any existing open one; `runDailyFollowup` is gated on it.
+- **A pending hänvisning may ride the approve click** (2026-09-17): the
+  dashboard approve form carries a pre-ticked `start_handoff` box per pending
+  handoff task, and the Slack card an `esc_approve_handoff` button.
+  `sendApprovedReply({ startHandoffs })` sends the reply FIRST and only after a
+  confirmed send starts each address that is still a *pending* handoff task of
+  that conversation, via `sendInitial`'s own claim path; anything else is
+  ignored, a handoff failure parks its own new conversation and never fails the
+  reply. Still operator-approved — this is not a fourth auto-send template.
 - **Ticks never overlap** (`makeExclusive` latch in the daemon), and
   per-message ingest is one SQLite transaction with attachments fetched
   before commit — a crash mid-ingest leaves the message unrecorded and

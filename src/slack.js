@@ -5,7 +5,7 @@ export function makeSlackClient(token) {
   return new WebClient(token);
 }
 
-export function buildEscalationBlocks({ escalation_id, kommun_namn, from_email, reply_text, draft_reply, gmail_thread_id, watchlist_vendors = [], respond_by = null }) {
+export function buildEscalationBlocks({ escalation_id, kommun_namn, from_email, reply_text, draft_reply, gmail_thread_id, watchlist_vendors = [], respond_by = null, pending_handoffs = [] }) {
   const idStr = String(escalation_id);
   const blocks = [
     { type: 'header', text: { type: 'plain_text', text: `Eskalering: ${kommun_namn}` } },
@@ -30,12 +30,27 @@ export function buildEscalationBlocks({ escalation_id, kommun_namn, from_email, 
       type: 'actions',
       elements: [
         { type: 'button', action_id: 'esc_approve', value: idStr, text: { type: 'plain_text', text: 'Approve' }, style: 'primary' },
+        // One click covers both sends (2026-09-17): when the kommun hänvisade
+        // vidare and that ärende is still pending, offer approving the reply
+        // AND starting the handoff T-INITIAL in the same click.
+        ...(pending_handoffs.length
+          ? [{ type: 'button', action_id: 'esc_approve_handoff', value: idStr, text: { type: 'plain_text', text: handoffButtonText(pending_handoffs) } }]
+          : []),
         { type: 'button', action_id: 'esc_edit', value: idStr, text: { type: 'plain_text', text: 'Edit' } },
         { type: 'button', action_id: 'esc_skip', value: idStr, text: { type: 'plain_text', text: 'Skip' }, style: 'danger' },
       ],
     },
   );
   return blocks;
+}
+
+// Slack caps button text at 75 characters. Name the single address when it
+// fits, otherwise count the ärenden.
+const BUTTON_TEXT_MAX = 75;
+function handoffButtonText(addresses) {
+  const single = `Approve + starta ärende till ${addresses[0]}`;
+  if (addresses.length === 1 && single.length <= BUTTON_TEXT_MAX) return single;
+  return `Approve + starta ${addresses.length} ärenden (hänvisning)`;
 }
 
 export async function postEscalation(slack, { channel, blocks, fallbackText }) {

@@ -1514,6 +1514,10 @@ export function createDashboardApp({
         finalBody, finalSubject, finalTo: req.body.finalTo ?? req.body.to,
         decision: action === 'send' || untouched ? 'approve_unmodified' : 'edit',
         slackClient,
+        // Ticked "starta även ärende till X" boxes (2026-09-17). One box posts
+        // a string, several an array; sendApprovedReply honours only addresses
+        // that are still pending handoff tasks of this conversation.
+        startHandoffs: [].concat(req.body.start_handoff ?? []),
       });
     } catch (e) {
       // Claim/staleness violations are expected races, not server errors:

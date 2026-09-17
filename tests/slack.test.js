@@ -54,6 +54,29 @@ describe('verifySlackSignature', () => {
   });
 });
 
+describe('buildEscalationBlocks pending-handoff button (2026-09-17)', () => {
+  const base = { escalation_id: 7, kommun_namn: 'Bengtsfors', from_email: 'a@x.se', reply_text: 'hej', draft_reply: 'svar', gmail_thread_id: 't1' };
+  it('adds an Approve + starta ärende button naming the pending address', () => {
+    const blocks = buildEscalationBlocks({ ...base, pending_handoffs: ['helen.pettersson@amal.se'] });
+    const actions = blocks.find((b) => b.type === 'actions');
+    expect(actions.elements.map((e) => e.action_id)).toEqual(['esc_approve', 'esc_approve_handoff', 'esc_edit', 'esc_skip']);
+    const btn = actions.elements.find((e) => e.action_id === 'esc_approve_handoff');
+    expect(btn.value).toBe('7');
+    expect(btn.text.text).toContain('helen.pettersson@amal.se');
+    expect(btn.text.text.length).toBeLessThanOrEqual(75); // Slack button text cap
+  });
+  it('keeps the button text within Slack\'s 75-char cap for several long addresses', () => {
+    const blocks = buildEscalationBlocks({ ...base, pending_handoffs: ['upphandlingsenheten.registrator@kommun.se', 'grundskoleforvaltningen@kommun.se'] });
+    const btn = blocks.find((b) => b.type === 'actions').elements.find((e) => e.action_id === 'esc_approve_handoff');
+    expect(btn.text.text.length).toBeLessThanOrEqual(75);
+    expect(btn.text.text).toMatch(/2 ärenden/);
+  });
+  it('omits the button when nothing is pending', () => {
+    const blocks = buildEscalationBlocks({ ...base, pending_handoffs: [] });
+    expect(blocks.find((b) => b.type === 'actions').elements.map((e) => e.action_id)).toEqual(['esc_approve', 'esc_edit', 'esc_skip']);
+  });
+});
+
 describe('buildEscalationBlocks watchlist banner', () => {
   const base = { escalation_id: 1, kommun_namn: 'Arjeplog', from_email: 'a@x.se', reply_text: 'hej', draft_reply: 'svar', gmail_thread_id: 't1' };
   it('adds a BEVAKAD LEVERANTÖR banner when watchlist_vendors present', () => {

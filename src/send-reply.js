@@ -129,7 +129,7 @@ async function archiveThreadBestEffort({ archiveThreadImpl, gmail, threadId, log
 //  - If Gmail throws after the claim, the escalation is parked as
 //    'send_failed' (never back to 'open') so nothing auto-retries an
 //    ambiguous send; the operator verifies in Gmail Sent first.
-export async function sendApprovedReply({ db, gmail, env, conv, esc, finalBody, finalSubject, finalTo, decision, gmailSendImpl = gmailSend, archiveThreadImpl = archiveThread, slackClient = null, log = null, clock = () => new Date() }) {
+export async function sendApprovedReply({ db, gmail, env, conv, esc, finalBody, finalSubject, finalTo, decision, gmailSendImpl = gmailSend, archiveThreadImpl = archiveThread, slackClient = null, log = null, clock = () => new Date(), startHandoffs = [] }) {
   const subject = finalSubject ?? esc.draft_subject ?? 'Re: Begäran om allmänna handlingar';
   const triggeringMessage = esc.message_id ? db.getMessageById(esc.message_id) : null;
 
@@ -336,12 +336,24 @@ export async function sendApprovedReply({ db, gmail, env, conv, esc, finalBody, 
   // §3): the operator who just clicked send is told the second click — start
   // the handoff ärende — is still owed. Carried on the Slack resolution
   // update and in the return value for the dashboard.
+  //
+  // One click covers both sends (2026-09-17): the operator may tick a pending
+  // hänvisning on the same approve, and the handoff T-INITIAL then follows the
+  // CONFIRMED reply — never before it, never when the reply was refused or
+  // failed (we are past every throw above). Each handoff rides sendInitial's
+  // own claim path; a handoff failure parks ITS conversation NEEDS_HUMAN and is
+  // reported, but can never undo or fail the reply that already went out.
+  const { started: startedHandoffs, failed: failedHandoffs } = await startPendingHandoffs({
+    db, gmail, env, conv, addresses: startHandoffs, gmailSendImpl, log,
+  });
   const pendingHandoffs = (db.listHandoffTasksForConversation?.(conv.id) ?? [])
     .filter((t) => t.status === 'pending')
     .map((t) => t.address);
-  const handoffDetail = pendingHandoffs.length
-    ? `⚠️ hänvisning väntar: starta ärende till ${pendingHandoffs.join(', ')}`
-    : undefined;
+  const handoffDetail = [
+    startedHandoffs.length ? `📨 ärende startat till ${startedHandoffs.join(', ')}` : null,
+    failedHandoffs.length ? `❌ ärende till ${failedHandoffs.join(', ')} kunde inte skickas: se ärendet` : null,
+    pendingHandoffs.length ? `⚠️ hänvisning väntar: starta ärende till ${pendingHandoffs.join(', ')}` : null,
+  ].filter(Boolean).join(' · ') || undefined;
   // Pass the decision so an unattended send is not labelled as operator-approved
   // (2026-08-17 design). Presentation only — resolvedStatus is what is stored.
   await stripSlackButtons({ slackClient, env, esc, kommun_namn: conv.kommun_namn, status: resolvedStatus, detail: handoffDetail, decision, log });
@@ -363,7 +375,39 @@ export async function sendApprovedReply({ db, gmail, env, conv, esc, finalBody, 
     final_body: finalBody,
     decided_at: sendStartedAt,
   });
-  return { ...sent, pending_handoffs: pendingHandoffs };
+  return { ...sent, pending_handoffs: pendingHandoffs, started_handoffs: startedHandoffs, failed_handoffs: failedHandoffs };
+}
+
+// Start the pending hänvisning ärenden the operator asked for, one T-INITIAL
+// each. Only addresses that are a PENDING handoff task of this conversation
+// qualify — anything else is ignored, so a stale form can never mail an
+// arbitrary address. Never throws: the caller has already sent the reply.
+async function startPendingHandoffs({ db, gmail, env, conv, addresses, gmailSendImpl, log }) {
+  const started = [];
+  const failed = [];
+  const wanted = new Set((Array.isArray(addresses) ? addresses : [addresses])
+    .filter((a) => typeof a === 'string').map((a) => a.trim().toLowerCase()).filter(Boolean));
+  if (wanted.size === 0) return { started, failed };
+  const pending = (db.listHandoffTasksForConversation?.(conv.id) ?? [])
+    .filter((t) => t.status === 'pending' && wanted.has(String(t.address).toLowerCase()));
+  for (const task of pending) {
+    const role = task.role ?? 'handoff';
+    const { subject, body } = renderInitialDraft({ kommun_namn: conv.kommun_namn, role, env });
+    try {
+      await sendInitial({
+        db, gmail, env, kommun_kod: conv.kommun_kod, kommun_namn: conv.kommun_namn,
+        role, contact_email: task.address, subject, body, gmailSendImpl,
+      });
+      started.push(task.address);
+    } catch (e) {
+      // A lost claim or an already-existing conversation means the address is
+      // already in play — nothing double-sent, nothing to report.
+      if (e.code === 'INITIAL_CLAIM_LOST' || /already exists/i.test(e.message)) continue;
+      failed.push(task.address);
+      log?.(`handoff start to ${task.address} for conversation ${conv.id} failed: ${e.message}`);
+    }
+  }
+  return { started, failed };
 }
 
 // Render the T-INITIAL template for a given kommun + role. Used by the
@@ -380,7 +424,7 @@ export function renderInitialDraft({ kommun_namn, role, env }) {
 // Create a new conversation and send the (possibly-edited) T-INITIAL to it.
 // Used by the dashboard's "send initial" action for kommuner that aren't
 // yet in the pilot.
-export async function sendInitial({ db, gmail, env, kommun_kod, kommun_namn, role, contact_email, subject, body }) {
+export async function sendInitial({ db, gmail, env, kommun_kod, kommun_namn, role, contact_email, subject, body, gmailSendImpl = gmailSend }) {
   const existing = db.raw
     .prepare('SELECT id FROM conversations WHERE kommun_kod = ? AND role = ?')
     .get(kommun_kod, role);
@@ -418,7 +462,7 @@ export async function sendInitial({ db, gmail, env, kommun_kod, kommun_namn, rol
   }
   let sent;
   try {
-    sent = await gmailSend(gmail, {
+    sent = await gmailSendImpl(gmail, {
       from: fromHeader(env),
       to: contact_email,
       subject,

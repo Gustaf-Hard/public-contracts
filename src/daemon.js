@@ -190,11 +190,17 @@ export function createInteractivityHandler({ db, slack, gmail, env, log = consol
         const esc = db.raw.prepare('SELECT * FROM escalations WHERE id = ?').get(escId);
         if (!esc) return;
         const conv = db.getConversation(esc.conversation_id);
-        if (parsed.action_id === 'esc_approve') {
+        if (parsed.action_id === 'esc_approve' || parsed.action_id === 'esc_approve_handoff') {
+          // esc_approve_handoff (2026-09-17): the same approve, plus every
+          // hänvisning still pending for this conversation. The plain Approve
+          // never starts one; sendApprovedReply honours only pending tasks.
+          const startHandoffs = parsed.action_id === 'esc_approve_handoff'
+            ? (db.listHandoffTasksForConversation?.(conv.id) ?? []).filter((t) => t.status === 'pending').map((t) => t.address)
+            : [];
           try {
             await sendApprovedReplyImpl({
               db, gmail, env, conv, esc, finalBody: esc.draft_body,
-              decision: 'approve_unmodified', slackClient: slack, log,
+              decision: 'approve_unmodified', slackClient: slack, log, startHandoffs,
             });
           } catch (e) {
             if (e.code === 'ESCALATION_NOT_OPEN') {

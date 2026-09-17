@@ -982,6 +982,48 @@ describe('runTick — soft internal-forward ingest (2026-07-20 §5)', () => {
     expect(db.getConversation(id).state).toBe('NEEDS_HUMAN');
   });
 
+  it('the Slack card for an external handoff carries an Approve + starta ärende button naming the pending address (2026-09-17)', async () => {
+    const spy = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue({
+      intent: 'handoff', confidence: 0.95, summary: 'Hänvisas externt.',
+      extracted: { arendenummer: null, promised_response_days: null, promised_response_date: null, handoff_to_email: 'registrator@stadsledningen.se', handoff_to_forvaltning: 'stadsledningen', questions: null, mentioned_vendors: null, reseller_relations: null },
+      suggested_action: 'escalate', is_final_delivery: false, draft_reply: 'Hej, jag kontaktar dem separat.', follow_up_at: null,
+    });
+    seedConv({ email: 'kansli@ale.se', thread: 'thr-a' });
+    const slackOps = fakeSlackOps();
+    const gmail = fakeGmail({
+      listResult: [{ id: 'ext-b' }],
+      getResult: { 'ext-b': mkMsg('ext-b', 'thr-a', 'K <kansli@ale.se>', 'Kontakta registrator@stadsledningen.se istället.') },
+    });
+    await runTick(deps({ gmail, slackOps, now: new Date('2026-06-24T12:00:00Z') }));
+    spy.mockRestore();
+
+    expect(slackOps.posts).toHaveLength(1);
+    const actions = slackOps.posts[0].find((b) => b.type === 'actions');
+    const btn = actions.elements.find((e) => e.action_id === 'esc_approve_handoff');
+    expect(btn).toBeTruthy();
+    expect(btn.text.text).toContain('registrator@stadsledningen.se');
+  });
+
+  it('a plain escalation (no handoff) posts no Approve + starta ärende button (2026-09-17)', async () => {
+    const spy = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue({
+      intent: 'clarification', confidence: 0.95, summary: 'Fråga.',
+      extracted: { arendenummer: null, promised_response_days: null, promised_response_date: null, handoff_to_email: null, handoff_to_forvaltning: null, questions: ['Vilken period?'], mentioned_vendors: null, reseller_relations: null },
+      suggested_action: 'escalate', is_final_delivery: false, draft_reply: 'Hej, perioden är 2024.', follow_up_at: null,
+    });
+    seedConv({ email: 'kansli@ale.se', thread: 'thr-a' });
+    const slackOps = fakeSlackOps();
+    const gmail = fakeGmail({
+      listResult: [{ id: 'cl-b' }],
+      getResult: { 'cl-b': mkMsg('cl-b', 'thr-a', 'K <kansli@ale.se>', 'Vilken period avser ni?') },
+    });
+    await runTick(deps({ gmail, slackOps, now: new Date('2026-06-24T12:00:00Z') }));
+    spy.mockRestore();
+
+    expect(slackOps.posts).toHaveLength(1);
+    const actions = slackOps.posts[0].find((b) => b.type === 'actions');
+    expect(actions.elements.map((e) => e.action_id)).not.toContain('esc_approve_handoff');
+  });
+
   it('respond_by_date from analysis.extracted is persisted on the resulting escalation (2026-09-12 design)', async () => {
     const spy = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue({
       intent: 'handoff', confidence: 0.95, summary: 'Hänvisas externt, kräver komplettering inom 7 dagar.',

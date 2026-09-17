@@ -157,6 +157,14 @@ async function recoverStuckSends(deps) {
   }
 }
 
+// Addresses the kommun hänvisade to that still have no ärende of their own —
+// what the Slack card's "Approve + starta ärende" button will start.
+function pendingHandoffAddresses(db, conversationId) {
+  return (db.listHandoffTasksForConversation?.(conversationId) ?? [])
+    .filter((t) => t.status === 'pending')
+    .map((t) => t.address);
+}
+
 async function escalateWithDraft({ conv, parsedInbound, messageId = null, classification, previousState, draftTemplate, llmDraft, reason, templateCtx = {}, watchlistVendors = [], draftSubject = null, draftBody = null, respondBy = null, deps }) {
   const { db, slackClient, slackOps, env, log } = deps;
 
@@ -273,6 +281,10 @@ async function escalateWithDraft({ conv, parsedInbound, messageId = null, classi
       gmail_thread_id: conv.gmail_thread_id ?? '(no thread)',
       watchlist_vendors: watchlistVendors,
       respond_by: cardRespondBy,
+      // Pending hänvisningar (2026-09-17): the handoff task is upserted in the
+      // same ingest pass BEFORE this escalation, so the card can offer
+      // "Approve + starta ärende" for it.
+      pending_handoffs: pendingHandoffAddresses(db, conv.id),
     });
     // The ONLY unguarded Slack call used to live here — and it sits AFTER
     // recordEscalation, so a Slack outage threw with the row already written:
@@ -950,6 +962,7 @@ async function retryUnpostedEscalations(deps) {
       // conversation can move on (an earlier restated frist, an operator
       // send) while this row sits unposted waiting for a Slack outage to heal.
       respond_by: db.effectiveRespondBy(esc.conversation_id),
+      pending_handoffs: pendingHandoffAddresses(db, esc.conversation_id),
     });
     try {
       attempts += 1;

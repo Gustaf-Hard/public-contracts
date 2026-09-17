@@ -613,6 +613,9 @@ const baseCss = `
   .card.card-alert { border-color: var(--bad); }
   .esc-reason { margin-bottom: 8px; }
   .esc-watchlist { margin-bottom: 8px; padding: 6px 10px; border-radius: 6px; background: #fde8e8; color: #9b1c1c; font-weight: 600; }
+  .start-handoff { margin: 6px 0 2px; padding: 6px 10px; border-radius: 6px; background: var(--bg-elev-2, #f3f4f6); }
+  .start-handoff-row { display: flex; gap: 8px; align-items: baseline; font-size: 13px; font-weight: 400; cursor: pointer; }
+  .start-handoff-row input { margin: 0; flex: none; }
   hr.soft { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
   .collapse-toggle { background: none; border: none; color: var(--accent); font: inherit; font-size: 12px;
     cursor: pointer; padding: 4px 0; }
@@ -1142,7 +1145,7 @@ export function renderOverview({ summary, rows, filter, sort, order, totalKommun
 
 // ---- Kommun detail ----
 
-export function renderEscalationForm(esc, gmailReady, returnTo = null) {
+export function renderEscalationForm(esc, gmailReady, returnTo = null, { handoffTargets = [] } = {}) {
   const disabled = gmailReady ? '' : 'disabled';
   const warn = gmailReady ? '' : '<span class="send-warning">⚠️ Gmail-token saknas — kör <code>npm run pilot-auth</code></span>';
   // When rendered inside a swappable pane, forms post via fetch and return to
@@ -1223,6 +1226,7 @@ export function renderEscalationForm(esc, gmailReady, returnTo = null) {
         <label>Brödtext</label>
         <textarea name="body">${escapeHtml(esc.draft_body ?? '')}</textarea>
       </div>
+      ${renderStartHandoffBoxes(handoffTargets)}
       <div class="buttons">
         <button class="btn ${gmailReady ? 'btn-primary' : 'btn-disabled'}" type="submit" ${disabled}>📨 Skicka</button>
         ${warn}
@@ -1234,6 +1238,22 @@ export function renderEscalationForm(esc, gmailReady, returnTo = null) {
       <button class="btn btn-secondary" type="submit"
         onclick="return confirm('Hoppa över denna eskalering utan att svara?')">Hoppa över</button>
     </form>`;
+}
+
+// One click covers both sends (2026-09-17): a pending hänvisning on the
+// ärende becomes a PRE-TICKED box on the approve form, so the operator who
+// sends "tack, jag kontaktar X" cannot forget to actually contact X. The
+// route only honours addresses that are still pending handoff tasks of the
+// conversation; the box is presentation, sendApprovedReply is the guard.
+function renderStartHandoffBoxes(targets) {
+  const pending = (targets ?? []).filter((t) => t && t.email && !t.started_conv_id);
+  if (!pending.length) return '';
+  return `<div class="field start-handoff">${pending.map((t) => `
+        <label class="start-handoff-row">
+          <input type="checkbox" name="start_handoff" value="${escapeHtml(t.email)}" checked>
+          Starta även ärende till <strong>${escapeHtml(t.email)}</strong>${t.forvaltning ? ` <span class="muted">(${escapeHtml(t.forvaltning)})</span>` : ''} — skickar T-INITIAL i en ny tråd efter att svaret gått iväg
+        </label>`).join('')}
+      </div>`;
 }
 
 export function renderCompose({ kommun, draft, availableRoles = [], selectedRole, candidateEmails = [], gmailReady = false, env = {}, heartbeat = null, partial = false, escalationCount = 0 }) {
@@ -2031,7 +2051,7 @@ function renderThreadAtts(atts, cap = 4) {
   return `<div class="thread-atts">${chips}${more}</div>`;
 }
 
-export function renderThreadGroups(threads, messages, attachmentsByMsg, signatures, escalationsByThread, gmailReady, blankReply = null) {
+export function renderThreadGroups(threads, messages, attachmentsByMsg, signatures, escalationsByThread, gmailReady, blankReply = null, { handoffTargets = [] } = {}) {
   const byThread = new Map();
   for (const m of messages) {
     const key = m.thread_id ?? 'none';
@@ -2075,7 +2095,7 @@ export function renderThreadGroups(threads, messages, attachmentsByMsg, signatur
     const threadAtts = msgs.flatMap((m) => attachmentsByMsg[m.id] ?? []);
     const attStrip = renderThreadAtts(threadAtts);
     const msgHtml = msgs.map((m, i) => threadMessage(m, attachmentsByMsg[m.id], signatures[m.id], i === msgs.length - 1)).join('');
-    const replies = threadEscs.map((e) => renderEscalationForm(e, gmailReady)).join('') + blankHere;
+    const replies = threadEscs.map((e) => renderEscalationForm(e, gmailReady, null, { handoffTargets })).join('') + blankHere;
     // Status controls live in a toolbar at the TOP of the expanded body — off
     // the dense row.
     const toolbar = `<div class="thread-toolbar">${threadStatusControls(t)}</div>`;
@@ -2235,8 +2255,11 @@ function renderCaseDetailPane(selected, gmailReady) {
     ? { threadId: blankReplyThreadId, html: blankReplyHtml }
     : null;
 
+  // Pending hänvisningar ride every reply form on this ärende as pre-ticked
+  // "starta även ärende" boxes (2026-09-17).
+  const pendingHandoffTargets = handoff_targets.filter((t) => !t.started_conv_id);
   const thread = threads.length
-    ? renderThreadGroups(threads, messages, attachmentsByMsg, signatures, escalationsByThread, gmailReady, blankReply)
+    ? renderThreadGroups(threads, messages, attachmentsByMsg, signatures, escalationsByThread, gmailReady, blankReply, { handoffTargets: pendingHandoffTargets })
     : (messages.length
         ? messages.map((m, i) => threadMessage(m, attachmentsByMsg[m.id], signatures[m.id], i === messages.length - 1)).join('')
         : '<p class="muted">Inga meddelanden ännu.</p>');
@@ -2250,7 +2273,7 @@ function renderCaseDetailPane(selected, gmailReady) {
         <span class="muted">Föreslaget svar till <strong>${escapeHtml(conv.contact_email ?? '')}</strong></span>
         ${intentBadge(e.classifier_class ?? 'unknown')}
       </div>
-      ${renderEscalationForm(e, gmailReady, returnTo)}
+      ${renderEscalationForm(e, gmailReady, returnTo, { handoffTargets: pendingHandoffTargets })}
     </div>`).join('');
 
   return `<div class="thread">

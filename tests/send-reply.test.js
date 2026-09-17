@@ -158,3 +158,88 @@ describe('sendApprovedReply — bounce resend (§4)', () => {
     expect(send).toHaveBeenCalledTimes(1); // never double-sent
   });
 });
+
+// One click covers both sends (2026-09-17): when the operator approves a reply
+// to a kommun that hänvisade vidare, the same approve may also start the
+// pending handoff ärende. The reply goes first; the handoff T-INITIAL only
+// follows a CONFIRMED reply send, through sendInitial's own claim path.
+describe('sendApprovedReply starts requested pending handoffs after the reply', () => {
+  function seedWithHandoff() {
+    const { db, conv, esc } = seedArboga();
+    const mid = db.raw.prepare('SELECT id FROM messages WHERE direction = ? ORDER BY id DESC').get('inbound').id;
+    db.upsertHandoffTask({
+      kommun_kod: conv.kommun_kod, address: 'helen.pettersson@amal.se', forvaltning: 'IT-enheten i Åmål',
+      role: 'other', source_conversation_id: conv.id, source_message_id: mid, verbatim: 1, same_domain: 0,
+    });
+    return { db, conv, esc };
+  }
+
+  it('sends the reply, then a T-INITIAL to the handoff address, and marks the task started', async () => {
+    const { db, conv, esc } = seedWithHandoff();
+    const send = vi.fn(async (_g, { to }) => (to === 'helen.pettersson@amal.se'
+      ? { id: 'out-h', threadId: 'thr-h' } : { id: 'out-1', threadId: 'thr-anneli' }));
+    const result = await sendApprovedReply({
+      db, gmail: {}, env, conv, esc, finalBody: 'tack', decision: 'approve_unmodified',
+      gmailSendImpl: send, startHandoffs: ['Helen.Pettersson@amal.se'],
+    });
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(send.mock.calls[0][1].to).toBe('Anneli.Waern@arboga.se');
+    expect(send.mock.calls[1][1].to).toBe('helen.pettersson@amal.se');
+    expect(send.mock.calls[1][1].body).toContain('Arboga');
+    const helen = db.raw.prepare('SELECT * FROM conversations WHERE contact_email = ?').get('helen.pettersson@amal.se');
+    expect(helen).toBeTruthy();
+    expect(helen.state).toBe('SENT');
+    expect(helen.role).toBe('other');
+    const task = db.listHandoffTasksForConversation(conv.id)[0];
+    expect(task.status).toBe('started');
+    expect(task.started_conv_id).toBe(helen.id);
+    expect(result.started_handoffs).toEqual(['helen.pettersson@amal.se']);
+    expect(result.pending_handoffs).toEqual([]);
+    // The reply's own bookkeeping is untouched.
+    expect(db.raw.prepare('SELECT status FROM escalations WHERE id = ?').get(esc.id).status).toBe('resolved_send');
+    expect(db.listDecisions()).toHaveLength(1);
+  });
+
+  it('a failed reply send starts NO handoff', async () => {
+    const { db, conv, esc } = seedWithHandoff();
+    const send = vi.fn(async () => { throw new Error('gmail 500'); });
+    await expect(sendApprovedReply({
+      db, gmail: {}, env, conv, esc, finalBody: 'tack', decision: 'approve_unmodified',
+      gmailSendImpl: send, startHandoffs: ['helen.pettersson@amal.se'],
+    })).rejects.toThrow();
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(db.raw.prepare('SELECT * FROM conversations WHERE contact_email = ?').get('helen.pettersson@amal.se')).toBeUndefined();
+    expect(db.listHandoffTasksForConversation(conv.id)[0].status).toBe('pending');
+  });
+
+  it('ignores a requested address that is not a pending handoff of this conversation', async () => {
+    const { db, conv, esc } = seedWithHandoff();
+    const send = vi.fn(async () => ({ id: 'out-1', threadId: 'thr-anneli' }));
+    const result = await sendApprovedReply({
+      db, gmail: {}, env, conv, esc, finalBody: 'tack', decision: 'approve_unmodified',
+      gmailSendImpl: send, startHandoffs: ['someone.else@amal.se'],
+    });
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(result.started_handoffs).toEqual([]);
+    expect(result.pending_handoffs).toEqual(['helen.pettersson@amal.se']);
+  });
+
+  it('a failed handoff send never fails the already-confirmed reply', async () => {
+    const { db, conv, esc } = seedWithHandoff();
+    const send = vi.fn(async (_g, { to }) => {
+      if (to === 'helen.pettersson@amal.se') throw new Error('gmail 500');
+      return { id: 'out-1', threadId: 'thr-anneli' };
+    });
+    const result = await sendApprovedReply({
+      db, gmail: {}, env, conv, esc, finalBody: 'tack', decision: 'approve_unmodified',
+      gmailSendImpl: send, startHandoffs: ['helen.pettersson@amal.se'],
+    });
+    expect(result.id).toBe('out-1');
+    expect(result.started_handoffs).toEqual([]);
+    expect(result.failed_handoffs).toEqual(['helen.pettersson@amal.se']);
+    expect(db.listDecisions()).toHaveLength(1);
+    // sendInitial parked the new conversation for the operator, as it does today.
+    const helen = db.raw.prepare('SELECT * FROM conversations WHERE contact_email = ?').get('helen.pettersson@amal.se');
+    expect(helen.state).toBe('NEEDS_HUMAN');
+  });
+});
