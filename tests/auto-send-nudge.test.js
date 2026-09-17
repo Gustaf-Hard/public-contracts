@@ -572,8 +572,10 @@ describe('runDailyFollowup auto-sends eligible T_FOLLOWUP_NUDGE', () => {
     expect(db.raw.prepare('SELECT COUNT(*) n FROM escalations').get().n).toBe(1);
   });
 
-  it('nudge cap: followup_count = 2 → free_form escalation to a human, never auto-sent', async () => {
-    writeSwitch({ auto_send_templates: ['T_FOLLOWUP_NUDGE'] });
+  it('nudge cap: followup_count = 2 → T_FOLLOWUP_FINAL escalation to a human, never auto-sent (even when listed in the switch)', async () => {
+    // Listing it in the switch must change nothing: only the three graduated
+    // templates have an auto-send rule, and T_FOLLOWUP_FINAL is not one.
+    writeSwitch({ auto_send_templates: ['T_FOLLOWUP_NUDGE', 'T_FOLLOWUP_FINAL'] });
     const id = seedConv({ followupCount: 2 });
     const gmail = fakeGmail();
     await runDailyFollowup(deps({ gmail }));
@@ -581,7 +583,7 @@ describe('runDailyFollowup auto-sends eligible T_FOLLOWUP_NUDGE', () => {
     expect(gmail.sendMessage).not.toHaveBeenCalled();
     const escs = db.listOpenEscalationsForConversation(id);
     expect(escs).toHaveLength(1);
-    expect(escs[0].draft_template).toBe('free_form');
+    expect(escs[0].draft_template).toBe('T_FOLLOWUP_FINAL');
     expect(db.listDecisions()).toHaveLength(0);
   });
 

@@ -5,6 +5,7 @@ import {
   T_RECEIPT,
   T_FOLLOWUP_NUDGE,
   T_FOLLOWUP_CLOSE,
+  T_FOLLOWUP_FINAL,
 } from '../src/templates.js';
 import { T_REQUEST_MISSING, T_UPDATE, T_DELAY_ACK, formatDateSv, computeReceivedMissing, chooseDeliveryReply } from '../src/templates.js';
 
@@ -112,6 +113,36 @@ describe('T_FOLLOWUP_NUDGE', () => {
       const m = T_FOLLOWUP_NUDGE({ ...ctx, sent_date });
       expect(m.body).toMatch(/min begäran om allmänna handlingar\./);
       expect(m.body).not.toMatch(/dagar sedan|skickad|undefined|null/);
+    }
+  });
+});
+
+// Third step after two ignored reminders (2026-09-17): a real draft instead of
+// the "(ingen draft — skriv själv via Edit)" placeholder. It asks for the
+// handlingar or an appealable written decision, and cites skyndsamhet without a
+// paragraph number (a machine draft never cites a paragraph unverified).
+describe('T_FOLLOWUP_FINAL', () => {
+  it('asks for the handlingar or a skriftligt, överklagbart beslut, citing skyndsamhet', () => {
+    const m = T_FOLLOWUP_FINAL({ ...ctx, sent_date: '2026-07-20' });
+    expect(m.subject).toMatch(/^Påminnelse: /);
+    expect(m.body).toMatch(/^Hej,\n/);
+    expect(m.body).toMatch(/20 juli 2026/);
+    expect(m.body).toMatch(/skyndsamt/);
+    expect(m.body).toMatch(/skriftligt beslut/);
+    expect(m.body).toMatch(/besvärshänvisning/);
+    expect(m.body).toMatch(/Gustaf Hård af Segerstad\ngustaf@mediagraf.se$/);
+  });
+  it('states no elapsed time, no paragraph citation and no em-dash', () => {
+    const m = T_FOLLOWUP_FINAL({ ...ctx, sent_date: '2026-07-20' });
+    expect(m.body).not.toMatch(/\bdagar\b|veckor|sedan/);
+    expect(m.body).not.toMatch(/§|kap\./);
+    expect(m.body).not.toMatch(/—|–/);
+  });
+  it('drops the date rather than inventing one when the send date is unknown', () => {
+    for (const sent_date of [null, undefined, '']) {
+      const m = T_FOLLOWUP_FINAL({ ...ctx, sent_date });
+      expect(m.body).toMatch(/vår begäran om allmänna handlingar\./);
+      expect(m.body).not.toMatch(/från den/);
     }
   });
 });

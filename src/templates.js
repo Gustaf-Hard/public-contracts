@@ -129,6 +129,32 @@ export function T_FOLLOWUP_NUDGE(ctx) {
   };
 }
 
+// Third step after MAX_NUDGES ignored reminders (2026-09-17). Until now this
+// hand-over minted the literal "(ingen draft — skriv själv via Edit)" and the
+// operator met an empty box. The defensible line (see the 2026-09-05 draft
+// audit): skyndsamhet without a paragraph number, then either the handlingar
+// or an appealable written decision. States no elapsed time (a human sends it
+// days after it is drafted) and asserts a conversation-wide negative, so it is
+// stale-sensitive in send-reply.js and never auto-sent.
+export function T_FOLLOWUP_FINAL(ctx) {
+  const sent = formatDateSv(ctx.sent_date);
+  const reference = sent
+    ? `vår begäran om allmänna handlingar från den ${sent}.`
+    : 'vår begäran om allmänna handlingar.';
+  return {
+    subject: `Påminnelse: ${ctx.thread_subject}`,
+    body: [
+      'Hej,',
+      '',
+      `Vi har fortfarande inte fått några handlingar eller något besked om ${reference} Enligt tryckfrihetsförordningen ska en begäran om allmänna handlingar hanteras skyndsamt.`,
+      '',
+      'Vi ber er därför att antingen lämna ut handlingarna eller, om ni bedömer att de inte kan lämnas ut, meddela ett skriftligt beslut med besvärshänvisning. Om något i begäran är oklart hjälper vi gärna till att precisera den.',
+      '',
+      signature(ctx),
+    ].join('\n'),
+  };
+}
+
 export function T_FOLLOWUP_CLOSE(ctx) {
   return {
     subject: `Re: ${ctx.thread_subject}`,

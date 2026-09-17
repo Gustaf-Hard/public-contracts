@@ -50,7 +50,7 @@ function errWithCode(message, code) {
 // specific delivery, a bounce resend answers a mail that never arrived, and
 // T_UPDATE opens a fresh round. Blocking those during an outage stalls real
 // work without protecting anyone.
-const STALE_SENSITIVE_TEMPLATES = new Set(['T_FOLLOWUP_NUDGE', 'T_FOLLOWUP_CLOSE', 'T_REQUEST_MISSING']);
+const STALE_SENSITIVE_TEMPLATES = new Set(['T_FOLLOWUP_NUDGE', 'T_FOLLOWUP_CLOSE', 'T_FOLLOWUP_FINAL', 'T_REQUEST_MISSING']);
 
 // The non-terminal waiting states a conversation can sanely resume into after a
 // free-form / soft escalation resolves. NEEDS_HUMAN and the terminal/quiescent

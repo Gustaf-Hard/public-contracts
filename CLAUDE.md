@@ -111,9 +111,15 @@ Phase-1 pipeline: `scripts/01|02|03 → src/seed.js|crawl.js|verify.js → data/
   `runDailyFollowup` gate, and the `STALE_INGEST` refusal in
   `sendApprovedReply`. While blind we draft no staleness nudge and send nothing
   from `STALE_SENSITIVE_TEMPLATES` (send-reply.js): `T_FOLLOWUP_NUDGE`,
-  `T_FOLLOWUP_CLOSE` *and* `T_REQUEST_MISSING` — each asserts a
-  conversation-wide negative ("vi har inte hört av er", "vi saknar fortfarande
-  avtal med X") that an unfetched mail can falsify. The guard calls
+  `T_FOLLOWUP_CLOSE`, `T_FOLLOWUP_FINAL` *and* `T_REQUEST_MISSING` — each
+  asserts a conversation-wide negative ("vi har inte hört av er", "vi saknar
+  fortfarande avtal med X") that an unfetched mail can falsify.
+  `T_FOLLOWUP_FINAL` (2026-09-17) is the third step after `MAX_NUDGES` ignored
+  reminders (skyndsamhet without a paragraph number, then handlingar or a
+  skriftligt beslut med besvärshänvisning); it replaced the empty
+  "(ingen draft)" hand-over, is operator-approved only, and
+  `backfillPlaceholderFinalDrafts` in `runDailyFollowup` heals pre-existing
+  placeholder rows in place (guarded on status + exact body + reason). The guard calls
   `db.getTickHealth()` unconditionally: a safety check must not opt itself out
   on a db object that lacks the method. Replies to mail we HAVE seen
   (T_RECEIPT, T_PRECISION, T_CROSSCHECK, bounce resends, T_UPDATE) are

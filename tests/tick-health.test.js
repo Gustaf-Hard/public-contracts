@@ -333,6 +333,19 @@ describe('approving a staleness nudge while ingest is blind (STALE_INGEST)', () 
     expect(db.raw.prepare('SELECT status FROM escalations WHERE id = ?').get(esc.id).status).toBe('open');
   });
 
+  // T_FOLLOWUP_FINAL says "vi har fortfarande inte fått några handlingar eller
+  // något besked" — the widest negative of all, so it is stale-sensitive too.
+  it('blocks T_FOLLOWUP_FINAL: it claims nothing has arrived at all', async () => {
+    blind();
+    const { conv, esc } = seedEscalation('T_FOLLOWUP_FINAL');
+    const send = vi.fn();
+    await expect(
+      sendApprovedReply({ db, gmail: {}, env, conv, esc, finalBody: 'vi har inte fått något', decision: 'approve_unmodified', gmailSendImpl: send })
+    ).rejects.toMatchObject({ code: 'STALE_INGEST' });
+    expect(send).not.toHaveBeenCalled();
+    expect(db.raw.prepare('SELECT status FROM escalations WHERE id = ?').get(esc.id).status).toBe('open');
+  });
+
   it('sends T_REQUEST_MISSING normally once a tick has succeeded', async () => {
     const { conv, esc } = seedEscalation('T_REQUEST_MISSING');
     db.recordHeartbeat({ kind: 'tick', error: null });

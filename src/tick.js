@@ -1,4 +1,4 @@
-import { T_INITIAL, T_PRECISION, T_RECEIPT, T_FOLLOWUP_NUDGE, T_FOLLOWUP_CLOSE, T_REQUEST_MISSING, T_UPDATE, T_DELAY_ACK, T_CROSSCHECK, computeReceivedMissing, chooseDeliveryReply } from './templates.js';
+import { T_INITIAL, T_PRECISION, T_RECEIPT, T_FOLLOWUP_NUDGE, T_FOLLOWUP_CLOSE, T_FOLLOWUP_FINAL, T_REQUEST_MISSING, T_UPDATE, T_DELAY_ACK, T_CROSSCHECK, computeReceivedMissing, chooseDeliveryReply } from './templates.js';
 import { computeKommunReview } from './contract-lifecycle.js';
 import { matchWatchlist } from './watchlist.js';
 import { crosscheckProbeGroups } from './vendor-kb.js';
@@ -20,7 +20,9 @@ import { analysePendingContracts } from './analyse-contract.js';
 import { isInVacation, vacationDaysBetween } from './vacation.js';
 import { isBounce, failedRecipient } from './bounce.js';
 
-const TEMPLATES = { T_INITIAL, T_PRECISION, T_RECEIPT, T_FOLLOWUP_NUDGE, T_FOLLOWUP_CLOSE, T_REQUEST_MISSING, T_UPDATE, T_DELAY_ACK, T_CROSSCHECK };
+const TEMPLATES = { T_INITIAL, T_PRECISION, T_RECEIPT, T_FOLLOWUP_NUDGE, T_FOLLOWUP_CLOSE, T_FOLLOWUP_FINAL, T_REQUEST_MISSING, T_UPDATE, T_DELAY_ACK, T_CROSSCHECK };
+
+const NO_DRAFT_PLACEHOLDER = '(ingen draft — skriv själv via Edit)';
 
 function fromHeader(env) {
   return `${env.GMAIL_FROM_NAME} <${env.GMAIL_USER_EMAIL}>`;
@@ -225,7 +227,7 @@ async function escalateWithDraft({ conv, parsedInbound, messageId = null, classi
   } else if (draftTemplate === 'free_form') {
     const baseSubject = parsedInbound?.subject?.replace(/^Re: /, '') ?? 'Begäran om allmänna handlingar';
     subject = `Re: ${baseSubject}`;
-    body = '(ingen draft — skriv själv via Edit)';
+    body = NO_DRAFT_PLACEHOLDER;
   } else if (TEMPLATES[draftTemplate]) {
     const ctx = tplCtx(conv, env, {
       thread_subject: parsedInbound?.subject?.replace(/^Re: /, '') ?? undefined,
@@ -1431,6 +1433,35 @@ export function followupCatchUpDue({ now, completedDate, hour = 9 }) {
   return now.getHours() >= hour;
 }
 
+// Rewrite open after-nudges escalations that still carry the placeholder body
+// into the T_FOLLOWUP_FINAL draft. Nothing is sent, no row is added; the
+// operator sees a real proposal where the empty box was. Never throws.
+export function backfillPlaceholderFinalDrafts({ db, env, log }) {
+  let healed = 0;
+  try {
+    const rows = db.raw.prepare(
+      "SELECT id, conversation_id FROM escalations WHERE status = 'open' AND draft_template = 'free_form' AND draft_body = ? AND reason LIKE '%nudges already sent%'"
+    ).all(NO_DRAFT_PLACEHOLDER);
+    for (const row of rows) {
+      const conv = db.getConversation(row.conversation_id);
+      if (!conv) continue;
+      const { subject, body } = T_FOLLOWUP_FINAL(tplCtx(conv, env, { sent_date: db.getFirstOutboundDate?.(conv.id) ?? null }));
+      // Guarded on the exact body too: a row the operator has meanwhile edited
+      // or resolved is not ours to touch.
+      const r = db.raw.prepare(
+        "UPDATE escalations SET draft_template = 'T_FOLLOWUP_FINAL', draft_subject = ?, draft_body = ? WHERE id = ? AND status = 'open' AND draft_body = ?"
+      ).run(subject, body, row.id, NO_DRAFT_PLACEHOLDER);
+      if (r.changes) {
+        healed += 1;
+        log?.(`BACKFILLED escalation ${row.id} (${conv.kommun_namn}/${conv.role}): placeholder → T_FOLLOWUP_FINAL`);
+      }
+    }
+  } catch (e) {
+    log?.(`placeholder backfill failed: ${e.message} — will retry on a later run`);
+  }
+  return healed;
+}
+
 export async function runDailyFollowup(deps) {
   const { db, now, log } = deps;
   // Vacation window (2026-07-17): during the Swedish summer the proactive
@@ -1550,6 +1581,12 @@ export async function runDailyFollowup(deps) {
     return; // deliberately NOT marked complete — a later healthy tick retries it
   }
 
+  // Heal after-nudges hand-overs minted before T_FOLLOWUP_FINAL existed
+  // (2026-09-17): they still hold the literal placeholder body. DB-only and
+  // idempotent; guarded on status, exact body and the after-nudges reason so a
+  // watchlist placeholder (a different problem) is left alone.
+  backfillPlaceholderFinalDrafts({ db, env: deps.env, log });
+
   // Kill switch (2026-08-17 design) — read fresh from disk EVERY run so the
   // operator pulling the switch takes effect on the next daily run without a
   // daemon restart. The daemon's startup-loaded overrides object is
@@ -1601,8 +1638,11 @@ export async function runDailyFollowup(deps) {
     if (action === 'send_followup_nudge') draftTemplate = 'T_FOLLOWUP_NUDGE';
     else if (action === 'send_followup_close') draftTemplate = 'T_FOLLOWUP_CLOSE';
     else if (action === 'escalate') {
+      // Third step (2026-09-17): a real draft, not the "(ingen draft)" hand-over
+      // that left the operator an empty box for weeks (Aneby #10). Still
+      // operator-approved and stale-sensitive; never in the auto-send set.
       reason = `stale ${conv.state} for ${days} days, ${conv.followup_count} nudges already sent`;
-      draftTemplate = 'free_form';
+      draftTemplate = 'T_FOLLOWUP_FINAL';
     }
 
     if (draftTemplate) {

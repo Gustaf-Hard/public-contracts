@@ -113,13 +113,56 @@ describe('runDailyFollowup — staleness drafting (M1: previously untested)', ()
     expect(db.listOpenEscalations()).toHaveLength(0);
   });
 
-  it('escalates free_form after MAX nudges', async () => {
+  it('escalates with a T_FOLLOWUP_FINAL draft after MAX nudges (2026-09-17) — never an empty placeholder', async () => {
     const id = seedConv({ stateChangedAt: '2026-06-01T00:00:00Z', followupCount: 2 });
     await runDailyFollowup(deps());
     const escs = db.listOpenEscalationsForConversation(id);
     expect(escs).toHaveLength(1);
-    expect(escs[0].draft_template).toBe('free_form');
+    expect(escs[0].draft_template).toBe('T_FOLLOWUP_FINAL');
     expect(escs[0].reason).toMatch(/2 nudges already sent/);
+    expect(escs[0].draft_body).toMatch(/skyndsamt/);
+    expect(escs[0].draft_body).toMatch(/skriftligt beslut/);
+    expect(escs[0].draft_body).not.toMatch(/ingen draft/);
+    expect(escs[0].draft_subject).toMatch(/^Påminnelse: /);
+  });
+
+  // Rows minted before the template existed hold the literal placeholder.
+  // The daily run heals them in place (guarded on status + exact body + the
+  // after-nudges reason) so the operator never meets an empty box again.
+  it('backfills an open placeholder after-nudges escalation with the T_FOLLOWUP_FINAL body, and nothing else', async () => {
+    const id = seedConv({ stateChangedAt: '2026-06-01T00:00:00Z', followupCount: 2 });
+    const placeholder = '(ingen draft — skriv själv via Edit)';
+    const target = db.recordEscalation({
+      conversation_id: id, message_id: null, reason: 'stale SENT for 15 days, 2 nudges already sent',
+      draft_template: 'free_form', draft_subject: 'Re: Begäran om allmänna handlingar', draft_body: placeholder,
+      previous_state: 'SENT',
+    });
+    // A watchlist placeholder (different reason) must stay as it is.
+    const other = seedConv({ role: 'utbildning', stateChangedAt: '2026-06-20T00:00:00Z' });
+    const untouched = db.recordEscalation({
+      conversation_id: other, message_id: null, reason: '⚠️ BEVAKAD LEVERANTÖR: Radish | llm intent=delivery',
+      draft_template: 'free_form', draft_subject: 'Re: x', draft_body: placeholder, previous_state: 'DELIVERING',
+    });
+    // A resolved placeholder row is history, not a draft.
+    const resolvedConv = seedConv({ role: 'gymnasie', stateChangedAt: '2026-06-20T00:00:00Z' });
+    const resolved = db.recordEscalation({
+      conversation_id: resolvedConv, message_id: null, reason: 'stale SENT for 15 days, 2 nudges already sent',
+      draft_template: 'free_form', draft_subject: 'Re: x', draft_body: placeholder, previous_state: 'SENT',
+    });
+    db.resolveEscalation(resolved, { status: 'resolved_skip' });
+
+    await runDailyFollowup(deps());
+
+    const row = (i) => db.raw.prepare('SELECT * FROM escalations WHERE id = ?').get(i);
+    expect(row(target).draft_template).toBe('T_FOLLOWUP_FINAL');
+    expect(row(target).draft_body).toMatch(/skyndsamt/);
+    expect(row(target).draft_subject).toMatch(/^Påminnelse: /);
+    expect(row(target).status).toBe('open');
+    expect(row(untouched).draft_body).toBe(placeholder);
+    expect(row(untouched).draft_template).toBe('free_form');
+    expect(row(resolved).draft_body).toBe(placeholder);
+    // Idempotent: no second open row was minted for the healed conversation.
+    expect(db.listOpenEscalationsForConversation(id)).toHaveLength(1);
   });
 
   it('never mints a duplicate draft while one is already open (H1) — day after day', async () => {
