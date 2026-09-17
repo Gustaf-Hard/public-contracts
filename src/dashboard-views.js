@@ -2195,7 +2195,7 @@ export function renderThread({ kommun, conv, thread, messages = [], attachmentsB
 // reply would sit and with the same fields, so it reads as "write the reply"
 // rather than "this page is broken". Seeded with whatever the analysis already
 // proposed; empty is fine, the operator writes it.
-function renderBlankReplyBox({ conv, seed = '', to = '', subject = '', gmailReady, returnTo }) {
+function renderBlankReplyBox({ conv, seed = '', to = '', subject = '', gmailReady, returnTo, handoffTargets = [] }) {
   const disabled = gmailReady ? '' : 'disabled';
   const warn = gmailReady ? '' : '<span class="send-warning">⚠️ Gmail-token saknas</span>';
   const paneAttrs = returnTo ? ` data-pane-form data-return="${escapeHtml(returnTo)}"` : '';
@@ -2221,6 +2221,7 @@ function renderBlankReplyBox({ conv, seed = '', to = '', subject = '', gmailRead
           <label>Brödtext</label>
           <textarea name="body" placeholder="Skriv ditt svar här…">${escapeHtml(seed)}</textarea>
         </div>
+        ${renderStartHandoffBoxes(handoffTargets)}
         <div class="buttons">
           <button class="btn ${gmailReady ? 'btn-primary' : 'btn-disabled'}" type="submit" ${disabled}>📨 Skicka</button>
           ${warn}
@@ -2245,8 +2246,11 @@ function renderCaseDetailPane(selected, gmailReady) {
   // Where the write-a-reply box goes: inside the thread carrying the message it
   // answers, so it sits exactly where a drafted reply would. Only falls below
   // the thread list when the message belongs to no thread.
+  // Pending hänvisningar ride every reply form on this ärende as pre-ticked
+  // "starta även ärende" boxes (2026-09-17) — the drafted ones and the blank one.
+  const pendingHandoffTargets = handoff_targets.filter((t) => !t.started_conv_id);
   const blankReplyHtml = needs_draft
-    ? renderBlankReplyBox({ conv, seed: draft_seed, to: draft_to, subject: draft_subject, gmailReady, returnTo })
+    ? renderBlankReplyBox({ conv, seed: draft_seed, to: draft_to, subject: draft_subject, gmailReady, returnTo, handoffTargets: pendingHandoffTargets })
     : '';
   const blankReplyThreadId = needs_draft
     ? ([...messages].reverse().find((m) => m.direction === 'inbound')?.thread_id ?? null)
@@ -2255,9 +2259,6 @@ function renderCaseDetailPane(selected, gmailReady) {
     ? { threadId: blankReplyThreadId, html: blankReplyHtml }
     : null;
 
-  // Pending hänvisningar ride every reply form on this ärende as pre-ticked
-  // "starta även ärende" boxes (2026-09-17).
-  const pendingHandoffTargets = handoff_targets.filter((t) => !t.started_conv_id);
   const thread = threads.length
     ? renderThreadGroups(threads, messages, attachmentsByMsg, signatures, escalationsByThread, gmailReady, blankReply, { handoffTargets: pendingHandoffTargets })
     : (messages.length

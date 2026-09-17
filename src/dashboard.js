@@ -1212,6 +1212,7 @@ export function createDashboardApp({
         db, gmail, env, conv, esc,
         finalBody, finalSubject: req.body.subject, finalTo: req.body.to,
         decision: 'edit', slackClient,
+        startHandoffs: [].concat(req.body.start_handoff ?? []),
       });
     } catch (e) {
       if (e.code === 'ESCALATION_NOT_OPEN' || e.code === 'STALE_ESCALATION' || e.code === 'STALE_INGEST') {

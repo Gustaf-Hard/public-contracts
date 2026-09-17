@@ -1908,6 +1908,40 @@ describe('handoff suggested ärenden', () => {
       expect(db.listHandoffTasksForConversation(convId).every((t) => t.status === 'pending')).toBe(true);
     } finally { spy.mockRestore(); }
   });
+
+  // The blank "inget utkast" reply box is a reply form too (2026-09-17): the
+  // operator writing "jag kontaktar X" by hand must get the same pre-ticked box.
+  function seedHandoffNeedingDraft() {
+    const convId = seedHandoff();
+    // needs_draft: last message inbound, no escalation, action not 'wait'.
+    db.updateConversationState(convId, 'ACK_RECEIVED', {});
+    return convId;
+  }
+
+  it('the blank reply box on a handoff ärende offers the pre-ticked start-handoff boxes', async () => {
+    const convId = seedHandoffNeedingDraft();
+    const res = await get(appG(), `/arenden/${convId}`);
+    expect(res.text).toContain('inget utkast');
+    expect(res.text).toMatch(/name="start_handoff" value="info@educ.goteborg.se" checked/);
+  });
+
+  it('a hand-written reply with start_handoff ticked also starts that ärende', async () => {
+    const convId = seedHandoffNeedingDraft();
+    const spy = vi.spyOn(gmailMod, 'sendMessage').mockImplementation(async (_g, { to }) => (
+      to === 'info@educ.goteborg.se' ? { id: 'm-h', threadId: 't-h' } : { id: 'm9', threadId: 't9' }));
+    try {
+      const res = await postForm(appGmail(), `/arenden/${convId}/reply`, {
+        to: 'ink@ink.goteborg.se', subject: 'Re: SV', body: 'Tack, jag kontaktar dem.',
+        start_handoff: 'info@educ.goteborg.se',
+      });
+      expect(res.status).toBe(302);
+      expect(spy).toHaveBeenCalledTimes(2);
+      expect(spy.mock.calls[1][1].to).toBe('info@educ.goteborg.se');
+      const tasks = db.listHandoffTasksForConversation(convId);
+      expect(tasks.find((t) => t.address === 'info@educ.goteborg.se').status).toBe('started');
+      expect(tasks.find((t) => t.address === 'grundskola@grundskola.goteborg.se').status).toBe('pending');
+    } finally { spy.mockRestore(); }
+  });
 });
 
 describe('stale-page protection', () => {
