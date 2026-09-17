@@ -1,4 +1,5 @@
 import { T_INITIAL, T_PRECISION, T_RECEIPT, T_FOLLOWUP_NUDGE, T_FOLLOWUP_CLOSE, T_FOLLOWUP_FINAL, T_REQUEST_MISSING, T_UPDATE, T_DELAY_ACK, T_CROSSCHECK, computeReceivedMissing, chooseDeliveryReply } from './templates.js';
+import { REQUEUED_REASON_PREFIX } from './storage.js';
 import { computeKommunReview } from './contract-lifecycle.js';
 import { matchWatchlist } from './watchlist.js';
 import { crosscheckProbeGroups } from './vendor-kb.js';
@@ -23,6 +24,15 @@ import { isBounce, failedRecipient } from './bounce.js';
 const TEMPLATES = { T_INITIAL, T_PRECISION, T_RECEIPT, T_FOLLOWUP_NUDGE, T_FOLLOWUP_CLOSE, T_FOLLOWUP_FINAL, T_REQUEST_MISSING, T_UPDATE, T_DELAY_ACK, T_CROSSCHECK };
 
 const NO_DRAFT_PLACEHOLDER = '(ingen draft — skriv själv via Edit)';
+
+// A draft the operator requeued from a parked send is theirs to approve: the
+// button said so, and the original already failed once at Gmail. No sweep
+// sends it (2026-09-17).
+function isRequeuedDraft(esc, log) {
+  const requeued = typeof esc.reason === 'string' && esc.reason.startsWith(REQUEUED_REASON_PREFIX);
+  if (requeued) log?.(`SKIP auto-send for escalation ${esc.id}: requeued from a parked send, operator approves it`);
+  return requeued;
+}
 
 function fromHeader(env) {
   return `${env.GMAIL_FROM_NAME} <${env.GMAIL_USER_EMAIL}>`;
@@ -1741,7 +1751,8 @@ export async function runDailyFollowup(deps) {
   // run, never reached while ingest is blind (the gate at the top returned).
   if (autoSendTemplates.includes('T_DELAY_ACK') && !isInVacation(todayIso, cfg)) {
     const openDelayAcks = db.listEscalationsByStatus('open')
-      .filter((e) => e.draft_template === 'T_DELAY_ACK');
+      .filter((e) => e.draft_template === 'T_DELAY_ACK')
+      .filter((e) => !isRequeuedDraft(e, log));
     for (const esc of openDelayAcks) {
       const conv = db.getConversation(esc.conversation_id);
       if (!conv) continue;
@@ -1804,6 +1815,7 @@ export async function runDailyFollowup(deps) {
   if (autoSendTemplates.includes('T_FOLLOWUP_CLOSE') && !isInVacation(todayIso, cfg)) {
     const openCloses = db.listEscalationsByStatus('open')
       .filter((e) => e.draft_template === 'T_FOLLOWUP_CLOSE')
+      .filter((e) => !isRequeuedDraft(e, log))
       // Redundant today (listEscalationsByStatus is already ORDER BY id) and
       // kept as local defence: oldest-first is THIS sweep's rule to hold, not
       // a property we want to inherit from a shared query's ordering.

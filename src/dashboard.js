@@ -6,7 +6,7 @@
 import express from 'express';
 import path from 'node:path';
 import { readFileSync, existsSync } from 'node:fs';
-import { openDb, ACTIVE_ESCALATION_STATUSES } from './storage.js';
+import { openDb, ACTIVE_ESCALATION_STATUSES, REQUEUED_REASON_PREFIX } from './storage.js';
 import { buildVelocityFacts } from './collection-velocity.js';
 import { buildPipeline, kommunStage } from './pipeline.js';
 import { effectiveFollowUp, TERMINAL_STATES } from './conversation.js';
@@ -688,6 +688,12 @@ function loadCaseDetail(db, convId, kommunFor = () => null) {
       const trigMsg = e.message_id ? db.getMessageById(e.message_id) : null;
       return { ...e, recipient: escalationRecipient(db, e, conv), thread_id: trigMsg?.thread_id ?? null };
     });
+  // Parked / in-flight sends (2026-09-17): not 'open', so they never rendered
+  // here while the queue pointed the operator at this very page. A parked row
+  // blocks every new draft, so the page must offer the way out.
+  const parked_escalations = db.raw
+    .prepare("SELECT * FROM escalations WHERE conversation_id = ? AND status IN ('sending', 'send_failed', 'send_unconfirmed') ORDER BY id DESC")
+    .all(convId);
   const threads = db.listThreadsForConversation(convId);
 
   // Suggested ärenden from the most recent EXTERNAL handoff. Newest wins: an
@@ -729,7 +735,7 @@ function loadCaseDetail(db, convId, kommunFor = () => null) {
     : '';
   const draft_subject = 'Re: ' + String(lastIn?.subject ?? 'Begäran om allmänna handlingar').replace(/^(Re|Sv|SV):\s*/i, '');
 
-  return { conv, messages, attachmentsByMsg, signatures, escalations, threads, handoff_targets,
+  return { conv, messages, attachmentsByMsg, signatures, escalations, parked_escalations, threads, handoff_targets,
     needs_draft, draft_seed: draft_seed.trim(), draft_to, draft_subject,
     follow_up: effectiveFollowUp(conv) };
 }
@@ -1725,6 +1731,63 @@ export function createDashboardApp({
       return res.status(500).send(`Send failed: ${escapeForError(e.message)}`);
     }
     done();
+  });
+
+  // Parked sends (2026-09-17): the two human ways out of send_failed /
+  // send_unconfirmed. Neither touches Gmail. The parked row itself is NEVER put
+  // back to 'open' (the safety invariant): requeue mints a NEW open row the
+  // normal approve path then claims, and dismiss records that the operator
+  // verified in Gmail Sent and chose not to resend.
+  const PARKED = new Set(['send_failed', 'send_unconfirmed']);
+  app.post('/escalations/:id/requeue', (req, res) => {
+    if (!db) return res.status(503).send('No DB');
+    const escId = parseInt(req.params.id, 10);
+    const esc = db.raw.prepare('SELECT * FROM escalations WHERE id = ?').get(escId);
+    if (!esc) return res.status(404).send('Escalation not found');
+    const conv = db.getConversation(esc.conversation_id);
+    if (!conv) return res.status(404).send('Case not found');
+    const newId = db.raw.transaction(() => {
+      // Guarded on the parked status: a second click or a racing dismiss must
+      // not mint two drafts from one parked row.
+      const r = db.raw.prepare(
+        "UPDATE escalations SET status = 'resolved_requeued', resolved_text = COALESCE(resolved_text, '') || ? , resolved_at = datetime('now') WHERE id = ? AND status IN ('send_failed', 'send_unconfirmed')"
+      ).run(' | omskickning: nytt utkast skapat av operatören', escId);
+      if (!r.changes) return null;
+      return db.recordEscalation({
+        conversation_id: conv.id, message_id: esc.message_id,
+        reason: `${REQUEUED_REASON_PREFIX}${escId} (${esc.status}: ${esc.resolved_text ?? 'okänt fel'})`,
+        draft_template: esc.draft_template, draft_subject: esc.draft_subject, draft_body: esc.draft_body,
+        classifier_class: esc.classifier_class, classifier_confidence: esc.classifier_confidence,
+        previous_state: esc.previous_state ?? conv.state,
+        watchlist_vendors: esc.watchlist_vendors, respond_by: esc.respond_by,
+      });
+    })();
+    if (newId == null) return res.status(409).send(escapeForError(`Escalation ${escId} is ${esc.status}, not parked — nothing requeued`));
+    res.redirect(backTo(req, `/arenden/${conv.id}`));
+  });
+
+  app.post('/escalations/:id/dismiss-parked', (req, res) => {
+    if (!db) return res.status(503).send('No DB');
+    const escId = parseInt(req.params.id, 10);
+    const esc = db.raw.prepare('SELECT * FROM escalations WHERE id = ?').get(escId);
+    if (!esc) return res.status(404).send('Escalation not found');
+    if (!PARKED.has(esc.status)) return res.status(409).send(escapeForError(`Escalation ${escId} is ${esc.status}, not parked`));
+    const reason = String(req.body?.reason ?? '').trim();
+    if (!reason) return res.status(400).send('Ange en anledning (t.ex. vad Skickat i Gmail visar).');
+    const conv = db.getConversation(esc.conversation_id);
+    const r = db.raw.prepare(
+      "UPDATE escalations SET status = 'resolved_closed', resolved_text = COALESCE(resolved_text, '') || ?, resolved_at = datetime('now') WHERE id = ? AND status IN ('send_failed', 'send_unconfirmed')"
+    ).run(` | avfärdad av operatören: ${reason}`, escId);
+    if (r.changes) {
+      db.recordDecision({
+        escalation_id: escId, conversation_id: esc.conversation_id,
+        conversation_state: esc.previous_state ?? conv?.state ?? null,
+        classifier_class: esc.classifier_class ?? null, classifier_confidence: esc.classifier_confidence ?? null,
+        draft_template: esc.draft_template, draft_body: esc.draft_body ?? '',
+        decision: 'closed', final_body: null,
+      });
+    }
+    res.redirect(backTo(req, `/arenden/${esc.conversation_id}`));
   });
 
   // Dismiss a pending hänvisning with an auditable reason (2026-09-06 design).

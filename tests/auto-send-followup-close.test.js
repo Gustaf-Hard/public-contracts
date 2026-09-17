@@ -7,7 +7,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { isAutoSendableFollowupClose } from '../src/conversation.js';
-import { openDb } from '../src/storage.js';
+import { openDb, REQUEUED_REASON_PREFIX } from '../src/storage.js';
 import { runDailyFollowup, CLOSE_AUTO_MAX_PER_RUN } from '../src/tick.js';
 
 function esc(overrides = {}) {
@@ -209,6 +209,22 @@ describe('runDailyFollowup T_FOLLOWUP_CLOSE sweep', () => {
     expect(db.listEscalationsByStatus('resolved_send')).toHaveLength(1);
     const d = db.listDecisions().find((x) => x.decision === 'auto_send');
     expect(d.draft_template).toBe('T_FOLLOWUP_CLOSE');
+  });
+
+  // A draft the operator requeued from a parked send (2026-09-17) was promised
+  // to them as "godkänner du som vanligt" — the sweep must leave it alone even
+  // though the template is otherwise auto-sendable.
+  it('never auto-sends a draft requeued from a parked send', async () => {
+    writeSwitch({ auto_send_templates: ['T_FOLLOWUP_CLOSE'] });
+    const id = seedConv();
+    seedInbound(id);
+    seedCloseEscalation(id);
+    db.raw.prepare("UPDATE escalations SET reason = ? WHERE conversation_id = ?")
+      .run(`${REQUEUED_REASON_PREFIX}232 (send_failed: send error: invalid_grant)`, id);
+    const gmail = fakeGmail();
+    await runDailyFollowup(deps({ gmail }));
+    expect(gmail.sent).toHaveLength(0);
+    expect(db.listEscalationsByStatus('open')).toHaveLength(1);
   });
 
   it('switch that does not list the template → nothing sent, draft stays open', async () => {

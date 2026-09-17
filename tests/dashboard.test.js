@@ -1944,6 +1944,94 @@ describe('handoff suggested ärenden', () => {
   });
 });
 
+// Parked sends (2026-09-17): a send_failed / send_unconfirmed row blocks every
+// new draft and, not being 'open', used to render NOTHING on the ärende page
+// while the queue said "se ärendet" (Härjedalen #81, invalid_grant, 25 days).
+describe('parked send on the ärende page', () => {
+  function seedParked({ status = 'send_failed', text = 'send error: invalid_grant' } = {}) {
+    const convId = db.createConversation({ kommun_kod: '2418', kommun_namn: 'Malå', role: 'central', contact_email: 'kommun@mala.se', scheduled_send_at: '2026-08-11T09:00:00Z' });
+    db.updateConversationState(convId, 'SENT', { gmail_thread_id: 'thr-p', last_outbound_at: '2026-08-11T09:44:53Z' });
+    db.recordMessage({ conversation_id: convId, gmail_message_id: 'out-p', direction: 'outbound',
+      from_email: 'me@x.se', to_email: 'kommun@mala.se', subject: 'Begäran om allmänna handlingar', body_text: 'x',
+      classification: null, classification_confidence: null, received_at: '2026-08-11T09:44:53Z', attachment_count: 0, gmail_thread_id: 'thr-p' });
+    const escId = db.recordEscalation({ conversation_id: convId, message_id: null, reason: 'stale SENT for 11 days',
+      draft_template: 'T_FOLLOWUP_NUDGE', draft_subject: 'Påminnelse: Begäran', draft_body: 'Hej,\n\nJag vill bara följa upp.', previous_state: 'SENT' });
+    db.resolveEscalation(escId, { status, resolved_text: text });
+    return { convId, escId };
+  }
+  const row = (id) => db.raw.prepare('SELECT * FROM escalations WHERE id = ?').get(id);
+
+  it('renders a Skickning parkerad card with the error, the draft and both actions', async () => {
+    const { convId, escId } = seedParked();
+    const res = await get(appWithFakes(), `/arenden/${convId}`);
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Skickning parkerad');
+    expect(res.text).toContain('invalid_grant');
+    expect(res.text).toContain('Jag vill bara följa upp.');
+    expect(res.text).toContain(`action="/escalations/${escId}/requeue"`);
+    expect(res.text).toContain(`action="/escalations/${escId}/dismiss-parked"`);
+  });
+
+  it('an in-flight sending row is shown as pågår with no actions', async () => {
+    const { convId, escId } = seedParked({ status: 'sending', text: null });
+    const res = await get(appWithFakes(), `/arenden/${convId}`);
+    expect(res.text).toContain('Skickning pågår');
+    expect(res.text).not.toContain(`action="/escalations/${escId}/requeue"`);
+    expect(res.text).not.toContain(`action="/escalations/${escId}/dismiss-parked"`);
+  });
+
+  it('requeue closes the parked row and mints a fresh open draft with the same text, sending nothing', async () => {
+    const { convId, escId } = seedParked();
+    const spy = vi.spyOn(gmailMod, 'sendMessage');
+    try {
+      const res = await postForm(appWithFakes(), `/escalations/${escId}/requeue`, {});
+      expect(res.status).toBe(302);
+      expect(spy).not.toHaveBeenCalled();
+    } finally { spy.mockRestore(); }
+    expect(row(escId).status).toBe('resolved_requeued');
+    expect(row(escId).resolved_text).toMatch(/invalid_grant/);
+    expect(row(escId).resolved_text).toMatch(/omskickning/);
+    const open = db.listOpenEscalationsForConversation(convId);
+    expect(open).toHaveLength(1);
+    expect(open[0].draft_template).toBe('T_FOLLOWUP_NUDGE');
+    expect(open[0].draft_body).toBe('Hej,\n\nJag vill bara följa upp.');
+    expect(open[0].draft_subject).toBe('Påminnelse: Begäran');
+    expect(open[0].previous_state).toBe('SENT');
+    expect(open[0].reason).toMatch(new RegExp(`omskickning av parkerad #${escId}`));
+    // The ärende page now shows the normal reply form for it.
+    const page = await get(appWithFakes(), `/arenden/${convId}`);
+    expect(page.text).toContain(`action="/escalations/${open[0].id}"`);
+    expect(page.text).not.toContain('Skickning parkerad');
+  });
+
+  it('requeue is a no-op on a row that is not parked', async () => {
+    const { convId, escId } = seedParked();
+    db.raw.prepare("UPDATE escalations SET status = 'open' WHERE id = ?").run(escId);
+    const res = await postForm(appWithFakes(), `/escalations/${escId}/requeue`, {});
+    expect(res.status).toBe(409);
+    expect(db.listOpenEscalationsForConversation(convId)).toHaveLength(1);
+    expect(row(escId).status).toBe('open');
+  });
+
+  it('dismiss-parked requires a reason, closes the row, records a closed decision and unblocks the follow-up', async () => {
+    const { convId, escId } = seedParked({ status: 'send_unconfirmed', text: 'claimed for sending but never finalized' });
+    const missing = await postForm(appWithFakes(), `/escalations/${escId}/dismiss-parked`, { reason: '  ' });
+    expect(missing.status).toBe(400);
+    expect(row(escId).status).toBe('send_unconfirmed');
+
+    const res = await postForm(appWithFakes(), `/escalations/${escId}/dismiss-parked`, { reason: 'Mejlet ligger i Skickat i Gmail' });
+    expect(res.status).toBe(302);
+    expect(row(escId).status).toBe('resolved_closed');
+    expect(row(escId).resolved_text).toMatch(/never finalized/);
+    expect(row(escId).resolved_text).toMatch(/Mejlet ligger i Skickat/);
+    const decisions = db.listDecisions().filter((d) => d.escalation_id === escId);
+    expect(decisions).toHaveLength(1);
+    expect(decisions[0].decision).toBe('closed');
+    expect(db.hasActiveEscalation(convId)).toBe(false);
+    expect(db.listOpenEscalationsForConversation(convId)).toHaveLength(0);
+  });
+});
+
 describe('stale-page protection', () => {
   it('marks every response no-store so a browser cannot show a healed outage as ongoing', async () => {
     // The health modal is server-rendered once per page load. A cached copy kept

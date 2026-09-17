@@ -613,6 +613,7 @@ const baseCss = `
   .card.card-alert { border-color: var(--bad); }
   .esc-reason { margin-bottom: 8px; }
   .esc-watchlist { margin-bottom: 8px; padding: 6px 10px; border-radius: 6px; background: #fde8e8; color: #9b1c1c; font-weight: 600; }
+  .parked-body { white-space: pre-wrap; font: inherit; margin: 0; padding: 8px 10px; background: var(--bg-elev-2, #f3f4f6); border-radius: 6px; }
   .start-handoff { margin: 6px 0 2px; padding: 6px 10px; border-radius: 6px; background: var(--bg-elev-2, #f3f4f6); }
   .start-handoff-row { display: flex; gap: 8px; align-items: baseline; font-size: 13px; font-weight: 400; cursor: pointer; }
   .start-handoff-row input { margin: 0; flex: none; }
@@ -2232,7 +2233,7 @@ function renderBlankReplyBox({ conv, seed = '', to = '', subject = '', gmailRead
 
 function renderCaseDetailPane(selected, gmailReady) {
   if (!selected) return '<div class="detail-empty"><p class="muted">Välj ett ärende i listan till vänster.</p></div>';
-  const { conv, messages, attachmentsByMsg, signatures, escalations, threads = [], handoff_targets = [], needs_draft = false, draft_seed = '', draft_to = '', draft_subject = '', follow_up } = selected;
+  const { conv, messages, attachmentsByMsg, signatures, escalations, parked_escalations = [], threads = [], handoff_targets = [], needs_draft = false, draft_seed = '', draft_to = '', draft_subject = '', follow_up } = selected;
   const returnTo = `/arenden/${conv.id}`;
   const duration = caseDuration(conv, messages);
   const fuBadge = fmtFollowUpBadge(follow_up?.date, follow_up?.source);
@@ -2294,6 +2295,7 @@ function renderCaseDetailPane(selected, gmailReady) {
       </div>
     </div>
     <div class="thread-msgs">${thread}</div>
+    ${renderParkedSends(parked_escalations, returnTo)}
     ${replyBoxes}
     ${blankReply ? '' : blankReplyHtml}
     ${renderHandoffSuggestions(handoff_targets, conv.id, gmailReady)}
@@ -2306,6 +2308,48 @@ function renderCaseDetailPane(selected, gmailReady) {
 // written in the mail, and whether it sits on the kommun's own domain. The
 // badges are shown, not enforced — the operator is the gate, and nothing at all
 // is created until they click.
+// A parked or in-flight send (2026-09-17). send_failed / send_unconfirmed offer
+// the two human ways out; 'sending' is informational (recoverStuckSends turns
+// an orphaned claim into send_unconfirmed by itself).
+function renderParkedSends(rows, returnTo = null) {
+  if (!rows.length) return '';
+  const paneAttrs = returnTo ? ` data-pane-form data-return="${escapeHtml(returnTo)}"` : '';
+  const returnField = returnTo ? `<input type="hidden" name="return" value="${escapeHtml(returnTo)}">` : '';
+  return rows.map((e) => {
+    const inflight = e.status === 'sending';
+    const title = inflight ? 'Skickning pågår' : `Skickning parkerad (${escapeHtml(e.status)})`;
+    const explain = inflight
+      ? 'Ett svar håller på att skickas. Om det står kvar här länge gör daemonen om det till send_unconfirmed.'
+      : (e.status === 'send_failed'
+        ? 'Gmail avvisade sändningen. Ingenting gick iväg om felet var invalid_grant eller liknande tokenfel; kontrollera Skickat i Gmail vid tvivel.'
+        : 'Sändningen påbörjades men bekräftades aldrig. Kontrollera Skickat i Gmail innan du gör om något: svaret kan redan ha gått iväg.');
+    const actions = inflight ? '' : `
+        <div class="buttons" style="gap:8px;flex-wrap:wrap">
+          <form method="post" action="/escalations/${e.id}/requeue"${paneAttrs} style="display:inline">
+            ${returnField}
+            <button class="btn btn-primary" type="submit" title="Skapar ett nytt utkast med samma text som du sedan godkänner som vanligt">🔁 Skicka igen som nytt utkast</button>
+          </form>
+          <form method="post" action="/escalations/${e.id}/dismiss-parked"${paneAttrs} style="display:inline">
+            ${returnField}
+            <input type="text" name="reason" placeholder="anledning, t.ex. ligger i Skickat" required class="dismiss-reason" style="width:220px">
+            <button class="btn btn-secondary" type="submit">Avfärda</button>
+          </form>
+        </div>`;
+    return `
+    <div class="reply-box parked-send">
+      <div class="reply-head">
+        <span class="avatar avatar-outbound">⚠️</span>
+        <span class="muted"><strong>${title}</strong> · ${escapeHtml(e.draft_template ?? 'free_form')} · ${escapeHtml(e.resolved_at ?? e.created_at ?? '')}</span>
+      </div>
+      <p class="muted" style="margin:0 0 6px">${explain}</p>
+      ${e.resolved_text ? `<div class="esc-watchlist">${escapeHtml(e.resolved_text)}</div>` : ''}
+      <div class="field"><label>Ämne</label><div class="muted">${escapeHtml(e.draft_subject ?? '')}</div></div>
+      <div class="field"><label>Brödtext</label><pre class="parked-body">${escapeHtml(e.draft_body ?? '')}</pre></div>
+      ${actions}
+    </div>`;
+  }).join('');
+}
+
 function renderHandoffSuggestions(targets, convId, gmailReady = false) {
   if (!targets.length) return '';
   const badge = (ok, yes, no) => ok

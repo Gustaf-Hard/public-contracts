@@ -7,7 +7,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { isAutoSendableDelayAck, DELAY_ACK_AUTO_MIN_CONFIDENCE } from '../src/conversation.js';
-import { openDb } from '../src/storage.js';
+import { openDb, REQUEUED_REASON_PREFIX } from '../src/storage.js';
 import { runDailyFollowup } from '../src/tick.js';
 
 const NOW = new Date('2026-08-20T09:00:00Z');
@@ -282,6 +282,22 @@ describe('runDailyFollowup delay-ack sweep', () => {
     expect(db.getConversation(id).last_outbound_at).toBeTruthy();
     // ...and the frist nobody answered is still outstanding.
     expect(db.latestRespondByForConversation(id)).toBe('2026-08-25');
+  });
+
+  it('never auto-sends a draft requeued from a parked send (2026-09-17)', async () => {
+    writeSwitch({ auto_send_templates: ['T_DELAY_ACK'] });
+    const id = seedConv({ state: 'ACK_RECEIVED', stateChangedAt: '2026-08-19T00:00:00Z' });
+    const msgId = seedInbound(id, {
+      classification: 'delay_promise', receivedAt: '2026-08-20T06:00:00Z',
+      bodyText: 'Hej,\nVi återkommer så snart underlaget är klart.\nMvh',
+    });
+    seedDelayAckEscalation(id, msgId);
+    db.raw.prepare("UPDATE escalations SET reason = ? WHERE conversation_id = ?")
+      .run(`${REQUEUED_REASON_PREFIX}77 (send_failed: send error: invalid_grant)`, id);
+    const gmail = fakeGmail();
+    await runDailyFollowup(deps({ gmail, now: new Date('2026-08-20T09:00:00Z') }));
+    expect(gmail.sent).toHaveLength(0);
+    expect(db.listEscalationsByStatus('open')).toHaveLength(1);
   });
 
   it('switch off / nudge-only switch → draft stays open, nothing sent', async () => {

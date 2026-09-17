@@ -11,8 +11,14 @@ import { splitHandoffContacts } from './handoff.js';
 // While ANY of these exists, the conversation must not receive a new
 // follow-up/precision draft: approving a fresh draft next to an ambiguous
 // send is how a kommun gets double-messaged. Everything else (resolved_send,
-// resolved_edit, resolved_skip, resolved_closed, superseded) is terminal.
+// resolved_edit, resolved_skip, resolved_closed, resolved_requeued, superseded)
+// is terminal.
 export const ACTIVE_ESCALATION_STATUSES = Object.freeze(['open', 'sending', 'send_failed', 'send_unconfirmed']);
+
+// Reason prefix of a draft the operator minted from a parked send (dashboard
+// /escalations/:id/requeue, 2026-09-17). The auto-send sweeps skip these: the
+// button promised the operator approves it, and the original failed at Gmail.
+export const REQUEUED_REASON_PREFIX = 'omskickning av parkerad #';
 
 // THE definition of "ingest is blind": no successful tick within this many
 // minutes (60 = four missed 15-minute ticks). One number, one meaning — the
