@@ -263,6 +263,20 @@ NEEDS_HUMAN, so the round-11 P2 bug was a mail that may already have gone out
 rendering as "Inget kräver din uppmärksamhet" while the Köhälsa digest listed its
 deadline. A parked row (send_failed / send_unconfirmed) is labelled `Skickning parkerad (<status>): se ärendet`, an in-flight `sending` row is labelled `Skickning pågår: se ärendet`, and `since` for such rows is the escalation's `resolved_at` (the moment it entered that status) falling back to `created_at` for legacy rows. The ärende page renders parked and in-flight rows as cards (`parked_escalations` in `loadCaseDetail`, 2026-09-17) with the two human ways out of a parked one: `POST /escalations/:id/requeue` closes it `resolved_requeued` and mints a NEW open row cloned from it whose reason starts with `REQUEUED_REASON_PREFIX` (storage.js), which both auto-send sweeps skip because the button promised the operator approves it; `POST /escalations/:id/dismiss-parked` (reason required) closes it `resolved_closed` with a `closed` decision. The parked row itself never goes back to `open` and nothing here touches Gmail. `buildWaiting` excludes the same set, or a parked send would be listed both as needing the operator and as progressing on its own.
 
+**Batch verdicts ride the same approved path** (`src/apply-verdicts.js`,
+`scripts/14-apply-verdicts.js`, 2026-09-26). A reviewer works from a DB snapshot
+(the nightly S3 backup) and produces one verdict per open escalation
+(`approve` / `edit` / `skip` / `human`); the applier replays them on the box
+through `sendApprovedReply` (decision `approve_unmodified` or `edit`) or the
+resolver's skip path, dry-run by default. Two snapshot checks sit in front of
+every row: an inbound received after `--reviewed-at` voids the verdict
+(`newer_inbound`; STALE_ESCALATION only compares with the draft's creation), and
+the row's `draft_sha256` must still match (`draft_changed`). `human` rows are
+never touched, a Gmail failure parks the row exactly as a click would and the
+batch continues; re-running is safe because resolved rows report `not_open`.
+The verdict file carries kommun staff names, so it lives outside git (S3
+`deploy/` prefix, then `/var/lib/mediagraf/`).
+
 **Polite scraping is enforced in `src/http.js`** (Phase 1). Every outbound
 HTTP call must go through `politeFetch` (1 req/sec/host, retry on 429/503,
 contactable User-Agent). Do not call `undici`/`fetch` directly.
