@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { classify, splitQuotedText, stripQuotedText, extractReturnDate, isInternalForwardText, delayAckBodyGate } from '../src/classifier.js';
+import { classify, splitQuotedText, stripQuotedText, extractReturnDate, isInternalForwardText, delayAckBodyGate, concessionFlags } from '../src/classifier.js';
+import { FOLLOWUP_CLOSE_LINE, CROSSCHECK_CLOSE_LINE } from '../src/templates.js';
 
 describe('splitQuotedText', () => {
   it('splits at the leading-date Gmail-sv attribution (no leading "Den")', () => {
@@ -400,5 +401,43 @@ describe('delayAckBodyGate', () => {
   it('ignores currency inside the quoted trailing history', () => {
     const body = 'Hej, vi återkommer inom kort.\n\nFrån: Gustaf Hård af Segerstad <gustaf.hard@gmail.com>\nSkickat: den 11 augusti\n…avtal värda 911 000 kr…';
     expect(delayAckBodyGate(body).ok).toBe(true);
+  });
+});
+
+// Concession gate (2026-09-28, Karlstad #100 + the concession audit): a draft
+// may restate the operator's decisions but never make a new commitment. These
+// are the sentences that did, verbatim from the live corpus.
+describe('concessionFlags', () => {
+  const sig = '\n\nMed vänliga hälsningar,\nG\ng@x.se';
+  it.each([
+    ['Karlstad 619', 'Hej,\n\nFör att komma framåt accepterar jag att handlingarna tillhandahålls som en sammanställning i tabellarisk form snarare än samtliga originaldokument i sin helhet.', 'accepts'],
+    ['Jönköping 518 amount', 'Hej,\n\nJag betalar gärna 276 kr för kopiorna.', 'amount'],
+    ['Jönköping 518 beslut', 'Hej,\n\nJag behöver inte ett skriftligt överklagbart beslut.', 'waives_beslut'],
+    ['Forshaga 916', 'Hej,\n\nJag noterar maskeringen. Jag godtar denna bedömning för närvarande.', 'accepts'],
+    ['Katrineholm 1624', 'Hej,\n\nTack för förtydligandet om Microsoft, det räcker för oss.', 'enough'],
+    ['Kristianstad 1686', 'Hej,\n\nDå betraktar vi vår begäran som besvarad.', 'closes'],
+    ['Vellinge 1737', 'Hej,\n\nTack, ni behöver inte göra något mer.', 'closes'],
+    ['instead of', 'Hej,\n\nEn lista i stället för avtalen går bra.', 'enough'],
+  ])('flags %s', (_name, body, reason) => {
+    expect(concessionFlags(body + sig)).toContain(reason);
+  });
+
+  it('does not flag a draft that thanks for a summary but still asks for the avtal', () => {
+    expect(concessionFlags('Hej,\n\nTack för sammanställningen. Jag önskar även själva avtalen i PDF-format.' + sig)).toEqual([]);
+  });
+
+  it('does not flag our own scope line "Det räcker med själva avtalen"', () => {
+    expect(concessionFlags('Hej,\n\nDet räcker med själva avtalen med pris och kommersiella villkor.' + sig)).toEqual([]);
+  });
+
+  it('ignores concessions in quoted kommun text below our reply', () => {
+    const body = 'Hej,\n\nTack, jag inväntar avtalen.' + sig + '\n\nFrån: kommun\nSkickat: den 1 september 2026\n\nVi accepterar att lämna ut mot 100 kr.';
+    expect(concessionFlags(body)).toEqual([]);
+  });
+
+  it('exempts the fixed close lines of T_FOLLOWUP_CLOSE and T_CROSSCHECK, not edits of them', () => {
+    expect(concessionFlags(`Hej,\n\n${FOLLOWUP_CLOSE_LINE}${sig}`)).toEqual([]);
+    expect(concessionFlags(`Hej,\n\n${CROSSCHECK_CLOSE_LINE}${sig}`)).toEqual([]);
+    expect(concessionFlags('Hej,\n\nVi betraktar begäran som slutförd.' + sig)).toContain('closes');
   });
 });

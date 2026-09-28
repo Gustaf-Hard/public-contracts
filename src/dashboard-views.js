@@ -18,7 +18,7 @@ import { CATEGORY_LABELS } from './vendor-kb.js';
 import { GRADE_LEVELS, slugifyProductName } from './vendor-analytics.js';
 import { matchResellers, RESELLERS } from './resellers.js';
 import { canonicalVendorName } from './vendor-aliases.js';
-import { splitQuotedText } from './classifier.js';
+import { splitQuotedText, concessionFlags } from './classifier.js';
 import { MAX_ANALYSIS_ATTEMPTS } from './storage.js';
 
 // Canonical reseller name → slug, for linking a vendor's framed ramavtal tag
@@ -1227,6 +1227,7 @@ export function renderEscalationForm(esc, gmailReady, returnTo = null, { handoff
         <label>Brödtext</label>
         <textarea name="body">${escapeHtml(esc.draft_body ?? '')}</textarea>
       </div>
+      ${renderConcessionBox(esc.draft_body)}
       ${renderStartHandoffBoxes(handoffTargets)}
       <div class="buttons">
         <button class="btn ${gmailReady ? 'btn-primary' : 'btn-disabled'}" type="submit" ${disabled}>📨 Skicka</button>
@@ -1239,6 +1240,26 @@ export function renderEscalationForm(esc, gmailReady, returnTo = null, { handoff
       <button class="btn btn-secondary" type="submit"
         onclick="return confirm('Hoppa över denna eskalering utan att svara?')">Hoppa över</button>
     </form>`;
+}
+
+// Concession gate (2026-09-28): sendApprovedReply refuses a body that accepts
+// a fee, masking or a summary instead of the avtal, waives the beslut or closes
+// the request unless this box is ticked. Always rendered (the operator may
+// write the concession themselves), never pre-ticked, and flagged loudly when
+// the draft as rendered already concedes something.
+const CONCESSION_LABELS = {
+  accepts: 'accepterar något', amount: 'nämner ett belopp', waives_beslut: 'avstår från beslut',
+  closes: 'avslutar begäran', enough: 'nöjer sig med mindre än avtalen',
+};
+function renderConcessionBox(body) {
+  const flags = concessionFlags(body ?? '');
+  const banner = flags.length
+    ? `<div class="esc-watchlist">⚠️ Utkastet ${escapeHtml(flags.map((f) => CONCESSION_LABELS[f] ?? f).join(', '))}. Det är ditt beslut, inte utkastets: läs igenom innan du godkänner.</div>`
+    : '';
+  return `${banner}<div class="field"><label class="start-handoff-row">
+          <input type="checkbox" name="accept_concession" value="1">
+          Jag godkänner att svaret accepterar en avgift, sekretess, en sammanställning i stället för avtalen, eller avslutar begäran
+        </label></div>`;
 }
 
 // One click covers both sends (2026-09-17): a pending hänvisning on the
@@ -2196,7 +2217,7 @@ export function renderThread({ kommun, conv, thread, messages = [], attachmentsB
 // reply would sit and with the same fields, so it reads as "write the reply"
 // rather than "this page is broken". Seeded with whatever the analysis already
 // proposed; empty is fine, the operator writes it.
-function renderBlankReplyBox({ conv, seed = '', to = '', subject = '', gmailReady, returnTo, handoffTargets = [] }) {
+function renderBlankReplyBox({ conv, seed = '', seedDate = '', to = '', subject = '', gmailReady, returnTo, handoffTargets = [] }) {
   const disabled = gmailReady ? '' : 'disabled';
   const warn = gmailReady ? '' : '<span class="send-warning">⚠️ Gmail-token saknas</span>';
   const paneAttrs = returnTo ? ` data-pane-form data-return="${escapeHtml(returnTo)}"` : '';
@@ -2207,7 +2228,9 @@ function renderBlankReplyBox({ conv, seed = '', to = '', subject = '', gmailRead
         <span class="muted">Svara <strong>${escapeHtml(to || conv.contact_email || '')}</strong></span>
         <span class="badge" style="background:#f59e0b1a;color:#b45309;border:1px solid #f59e0b66;font-size:11px;padding:2px 8px">inget utkast</span>
       </div>
-      <p class="muted" style="margin:0 0 8px">Kommunen har svarat och väntar på dig. Inget svar var förberett, så skriv det här.</p>
+      <p class="muted" style="margin:0 0 8px">${seed
+        ? `Kommunen har svarat och väntar på dig. Förslag från analysen av mejlet ${escapeHtml(seedDate)}: den såg bara det mejlet, inte hela tråden, så läs igenom innan du skickar.`
+        : 'Kommunen har svarat och väntar på dig. Inget svar var förberett, så skriv det här.'}</p>
       <form class="action-form" method="post" action="/arenden/${conv.id}/reply"${paneAttrs}>
         ${returnTo ? `<input type="hidden" name="return" value="${escapeHtml(returnTo)}">` : ''}
         <div class="field">
@@ -2222,6 +2245,7 @@ function renderBlankReplyBox({ conv, seed = '', to = '', subject = '', gmailRead
           <label>Brödtext</label>
           <textarea name="body" placeholder="Skriv ditt svar här…">${escapeHtml(seed)}</textarea>
         </div>
+        ${renderConcessionBox(seed)}
         ${renderStartHandoffBoxes(handoffTargets)}
         <div class="buttons">
           <button class="btn ${gmailReady ? 'btn-primary' : 'btn-disabled'}" type="submit" ${disabled}>📨 Skicka</button>
@@ -2233,7 +2257,7 @@ function renderBlankReplyBox({ conv, seed = '', to = '', subject = '', gmailRead
 
 function renderCaseDetailPane(selected, gmailReady) {
   if (!selected) return '<div class="detail-empty"><p class="muted">Välj ett ärende i listan till vänster.</p></div>';
-  const { conv, messages, attachmentsByMsg, signatures, escalations, parked_escalations = [], threads = [], handoff_targets = [], needs_draft = false, draft_seed = '', draft_to = '', draft_subject = '', follow_up } = selected;
+  const { conv, messages, attachmentsByMsg, signatures, escalations, parked_escalations = [], threads = [], handoff_targets = [], needs_draft = false, draft_seed = '', draft_seed_date = '', draft_to = '', draft_subject = '', follow_up } = selected;
   const returnTo = `/arenden/${conv.id}`;
   const duration = caseDuration(conv, messages);
   const fuBadge = fmtFollowUpBadge(follow_up?.date, follow_up?.source);
@@ -2251,7 +2275,7 @@ function renderCaseDetailPane(selected, gmailReady) {
   // "starta även ärende" boxes (2026-09-17) — the drafted ones and the blank one.
   const pendingHandoffTargets = handoff_targets.filter((t) => !t.started_conv_id);
   const blankReplyHtml = needs_draft
-    ? renderBlankReplyBox({ conv, seed: draft_seed, to: draft_to, subject: draft_subject, gmailReady, returnTo, handoffTargets: pendingHandoffTargets })
+    ? renderBlankReplyBox({ conv, seed: draft_seed, seedDate: draft_seed_date, to: draft_to, subject: draft_subject, gmailReady, returnTo, handoffTargets: pendingHandoffTargets })
     : '';
   const blankReplyThreadId = needs_draft
     ? ([...messages].reverse().find((m) => m.direction === 'inbound')?.thread_id ?? null)

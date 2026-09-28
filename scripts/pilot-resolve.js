@@ -18,7 +18,7 @@ const action = arg('action');
 const text = arg('text');
 
 if (!escId || !['send', 'edit', 'skip'].includes(action)) {
-  console.error('Usage: pilot-resolve --escalation=<id> --action=send|edit|skip [--text="..."]');
+  console.error('Usage: pilot-resolve --escalation=<id> --action=send|edit|skip [--text="..."] [--accept-concession]');
   process.exit(1);
 }
 
@@ -58,6 +58,8 @@ try {
     db, gmail, env: process.env, conv, esc,
     finalBody: replyText,
     decision: action === 'edit' ? 'edit' : 'approve_unmodified',
+    // Accepting a fee, masking, a summary or closing is a deliberate operator call.
+    acceptConcessions: process.argv.includes('--accept-concession'),
   });
   console.log(`Escalation ${escId} resolved (${action}). Sent gmail message ${sent.id}. Decision logged.`);
 } catch (e) {

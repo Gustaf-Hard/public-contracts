@@ -2317,3 +2317,55 @@ describe('resolve endpoint edit/approve honesty (2026-08-31)', () => {
     } finally { spy.mockRestore(); }
   });
 });
+
+// Karlstad #100 (2026-09-27): the blank reply box was pre-filled with the
+// draft_reply Haiku wrote when it analysed a 24 Aug mail, a month later and
+// blind to the thread. An old per-message suggestion is not a draft.
+describe('blank reply box seed', () => {
+  function seedAwaiting({ ingestedAt = null } = {}) {
+    const convId = db.createConversation({ kommun_kod: '1780', kommun_namn: 'Karlstad', role: 'central', contact_email: 'kommunarkivet@karlstad.se', scheduled_send_at: '2026-08-11T09:00:00Z' });
+    db.updateConversationState(convId, 'NEEDS_HUMAN', {});
+    const mid = db.recordMessage({ conversation_id: convId, gmail_message_id: 'in-k', direction: 'inbound',
+      from_email: 'bou@karlstad.se', to_email: 'me@x.se', subject: 'Sv: Begäran', body_text: 'Önskar du sammanställning?',
+      classification: 'clarification', classification_confidence: 0.9, received_at: '2026-08-24T11:04:11Z', attachment_count: 0,
+      analysis_json: { intent: 'clarification', suggested_action: 'send_precision', draft_reply: 'Hej,\n\nFÖRSLAG-FRÅN-ANALYSEN' } });
+    if (ingestedAt) db.raw.prepare('UPDATE messages SET ingested_at = ? WHERE id = ?').run(ingestedAt, mid);
+    return convId;
+  }
+
+  it('seeds a fresh analysis draft and labels it as an unchecked suggestion', async () => {
+    const convId = seedAwaiting();
+    const res = await get(appWithFakes(), `/arenden/${convId}`);
+    expect(res.text).toContain('FÖRSLAG-FRÅN-ANALYSEN');
+    expect(res.text).toContain('Förslag från analysen');
+  });
+
+  it('leaves the box empty when the analysed mail is older than the seed window', async () => {
+    const convId = seedAwaiting({ ingestedAt: '2026-08-24 11:04:11' });
+    const res = await get(appWithFakes(), `/arenden/${convId}`);
+    expect(res.text).toContain('inget utkast');
+    expect(res.text).not.toContain('FÖRSLAG-FRÅN-ANALYSEN');
+  });
+});
+
+// Concession gate on the dashboard (2026-09-28): the box is always there,
+// never pre-ticked; a conceding draft is flagged and refused without it.
+describe('concession box on the reply form', () => {
+  function seedConceding() {
+    const convId = db.createConversation({ kommun_kod: '0680', kommun_namn: 'Jönköping', role: 'central', contact_email: 'reg@jonkoping.se', scheduled_send_at: '2026-08-11T09:00:00Z' });
+    db.updateConversationState(convId, 'NEEDS_HUMAN', {});
+    const mid = db.recordMessage({ conversation_id: convId, gmail_message_id: 'in-j', direction: 'inbound',
+      from_email: 'reg@jonkoping.se', to_email: 'me@x.se', subject: 'Sv: Begäran', body_text: 'Avgift 276 kr.',
+      classification: 'unknown', classification_confidence: 0.9, received_at: '2026-09-14T08:00:00Z', attachment_count: 0 });
+    const escId = db.recordEscalation({ conversation_id: convId, message_id: mid, reason: 'llm intent=fee_demand',
+      draft_template: 'free_form', draft_subject: 'Re: Sv: Begäran', draft_body: 'Hej,\n\nJag accepterar avgiften på 276 kr.' });
+    return { convId, escId };
+  }
+
+  it('flags a conceding draft and renders the unticked box', async () => {
+    const { convId } = seedConceding();
+    const res = await get(appWithFakes(), `/arenden/${convId}`);
+    expect(res.text).toContain('Utkastet accepterar något, nämner ett belopp');
+    expect(res.text).toMatch(/name="accept_concession" value="1">/);
+  });
+});

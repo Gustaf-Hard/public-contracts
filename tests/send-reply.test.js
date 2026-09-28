@@ -243,3 +243,35 @@ describe('sendApprovedReply starts requested pending handoffs after the reply', 
     expect(helen.state).toBe('NEEDS_HUMAN');
   });
 });
+
+// Concession gate (2026-09-28): a body that accepts a fee, masking or a
+// summary, waives the beslut or closes the request needs the operator's
+// explicit acceptConcessions, is never sent unattended, and is refused BEFORE
+// the claim so the escalation stays open.
+describe('sendApprovedReply concession gate', () => {
+  const CONCEDING = 'Hej,\n\nJag accepterar avgiften på 276 kr.\n\nMed vänliga hälsningar,\nMe';
+
+  it.each(['approve_unmodified', 'edit'])('refuses a conceding %s without acceptConcessions', async (decision) => {
+    const { db, conv, esc } = seedArboga();
+    const send = vi.fn(async () => ({ id: 'out-c', threadId: 'thr-anneli' }));
+    await expect(sendApprovedReply({ db, gmail: {}, env, conv, esc, finalBody: CONCEDING, decision, gmailSendImpl: send }))
+      .rejects.toMatchObject({ code: 'CONCESSION_UNCONFIRMED' });
+    expect(send).not.toHaveBeenCalled();
+    expect(db.raw.prepare('SELECT status FROM escalations WHERE id = ?').get(esc.id).status).toBe('open');
+  });
+
+  it('sends a conceding body when the operator accepted it', async () => {
+    const { db, conv, esc } = seedArboga();
+    const send = vi.fn(async () => ({ id: 'out-c', threadId: 'thr-anneli' }));
+    await sendApprovedReply({ db, gmail: {}, env, conv, esc, finalBody: CONCEDING, decision: 'edit', acceptConcessions: true, gmailSendImpl: send });
+    expect(send).toHaveBeenCalledOnce();
+  });
+
+  it('never auto-sends a conceding body, even with acceptConcessions', async () => {
+    const { db, conv, esc } = seedArboga();
+    const send = vi.fn(async () => ({ id: 'out-c', threadId: 'thr-anneli' }));
+    await expect(sendApprovedReply({ db, gmail: {}, env, conv, esc, finalBody: CONCEDING, decision: 'auto_send', acceptConcessions: true, gmailSendImpl: send }))
+      .rejects.toMatchObject({ code: 'CONCESSION_UNCONFIRMED' });
+    expect(send).not.toHaveBeenCalled();
+  });
+});
