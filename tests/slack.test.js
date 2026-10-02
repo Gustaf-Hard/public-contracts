@@ -327,3 +327,13 @@ describe('postAlert block budget', () => {
     expect(slack.calls[0].blocks.length).toBeGreaterThan(1);
   });
 });
+
+describe('updateEscalationResolved — deferred', () => {
+  it('labels a parked draft as pausad, not as a failure or a skip', async () => {
+    const calls = [];
+    const slack = { chat: { update: async (a) => { calls.push(a); } } };
+    await updateEscalationResolved(slack, { channel: 'C1', ts: 's1', kommun_namn: 'Malå', status: 'deferred' });
+    expect(calls[0].text).toContain('Pausad');
+    expect(calls[0].text).not.toMatch(/misslyckades|Skippad/);
+  });
+});

@@ -185,6 +185,9 @@ export async function updateEscalationResolved(slack, { channel, ts, kommun_namn
       resolved_skip: '⏭️ Skippad',
       resolved_closed: '🗄️ Ärendet stängt',
       superseded: '↪️ Ersatt av nyare eskalering',
+      // Parked by the operator (2026-10-02): nothing sent, the draft is kept
+      // and resumable from the dashboard. Not a failure and not a skip.
+      deferred: '⏸️ Pausad — utkastet sparat, inget skickat',
       send_failed: '❌ Sändning misslyckades',
       send_unconfirmed: '⚠️ Sändning obekräftad — kontrollera Skickat i Gmail',
     }[status] ?? status;
