@@ -262,13 +262,52 @@ NEEDS_HUMAN **or** it has any escalation whose status is in
 NEEDS_HUMAN, so the round-11 P2 bug was a mail that may already have gone out
 rendering as "Inget kräver din uppmärksamhet" while the Köhälsa digest listed its
 deadline. A parked row (send_failed / send_unconfirmed) is labelled `Skickning parkerad (<status>): se ärendet`, an in-flight `sending` row is labelled `Skickning pågår: se ärendet`, and `since` for such rows is the escalation's `resolved_at` (the moment it entered that status) falling back to `created_at` for legacy rows. The ärende page renders parked and in-flight rows as cards (`parked_escalations` in `loadCaseDetail`, 2026-09-17) with the two human ways out of a parked one: `POST /escalations/:id/requeue` closes it `resolved_requeued` and mints a NEW open row cloned from it whose reason starts with `REQUEUED_REASON_PREFIX` (storage.js), which both auto-send sweeps skip because the button promised the operator approves it; `POST /escalations/:id/dismiss-parked` (reason required) closes it `resolved_closed` with a `closed` decision. The parked row itself never goes back to `open` and nothing here touches Gmail. `buildWaiting` excludes the same set, or a parked send would be listed both as needing the operator and as progressing on its own.
+**`deferred` is the one status outside both halves** (2026-10-02): "the operator
+read this draft and chose to do nothing for now, nothing was sent". It is
+deliberately NOT in `ACTIVE_ESCALATION_STATUSES`, so a parked case drops out of
+Behöver dig, `caseBucket`'s `behover_dig`, `listOpenEscalationsAgedDays`,
+`listOrphanNeedsHuman`, `hasActiveEscalation` and STALE_ESCALATION for free —
+and `hasDeferredEscalation` (storage.js) is what the other half reads, so that
+a park also stops the chasing we do on our OWN initiative: the `runDailyFollowup`
+staleness loop, both `runRefreshScan` loops, `buildWaiting`, and
+`listConversationsWithDeadlineDue` / `listOrphanNeedsHuman` in SQL. A nudge is
+the one thing that undoes a deliberate silence. The draft body is kept verbatim,
+`resolved_at` is the park moment and `resolved_text` is `pausad: <reason>`
+(+ optional ` – note`) over `DEFER_REASONS` (`avgift`/`sekretess`/`juridik`/`annat`)
+— read it ONLY through `parseDeferReason`, never a second regex. The ledger gets
+`defer` on the way in and `resume` on the way out; both are outside
+`listOperatorDecisionTimes`, so a park can never discharge a kommun frist.
+Exactly two things wake a parked case: the operator's `POST
+/escalations/:id/resume` (`resumeEscalationIfDeferred`, which refuses with 409
+when the case already holds an ACTIVE row — a second open draft next to an
+in-flight send is the double-message the invariant exists to stop), and a new
+inbound that mints a draft (`escalateWithDraft` supersedes a `deferred` row like
+an `open` one, carrying the frist forward). The void path, vacation-mode
+`supersedeStaleNudgeEscalations` and `retryUnpostedEscalations` all stay
+`status='open'` — they put nothing in the row's place, so touching it would make
+a parked case vanish. Parking rides `deferEscalationIfOpen` (the same atomic
+claim as skip) plus `restoreStateAfterDefer` (send-reply.js, beside
+`saneRestoreState`): NEEDS_HUMAN with no active escalation is a bug everywhere,
+so the park restores the draft's `previous_state` and nulls `follow_up_at`. It
+renders as its own yellow Pausade card+section on the overview, a 4th Ärenden
+bucket claimed BEFORE `behover_dig` (`deferred_esc` in `loadCaseSummaries`), and
+a card with only a ▶️ Återuppta button on the ärende, kommun and focused-thread
+pages — all three, because reading `status='open'` alone is the a7ec79c bug class.
+`escalationActionLabel` never sees a deferred row; `deferredLabel` (dashboard.js)
+is its counterpart.
 
 **Batch verdicts ride the same approved path** (`src/apply-verdicts.js`,
 `scripts/14-apply-verdicts.js`, 2026-09-26). A reviewer works from a DB snapshot
 (the nightly S3 backup) and produces one verdict per open escalation
-(`approve` / `edit` / `skip` / `human`); the applier replays them on the box
-through `sendApprovedReply` (decision `approve_unmodified` or `edit`) or the
-resolver's skip path, dry-run by default. Two snapshot checks sit in front of
+(`approve` / `edit` / `skip` / `defer` / `human`); the applier replays them on
+the box through `sendApprovedReply` (decision `approve_unmodified` or `edit`),
+the resolver's skip path, or the park path, dry-run by default. A `defer` row
+(2026-10-02) needs a `defer_reason` from `DEFER_REASONS` plus an optional
+`defer_note`, touches no Gmail, and does exactly what the dashboard Pausa form
+does: `deferEscalationIfOpen` + a `defer` decision + `restoreStateAfterDefer`
+(dry run reports `would_defer`, apply `deferred`, a reason outside the four
+`missing_defer_reason`). `--only=<verdicts>` is a plain Set over `v.verdict`, so
+`--only=defer` works without further wiring. Two snapshot checks sit in front of
 every row: an inbound received after `--reviewed-at` voids the verdict
 (`newer_inbound`; STALE_ESCALATION only compares with the draft's creation), and
 the row's `draft_sha256` must still match (`draft_changed`). `human` rows are
@@ -322,6 +361,7 @@ permissive to paper over the change.
 - Threads & recipient routing: `docs/superpowers/specs/2026-07-03-conversation-threads-and-recipients-design.md`
 - Perpetual contract refresh (lifecycle, T_UPDATE, refresh scan): `docs/superpowers/specs/2026-07-09-perpetual-contract-refresh-design.md`; live activation: `docs/superpowers/runbooks/2026-07-09-refresh-activation.md`
 - Auto-send follow-up nudges (first unattended send): `docs/superpowers/specs/2026-08-17-auto-send-followup-nudge-design.md`
+- Deferred escalations ("Pausade") + the `T_UPPGIFT` fee-case reply: `docs/superpowers/specs/2026-10-02-deferred-escalations-design.md`
 - Vendor data center (/leverantorer pricing, analytics, explorer): `docs/superpowers/specs/2026-07-09-vendor-data-center-design.md` — pure analytics in `src/vendor-analytics.js`, shared client/server explorer logic in `public/explorer-core.js`
 - Collection schema/roles: `docs/superpowers/specs/2026-05-16-municipality-email-collection-design.md`
 - User-facing usage/outputs: `README.md`
