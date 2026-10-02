@@ -18,6 +18,7 @@ const mk = (over) => ({
   open_esc: over.open_esc ?? 1, follow_up_at: over.follow_up_at ?? null,
   follow_up_source: null, since: over.since ?? null, subject: 'x', snippet: '', last_direction: 'inbound',
   deferred_esc: over.deferred_esc ?? 0,
+  has_pending_handoff: over.has_pending_handoff ?? false,
 });
 
 describe('renderArenden — bucket ordering', () => {
@@ -51,6 +52,34 @@ describe('renderArenden — bucket ordering', () => {
     const behoverGroup = html.split('Pausade')[0];
     expect(behoverGroup).toContain('Behover');
     expect(behoverGroup).not.toContain('Langepausad');
+  });
+
+  // Round-14: Pausade sits directly under Behöver dig, the same order the
+  // overview uses — the two surfaces must read the same way.
+  it('Pausade renders directly under Behöver dig, above Öppna and Stängda', () => {
+    const cases = [
+      mk({ conv_id: 10, kommun_namn: 'Oppen', state: 'SENT', open_esc: 0, follow_up_at: '2026-08-01' }),
+      mk({ conv_id: 11, kommun_namn: 'Stangd', state: 'DONE', open_esc: 0 }),
+      mk({ conv_id: 12, kommun_namn: 'Pausad', deferred_esc: 1, open_esc: 0 }),
+      mk({ conv_id: 13, kommun_namn: 'Rod', open_esc: 1 }),
+    ];
+    const html = renderArenden({ cases });
+    const headings = ['Behöver dig', 'Pausade', 'Öppna', 'Stängda'].map((h) => html.indexOf(`${h} <span class="count"`));
+    expect(headings.every((i) => i > -1)).toBe(true);
+    expect([...headings].sort((a, b) => a - b)).toEqual(headings);
+  });
+
+  // A parked draft NEXT TO pending work stays in Behöver dig: buildActionQueue
+  // and buildDeferred both key on the escalation, so the case is red there —
+  // claiming it for Pausade here would make the two surfaces disagree.
+  it.each([
+    ['an active escalation', { open_esc: 1 }],
+    ['a pending hänvisning', { open_esc: 0, has_pending_handoff: true }],
+  ])('a deferred case with %s stays in Behöver dig', (_label, extra) => {
+    const cases = [mk({ conv_id: 14, kommun_namn: 'Bada', deferred_esc: 1, state: 'SENT', ...extra })];
+    const html = renderArenden({ cases });
+    expect(html).toContain('Behöver dig');
+    expect(html).not.toContain('Pausade');
   });
 
   // A parked row on a closed case must not resurrect it — terminal stays first,

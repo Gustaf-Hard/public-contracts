@@ -2487,6 +2487,100 @@ describe('Pausade — deferred escalations on the dashboard', () => {
     expect(row(escId).status).toBe('open'); // rendering changes nothing
   });
 
+  // Round-14 finding 1: the blank reply box is still offered on a parked case
+  // (the park leaves no open escalation), so the operator can answer the kommun
+  // by hand without ever touching Återuppta. The park must end with that send —
+  // otherwise the case sits in Pausade for ever, keeps blocking its follow-ups,
+  // and Återuppta later reopens a draft that has been overtaken.
+  describe('a free reply ends the park', () => {
+    const appGmailDefer = () => createDashboardApp({
+      db, municipalitiesLoader: () => JSON.parse(require('node:fs').readFileSync(muniPath, 'utf8')),
+      gmailClient: { gmail: {} }, env: { GMAIL_USER_EMAIL: 'me@x.se', GMAIL_FROM_NAME: 'Test' },
+    });
+
+    it('supersedes every deferred row for the conversation once Gmail accepted', async () => {
+      const { convId, escId } = seedDeferrable({ state: 'SENT' });
+      db.deferEscalationIfOpen(escId, { reason: 'avgift' });
+      const spy = vi.spyOn(gmailMod, 'sendMessage').mockResolvedValue({ id: 'm-free', threadId: 'thr-d' });
+      try {
+        const res = await postForm(appGmailDefer(), `/arenden/${convId}/reply`, {
+          to: 'kommun@mala.se', subject: 'Re: SV: Begäran', body: 'Hej,\n\nVi betalar inte avgiften.',
+        });
+        expect(res.status).toBe(302);
+        expect(spy).toHaveBeenCalledOnce();
+      } finally { spy.mockRestore(); }
+
+      expect(row(escId).status).toBe('superseded');
+      expect(row(escId).resolved_text).toMatch(/superseded/);
+      expect(db.hasDeferredEscalation(convId)).toBe(false);
+      expect(buildDeferred(db)).toEqual([]);
+      const page = await get(appWithFakes(), `/arenden/${convId}`);
+      expect(page.text).not.toContain(`action="/escalations/${escId}/resume"`);
+    });
+
+    it('a FAILED send leaves the park exactly as it was', async () => {
+      const { convId, escId } = seedDeferrable({ state: 'SENT' });
+      db.deferEscalationIfOpen(escId, { reason: 'avgift', note: 'kvar' });
+      const spy = vi.spyOn(gmailMod, 'sendMessage').mockRejectedValue(new Error('gmail 500'));
+      try {
+        const res = await postForm(appGmailDefer(), `/arenden/${convId}/reply`, {
+          to: 'kommun@mala.se', subject: 'Re', body: 'Hej,\n\nNågot.',
+        });
+        expect(res.status).toBe(500);
+      } finally { spy.mockRestore(); }
+      // Nothing went out, so the park still describes reality.
+      expect(row(escId).status).toBe('deferred');
+      expect(db.hasDeferredEscalation(convId)).toBe(true);
+    });
+  });
+
+  // Round-14 finding 2: a park means "not now", and closing the case answers
+  // "when?". A row left behind kept a finished kommun in Pausade with a live
+  // Återuppta button on a DONE case.
+  it('closing a case resolves its parked drafts with a closed decision', async () => {
+    const { convId, escId } = seedDeferrable({ state: 'SENT' });
+    db.deferEscalationIfOpen(escId, { reason: 'avgift', note: 'avgiftsbeslut' });
+    const res = await postForm(appWithFakes(), `/conversations/${convId}/close`, { state: 'DONE' });
+    expect(res.status).toBe(302);
+
+    expect(row(escId).status).toBe('resolved_closed');
+    expect(row(escId).resolved_text).toMatch(/avgiftsbeslut/); // the park reason is kept
+    expect(row(escId).resolved_text).toMatch(/ärendet stängdes/);
+    const decisions = db.listDecisions().filter((d) => d.escalation_id === escId);
+    expect(decisions.map((d) => d.decision)).toEqual(['closed']);
+    expect(buildDeferred(db)).toEqual([]);
+  });
+
+  it.each(['DONE', 'DEAD_END'])('a %s case drops out of Pausade and refuses Återuppta with 409', async (state) => {
+    const { convId, escId } = seedDeferrable({ state: 'SENT' });
+    db.deferEscalationIfOpen(escId, { reason: 'juridik' });
+    // Bypass the close route so a legacy parked row on a closed case is what
+    // the reader meets — the state is what must be honoured, not the cleanup.
+    db.updateConversationState(convId, state, {});
+
+    expect(buildDeferred(db)).toEqual([]);
+    const res = await postForm(appWithFakes(), `/escalations/${escId}/resume`, {});
+    expect(res.status).toBe(409);
+    expect(res.text).toMatch(/öppna ärendet igen/i);
+    expect(row(escId).status).toBe('deferred'); // nothing is deleted
+  });
+
+  // Round-14 finding 5: parking a case that is NOT NEEDS_HUMAN changes no
+  // state, so it must write no state change — re-stamping state_changed_at
+  // would reset the staleness clock of a case whose real last event is weeks
+  // older than the park.
+  it('parking a non-NEEDS_HUMAN case leaves state_changed_at alone', async () => {
+    const { convId, escId } = seedDeferrable({ state: 'DELIVERING' });
+    db.raw.prepare("UPDATE conversations SET state_changed_at = '2026-08-20 08:00:00' WHERE id = ?").run(convId);
+
+    await postForm(appWithFakes(), `/escalations/${escId}`, { action: 'defer', reason: 'sekretess' });
+
+    const conv = db.getConversation(convId);
+    expect(conv.state).toBe('DELIVERING');
+    expect(conv.state_changed_at).toBe('2026-08-20 08:00:00');
+    expect(conv.follow_up_at).toBeNull(); // the promise still goes
+  });
+
   it('deferredLabel names the reason and the park date, with the note when there is one', () => {
     expect(deferredLabel({ resolved_text: 'pausad: avgift', resolved_at: '2026-09-25 08:00:00' }))
       .toBe('Pausad (avgift) · sedan 2026-09-25');

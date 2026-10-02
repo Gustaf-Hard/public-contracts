@@ -1857,11 +1857,13 @@ export function renderKommunDetail({ kommun, conversations, messagesByConv, atta
 
 const ARENDEN_BUCKETS = [
   { key: 'behover_dig', label: 'Behöver dig' },
+  // Pausade (2026-10-02): parked by the operator, nothing sent, resumable.
+  // Directly under Behöver dig, the same place the overview puts it — the two
+  // surfaces must read the same way, and under Stängda it would be unreachable
+  // once that bucket grows to a few hundred rows.
+  { key: 'pausade', label: 'Pausade' },
   { key: 'oppna', label: 'Öppna' },
   { key: 'stangda', label: 'Stängda' },
-  // Pausade (2026-10-02): parked by the operator, nothing sent, resumable.
-  // Last, deliberately — it is the one bucket nobody has to look at today.
-  { key: 'pausade', label: 'Pausade' },
 ];
 
 function caseBucket(c) {
@@ -1879,7 +1881,14 @@ function caseBucket(c) {
   // legacy row, and awaiting_us is true for exactly the fee/sekretess mails
   // that get parked — so anything but a first claim here would put it straight
   // back in the red bucket.
-  if ((c.deferred_esc ?? 0) > 0) return 'pausade';
+  //
+  // But ONLY when nothing is actually pending. A conversation can hold a parked
+  // draft AND an active escalation (a new inbound's draft lands next to an
+  // older park that escalateWithDraft did not supersede, a requeued send) or a
+  // pending hänvisning, and buildActionQueue/buildDeferred both key on the
+  // ESCALATION, so the case is in Behöver dig there. Claiming it for Pausade
+  // here would make the two surfaces disagree about the same case.
+  if ((c.deferred_esc ?? 0) > 0 && (c.open_esc ?? 0) === 0 && !c.has_pending_handoff) return 'pausade';
   if (c.state === 'NEEDS_HUMAN' || (c.open_esc ?? 0) > 0 || c.has_pending_handoff) return 'behover_dig';
   // The kommun spoke last and we are not deliberately silent. Keying the queue
   // on open escalations alone hid exactly this: a draft voided because the
@@ -2435,20 +2444,35 @@ function renderParkedSends(rows, returnTo = null) {
 // back. Deliberately NO send/skip controls: a parked row is not approvable, so
 // the operator resumes it first and then faces the normal form with the normal
 // guards (STALE_ESCALATION included).
+// The label for a PARKED row (2026-10-02). escalationActionLabel is about what
+// the operator must do next, and a deferred row asks for nothing — it reports
+// why and since when, so it reads "Pausad (avgift) · sedan 2026-09-25 · note".
+// Deferred rows never reach escalationActionLabel (they are outside
+// ACTIVE_ESCALATION_STATUSES, so no queue that calls it can see them), which is
+// why this is a second function rather than a branch in that one.
+//
+// It lives here, not in dashboard.js, because BOTH the Pausade queue rows and
+// the card below render it and dashboard.js imports this module, not the other
+// way round. dashboard.js re-exports it so callers keep one import site.
+// parseDeferReason is the only reader of resolved_text; a legacy or unreadable
+// value degrades to "annat" instead of printing raw DB text at an operator.
+export function deferredLabel(esc) {
+  const { reason, note } = parseDeferReason(esc?.resolved_text);
+  const since = esc?.resolved_at ? String(esc.resolved_at).slice(0, 10) : null;
+  return [`Pausad (${reason})`, since ? `sedan ${since}` : null, note].filter(Boolean).join(' · ');
+}
+
 function renderDeferredEscalations(rows, returnTo = null) {
   if (!rows?.length) return '';
   const paneAttrs = returnTo ? ` data-pane-form data-return="${escapeHtml(returnTo)}"` : '';
   const returnField = returnTo ? `<input type="hidden" name="return" value="${escapeHtml(returnTo)}">` : '';
-  return rows.map((e) => {
-    const { reason, note } = parseDeferReason(e.resolved_text);
-    const since = e.resolved_at ? String(e.resolved_at).slice(0, 10) : null;
-    return `
+  return rows.map((e) => `
     <div class="reply-box deferred-esc">
       <div class="reply-head">
         <span class="avatar avatar-outbound">⏸️</span>
-        <span class="muted"><strong>Pausad (${escapeHtml(reason)})</strong>${since ? ` · sedan ${escapeHtml(since)}` : ''} · ${escapeHtml(e.draft_template ?? 'free_form')}</span>
+        <span class="muted"><strong>${escapeHtml(deferredLabel(e))}</strong> · ${escapeHtml(e.draft_template ?? 'free_form')}</span>
       </div>
-      <p class="muted" style="margin:0 0 6px">Ingenting har skickats. Utkastet ligger kvar som det var; återuppta det när du vill svara.${note ? ` <strong>${escapeHtml(note)}</strong>` : ''}</p>
+      <p class="muted" style="margin:0 0 6px">Ingenting har skickats. Utkastet ligger kvar som det var; återuppta det när du vill svara.</p>
       <div class="field"><label>Ämne</label><div class="muted">${escapeHtml(e.draft_subject ?? '')}</div></div>
       <div class="field"><label>Brödtext</label><pre class="parked-body">${escapeHtml(e.draft_body ?? '')}</pre></div>
       <div class="buttons">
@@ -2457,8 +2481,7 @@ function renderDeferredEscalations(rows, returnTo = null) {
           <button class="btn btn-primary" type="submit" title="Lägger tillbaka utkastet i Behöver dig">▶️ Återuppta</button>
         </form>
       </div>
-    </div>`;
-  }).join('');
+    </div>`).join('');
 }
 
 function renderHandoffSuggestions(targets, convId, gmailReady = false) {
