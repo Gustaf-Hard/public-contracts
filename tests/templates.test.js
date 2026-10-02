@@ -7,7 +7,7 @@ import {
   T_FOLLOWUP_CLOSE,
   T_FOLLOWUP_FINAL,
 } from '../src/templates.js';
-import { T_REQUEST_MISSING, T_UPDATE, T_DELAY_ACK, formatDateSv, computeReceivedMissing, chooseDeliveryReply } from '../src/templates.js';
+import { T_REQUEST_MISSING, T_UPDATE, T_DELAY_ACK, T_UPPGIFT, formatDateSv, computeReceivedMissing, chooseDeliveryReply } from '../src/templates.js';
 
 const ctx = {
   kommun_namn: 'Malå',
@@ -418,7 +418,47 @@ describe('outbound style: no em-dash in reply prose', () => {
       T_FOLLOWUP_NUDGE({ ...ctx, sent_date: '2026-08-01' }),
       T_FOLLOWUP_CLOSE(ctx),
       T_DELAY_ACK({ ...ctx, delay_date: '2026-08-20' }),
+      T_UPPGIFT(ctx),
     ];
     for (const m of replies) expect(m.body).not.toMatch(/[—–]/);
+  });
+});
+
+// T_UPPGIFT (2026-10-02 deferred-escalations design): the free way round a fee
+// demand. We drop the request for COPIES and ask for the facts out of the
+// avtal instead, which a kommun may hand over without producing (and charging
+// for) documents. No legal paragraph cites, no company name, no date — the
+// kommun has already told us what copies cost, so the mail has one job.
+describe('T_UPPGIFT', () => {
+  const m = T_UPPGIFT(ctx);
+
+  it('replies in-thread and acknowledges the fee without arguing about it', () => {
+    expect(m.subject).toBe(`Re: ${ctx.thread_subject}`);
+    expect(m.body).toMatch(/Tack för beskedet om avgiften/);
+    expect(m.body).toMatch(/avstår från kopior/);
+  });
+
+  it('asks for the four facts, offers one row per avtal or a register extract', () => {
+    for (const fact of ['leverantör', 'vad avtalet gäller', 'avtalsperiod', 'årskostnad']) {
+      expect(m.body.toLowerCase()).toContain(fact);
+    }
+    expect(m.body).toMatch(/En rad per avtal/);
+    expect(m.body).toMatch(/avtalsregister/);
+  });
+
+  it('signs with the env identity and names no company, paragraph or date', () => {
+    expect(m.body).toContain(ctx.from_name);
+    expect(m.body).toContain(ctx.from_email);
+    // The prose above the signature is what must stay clean — the signature
+    // itself is the env identity and carries the sender's own domain.
+    const prose = m.body.slice(0, m.body.indexOf('Med vänliga hälsningar'));
+    expect(prose).not.toMatch(/tryckfrihetsförordningen|kap\.|§/);
+    expect(prose).not.toMatch(/mediagraf/i);
+    expect(prose).not.toMatch(/\d{4}-\d{2}-\d{2}/);
+  });
+
+  it('is a pure function of its ctx', () => {
+    expect(T_UPPGIFT(ctx)).toEqual(m);
+    expect(T_UPPGIFT({ ...ctx, thread_subject: 'Annat' }).subject).toBe('Re: Annat');
   });
 });

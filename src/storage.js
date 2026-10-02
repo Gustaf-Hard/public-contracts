@@ -15,6 +15,44 @@ import { splitHandoffContacts } from './handoff.js';
 // is terminal.
 export const ACTIVE_ESCALATION_STATUSES = Object.freeze(['open', 'sending', 'send_failed', 'send_unconfirmed']);
 
+// "The operator looked at the draft and chose to do nothing for now" —
+// deferred escalations (2026-10-02 design). A new string value in
+// escalations.status, not a schema change (CLAUDE.md "No schema changes
+// casually"). Nothing was sent, the draft body is kept verbatim so it can be
+// resumed, resolved_at is the moment it was parked and resolved_text carries
+// the reason (parseDeferReason below).
+//
+// It is deliberately NOT in ACTIVE_ESCALATION_STATUSES: that set means
+// "outbound work is pending or may already have left Gmail", and a parked row
+// is neither. Leaving it out is what drops a parked case out of Behöver dig,
+// the Ärenden behover_dig bucket, listOpenEscalationsAgedDays,
+// listOrphanNeedsHuman, hasActiveEscalation and STALE_ESCALATION for free.
+// What it must ALSO be excluded from is the chasing we do on our own
+// initiative — the staleness loop, the refresh heal, Pågår and the Köhälsa ⏰
+// list — because a deliberately parked fee dispute is not a kommun we are
+// waiting on. Those exclusions read hasDeferredEscalation.
+export const DEFERRED_ESCALATION_STATUS = 'deferred';
+
+// The four reasons the operator parks a case for (2026-09-26 batch): a fee
+// demand we are not paying, a sekretess/masking decision, an överklagbart
+// beslut, and everything else.
+export const DEFER_REASONS = Object.freeze(['avgift', 'sekretess', 'juridik', 'annat']);
+
+// `resolved_text` of a deferred row is `pausad: <reason>` plus an optional
+// ` – <free note>`. THE one parser for that string: every surface (the Pausade
+// section, the ärende card, the batch log) goes through this so no second
+// regex can drift from the writer in deferEscalationIfOpen. Fails soft —
+// anything it cannot read is 'annat' with no note, never an exception on a
+// render path.
+const DEFER_TEXT_RE = /^pausad:\s*([^\s–]+)(?:\s*–\s*([\s\S]*))?$/i;
+export function parseDeferReason(resolvedText) {
+  const m = DEFER_TEXT_RE.exec(String(resolvedText ?? '').trim());
+  if (!m) return { reason: 'annat', note: null };
+  const reason = DEFER_REASONS.includes(m[1].toLowerCase()) ? m[1].toLowerCase() : 'annat';
+  const note = (m[2] ?? '').trim();
+  return { reason, note: note === '' ? null : note };
+}
+
 // Reason prefix of a draft the operator minted from a parked send (dashboard
 // /escalations/:id/requeue, 2026-09-17). The auto-send sweeps skip these: the
 // button promised the operator approves it, and the original failed at Gmail.
@@ -681,7 +719,10 @@ export function openDb(path) {
   // The ALLOWLIST is the safety property, not tidiness. Not every operator
   // decision is a send: `skip` (daemon.js, dashboard.js,
   // scripts/pilot-resolve.js) and `closed` (dashboard.js) resolve an escalation
-  // with nothing sent at all. Counting those would let silence answer a
+  // with nothing sent at all, and so do 'defer' / 'resume' (the 2026-10-02
+  // park/un-park pair: the operator looked at the draft and decided to do
+  // nothing for now, which is the opposite of an answer). Counting those would
+  // let silence answer a
   // question — an operator skipping a precision draft would license an
   // unattended nudge to a kommun still waiting for the reply. Exactly two
   // values reach recordDecision from an operator send: 'approve_unmodified' and
@@ -810,6 +851,77 @@ export function openDb(path) {
     return r.changes === 1;
   }
 
+  // Park an OPEN escalation as 'deferred' (2026-10-02 design). The same atomic
+  // claim shape as resolveEscalationIfOpen: only the caller that moves the row
+  // out of 'open' returns true, so a racing approve/skip can never have its
+  // real outcome overwritten by a park, and a double click parks once.
+  // Nothing is sent and nothing is deleted — the draft body stays as it is so
+  // Återuppta hands the operator back exactly what they saw.
+  // The reason is normalised here rather than trusted: a form can post
+  // anything, and 'annat' is the honest fallback for a value we don't know.
+  function deferEscalationIfOpen(id, { reason = 'annat', note = null } = {}) {
+    const r = DEFER_REASONS.includes(String(reason).toLowerCase()) ? String(reason).toLowerCase() : 'annat';
+    const n = String(note ?? '').trim().replace(/\s+/g, ' ');
+    const text = `pausad: ${r}${n ? ` – ${n}` : ''}`;
+    const res = db.prepare(`
+      UPDATE escalations
+      SET status = '${DEFERRED_ESCALATION_STATUS}', resolved_text = ?, resolved_at = datetime('now')
+      WHERE id = ? AND status = 'open'
+    `).run(text, id);
+    return res.changes === 1;
+  }
+
+  // Un-park: 'deferred' → 'open', park stamps cleared so the row is
+  // indistinguishable from a fresh draft again. ONE transaction, because the
+  // invariant "at most one open escalation per conversation" has to hold
+  // against whatever appeared while the case was parked: a new inbound may have
+  // minted a draft (which supersedes the deferred row anyway), or a send may be
+  // in flight/parked. Resume loses to all of them and returns false — the
+  // caller answers 409 rather than creating a second approvable draft.
+  function resumeEscalationIfDeferred(id) {
+    return db.transaction(() => {
+      const row = db.prepare(
+        `SELECT conversation_id FROM escalations WHERE id = ? AND status = '${DEFERRED_ESCALATION_STATUS}'`
+      ).get(id);
+      if (!row) return false;
+      if (hasActiveEscalation(row.conversation_id)) return false;
+      const r = db.prepare(`
+        UPDATE escalations
+        SET status = 'open', resolved_at = NULL, resolved_text = NULL
+        WHERE id = ? AND status = '${DEFERRED_ESCALATION_STATUS}'
+      `).run(id);
+      return r.changes === 1;
+    })();
+  }
+
+  // "Is this case parked by the operator?" — the gate every self-initiated
+  // chase reads (the staleness loop, the refresh heal, Pågår, the Köhälsa ⏰
+  // list). Deliberately separate from hasActiveEscalation: a parked case needs
+  // neither a nudge nor a place in Behöver dig.
+  function hasDeferredEscalation(conversationId) {
+    return db.prepare(
+      `SELECT 1 FROM escalations WHERE conversation_id = ? AND status = '${DEFERRED_ESCALATION_STATUS}' LIMIT 1`
+    ).get(conversationId) != null;
+  }
+
+  // Every parked row, newest-parked first, joined with what the operator needs
+  // to recognise the case. The dashboard's Pausade card/section re-sorts to
+  // oldest-parked first (the longest-parked case is the one to revisit).
+  function listDeferredEscalations() {
+    return db.prepare(`
+      SELECT e.*, c.kommun_kod, c.kommun_namn, c.role, c.state
+      FROM escalations e JOIN conversations c ON c.id = e.conversation_id
+      WHERE e.status = '${DEFERRED_ESCALATION_STATUS}'
+      ORDER BY e.resolved_at DESC, e.id DESC
+    `).all();
+  }
+
+  function listDeferredEscalationsForConversation(conversationId) {
+    return db.prepare(
+      `SELECT * FROM escalations WHERE conversation_id = ? AND status = '${DEFERRED_ESCALATION_STATUS}' ORDER BY id`
+    ).all(conversationId);
+  }
+
   // Atomically claim an open escalation for sending. Returns true when this
   // caller won the claim (exactly one row moved open → sending); false when the
   // escalation was already resolved, already claimed, or doesn't exist. This is
@@ -877,6 +989,10 @@ export function openDb(path) {
   // the field only invited that misreading.
   //
   // Closed cases are excluded here, as in every other digest query (round-4 H5).
+  // DEFERRED cases too (2026-10-02): the whole point of parking is that the
+  // deadline is not ours to chase right now, so putting it back in the operator's
+  // face every morning would undo the decision they just made. The park is
+  // visible in its own Pausade section instead.
   // Filtering and sorting happen in JS because the effective deadline is not a
   // column. Advisory surfacing only.
   function listConversationsWithDeadlineDue(byIsoDate) {
@@ -887,6 +1003,10 @@ export function openDb(path) {
                 ORDER BY e.id DESC LIMIT 1) AS active_escalation_id
       FROM conversations c
       WHERE c.state NOT IN ('DONE', 'DEAD_END')
+        AND NOT EXISTS (
+          SELECT 1 FROM escalations d
+          WHERE d.conversation_id = c.id AND d.status = '${DEFERRED_ESCALATION_STATUS}'
+        )
       ORDER BY c.id
     `).all(...ACTIVE_ESCALATION_STATUSES)
       .map((r) => ({
@@ -1145,6 +1265,12 @@ export function openDb(path) {
   // to Slack as "Behöver dig utan utkast" is exactly backwards and buries it.
   // Terminal statuses (resolved_*, superseded) still count as nothing to
   // approve, which is what this list is for.
+  // 2026-10-02: a DEFERRED row is excluded too, for the opposite reason — it is
+  // not urgent, it is deliberate. A parked case whose state the defer path could
+  // not move off NEEDS_HUMAN (legacy rows, or a defer that raced a state change)
+  // would otherwise be nagged as a 🧭 orphan every day, which is exactly the
+  // "parked cases get skipped and nagged forever" problem the status exists to
+  // end.
   function listOrphanNeedsHuman() {
     const pending = db.prepare(
       "SELECT 1 FROM handoff_tasks WHERE kommun_kod = ? AND status = 'pending' LIMIT 1"
@@ -1157,6 +1283,10 @@ export function openDb(path) {
           SELECT 1 FROM escalations e
           WHERE e.conversation_id = c.id
             AND e.status IN (${ACTIVE_ESCALATION_STATUSES.map(() => '?').join(', ')})
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM escalations d
+          WHERE d.conversation_id = c.id AND d.status = '${DEFERRED_ESCALATION_STATUS}'
         )
       ORDER BY c.state_changed_at
     `).all(...ACTIVE_ESCALATION_STATUSES)
@@ -2048,6 +2178,11 @@ export function openDb(path) {
     getEscalationBySlackTs,
     resolveEscalation,
     resolveEscalationIfOpen,
+    deferEscalationIfOpen,
+    resumeEscalationIfDeferred,
+    hasDeferredEscalation,
+    listDeferredEscalations,
+    listDeferredEscalationsForConversation,
     supersedeStaleNudgeEscalations,
     claimEscalationForSending,
     claimConversationForInitialSend,

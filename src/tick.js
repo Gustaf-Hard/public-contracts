@@ -1,4 +1,4 @@
-import { T_INITIAL, T_PRECISION, T_RECEIPT, T_FOLLOWUP_NUDGE, T_FOLLOWUP_CLOSE, T_FOLLOWUP_FINAL, T_REQUEST_MISSING, T_UPDATE, T_DELAY_ACK, T_CROSSCHECK, computeReceivedMissing, chooseDeliveryReply } from './templates.js';
+import { T_INITIAL, T_PRECISION, T_RECEIPT, T_FOLLOWUP_NUDGE, T_FOLLOWUP_CLOSE, T_FOLLOWUP_FINAL, T_REQUEST_MISSING, T_UPDATE, T_DELAY_ACK, T_CROSSCHECK, T_UPPGIFT, computeReceivedMissing, chooseDeliveryReply } from './templates.js';
 import { REQUEUED_REASON_PREFIX } from './storage.js';
 import { computeKommunReview } from './contract-lifecycle.js';
 import { matchWatchlist } from './watchlist.js';
@@ -21,7 +21,10 @@ import { analysePendingContracts } from './analyse-contract.js';
 import { isInVacation, vacationDaysBetween } from './vacation.js';
 import { isBounce, failedRecipient } from './bounce.js';
 
-const TEMPLATES = { T_INITIAL, T_PRECISION, T_RECEIPT, T_FOLLOWUP_NUDGE, T_FOLLOWUP_CLOSE, T_FOLLOWUP_FINAL, T_REQUEST_MISSING, T_UPDATE, T_DELAY_ACK, T_CROSSCHECK };
+// Registered so a draft minted with this template name renders (the escalation
+// row only stores the NAME). T_UPPGIFT has no automatic chooser yet — the
+// 2026-10-02 design keeps the five fee-case test sends in the operator's hands.
+const TEMPLATES = { T_INITIAL, T_PRECISION, T_RECEIPT, T_FOLLOWUP_NUDGE, T_FOLLOWUP_CLOSE, T_FOLLOWUP_FINAL, T_REQUEST_MISSING, T_UPDATE, T_DELAY_ACK, T_CROSSCHECK, T_UPPGIFT };
 
 const NO_DRAFT_PLACEHOLDER = '(ingen draft — skriv själv via Edit)';
 
@@ -202,8 +205,20 @@ async function escalateWithDraft({ conv, parsedInbound, messageId = null, classi
   // restate it — carry the superseded escalation's respond_by forward so a
   // supersede never silently drops a live Svarsfrist (2026-09-12 review
   // finding 3). Last superseded row with a respond_by wins if more than one.
+  //
+  // DEFERRED rows are superseded here too (2026-10-02 design). The park said
+  // "nothing from us for now", never "ignore what they send back": a kommun
+  // dropping the fee or answering the uppgift ask is exactly the event that
+  // must reach the operator, and leaving the parked row in place next to the
+  // new draft would break "at most one open next-action" the moment it is
+  // resumed. The void path (no new draft) deliberately does NOT do this — see
+  // the comment there.
   let inheritedRespondBy = null;
-  for (const existing of db.listOpenEscalationsForConversation(conv.id)) {
+  const toSupersede = [
+    ...db.listOpenEscalationsForConversation(conv.id),
+    ...db.listDeferredEscalationsForConversation(conv.id),
+  ];
+  for (const existing of toSupersede) {
     if (existing.respond_by) inheritedRespondBy = existing.respond_by;
     db.resolveEscalation(existing.id, {
       status: 'superseded',
@@ -838,7 +853,10 @@ async function dispatchEscalationForIngest(pending, deps) {
   // escalateWithDraft supersedes open escalations too, so this only changes the
   // case where the reply itself warrants no new draft. Only 'open' is touched —
   // a 'sending' claim is mid-Gmail-call and a parked 'send_failed' is a human's
-  // decision to make.
+  // decision to make. A 'deferred' row (2026-10-02) is the operator's decision
+  // too, and this path puts NOTHING in its place: voiding it would make a
+  // deliberately parked case silently disappear on the next autoresponder-ish
+  // mail. escalateWithDraft supersedes it only because it mints a replacement.
   const isMachineTraffic = classification.class === 'auto_ack' || classification.class === 'auto_reply'
     || isRepeatAutoresponder;
   if (!isMachineTraffic && !draftTemplate) {
@@ -1625,7 +1643,13 @@ export async function runDailyFollowup(deps) {
     // it could double-message a kommun whose previous reply may already have
     // gone out. Non-open active statuses are surfaced to the operator via
     // Slack; the conversation needs a human, not another nudge.
-    if (db.hasActiveEscalation(conv.id)) continue;
+    //
+    // A DEFERRED row (2026-10-02) gates this loop for a different reason: it is
+    // not pending work at all, which is why it is outside
+    // ACTIVE_ESCALATION_STATUSES — but a parked fee dispute or sekretess
+    // decision must never collect a fresh T_FOLLOWUP_NUDGE/CLOSE/FINAL. The
+    // operator chose silence here, and a nudge is the one thing that undoes it.
+    if (db.hasActiveEscalation(conv.id) || db.hasDeferredEscalation(conv.id)) continue;
 
     // Discount the clock: subtract whole vacation days elapsed since the state
     // change so a conversation quiet across the summer doesn't accrue stale
@@ -1995,8 +2019,11 @@ export async function runRefreshScan(deps) {
   // (A REFRESH_DUE conversation with an open T_UPDATE is still awaiting the
   // operator and is left alone.) This is surface-agnostic: however the skip
   // happened (Slack, dashboard, CLI), the next scan reconciles it.
+  // A DEFERRED T_UPDATE is not a skip (2026-10-02): the operator parked the
+  // refresh, so the case stays REFRESH_DUE and keeps the parked draft rather
+  // than being reverted to DONE and re-armed behind their back.
   for (const conv of db.listConversationsByState('REFRESH_DUE')) {
-    if (db.hasActiveEscalation(conv.id)) continue;
+    if (db.hasActiveEscalation(conv.id) || db.hasDeferredEscalation(conv.id)) continue;
     // Clear next_review_at as part of the revert so the SAME scan cannot
     // immediately re-mint the skipped T_UPDATE. The next runTick armRefresh
     // recomputes from the current contract set and re-arms it later.
@@ -2007,8 +2034,11 @@ export async function runRefreshScan(deps) {
   for (const conv of db.listConversationsDueForRefresh(todayIso)) {
     if (!refreshAllowlist.includes(conv.kommun_kod)) continue;
     // At most one active next-action per conversation (review H1) — never mint
-    // a refresh draft next to unresolved outbound.
-    if (db.hasActiveEscalation(conv.id)) continue;
+    // a refresh draft next to unresolved outbound. A parked draft counts here
+    // too (2026-10-02): a refresh T_UPDATE is OUR initiative, not an answer to
+    // a kommun mail, so minting one would supersede the park (escalateWithDraft
+    // does) and quietly undo the operator's decision.
+    if (db.hasActiveEscalation(conv.id) || db.hasDeferredEscalation(conv.id)) continue;
 
     // Recompute the review deterministically at scan time from the CURRENT
     // contract set (finding 7) — never trust a possibly-stale next_review_at

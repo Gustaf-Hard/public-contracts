@@ -373,3 +373,36 @@ export function T_REQUEST_MISSING(ctx) {
   parts.push('', signature(ctx));
   return { subject: `Re: ${ctx.thread_subject}`, body: parts.join('\n') };
 }
+
+// T_UPPGIFT (2026-10-02 deferred-escalations design) — the free way round a fee
+// demand. After the 2026-09-26 batch, 38 of the parked cases were kommuner
+// demanding payment for copies. Paying is out of the question at fleet scale
+// and arguing about the avgift is pointless, but "uppgift ur allmän handling"
+// is a different ask: a kommun may read the facts out of its avtalsregister and
+// put them in a mail without producing (and charging for) a single copy.
+//
+// Deliberately narrow prose: it accepts the fee notice instead of disputing it,
+// cites no paragraph (the earlier mails already did), names no company and
+// carries no date, so the operator can send it weeks after it was drafted. It
+// asks for exactly the four fields the extraction needs, and offers the two
+// shapes a kommun can produce cheaply: one row per avtal in the mail body, or a
+// register extract.
+//
+// It is NOT stale-sensitive: it asserts nothing about silence or about what we
+// have or have not received, only that we are dropping the copy request. Which
+// fee cases get it is the operator's call for now (the five test sends ride the
+// batch applier as `edit` verdicts carrying this body) — no chooser wires it.
+export function T_UPPGIFT(ctx) {
+  return {
+    subject: `Re: ${ctx.thread_subject}`,
+    body: [
+      'Hej,',
+      '',
+      'Tack för beskedet om avgiften. Vi avstår från kopior av handlingarna tills vidare.',
+      '',
+      'I stället undrar vi om ni kan lämna uppgifter ur avtalen, så att inga kopior behöver tas fram: leverantör, vad avtalet gäller, avtalsperiod och årskostnad eller kontraktsvärde. En rad per avtal direkt i mejlet räcker gott, eller ett utdrag ur ert avtalsregister om ni har ett sådant.',
+      '',
+      signature(ctx),
+    ].join('\n'),
+  };
+}

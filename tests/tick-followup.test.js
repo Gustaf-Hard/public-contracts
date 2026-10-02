@@ -253,6 +253,25 @@ describe('active (non-terminal) escalations gate new drafts (hardening findings 
     expect(db.raw.prepare('SELECT status FROM escalations WHERE id=?').get(escId).status).toBe('sending');
   });
 
+  // Deferred escalations (2026-10-02): 'deferred' is NOT an active status, so
+  // hasActiveEscalation says no and the staleness loop would happily nudge a
+  // kommun about a fee dispute the operator deliberately parked. The gate reads
+  // hasDeferredEscalation alongside it for exactly that case.
+  it('a deferred escalation gates the staleness loop', async () => {
+    const id = seedConv({ stateChangedAt: '2026-06-01T00:00:00Z' }); // stale past the jitter ceiling
+    const escId = db.recordEscalation({
+      conversation_id: id, message_id: null, reason: 'avgiftsbesked',
+      draft_template: 'free_form', draft_subject: 's', draft_body: 'b', previous_state: 'SENT',
+    });
+    expect(db.deferEscalationIfOpen(escId, { reason: 'avgift' })).toBe(true);
+    expect(db.hasActiveEscalation(id)).toBe(false); // the gate cannot lean on this one
+
+    await runDailyFollowup(deps());
+
+    expect(db.raw.prepare('SELECT COUNT(*) n FROM escalations').get().n).toBe(1); // no fresh nudge
+    expect(db.raw.prepare('SELECT status FROM escalations WHERE id=?').get(escId).status).toBe('deferred');
+  });
+
   it('an inbound-triggered draft is deferred while a sending escalation is in flight (never superseded)', async () => {
     const spy = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue(null);
     const id = seedConv({ state: 'SENT' });
@@ -327,6 +346,88 @@ describe('escalateWithDraft — at most one open escalation per conversation (H1
     expect(slackOps.updates).toHaveLength(1);
     expect(slackOps.updates[0].ts).toBe('old-ts');
     expect(slackOps.updates[0].status).toBe('superseded');
+  });
+
+  // A kommun that answers the parked case (drops the fee, answers the uppgift
+  // ask) MUST reach the operator. A new inbound that mints a draft therefore
+  // supersedes a 'deferred' row exactly as it supersedes an 'open' one — the
+  // park was "nothing from us for now", not "ignore their reply".
+  it('a new inbound-triggered draft supersedes a deferred row and strips its buttons', async () => {
+    const spy = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue(null);
+    const id = seedConv({ state: 'SENT' });
+    const parked = db.recordEscalation({
+      conversation_id: id, message_id: null, reason: 'avgiftsbesked',
+      draft_template: 'free_form', draft_subject: 's', draft_body: 'b',
+      previous_state: 'SENT', slack_ts: 'parked-ts', respond_by: '2026-09-30',
+    });
+    expect(db.deferEscalationIfOpen(parked, { reason: 'avgift', note: 'väntar' })).toBe(true);
+
+    const slackOps = fakeSlackOps();
+    const gmail = fakeGmail({
+      listResult: [{ id: 'in-wake' }],
+      getResult: {
+        'in-wake': {
+          id: 'in-wake', threadId: 'thr-a',
+          payload: {
+            headers: [
+              { name: 'From', value: 'K <kansli@ale.se>' }, { name: 'To', value: 'me@x.se' },
+              { name: 'Subject', value: 'SV' },
+            ],
+            mimeType: 'text/plain', body: { data: b64('Hej, kan du ringa mig?') },
+          },
+        },
+      },
+    });
+    await runTick(deps({ gmail, slackOps }));
+    spy.mockRestore();
+
+    const open = db.listOpenEscalationsForConversation(id);
+    expect(open).toHaveLength(1);
+    expect(open[0].id).not.toBe(parked);
+    expect(db.raw.prepare('SELECT status FROM escalations WHERE id=?').get(parked).status).toBe('superseded');
+    expect(db.hasDeferredEscalation(id)).toBe(false);
+    // The kommun's frist does not die with the parked row (2026-09-12 finding 3).
+    expect(open[0].respond_by).toBe('2026-09-30');
+    expect(slackOps.updates.map((u) => u.ts)).toContain('parked-ts');
+  });
+
+  // The other half of the rule: an inbound that warrants NO new draft must
+  // leave the park alone. The void path supersedes 'open' rows only — an
+  // auto-ack or a question we do not answer must never make a parked case
+  // vanish with nothing in its place.
+  it('the void path leaves a deferred row parked', async () => {
+    const id = seedConv({ state: 'NEEDS_HUMAN' });
+    const parked = db.recordEscalation({
+      conversation_id: id, message_id: null, reason: 'sekretessbeslut',
+      draft_template: 'free_form', draft_subject: 's', draft_body: 'b', previous_state: 'SENT',
+    });
+    expect(db.deferEscalationIfOpen(parked, { reason: 'sekretess' })).toBe(true);
+    const spy = vi.spyOn(analyseMod, 'analyseMessage').mockResolvedValue({
+      intent: 'clarification', confidence: 0.9, summary: 'Frågor om begäran.',
+      suggested_action: 'send_precision', is_final_delivery: false,
+      draft_reply: 'd', follow_up_at: null, extracted: { questions: ['Vilken period?'] },
+    });
+    const gmail = fakeGmail({
+      listResult: [{ id: 'in-void' }],
+      getResult: {
+        'in-void': {
+          id: 'in-void', threadId: 'thr-a',
+          payload: {
+            headers: [
+              { name: 'From', value: 'K <kansli@ale.se>' }, { name: 'To', value: 'me@x.se' },
+              { name: 'Subject', value: 'SV' },
+            ],
+            mimeType: 'text/plain', body: { data: b64('Kan du precisera?') },
+          },
+        },
+      },
+    });
+    await runTick(deps({ gmail }));
+    spy.mockRestore();
+
+    expect(db.hasGmailMessageId('in-void')).toBe(true);
+    expect(db.listOpenEscalationsForConversation(id)).toHaveLength(0); // nothing new was minted
+    expect(db.raw.prepare('SELECT status FROM escalations WHERE id=?').get(parked).status).toBe('deferred');
   });
 });
 
@@ -765,14 +866,17 @@ describe('queue hygiene digest (2026-09-12 design)', () => {
   it('names the 🕰 cases kommun/role, the way ⏰ and 🧭 do', async () => {
     const cid = db.createConversation({ kommun_kod: '0005', kommun_namn: 'Gammal', role: 'utbildning', contact_email: 'g@g.se', scheduled_send_at: '2026-08-01T08:00:00Z' });
     const escId = db.recordEscalation({ conversation_id: cid, reason: 'r', draft_template: 'free_form', draft_body: 'b' });
-    db.raw.prepare("UPDATE escalations SET created_at = datetime('now', '-9 days') WHERE id = ?").run(escId);
+    // Seeded relative to the SIMULATED now, not the real clock: the aged-draft
+    // age is rendered as (now - created_at), so datetime('now', '-9 days') made
+    // the label negative the day the real clock passed the simulated date. The
+    // SQL age filter reads the real clock, and a 2026-09 row is well past 7
+    // days there either way.
+    db.raw.prepare("UPDATE escalations SET created_at = '2026-09-03 09:00:00' WHERE id = ?").run(escId);
     const slackOps = fakeSlackOps();
     await runDailyFollowup(deps({ slackOps, now: new Date('2026-09-12T09:00:00Z') }));
     const digest = slackOps.alerts.find((t) => t.includes('Köhälsa'));
     expect(digest).toContain('🕰');
-    // The age in days is relative to the real clock (created_at is seeded with
-    // SQLite's datetime('now')), so the label shape is what matters here.
-    expect(digest.split('🕰')[1]).toMatch(/Gammal\/utbildning \(\d+ d\)/);
+    expect(digest.split('🕰')[1]).toMatch(/Gammal\/utbildning \(9 d\)/);
   });
 
   it('keeps the deadline suffix on a 🧭 case that carries one', async () => {

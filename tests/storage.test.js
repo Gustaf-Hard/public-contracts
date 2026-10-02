@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { openDb, ACTIVE_ESCALATION_STATUSES } from '../src/storage.js';
+import { openDb, ACTIVE_ESCALATION_STATUSES, DEFERRED_ESCALATION_STATUS, parseDeferReason } from '../src/storage.js';
 
 let tmp, db;
 beforeEach(() => {
@@ -1649,5 +1649,179 @@ describe('effectiveRespondBy discharge-checks its own escalation candidate (roun
     // copy (its trigger-less created_at predates the send).
     expect(db.effectiveRespondBy(cid)).toBeNull();
     expect(dueRow(cid)).toBeUndefined();
+  });
+});
+
+// Deferred escalations (2026-10-02 design): "the operator looked at the draft
+// and chose to do nothing for now". A new string value in escalations.status —
+// no migration — that is deliberately NOT in ACTIVE_ESCALATION_STATUSES, so a
+// parked case leaves every queue that means "outbound work is pending", while
+// still being excluded from the staleness/deadline chasing that would nag the
+// kommun about a case we parked on purpose.
+describe('deferred escalations (2026-10-02 design)', () => {
+  let kod = 7000;
+  function seedDeferrable({ state = 'NEEDS_HUMAN', namn = 'Pausbar', respond_by = null } = {}) {
+    const cid = db.createConversation({
+      kommun_kod: String(kod++), kommun_namn: namn, role: 'central',
+      contact_email: 'p@p.se', scheduled_send_at: '2026-09-01T08:00:00Z',
+    });
+    db.updateConversationState(cid, state, {});
+    const eid = db.recordEscalation({
+      conversation_id: cid, reason: 'avgiftsbesked', draft_template: 'free_form',
+      draft_subject: 'Re: Avgift', draft_body: 'utkast', previous_state: 'SENT', respond_by,
+    });
+    return { cid, eid };
+  }
+
+  it('deferEscalationIfOpen parks an open row with a parseable reason and a stamp', () => {
+    const { eid } = seedDeferrable();
+    expect(db.deferEscalationIfOpen(eid, { reason: 'avgift', note: 'väntar på beslut' })).toBe(true);
+    const row = db.raw.prepare('SELECT * FROM escalations WHERE id = ?').get(eid);
+    expect(row.status).toBe(DEFERRED_ESCALATION_STATUS);
+    expect(row.resolved_text).toBe('pausad: avgift – väntar på beslut');
+    expect(row.resolved_at).toBeTruthy();
+    expect(row.draft_body).toBe('utkast'); // the draft is kept so it can be resumed
+    expect(parseDeferReason(row.resolved_text)).toEqual({ reason: 'avgift', note: 'väntar på beslut' });
+  });
+
+  it('a note is optional and an unknown reason falls back to annat', () => {
+    const a = seedDeferrable();
+    expect(db.deferEscalationIfOpen(a.eid, { reason: 'sekretess' })).toBe(true);
+    expect(db.raw.prepare('SELECT resolved_text t FROM escalations WHERE id=?').get(a.eid).t).toBe('pausad: sekretess');
+    const b = seedDeferrable();
+    expect(db.deferEscalationIfOpen(b.eid, { reason: 'nonsens', note: '  ' })).toBe(true);
+    expect(db.raw.prepare('SELECT resolved_text t FROM escalations WHERE id=?').get(b.eid).t).toBe('pausad: annat');
+  });
+
+  it('parseDeferReason never regexes outside storage: junk and legacy text read as annat', () => {
+    expect(parseDeferReason('pausad: juridik')).toEqual({ reason: 'juridik', note: null });
+    expect(parseDeferReason('pausad: avgift – a – b')).toEqual({ reason: 'avgift', note: 'a – b' });
+    expect(parseDeferReason('something else')).toEqual({ reason: 'annat', note: null });
+    expect(parseDeferReason(null)).toEqual({ reason: 'annat', note: null });
+  });
+
+  it('deferEscalationIfOpen refuses anything that is not open, and clobbers nothing', () => {
+    const { eid } = seedDeferrable();
+    db.resolveEscalation(eid, { status: 'resolved_send', resolved_text: 'sent' });
+    expect(db.deferEscalationIfOpen(eid, { reason: 'avgift' })).toBe(false);
+    const row = db.raw.prepare('SELECT status, resolved_text FROM escalations WHERE id=?').get(eid);
+    expect(row.status).toBe('resolved_send');
+    expect(row.resolved_text).toBe('sent');
+    // And a second defer of an already-parked row is a no-op too.
+    const b = seedDeferrable();
+    expect(db.deferEscalationIfOpen(b.eid, { reason: 'avgift' })).toBe(true);
+    expect(db.deferEscalationIfOpen(b.eid, { reason: 'juridik' })).toBe(false);
+    expect(parseDeferReason(db.raw.prepare('SELECT resolved_text t FROM escalations WHERE id=?').get(b.eid).t).reason).toBe('avgift');
+  });
+
+  // The counterpart of the it.each(ACTIVE_ESCALATION_STATUSES) loops above:
+  // 'deferred' means "nothing was sent and nothing is pending", so every guard
+  // that asks "is outbound work in flight?" must answer no for it.
+  it('deferred is NOT an active status', () => {
+    expect(ACTIVE_ESCALATION_STATUSES).not.toContain(DEFERRED_ESCALATION_STATUS);
+    const { cid, eid } = seedDeferrable();
+    db.deferEscalationIfOpen(eid, { reason: 'avgift' });
+    expect(db.hasActiveEscalation(cid)).toBe(false);
+    expect(db.listActiveEscalationsForConversation(cid)).toEqual([]);
+    expect(db.listOpenEscalationsForConversation(cid)).toEqual([]);
+    expect(db.hasDeferredEscalation(cid)).toBe(true);
+  });
+
+  it.each(ACTIVE_ESCALATION_STATUSES)('hasDeferredEscalation is false for a %s escalation', (status) => {
+    const { cid, eid } = seedDeferrable();
+    db.raw.prepare('UPDATE escalations SET status = ? WHERE id = ?').run(status, eid);
+    expect(db.hasDeferredEscalation(cid)).toBe(false);
+  });
+
+  it('listDeferredEscalations joins kommun/role/state, newest-parked first', () => {
+    const first = seedDeferrable({ namn: 'Först', state: 'SENT' });
+    db.deferEscalationIfOpen(first.eid, { reason: 'avgift' });
+    db.raw.prepare("UPDATE escalations SET resolved_at = '2026-09-20 08:00:00' WHERE id = ?").run(first.eid);
+    const second = seedDeferrable({ namn: 'Senast', state: 'DELIVERING' });
+    db.deferEscalationIfOpen(second.eid, { reason: 'juridik', note: 'överklagbart' });
+    db.raw.prepare("UPDATE escalations SET resolved_at = '2026-09-28 08:00:00' WHERE id = ?").run(second.eid);
+    // An open row on a third case must not leak into the list.
+    seedDeferrable({ namn: 'Öppen' });
+
+    const rows = db.listDeferredEscalations();
+    expect(rows.map((r) => r.kommun_namn)).toEqual(['Senast', 'Först']);
+    expect(rows[0]).toMatchObject({ role: 'central', state: 'DELIVERING', status: 'deferred' });
+    expect(rows[0].draft_body).toBe('utkast');
+    expect(db.listDeferredEscalationsForConversation(second.cid).map((r) => r.id)).toEqual([second.eid]);
+    expect(db.listDeferredEscalationsForConversation(first.cid + 9999)).toEqual([]);
+  });
+
+  it('resumeEscalationIfDeferred reopens the frozen draft and clears the park stamps', () => {
+    const { cid, eid } = seedDeferrable();
+    db.deferEscalationIfOpen(eid, { reason: 'avgift', note: 'n' });
+    expect(db.resumeEscalationIfDeferred(eid)).toBe(true);
+    const row = db.raw.prepare('SELECT * FROM escalations WHERE id = ?').get(eid);
+    expect(row.status).toBe('open');
+    expect(row.resolved_at).toBeNull();
+    expect(row.resolved_text).toBeNull();
+    expect(row.draft_body).toBe('utkast');
+    expect(db.hasActiveEscalation(cid)).toBe(true);
+    expect(db.hasDeferredEscalation(cid)).toBe(false);
+    // Not deferred any more -> a second click changes nothing.
+    expect(db.resumeEscalationIfDeferred(eid)).toBe(false);
+  });
+
+  // "At most one open escalation per conversation. Always." A resume is a new
+  // open row from the queue's point of view, so it must lose to anything active
+  // that appeared while the case was parked.
+  it.each(ACTIVE_ESCALATION_STATUSES)('resume is refused while the case has a %s escalation', (status) => {
+    const { cid, eid } = seedDeferrable();
+    db.deferEscalationIfOpen(eid, { reason: 'avgift' });
+    const rival = db.recordEscalation({ conversation_id: cid, reason: 'nyare' });
+    db.raw.prepare('UPDATE escalations SET status = ? WHERE id = ?').run(status, rival);
+
+    expect(db.resumeEscalationIfDeferred(eid)).toBe(false);
+    expect(db.raw.prepare('SELECT status FROM escalations WHERE id=?').get(eid).status).toBe('deferred');
+    expect(db.raw.prepare('SELECT status FROM escalations WHERE id=?').get(rival).status).toBe(status);
+  });
+
+  it('resumeEscalationIfDeferred is a no-op on an unknown id', () => {
+    expect(db.resumeEscalationIfDeferred(987654)).toBe(false);
+  });
+
+  // The whole point of parking is that neither the deadline nor the silence is
+  // ours to chase right now.
+  it('a parked case leaves the Köhälsa deadline list and the 🧭 orphan list', () => {
+    const { cid, eid } = seedDeferrable({ namn: 'Parkerad frist', respond_by: '2026-09-13' });
+    expect(db.listConversationsWithDeadlineDue('2026-09-14').map((r) => r.conversation_id)).toContain(cid);
+    expect(db.listOrphanNeedsHuman().map((c) => c.id)).not.toContain(cid); // open row -> not an orphan
+
+    db.deferEscalationIfOpen(eid, { reason: 'avgift' });
+
+    expect(db.listConversationsWithDeadlineDue('2026-09-14').map((r) => r.conversation_id)).not.toContain(cid);
+    // NEEDS_HUMAN with no active row would otherwise be reported as a 🧭 orphan
+    // every single day; the deferred row is what says "deliberate", and the
+    // defer path also moves the case off NEEDS_HUMAN.
+    expect(db.listOrphanNeedsHuman().map((c) => c.id)).not.toContain(cid);
+  });
+
+  it('a conversation-wide inbound frist is suppressed too, not just the escalation snapshot', () => {
+    const { cid, eid } = seedDeferrable({ namn: 'Frist i mejl' });
+    db.recordMessage({
+      conversation_id: cid, gmail_message_id: `g-${cid}`, direction: 'inbound',
+      from_email: 'p@p.se', to_email: 'x', subject: 's', body_text: 'b',
+      received_at: '2026-09-11T08:00:00Z', attachment_count: 0,
+      analysis_json: JSON.stringify({ extracted: { respond_by_date: '2026-09-13' } }),
+    });
+    expect(db.listConversationsWithDeadlineDue('2026-09-14').map((r) => r.conversation_id)).toContain(cid);
+    db.deferEscalationIfOpen(eid, { reason: 'sekretess' });
+    expect(db.listConversationsWithDeadlineDue('2026-09-14').map((r) => r.conversation_id)).not.toContain(cid);
+  });
+
+  // defer/resume sent NOTHING, so they can never discharge a kommun-imposed
+  // frist. The allowlist is a positive list for exactly this reason.
+  it('defer and resume are outside listOperatorDecisionTimes', () => {
+    const { cid, eid } = seedDeferrable();
+    const base = { escalation_id: eid, conversation_id: cid, conversation_state: 'SENT', draft_body: 'x', draft_template: 'free_form' };
+    db.recordDecision({ ...base, decision: 'defer', final_body: null });
+    db.recordDecision({ ...base, decision: 'resume', final_body: null });
+    expect(db.listOperatorDecisionTimes(cid)).toEqual([]);
+    db.recordDecision({ ...base, decision: 'edit', final_body: 'y' });
+    expect(db.listOperatorDecisionTimes(cid)).toHaveLength(1);
   });
 });
