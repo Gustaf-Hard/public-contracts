@@ -1,7 +1,7 @@
 // Batch application of reviewed verdicts over open escalations (2026-09-26).
 //
 // A reviewer read a snapshot of the DB (the nightly backup) and produced one
-// verdict per open escalation: approve / edit / skip / human. This module
+// verdict per open escalation: approve / edit / skip / defer / human. This module
 // replays those verdicts against the LIVE db through the one approved-send
 // path, sendApprovedReply. It is the CLI resolver (scripts/pilot-resolve.js)
 // looped over a file, plus the two checks a snapshot review needs:
@@ -17,7 +17,8 @@
 // the escalation exactly as a dashboard click would, and the batch moves on.
 import { createHash } from 'node:crypto';
 import { sendMessage as gmailSend } from './gmail.js';
-import { sendApprovedReply } from './send-reply.js';
+import { sendApprovedReply, restoreStateAfterDefer } from './send-reply.js';
+import { DEFER_REASONS } from './storage.js';
 
 export const sha256 = (s) => createHash('sha256').update(s ?? '').digest('hex');
 
@@ -56,6 +57,35 @@ export async function applyVerdicts({
         decision: 'skip', final_body: null,
       });
       done('skipped');
+      continue;
+    }
+
+    // Park it (2026-10-02 design): the verdict for the 38 fee demands and 15
+    // sekretess decisions the reviewers deliberately left alone. Nothing is
+    // sent, the draft is kept so it can be resumed, and the case leaves the
+    // queues without being skipped away. `defer_reason` is REQUIRED and must be
+    // one of the four — a park whose reason nobody can read back is worth less
+    // than no park at all, and the Pausade surfaces are keyed on it, so this
+    // fails the row rather than silently writing 'annat' over a typo.
+    if (v.verdict === 'defer') {
+      if (!DEFER_REASONS.includes(String(v.defer_reason ?? '').toLowerCase())) {
+        done('missing_defer_reason', { defer_reason: v.defer_reason ?? null });
+        continue;
+      }
+      if (!apply) { done('would_defer'); continue; }
+      if (!db.deferEscalationIfOpen(esc.id, { reason: v.defer_reason, note: v.defer_note })) {
+        done('not_open', { status: db.raw.prepare('SELECT status FROM escalations WHERE id = ?').get(esc.id)?.status });
+        continue;
+      }
+      db.recordDecision({
+        escalation_id: esc.id, conversation_id: conv.id,
+        conversation_state: esc.previous_state ?? conv.state,
+        classifier_class: esc.classifier_class ?? null, classifier_confidence: esc.classifier_confidence ?? null,
+        draft_template: esc.draft_template, draft_body: esc.draft_body,
+        decision: 'defer', final_body: null,
+      });
+      restoreStateAfterDefer({ db, conv, esc });
+      done('deferred');
       continue;
     }
 

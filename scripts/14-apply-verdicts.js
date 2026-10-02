@@ -5,7 +5,7 @@
 //
 //   node scripts/14-apply-verdicts.js --file=verdicts.json --reviewed-at=2026-09-26T03:00:14Z            # dry run
 //   node scripts/14-apply-verdicts.js --file=verdicts.json --reviewed-at=2026-09-26T03:00:14Z --apply    # sends
-//   optional: --only=approve,skip   --limit=N   --log=results.jsonl
+//   optional: --only=approve,skip,defer   --limit=N   --log=results.jsonl
 import 'dotenv/config';
 import fs from 'node:fs';
 import { openDb } from '../src/storage.js';
@@ -23,7 +23,7 @@ const only = arg('only') ? new Set(arg('only').split(',')) : null;
 const limit = arg('limit') ? parseInt(arg('limit'), 10) : Infinity;
 const logPath = arg('log') ?? `apply-verdicts-${new Date().toISOString().replace(/[:.]/g, '-')}.jsonl`;
 if (!file || !reviewedAt) {
-  console.error('Usage: 14-apply-verdicts.js --file=<verdicts.json> --reviewed-at=<ISO> [--apply] [--only=approve,edit,skip] [--limit=N] [--log=path]');
+  console.error('Usage: 14-apply-verdicts.js --file=<verdicts.json> --reviewed-at=<ISO> [--apply] [--only=approve,edit,skip,defer] [--limit=N] [--log=path]');
   process.exit(1);
 }
 

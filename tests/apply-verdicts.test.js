@@ -116,6 +116,87 @@ describe('applyVerdicts', () => {
     expect(res.map((r) => r.outcome)).toEqual(['not_open', 'missing', 'left_for_operator']);
   });
 
+  // Defer (2026-10-02): the reviewer's verdict for "leave this one parked".
+  // Same five snapshot guards as skip, no Gmail at all.
+  it('defer dry run reports would_defer and writes nothing', async () => {
+    const { db, escId } = seed();
+    const send = vi.fn();
+    const res = await applyVerdicts({ db, gmail: {}, env, reviewedAt, apply: false, gmailSendImpl: send,
+      verdicts: [{ esc: escId, verdict: 'defer', defer_reason: 'avgift', draft_sha256: sha('tack för avtalen') }] });
+    expect(send).not.toHaveBeenCalled();
+    expect(escRow(db, escId).status).toBe('open');
+    expect(decisions(db)).toHaveLength(0);
+    // The verdict string travels verbatim, which is what makes --only=defer
+    // (a plain Set over v.verdict in scripts/14-apply-verdicts.js) select it.
+    expect(res).toEqual([{ esc: escId, verdict: 'defer', outcome: 'would_defer' }]);
+  });
+
+  it('defer parks the row with its reason, records a defer decision and sends nothing', async () => {
+    const { db, convId, escId } = seed();
+    db.updateConversationState(convId, 'NEEDS_HUMAN', { follow_up_at: '2026-10-20' });
+    db.raw.prepare("UPDATE escalations SET previous_state = 'DELIVERING' WHERE id = ?").run(escId);
+    const send = vi.fn();
+    const res = await applyVerdicts({ db, gmail: {}, env, reviewedAt, apply: true, gmailSendImpl: send,
+      verdicts: [{ esc: escId, verdict: 'defer', defer_reason: 'juridik', defer_note: 'överklagbart beslut', draft_sha256: sha('tack för avtalen') }] });
+    expect(send).not.toHaveBeenCalled();
+    expect(escRow(db, escId).status).toBe('deferred');
+    expect(escRow(db, escId).resolved_text).toBe('pausad: juridik – överklagbart beslut');
+    expect(escRow(db, escId).draft_body).toBe('tack för avtalen'); // frozen, resumable
+    expect(decisions(db)[0].decision).toBe('defer');
+    expect(decisions(db)[0].final_body).toBeNull();
+    expect(res[0].outcome).toBe('deferred');
+    // Off NEEDS_HUMAN, follow-up promise dropped — the same move the dashboard
+    // Pausa form makes.
+    expect(db.getConversation(convId).state).toBe('DELIVERING');
+    expect(db.getConversation(convId).follow_up_at).toBeNull();
+    expect(db.hasDeferredEscalation(convId)).toBe(true);
+    expect(db.hasActiveEscalation(convId)).toBe(false);
+  });
+
+  it('defer without a reason is refused before anything is written', async () => {
+    const { db, escId } = seed();
+    const res = await applyVerdicts({ db, gmail: {}, env, reviewedAt, apply: true,
+      verdicts: [
+        { esc: escId, verdict: 'defer', draft_sha256: sha('tack för avtalen') },
+        { esc: escId, verdict: 'defer', defer_reason: 'nonsens', draft_sha256: sha('tack för avtalen') },
+      ] });
+    expect(res.map((r) => r.outcome)).toEqual(['missing_defer_reason', 'missing_defer_reason']);
+    expect(escRow(db, escId).status).toBe('open');
+    expect(decisions(db)).toHaveLength(0);
+  });
+
+  it('defer inherits the snapshot guards', async () => {
+    // draft_changed
+    const changed = seed({ draft: 'ny text' });
+    let res = await applyVerdicts({ db: changed.db, gmail: {}, env, reviewedAt, apply: true,
+      verdicts: [{ esc: changed.escId, verdict: 'defer', defer_reason: 'avgift', draft_sha256: sha('tack för avtalen') }] });
+    expect(res[0].outcome).toBe('draft_changed');
+    expect(escRow(changed.db, changed.escId).status).toBe('open');
+
+    // newer_inbound
+    const fresh = seed();
+    fresh.db.recordMessage({
+      conversation_id: fresh.convId, gmail_message_id: 'in-late', direction: 'inbound',
+      from_email: 'reg@arboga.se', to_email: 'me@x.se', subject: 'SV', body_text: 'mer',
+      classification: 'delivery', classification_confidence: 0.9, received_at: '2026-09-26T08:00:00Z',
+      attachment_count: 0, gmail_thread_id: 'thr',
+    });
+    res = await applyVerdicts({ db: fresh.db, gmail: {}, env, reviewedAt, apply: true,
+      verdicts: [{ esc: fresh.escId, verdict: 'defer', defer_reason: 'avgift', draft_sha256: sha('tack för avtalen') }] });
+    expect(res[0].outcome).toBe('newer_inbound');
+    expect(escRow(fresh.db, fresh.escId).status).toBe('open');
+
+    // not_open + missing
+    const done = seed();
+    done.db.resolveEscalation(done.escId, { status: 'resolved_send' });
+    res = await applyVerdicts({ db: done.db, gmail: {}, env, reviewedAt, apply: true,
+      verdicts: [
+        { esc: done.escId, verdict: 'defer', defer_reason: 'avgift', draft_sha256: sha('tack för avtalen') },
+        { esc: 4242, verdict: 'defer', defer_reason: 'avgift', draft_sha256: 'x' },
+      ] });
+    expect(res.map((r) => r.outcome)).toEqual(['not_open', 'missing']);
+  });
+
   it('a failed send does not stop the batch', async () => {
     const a = seed();
     const db = a.db;
