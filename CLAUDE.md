@@ -277,24 +277,40 @@ the one thing that undoes a deliberate silence. The draft body is kept verbatim,
 — read it ONLY through `parseDeferReason`, never a second regex. The ledger gets
 `defer` on the way in and `resume` on the way out; both are outside
 `listOperatorDecisionTimes`, so a park can never discharge a kommun frist.
-Exactly two things wake a parked case: the operator's `POST
-/escalations/:id/resume` (`resumeEscalationIfDeferred`, which refuses with 409
-when the case already holds an ACTIVE row — a second open draft next to an
-in-flight send is the double-message the invariant exists to stop), and a new
-inbound that mints a draft (`escalateWithDraft` supersedes a `deferred` row like
-an `open` one, carrying the frist forward). The void path, vacation-mode
+A park ENDS whenever the kommun gets an answer, by any route: the operator's
+`POST /escalations/:id/resume` (`resumeEscalationIfDeferred`, 409 when the row
+is not parked, when the case already holds an ACTIVE row — a second open draft
+next to an in-flight send is the double-message the invariant exists to stop —
+or when the case is DONE/DEAD_END, which has no next action to resume into); a
+new inbound that mints a draft (`escalateWithDraft` supersedes a `deferred` row
+like an `open` one, carrying the frist forward); the free-reply box
+(`POST /arenden/:id/reply` → `supersedeDeferredAfterReply`, AFTER Gmail accepted
+only, because a failed send sent nothing); and closing the case
+(`/conversations/:id/close` resolves parked rows `resolved_closed` with a
+`closed` decision). Nothing else: the void path, vacation-mode
 `supersedeStaleNudgeEscalations` and `retryUnpostedEscalations` all stay
 `status='open'` — they put nothing in the row's place, so touching it would make
-a parked case vanish. Parking rides `deferEscalationIfOpen` (the same atomic
-claim as skip) plus `restoreStateAfterDefer` (send-reply.js, beside
-`saneRestoreState`): NEEDS_HUMAN with no active escalation is a bug everywhere,
-so the park restores the draft's `previous_state` and nulls `follow_up_at`. It
-renders as its own yellow Pausade card+section on the overview, a 4th Ärenden
-bucket claimed BEFORE `behover_dig` (`deferred_esc` in `loadCaseSummaries`), and
-a card with only a ▶️ Återuppta button on the ärende, kommun and focused-thread
-pages — all three, because reading `status='open'` alone is the a7ec79c bug class.
-`escalationActionLabel` never sees a deferred row; `deferredLabel` (dashboard.js)
-is its counterpart.
+a parked case vanish. The park sequence itself is ONE function,
+`deferEscalation` (send-reply.js, beside `saneRestoreState`): atomic claim →
+`defer` decision → `restoreStateAfterDefer` → Slack strip. Both surfaces (the
+dashboard Pausa form and the applier's `defer` verdict) call it, which is what
+makes "they park identically" a fact. `restoreStateAfterDefer` restores the
+draft's `previous_state` only when the case is NEEDS_HUMAN (a bug everywhere
+without an active escalation) and otherwise nulls `follow_up_at` through
+`setFollowUp` — never `updateConversationState`, which would re-stamp
+`state_changed_at` and reset the staleness clock of a case whose real last event
+is older than the park. It renders as its own yellow Pausade card+section on the
+overview and an Ärenden bucket directly under Behöver dig, claimed only when
+`deferred_esc > 0 && open_esc === 0 && !has_pending_handoff` (both counts come
+from one grouped query, `escalationCountsByConversation`) — a park next to
+pending work stays red, or Ärenden and the queues would disagree about the same
+case — plus a card with only a ▶️ Återuppta button on the ärende, kommun and
+focused-thread pages, all three, because reading `status='open'` alone is the
+a7ec79c bug class. `listDeferredEscalations` is the Pausade list's only source:
+live cases only, longest-parked first, sorted in SQL.
+`escalationActionLabel` never sees a deferred row; `deferredLabel`
+(dashboard-views.js, re-exported from dashboard.js) is its counterpart and the
+one reader of `resolved_text` on a render path.
 
 **Batch verdicts ride the same approved path** (`src/apply-verdicts.js`,
 `scripts/14-apply-verdicts.js`, 2026-09-26). A reviewer works from a DB snapshot
@@ -304,9 +320,10 @@ the box through `sendApprovedReply` (decision `approve_unmodified` or `edit`),
 the resolver's skip path, or the park path, dry-run by default. A `defer` row
 (2026-10-02) needs a `defer_reason` from `DEFER_REASONS` plus an optional
 `defer_note`, touches no Gmail, and does exactly what the dashboard Pausa form
-does: `deferEscalationIfOpen` + a `defer` decision + `restoreStateAfterDefer`
-(dry run reports `would_defer`, apply `deferred`, a reason outside the four
-`missing_defer_reason`). `--only=<verdicts>` is a plain Set over `v.verdict`, so
+does, by calling the same `deferEscalation` (dry run reports `would_defer`,
+apply `deferred`, a reason outside the four `missing_defer_reason`). Pass it
+`slackClient`/`slackOps` and the park strips the row's Slack buttons too — live
+buttons on a parked draft are a second way to send what the batch just parked. `--only=<verdicts>` is a plain Set over `v.verdict`, so
 `--only=defer` works without further wiring. Two snapshot checks sit in front of
 every row: an inbound received after `--reviewed-at` voids the verdict
 (`newer_inbound`; STALE_ESCALATION only compares with the draft's creation), and
