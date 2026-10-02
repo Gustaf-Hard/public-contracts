@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { openDb } from '../src/storage.js';
-import { createDashboardApp, buildActionQueue, buildWaiting, applyFilter, buildOverviewRows, contentDisposition, escalationActionLabel, caseTooltip } from '../src/dashboard.js';
+import { createDashboardApp, buildActionQueue, buildWaiting, buildDeferred, applyFilter, buildOverviewRows, contentDisposition, escalationActionLabel, deferredLabel, caseTooltip } from '../src/dashboard.js';
 import { layout, renderEscalationForm, renderOverview, renderArenden } from '../src/dashboard-views.js';
 
 let tmp, db, dbPath, muniPath;
@@ -1313,7 +1313,11 @@ describe('caseTooltip: active escalation outside NEEDS_HUMAN (round-13 R2)', () 
 
   it('still shows the follow-up narrative when there is no active escalation (unchanged)', () => {
     const conv = { state: 'ACK_RECEIVED', last_outbound_at: '2026-09-01T08:00:00Z' };
-    const tip = caseTooltip(conv, null, { date: '2026-09-20', source: 'our_followup' }, undefined);
+    // The bevakar wording is only right while the follow-up is still ahead of
+    // us, and caseTooltip reads the real clock — a hardcoded date turns the
+    // narrative into "försenat" the day it passes, which is what broke here.
+    const ahead = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+    const tip = caseTooltip(conv, null, { date: ahead, source: 'our_followup' }, undefined);
     expect(tip).toContain('bevakar');
     expect(tip).not.toContain('du måste agera');
   });
@@ -2315,5 +2319,179 @@ describe('resolve endpoint edit/approve honesty (2026-08-31)', () => {
       expect(d.final_body).not.toContain('\r');
       expect(d.draft_body).not.toContain('\r');
     } finally { spy.mockRestore(); }
+  });
+});
+
+// Deferred escalations (2026-10-02 design): the operator parks a draft and the
+// case leaves every queue that means "act on this now" without vanishing. The
+// a7ec79c bug class is the thing to watch — a non-'open' row that renders
+// nowhere while the queues point at it.
+describe('Pausade — deferred escalations on the dashboard', () => {
+  function seedDeferrable({ kod = '2418', namn = 'Malå', state = 'NEEDS_HUMAN', respond_by = null } = {}) {
+    const convId = db.createConversation({
+      kommun_kod: kod, kommun_namn: namn, role: 'central',
+      contact_email: 'kommun@mala.se', scheduled_send_at: '2026-08-11T09:00:00Z',
+    });
+    db.updateConversationState(convId, state, { gmail_thread_id: 'thr-d', last_outbound_at: '2026-08-11T09:44:53Z', follow_up_at: '2026-10-20' });
+    const thread = db.upsertThread({ conversation_id: convId, gmail_thread_id: `thr-d-${convId}`, counterparty_email: 'kommun@mala.se' });
+    const mid = db.recordMessage({
+      conversation_id: convId, gmail_message_id: `in-${convId}`, direction: 'inbound',
+      from_email: 'kommun@mala.se', to_email: 'me@x.se', subject: 'SV: Begäran', body_text: 'Avgift 1 200 kr.',
+      classification: 'fee_demand', classification_confidence: 0.9, received_at: '2026-08-20T09:00:00Z',
+      attachment_count: 0, gmail_thread_id: `thr-d-${convId}`, thread_id: thread.id,
+    });
+    const escId = db.recordEscalation({
+      conversation_id: convId, message_id: null, reason: 'avgiftsbesked',
+      draft_template: 'free_form', draft_subject: 'Re: SV: Begäran',
+      draft_body: 'Hej,\n\nVi avstår från kopior.', previous_state: 'SENT', respond_by,
+    });
+    return { convId, escId, threadId: thread.id, mid };
+  }
+  const row = (id) => db.raw.prepare('SELECT * FROM escalations WHERE id = ?').get(id);
+
+  it('POST action=defer parks the row, records a defer decision and moves the case off NEEDS_HUMAN', async () => {
+    const { convId, escId } = seedDeferrable();
+    const res = await postForm(appWithFakes(), `/escalations/${escId}`, { action: 'defer', reason: 'avgift', note: 'tar inte sammanställning' });
+    expect(res.status).toBe(302);
+
+    expect(row(escId).status).toBe('deferred');
+    expect(row(escId).resolved_text).toBe('pausad: avgift – tar inte sammanställning');
+    expect(row(escId).draft_body).toBe('Hej,\n\nVi avstår från kopior.'); // frozen, not cleared
+    const decisions = db.listDecisions().filter((d) => d.escalation_id === escId);
+    expect(decisions).toHaveLength(1);
+    expect(decisions[0].decision).toBe('defer');
+    expect(decisions[0].final_body).toBeNull();
+    expect(decisions[0].conversation_state).toBe('SENT'); // esc.previous_state
+
+    // NEEDS_HUMAN with no active escalation is a bug everywhere, so the park
+    // restores the state the draft was written for and drops the follow-up
+    // promise (nothing is live any more).
+    const conv = db.getConversation(convId);
+    expect(conv.state).toBe('SENT');
+    expect(conv.follow_up_at).toBeNull();
+
+    // Out of Behöver dig AND out of Pågår — a parked case is in neither.
+    expect(buildActionQueue(db).some((x) => x.conv_id === convId)).toBe(false);
+    expect(buildWaiting(db).some((x) => x.conv_id === convId)).toBe(false);
+    expect(buildDeferred(db).map((d) => d.conv_id)).toEqual([convId]);
+  });
+
+  it('defer is refused for anything that is not open, and records nothing', async () => {
+    const { escId } = seedDeferrable();
+    db.resolveEscalation(escId, { status: 'resolved_send', resolved_text: 'sent' });
+    const res = await postForm(appWithFakes(), `/escalations/${escId}`, { action: 'defer', reason: 'avgift' });
+    expect(res.status).toBe(302); // the not-open guard redirects, as for skip
+    expect(row(escId).status).toBe('resolved_send');
+    expect(db.listDecisions()).toHaveLength(0);
+  });
+
+  it('an unknown action is still a 400', async () => {
+    const { escId } = seedDeferrable();
+    const res = await postForm(appWithFakes(), `/escalations/${escId}`, { action: 'nonsense' });
+    expect(res.status).toBe(400);
+    expect(row(escId).status).toBe('open');
+  });
+
+  it('the overview shows a Pausade card and a Pausade section, oldest-parked first', async () => {
+    const a = seedDeferrable({ kod: '2418', namn: 'Malå' });
+    db.deferEscalationIfOpen(a.escId, { reason: 'avgift' });
+    db.raw.prepare("UPDATE escalations SET resolved_at = '2026-09-10 08:00:00' WHERE id = ?").run(a.escId);
+    const b = seedDeferrable({ kod: '0560', namn: 'Boxholm' });
+    db.deferEscalationIfOpen(b.escId, { reason: 'juridik', note: 'överklagbart beslut' });
+    db.raw.prepare("UPDATE escalations SET resolved_at = '2026-09-25 08:00:00' WHERE id = ?").run(b.escId);
+
+    const res = await get(appWithFakes(), '/');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Pausade');
+    expect(res.text).toMatch(/<div class="label">Pausade<\/div><div class="value warn">2<\/div>/);
+    expect(res.text).toContain('Pausad (avgift)');
+    expect(res.text).toContain('Pausad (juridik)');
+    expect(res.text).toContain('överklagbart beslut');
+    expect(res.text).toContain('class="queue queue-warn"');
+    // Oldest park on top: Malå (09-10) before Boxholm (09-25).
+    expect(res.text.indexOf('Malå')).toBeLessThan(res.text.indexOf('Boxholm'));
+  });
+
+  it('the ärende page renders the parked draft with an Återuppta form', async () => {
+    const { convId, escId } = seedDeferrable();
+    db.deferEscalationIfOpen(escId, { reason: 'sekretess', note: 'maskning accepterad' });
+    const res = await get(appWithFakes(), `/arenden/${convId}`);
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Pausad');
+    expect(res.text).toContain('sekretess');
+    expect(res.text).toContain('maskning accepterad');
+    expect(res.text).toContain('Vi avstår från kopior.');
+    expect(res.text).toContain(`action="/escalations/${escId}/resume"`);
+    // Not an approvable draft: no send form for the parked row.
+    expect(res.text).not.toContain(`action="/escalations/${escId}"`);
+  });
+
+  it('Återuppta reopens the draft and puts the case back in Behöver dig', async () => {
+    const { convId, escId } = seedDeferrable();
+    db.deferEscalationIfOpen(escId, { reason: 'avgift' });
+    const res = await postForm(appWithFakes(), `/escalations/${escId}/resume`, {});
+    expect(res.status).toBe(302);
+    expect(row(escId).status).toBe('open');
+    expect(row(escId).resolved_at).toBeNull();
+    expect(buildActionQueue(db).some((x) => x.conv_id === convId)).toBe(true);
+    expect(buildDeferred(db)).toEqual([]);
+    const decisions = db.listDecisions().filter((d) => d.escalation_id === escId);
+    expect(decisions.map((d) => d.decision)).toEqual(['resume']);
+    // The normal reply form is back.
+    const page = await get(appWithFakes(), `/arenden/${convId}`);
+    expect(page.text).toContain(`action="/escalations/${escId}"`);
+  });
+
+  it('Återuppta is refused with 409 when the case already has an active escalation', async () => {
+    const { convId, escId } = seedDeferrable();
+    db.deferEscalationIfOpen(escId, { reason: 'avgift' });
+    const rival = db.recordEscalation({ conversation_id: convId, reason: 'nyare inbound', draft_template: 'free_form', draft_body: 'b' });
+    const res = await postForm(appWithFakes(), `/escalations/${escId}/resume`, {});
+    expect(res.status).toBe(409);
+    expect(row(escId).status).toBe('deferred');
+    expect(row(rival).status).toBe('open');
+    expect(db.listDecisions()).toHaveLength(0);
+  });
+
+  it('Återuppta on a row that is not parked is a 409, not a reopen', async () => {
+    const { escId } = seedDeferrable();
+    const res = await postForm(appWithFakes(), `/escalations/${escId}/resume`, {});
+    expect(res.status).toBe(409);
+    expect(row(escId).status).toBe('open');
+  });
+
+  // The a7ec79c bug class: these two pages read status='open' only, so a parked
+  // draft used to render nowhere on them.
+  it('the kommun page and the focused thread page both render the parked draft', async () => {
+    const { escId, threadId } = seedDeferrable();
+    db.deferEscalationIfOpen(escId, { reason: 'avgift', note: 'avgiftsbeslut' });
+    const kommun = await get(appWithFakes(), '/kommun/2418');
+    expect(kommun.status).toBe(200);
+    expect(kommun.text).toContain('Pausad (avgift)');
+    expect(kommun.text).toContain(`action="/escalations/${escId}/resume"`);
+
+    const page = await get(appWithFakes(), `/kommun/2418/trad/${threadId}`);
+    expect(page.status).toBe(200);
+    expect(page.text).toContain('Pausad (avgift)');
+    expect(page.text).toContain(`action="/escalations/${escId}/resume"`);
+  });
+
+  it('the escalation form offers a Pausa control with the four reasons', async () => {
+    const { convId, escId } = seedDeferrable();
+    const res = await get(appWithFakes(), `/arenden/${convId}`);
+    expect(res.text).toContain(`name="action" value="defer"`);
+    expect(res.text).toContain('⏸️ Pausa');
+    for (const reason of ['avgift', 'sekretess', 'juridik', 'annat']) {
+      expect(res.text).toContain(`<option value="${reason}"`);
+    }
+    expect(row(escId).status).toBe('open'); // rendering changes nothing
+  });
+
+  it('deferredLabel names the reason and the park date, with the note when there is one', () => {
+    expect(deferredLabel({ resolved_text: 'pausad: avgift', resolved_at: '2026-09-25 08:00:00' }))
+      .toBe('Pausad (avgift) · sedan 2026-09-25');
+    expect(deferredLabel({ resolved_text: 'pausad: juridik – överklagbart', resolved_at: '2026-09-25 08:00:00' }))
+      .toBe('Pausad (juridik) · sedan 2026-09-25 · överklagbart');
+    expect(deferredLabel({ resolved_text: null, resolved_at: null })).toBe('Pausad (annat)');
   });
 });

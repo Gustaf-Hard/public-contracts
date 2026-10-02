@@ -19,7 +19,7 @@ import { GRADE_LEVELS, slugifyProductName } from './vendor-analytics.js';
 import { matchResellers, RESELLERS } from './resellers.js';
 import { canonicalVendorName } from './vendor-aliases.js';
 import { splitQuotedText } from './classifier.js';
-import { MAX_ANALYSIS_ATTEMPTS } from './storage.js';
+import { MAX_ANALYSIS_ATTEMPTS, DEFER_REASONS, parseDeferReason } from './storage.js';
 
 // Canonical reseller name → slug, for linking a vendor's framed ramavtal tag
 // to /ramavtal/:slug. Built once from the curated RESELLERS list.
@@ -578,6 +578,9 @@ const baseCss = `
   .queue-row:last-child { border-bottom: none; }
   .queue-row:hover { background: var(--bg-elev-2); text-decoration: none; }
   .queue-alert .queue-row { border-left: 3px solid var(--bad); }
+  /* Parked-case queue (2026-10-02): yellow, not red — the operator stopped
+     these on purpose, so they read as "revisit when you want", not overdue. */
+  .queue-warn .queue-row { border-left: 3px solid var(--warn); }
   .queue-row .q-kommun { font-weight: 600; }
   .queue-row .q-action { color: var(--bad); font-size: 13px; font-weight: 500; }
   .q-action .bad { color: var(--bad); font-weight: 500; }
@@ -663,6 +666,7 @@ const baseCss = `
   .mail-row.active { background: color-mix(in srgb, var(--accent) 12%, transparent); box-shadow: inset 3px 0 0 var(--accent); }
   .mail-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--fg-muted); }
   .mail-dot.bad { background: var(--bad); } .mail-dot.ok { background: var(--accent); } .mail-dot.muted { background: var(--border); }
+  .mail-dot.warn { background: var(--warn); }
   .mail-sender { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; }
   .mail-row.unread .mail-sender, .mail-row.unread .mail-subject { font-weight: 700; }
   .mail-line { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 13px; }
@@ -957,7 +961,7 @@ function sortHeader({ key, label, currentSort, currentOrder, filter, align = 'le
   return `<th${style}><a href="?${params.toString()}" class="th-sort${isActive ? ' th-sort-active' : ''}">${escapeHtml(label)}${indicator}</a></th>`;
 }
 
-export function renderOverview({ summary, rows, filter, sort, order, totalKommuner, q = '', actionQueue = [], waiting = [], vacationActive = false, heartbeat = null, partial = false, escalationCount = 0 }) {
+export function renderOverview({ summary, rows, filter, sort, order, totalKommuner, q = '', actionQueue = [], waiting = [], deferred = [], vacationActive = false, heartbeat = null, partial = false, escalationCount = 0 }) {
   const activeFilter = filter ?? 'active';
   // Vacation mode (2026-07-17): a muted banner so the operator knows the
   // proactive staleness loop is paused for the summer. Real inbound and the
@@ -1009,6 +1013,7 @@ export function renderOverview({ summary, rows, filter, sort, order, totalKommun
   const stats = `
     <div class="stats stats-band">
       <div class="stat-card${needsCount > 0 ? ' stat-alert' : ''}"><div class="label">Behöver dig</div><div class="value ${needsCount > 0 ? 'bad' : 'good'}">${needsCount}</div></div>
+      <div class="stat-card"><div class="label">Pausade</div><div class="value warn">${deferred.length}</div></div>
       <div class="stat-card"><div class="label">Aktiva</div><div class="value">${summary.in_pilot}</div></div>
       <div class="stat-card"><div class="label">Levererar</div><div class="value good">${summary.delivering}</div></div>
       <div class="stat-card"><div class="label">Klart</div><div class="value good">${summary.done}</div></div>
@@ -1040,6 +1045,17 @@ export function renderOverview({ summary, rows, filter, sort, order, totalKommun
         ? '<div class="empty-state">Inget kräver din uppmärksamhet just nu. 🎉</div>'
         : `<div class="queue queue-alert">${actionQueue.map((a) =>
             queueRow(a, `<span class="q-action">${a.respond_by ? `<span class="bad">⏰ senast ${escapeHtml(a.respond_by)}</span> · ` : ''}${escapeHtml(a.action)}</span>`, { ageAlert: true })).join('')}</div>`}
+    </section>`;
+
+  // Pausade (2026-10-02 design): the counterweight to parking being invisible.
+  // Right below Behöver dig, same queueRow shape, yellow rather than red, and
+  // no ageAlert — a long park is the point, not a failure. Longest-parked
+  // first (buildDeferred's order), label from deferredLabel.
+  const deferredSection = deferred.length === 0 ? '' : `
+    <section class="board-section">
+      <h2>Pausade <span class="count">${deferred.length}</span></h2>
+      <div class="queue queue-warn">${deferred.map((d) =>
+        queueRow(d, `<span class="q-action">${escapeHtml(d.label)}</span>`)).join('')}</div>
     </section>`;
 
   // Only the 10 most overdue render here — the full set duplicates the kommun
@@ -1117,6 +1133,7 @@ export function renderOverview({ summary, rows, filter, sort, order, totalKommun
     ${stats}
     <div class="board">
       ${actionSection}
+      ${deferredSection}
       ${waitingSection}
     </div>
     <section class="board-section">
@@ -1238,8 +1255,40 @@ export function renderEscalationForm(esc, gmailReady, returnTo = null, { handoff
       <input type="hidden" name="action" value="skip">
       <button class="btn btn-secondary" type="submit"
         onclick="return confirm('Hoppa över denna eskalering utan att svara?')">Hoppa över</button>
+    </form>
+    ${renderDeferForm(esc, paneAttrs, returnField)}`;
+}
+
+// Pausa (2026-10-02): the third way out of a draft, between sending it and
+// hoppa över. Skip resolves the escalation and the draft is gone; Pausa keeps
+// it, with a reason so the Pausade list can say what the case is waiting for.
+// The reason is a <select> over the four values storage accepts — the route
+// normalises anything else to 'annat', so a hand-rolled POST cannot write a
+// label no surface can read back.
+function renderDeferForm(esc, paneAttrs, returnField) {
+  return `
+    <form class="defer-form" method="post" action="/escalations/${esc.id}" style="margin-top:8px"${paneAttrs}>
+      ${returnField}
+      <input type="hidden" name="action" value="defer">
+      <label class="muted" style="font-size:12px">Pausa utan att svara:</label>
+      <select name="reason" aria-label="Anledning till pausen">
+        ${DEFER_REASON_LABELS.map(([value, label], i) =>
+          `<option value="${value}"${i === 0 ? ' selected' : ''}>${escapeHtml(label)}</option>`).join('')}
+      </select>
+      <input type="text" name="note" placeholder="valfri anteckning" class="dismiss-reason" style="width:200px">
+      <button class="btn btn-secondary" type="submit"
+        onclick="return confirm('Pausa ärendet? Inget skickas och utkastet sparas.')">⏸️ Pausa</button>
     </form>`;
 }
+
+// The operator-facing wording for each stored reason. The VALUES are
+// storage.js's DEFER_REASONS and must stay in that set.
+const DEFER_REASON_LABELS = DEFER_REASONS.map((r) => [r, {
+  avgift: 'avgift (vi betalar inte)',
+  sekretess: 'sekretess/maskning',
+  juridik: 'juridik (överklagbart beslut)',
+  annat: 'annat',
+}[r] ?? r]);
 
 // One click covers both sends (2026-09-17): a pending hänvisning on the
 // ärende becomes a PRE-TICKED box on the approve form, so the operator who
@@ -1483,7 +1532,7 @@ function docTypeBadge(att) {
   }
 }
 
-export function renderKommunDetail({ kommun, conversations, messagesByConv, attachmentsByMsg, escalationsByConv, signatures, followUpByConv = {}, threadsByConv = {}, initialDrafts = {}, gmailReady = false, vendorSlugsByName = new Map(), resellerRelationsByVendor = new Map(), handoffContacts = [], handoffTasksPending = [], heartbeat = null, partial = false, escalationCount = 0 }) {
+export function renderKommunDetail({ kommun, conversations, messagesByConv, attachmentsByMsg, escalationsByConv, deferredEscalationsByConv = {}, signatures, followUpByConv = {}, threadsByConv = {}, initialDrafts = {}, gmailReady = false, vendorSlugsByName = new Map(), resellerRelationsByVendor = new Map(), handoffContacts = [], handoffTasksPending = [], heartbeat = null, partial = false, escalationCount = 0 }) {
   if (!kommun) {
     return layout({ title: 'Saknad kommun', body: '<p>Hittade inte kommunen.</p>', currentPath: '/', heartbeat, partial, escalationCount });
   }
@@ -1775,10 +1824,24 @@ export function renderKommunDetail({ kommun, conversations, messagesByConv, atta
       <div class="thread-msgs">${orphanMsgs.map((m, i) => threadMessage(m, attachmentsByMsg[m.id], signatures[m.id], i === orphanMsgs.length - 1)).join('')}</div>
     </div>`;
 
+  // Parked drafts for every ärende of this kommun (2026-10-02). Own section,
+  // above the thread list and below Behöver åtgärd: a park is not urgent, but
+  // it must be FINDABLE from the kommun profile, which read status='open' only.
+  const deferredRows = conversations.flatMap((conv) =>
+    (deferredEscalationsByConv[conv.id] ?? []).map((esc) => ({ esc, conv })));
+  const pausadeSection = deferredRows.length === 0 ? '' : `
+    <div class="card">
+      <h3 style="margin:0 0 4px">⏸️ Pausade utkast (${deferredRows.length})</h3>
+      ${deferredRows.map(({ esc, conv }) => `
+        <div class="muted" style="font-size:12px;margin:8px 0 0">Ärende #${conv.id} · ${escapeHtml(conv.role)}</div>
+        ${renderDeferredEscalations([esc], `/kommun/${escapeHtml(kommun.kommun_kod)}`)}`).join('')}
+    </div>`;
+
   const mainColumn = `
     <div style="min-width:0">
       <p><a href="/">← Översikt</a></p>
       ${needsActionSection}
+      ${pausadeSection}
       <h2 style="margin:6px 0 14px">Trådar (${threadRows.length})</h2>
       ${threadList}
       ${orphanSection}
@@ -1796,6 +1859,9 @@ const ARENDEN_BUCKETS = [
   { key: 'behover_dig', label: 'Behöver dig' },
   { key: 'oppna', label: 'Öppna' },
   { key: 'stangda', label: 'Stängda' },
+  // Pausade (2026-10-02): parked by the operator, nothing sent, resumable.
+  // Last, deliberately — it is the one bucket nobody has to look at today.
+  { key: 'pausade', label: 'Pausade' },
 ];
 
 function caseBucket(c) {
@@ -1808,6 +1874,12 @@ function caseBucket(c) {
   // Round-13 R3: a pending hänvisning task is operator work exactly like an
   // open escalation, carried separately from open_esc so a handoff-only case
   // (no escalation, not NEEDS_HUMAN) is not invisible here.
+  // Parked (2026-10-02) BEFORE behover_dig: the park leaves the case looking
+  // like work in every other respect — the state may still be NEEDS_HUMAN on a
+  // legacy row, and awaiting_us is true for exactly the fee/sekretess mails
+  // that get parked — so anything but a first claim here would put it straight
+  // back in the red bucket.
+  if ((c.deferred_esc ?? 0) > 0) return 'pausade';
   if (c.state === 'NEEDS_HUMAN' || (c.open_esc ?? 0) > 0 || c.has_pending_handoff) return 'behover_dig';
   // The kommun spoke last and we are not deliberately silent. Keying the queue
   // on open escalations alone hid exactly this: a draft voided because the
@@ -1821,7 +1893,7 @@ function caseBucket(c) {
 // snippet, date on the right. Grouped under the status buckets.
 function renderCaseList(cases, selectedId) {
   if (cases.length === 0) return '<div class="empty-state">Inga ärenden ännu.</div>';
-  const groups = { behover_dig: [], oppna: [], stangda: [] };
+  const groups = { behover_dig: [], oppna: [], stangda: [], pausade: [] };
   for (const c of cases) groups[caseBucket(c)].push(c);
   // Order within each bucket (rows otherwise fall in enrollment order, which
   // reads as unsorted). Behöver dig: longest-waiting first (oldest `since` on
@@ -1830,13 +1902,17 @@ function renderCaseList(cases, selectedId) {
   groups.behover_dig.sort((a, b) => (a.since ?? '9999').localeCompare(b.since ?? '9999'));
   groups.oppna.sort((a, b) => (a.follow_up_at ?? '9999-12-31').localeCompare(b.follow_up_at ?? '9999-12-31'));
   groups.stangda.sort((a, b) => (b.since ?? '').localeCompare(a.since ?? ''));
+  // Pausade: longest-waiting first, like Behöver dig — the oldest park is the
+  // one most likely worth revisiting.
+  groups.pausade.sort((a, b) => (a.since ?? '9999').localeCompare(b.since ?? '9999'));
   return ARENDEN_BUCKETS.map((b) => {
     const items = groups[b.key];
     if (items.length === 0) return '';
     return `<div class="case-group">
       <div class="case-group-head">${escapeHtml(b.label)} <span class="count">${items.length}</span></div>
       ${items.map((c) => {
-        const dot = b.key === 'behover_dig' ? 'bad' : (b.key === 'stangda' ? 'muted' : 'ok');
+        const dot = b.key === 'behover_dig' ? 'bad'
+          : (b.key === 'stangda' ? 'muted' : (b.key === 'pausade' ? 'warn' : 'ok'));
         const date = b.key === 'oppna'
           ? (fmtFollowUpBadge(c.follow_up_at, c.follow_up_source) ?? `<span class="muted">${escapeHtml(fmtAgo(c.since))}</span>`)
           : `<span class="muted">${escapeHtml(fmtAgo(c.since))}</span>`;
@@ -2152,7 +2228,7 @@ export function renderThreadList(rows, { kommunKod } = {}) {
 // escalation reply forms (via renderEscalationForm, returnTo = this page). Pure
 // over params; the route loads the data and verifies the thread belongs to the
 // kommun (404 otherwise).
-export function renderThread({ kommun, conv, thread, messages = [], attachmentsByMsg = {}, signatures = {}, escalations = [], gmailReady = false, heartbeat = null, partial = false, escalationCount = 0 }) {
+export function renderThread({ kommun, conv, thread, messages = [], attachmentsByMsg = {}, signatures = {}, escalations = [], deferred = [], gmailReady = false, heartbeat = null, partial = false, escalationCount = 0 }) {
   if (!kommun || !conv || !thread) {
     return layout({ title: 'Saknad tråd', body: '<p>Hittade inte tråden.</p>', currentPath: '/', heartbeat, partial, escalationCount });
   }
@@ -2186,6 +2262,7 @@ export function renderThread({ kommun, conv, thread, messages = [], attachmentsB
         </div>
       </div>
       <div class="thread-msgs">${msgHtml}</div>
+      ${renderDeferredEscalations(deferred, returnTo)}
       ${replyBoxes}
     </div>`;
   return layout({ title: `${kommun.kommun_namn} — tråd`, body, currentPath: '/', heartbeat, partial, escalationCount });
@@ -2233,7 +2310,7 @@ function renderBlankReplyBox({ conv, seed = '', to = '', subject = '', gmailRead
 
 function renderCaseDetailPane(selected, gmailReady) {
   if (!selected) return '<div class="detail-empty"><p class="muted">Välj ett ärende i listan till vänster.</p></div>';
-  const { conv, messages, attachmentsByMsg, signatures, escalations, parked_escalations = [], threads = [], handoff_targets = [], needs_draft = false, draft_seed = '', draft_to = '', draft_subject = '', follow_up } = selected;
+  const { conv, messages, attachmentsByMsg, signatures, escalations, parked_escalations = [], deferred_escalations = [], threads = [], handoff_targets = [], needs_draft = false, draft_seed = '', draft_to = '', draft_subject = '', follow_up } = selected;
   const returnTo = `/arenden/${conv.id}`;
   const duration = caseDuration(conv, messages);
   const fuBadge = fmtFollowUpBadge(follow_up?.date, follow_up?.source);
@@ -2296,6 +2373,7 @@ function renderCaseDetailPane(selected, gmailReady) {
     </div>
     <div class="thread-msgs">${thread}</div>
     ${renderParkedSends(parked_escalations, returnTo)}
+    ${renderDeferredEscalations(deferred_escalations, returnTo)}
     ${replyBoxes}
     ${blankReply ? '' : blankReplyHtml}
     ${renderHandoffSuggestions(handoff_targets, conv.id, gmailReady)}
@@ -2346,6 +2424,39 @@ function renderParkedSends(rows, returnTo = null) {
       <div class="field"><label>Ämne</label><div class="muted">${escapeHtml(e.draft_subject ?? '')}</div></div>
       <div class="field"><label>Brödtext</label><pre class="parked-body">${escapeHtml(e.draft_body ?? '')}</pre></div>
       ${actions}
+    </div>`;
+  }).join('');
+}
+
+// A PARKED draft (2026-10-02 deferred-escalations design). Same .reply-box
+// shape as renderParkedSends, with the opposite story: nothing went wrong and
+// nothing is pending — the operator read this draft and chose to do nothing for
+// now. It shows why, since when, the frozen draft verbatim, and the one way
+// back. Deliberately NO send/skip controls: a parked row is not approvable, so
+// the operator resumes it first and then faces the normal form with the normal
+// guards (STALE_ESCALATION included).
+function renderDeferredEscalations(rows, returnTo = null) {
+  if (!rows?.length) return '';
+  const paneAttrs = returnTo ? ` data-pane-form data-return="${escapeHtml(returnTo)}"` : '';
+  const returnField = returnTo ? `<input type="hidden" name="return" value="${escapeHtml(returnTo)}">` : '';
+  return rows.map((e) => {
+    const { reason, note } = parseDeferReason(e.resolved_text);
+    const since = e.resolved_at ? String(e.resolved_at).slice(0, 10) : null;
+    return `
+    <div class="reply-box deferred-esc">
+      <div class="reply-head">
+        <span class="avatar avatar-outbound">⏸️</span>
+        <span class="muted"><strong>Pausad (${escapeHtml(reason)})</strong>${since ? ` · sedan ${escapeHtml(since)}` : ''} · ${escapeHtml(e.draft_template ?? 'free_form')}</span>
+      </div>
+      <p class="muted" style="margin:0 0 6px">Ingenting har skickats. Utkastet ligger kvar som det var; återuppta det när du vill svara.${note ? ` <strong>${escapeHtml(note)}</strong>` : ''}</p>
+      <div class="field"><label>Ämne</label><div class="muted">${escapeHtml(e.draft_subject ?? '')}</div></div>
+      <div class="field"><label>Brödtext</label><pre class="parked-body">${escapeHtml(e.draft_body ?? '')}</pre></div>
+      <div class="buttons">
+        <form method="post" action="/escalations/${e.id}/resume"${paneAttrs} style="display:inline">
+          ${returnField}
+          <button class="btn btn-primary" type="submit" title="Lägger tillbaka utkastet i Behöver dig">▶️ Återuppta</button>
+        </form>
+      </div>
     </div>`;
   }).join('');
 }

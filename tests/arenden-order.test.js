@@ -17,6 +17,7 @@ const mk = (over) => ({
   kommun_namn: over.kommun_namn, role: 'central', state: over.state ?? 'NEEDS_HUMAN',
   open_esc: over.open_esc ?? 1, follow_up_at: over.follow_up_at ?? null,
   follow_up_source: null, since: over.since ?? null, subject: 'x', snippet: '', last_direction: 'inbound',
+  deferred_esc: over.deferred_esc ?? 0,
 });
 
 describe('renderArenden — bucket ordering', () => {
@@ -29,6 +30,36 @@ describe('renderArenden — bucket ordering', () => {
     ];
     const html = renderArenden({ cases });
     expect(orderOf(html, ['Recent', 'Old', 'Middle'])).toEqual(['Old', 'Middle', 'Recent']);
+  });
+
+  // Pausade (2026-10-02): its own bucket, claimed BEFORE behover_dig — a parked
+  // case is still NEEDS_HUMAN-ish in every other respect (awaiting_us, a
+  // lingering state), and the whole point of the park is that it leaves the
+  // red queue. Longest-parked first, the same "revisit the oldest" ordering
+  // Behöver dig uses.
+  it('Pausade: a deferred case leaves Behöver dig, longest-parked first', () => {
+    const cases = [
+      mk({ conv_id: 6, kommun_namn: 'Nypausad', deferred_esc: 1, open_esc: 0, since: '2026-09-25T08:00:00Z' }),
+      mk({ conv_id: 7, kommun_namn: 'Behover', open_esc: 1, since: '2026-09-20T08:00:00Z' }),
+      mk({ conv_id: 8, kommun_namn: 'Langepausad', deferred_esc: 1, open_esc: 0, since: '2026-09-01T08:00:00Z' }),
+    ];
+    const html = renderArenden({ cases });
+    expect(html).toContain('Pausade');
+    expect(orderOf(html, ['Nypausad', 'Langepausad'])).toEqual(['Langepausad', 'Nypausad']);
+    // The buckets are rendered as separate groups; the parked pair is not in
+    // the Behöver dig group.
+    const behoverGroup = html.split('Pausade')[0];
+    expect(behoverGroup).toContain('Behover');
+    expect(behoverGroup).not.toContain('Langepausad');
+  });
+
+  // A parked row on a closed case must not resurrect it — terminal stays first,
+  // the round-13 R1 ordering rule.
+  it('a terminal case with a deferred row stays in Stängda', () => {
+    const cases = [mk({ conv_id: 9, kommun_namn: 'Stangd', state: 'DONE', deferred_esc: 1, open_esc: 0 })];
+    const html = renderArenden({ cases });
+    expect(html).toContain('Stängda');
+    expect(html).not.toContain('Pausade');
   });
 
   it('Öppna: soonest follow-up due first', () => {

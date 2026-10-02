@@ -81,6 +81,29 @@ export function saneRestoreState(previousState, conv, db) {
   return 'SENT';
 }
 
+// The conversation-side half of a defer (2026-10-02 deferred-escalations
+// design). Lives next to saneRestoreState because it is the same rule, and in
+// ONE place because both defer surfaces (the dashboard Pausa form and the
+// batch applier's `defer` verdict) must move the case identically.
+//
+// Two effects:
+//   - NEEDS_HUMAN with no active escalation is treated as a bug everywhere
+//     (listOrphanNeedsHuman, buildActionQueue's state arm, caseBucket), and a
+//     deferred row is deliberately not active — so the park restores the state
+//     the draft was written for. Any other state is left alone: an open
+//     escalation puts a case in Behöver dig through the escalation arm, so
+//     resume does not need the state back.
+//   - follow_up_at goes to NULL, the same as closing a case: there is no live
+//     follow-up promise behind a draft nobody sent.
+// updateConversationState re-stamps state_changed_at, which is correct here:
+// the park IS the case's latest event, and the staleness loop skips deferred
+// cases anyway, so the clock only matters once the park is over.
+export function restoreStateAfterDefer({ db, conv, esc }) {
+  const state = conv.state === 'NEEDS_HUMAN' ? saneRestoreState(esc?.previous_state, conv, db) : conv.state;
+  db.updateConversationState(conv.id, state, { follow_up_at: null });
+  return state;
+}
+
 // Best-effort: replace the escalation's Slack message with a resolved,
 // button-less version. Never lets a Slack failure break the send path.
 async function stripSlackButtons({ slackClient, env, esc, kommun_namn, status, detail, decision = null, log }) {

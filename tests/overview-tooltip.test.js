@@ -7,6 +7,7 @@ describe('escalationActionLabel', () => {
     expect(escalationActionLabel({ draft_template: 'T_FOLLOWUP_NUDGE' })).toBe('skicka påminnelse');
     expect(escalationActionLabel({ draft_template: 'T_FOLLOWUP_CLOSE' })).toBe('skicka avslutspåminnelse');
     expect(escalationActionLabel({ draft_template: 'T_RECEIPT' })).toBe('skicka mottagningskvitto');
+    expect(escalationActionLabel({ draft_template: 'T_UPPGIFT' })).toBe('uppgiftsförfrågan');
   });
 
   it('falls back to a generic action for unknown/empty templates', () => {

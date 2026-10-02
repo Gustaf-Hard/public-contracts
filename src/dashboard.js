@@ -6,7 +6,7 @@
 import express from 'express';
 import path from 'node:path';
 import { readFileSync, existsSync } from 'node:fs';
-import { openDb, ACTIVE_ESCALATION_STATUSES, REQUEUED_REASON_PREFIX } from './storage.js';
+import { openDb, ACTIVE_ESCALATION_STATUSES, REQUEUED_REASON_PREFIX, DEFERRED_ESCALATION_STATUS, DEFER_REASONS, parseDeferReason } from './storage.js';
 import { buildVelocityFacts } from './collection-velocity.js';
 import { buildPipeline, kommunStage } from './pipeline.js';
 import { effectiveFollowUp, TERMINAL_STATES } from './conversation.js';
@@ -14,7 +14,7 @@ import { resolveVacationConfig, isInVacation } from './vacation.js';
 import { buildOAuthClient, loadStoredToken, saveToken, makeGmail, makeReloadingClient } from './gmail.js';
 import { beginReauth } from './gmail-auth.js';
 import { requireAuth, requireOriginToken, mountAuthRoutes } from './web-auth.js';
-import { sendApprovedReply, sendInitial, renderInitialDraft } from './send-reply.js';
+import { sendApprovedReply, sendInitial, renderInitialDraft, restoreStateAfterDefer } from './send-reply.js';
 import { homeDomainFromWebbplats } from './handoff.js';
 import { makeSlackClient, updateEscalationResolved } from './slack.js';
 import { resolveReplyRecipient } from './threads.js';
@@ -139,8 +139,25 @@ export function escalationActionLabel(esc) {
     T_FOLLOWUP_NUDGE: 'skicka påminnelse',
     T_FOLLOWUP_CLOSE: 'skicka avslutspåminnelse',
     T_RECEIPT: 'skicka mottagningskvitto',
+    // The fee-case alternative (2026-10-02): we drop the copy request and ask
+    // for the facts out of the avtal instead.
+    T_UPPGIFT: 'uppgiftsförfrågan',
   };
   return labels[esc?.draft_template] ?? 'granska och svara';
+}
+
+// The label for a PARKED row (2026-10-02). escalationActionLabel is about what
+// the operator must do next, and a deferred row asks for nothing — it reports
+// why and since when, so the Pausade rows read "Pausad (avgift) · sedan
+// 2026-09-25". Deferred rows never reach escalationActionLabel (they are
+// outside ACTIVE_ESCALATION_STATUSES, so no queue that calls it can see them),
+// which is why this is a second function rather than a branch in that one.
+// parseDeferReason is the only reader of resolved_text; a legacy/unreadable
+// value degrades to "annat" instead of printing raw DB text.
+export function deferredLabel(esc) {
+  const { reason, note } = parseDeferReason(esc?.resolved_text);
+  const since = esc?.resolved_at ? String(esc.resolved_at).slice(0, 10) : null;
+  return [`Pausad (${reason})`, since ? `sedan ${since}` : null, note].filter(Boolean).join(' · ');
 }
 
 // Build a valid Content-Disposition header for a download. HTTP header values
@@ -576,6 +593,33 @@ export function buildActionQueue(db) {
   });
 }
 
+// Cases the operator PARKED (2026-10-02): a draft they read and deliberately
+// left unsent. One row per deferred escalation, longest-parked first — the
+// oldest park is the one most likely to be worth revisiting, the same
+// "oldest on top" rule Behöver dig uses.
+//
+// Not derived from buildActionQueue/buildWaiting: a parked case is in neither,
+// so it needs its own list or it would be invisible everywhere (the a7ec79c
+// bug class). The escalation id travels with the row because Återuppta acts on
+// the escalation, not the conversation.
+export function buildDeferred(db) {
+  if (!db) return [];
+  return db.listDeferredEscalations()
+    .map((e) => ({
+      esc_id: e.id,
+      conv_id: e.conversation_id,
+      kommun_kod: e.kommun_kod,
+      kommun_namn: e.kommun_namn,
+      role: e.role,
+      state: e.state,
+      label: deferredLabel(e),
+      ...parseDeferReason(e.resolved_text),
+      // The park moment, in the ISO shape fmtAgo/daysAgo read.
+      since: e.resolved_at ? String(e.resolved_at).replace(' ', 'T') : null,
+    }))
+    .sort((a, b) => (a.since ?? '9999').localeCompare(b.since ?? '9999'));
+}
+
 // Open cases that are progressing on their own (waiting on the kommun), i.e. NOT
 // in the action queue. Soonest follow-up first.
 const WAITING_STATES = new Set(['INITIAL', 'SENT', 'ACK_RECEIVED', 'AWAITING_PRECISION', 'DELIVERING']);
@@ -595,6 +639,14 @@ export function buildWaiting(db) {
     // be listed BOTH as needing the operator and as progressing on its own.
     if (db.hasActiveEscalation(c.id)) continue; // belongs in the action queue
     if (pendingHandoffConvIds.has(c.id)) continue; // ditto — HANDOFF row there
+    // A PARKED case (2026-10-02) is not progressing on its own either: the park
+    // moved it off NEEDS_HUMAN, so without this it would reappear under "Pågår ·
+    // väntar" the instant it left Behöver dig, as if we were waiting on the
+    // kommun. We are not — we are waiting on ourselves, in Pausade.
+    // Called unconditionally (the getTickHealth pattern in CLAUDE.md): a
+    // filter that decides whether a case is honestly described must not opt
+    // itself out on a db object that happens to lack the method.
+    if (db.hasDeferredEscalation(c.id)) continue;
     const fu = effectiveFollowUp(c);
     out.push({
       conv_id: c.id,
@@ -628,6 +680,12 @@ function loadCaseSummaries(db) {
     const open_esc = db.raw
       .prepare(`SELECT COUNT(*) n FROM escalations WHERE conversation_id = ? AND status IN (${openEscPlaceholders})`)
       .get(c.id, ...ACTIVE_ESCALATION_STATUSES).n;
+    // Parked rows (2026-10-02), counted separately: caseBucket claims the case
+    // for 'pausade' BEFORE 'behover_dig', so the park has to be visible here
+    // and must not be folded into open_esc (which means "pending outbound").
+    const deferred_esc = db.raw
+      .prepare('SELECT COUNT(*) n FROM escalations WHERE conversation_id = ? AND status = ?')
+      .get(c.id, DEFERRED_ESCALATION_STATUS).n;
     const last = db.raw
       .prepare('SELECT subject, body_text, direction, analysis_json FROM messages WHERE conversation_id = ? ORDER BY received_at DESC, id DESC LIMIT 1')
       .get(c.id);
@@ -640,7 +698,7 @@ function loadCaseSummaries(db) {
     const awaiting_us = last?.direction === 'inbound' && lastAction !== 'wait';
     return {
       conv_id: c.id, kommun_kod: c.kommun_kod, kommun_namn: c.kommun_namn, role: c.role,
-      state: c.state, open_esc, follow_up_at: fu.date, follow_up_source: fu.source, since: caseSince(c),
+      state: c.state, open_esc, deferred_esc, follow_up_at: fu.date, follow_up_source: fu.source, since: caseSince(c),
       subject: last?.subject ?? 'Begäran om allmänna handlingar',
       snippet: (last?.body_text ?? '').replace(/\s+/g, ' ').trim().slice(0, 100),
       last_direction: last?.direction ?? null,
@@ -694,6 +752,12 @@ function loadCaseDetail(db, convId, kommunFor = () => null) {
   const parked_escalations = db.raw
     .prepare("SELECT * FROM escalations WHERE conversation_id = ? AND status IN ('sending', 'send_failed', 'send_unconfirmed') ORDER BY id DESC")
     .all(convId);
+  // Deferred rows (2026-10-02), same reasoning as parked sends: not 'open', so
+  // the escalations query above cannot see them, and this page is where
+  // Återuppta lives. Newest park first.
+  const deferred_escalations = db.raw
+    .prepare('SELECT * FROM escalations WHERE conversation_id = ? AND status = ? ORDER BY id DESC')
+    .all(convId, DEFERRED_ESCALATION_STATUS);
   const threads = db.listThreadsForConversation(convId);
 
   // Suggested ärenden from the most recent EXTERNAL handoff. Newest wins: an
@@ -735,7 +799,7 @@ function loadCaseDetail(db, convId, kommunFor = () => null) {
     : '';
   const draft_subject = 'Re: ' + String(lastIn?.subject ?? 'Begäran om allmänna handlingar').replace(/^(Re|Sv|SV):\s*/i, '');
 
-  return { conv, messages, attachmentsByMsg, signatures, escalations, parked_escalations, threads, handoff_targets,
+  return { conv, messages, attachmentsByMsg, signatures, escalations, parked_escalations, deferred_escalations, threads, handoff_targets,
     needs_draft, draft_seed: draft_seed.trim(), draft_to, draft_subject,
     follow_up: effectiveFollowUp(conv) };
 }
@@ -884,6 +948,7 @@ export function createDashboardApp({
       totalKommuner: municipalities.length,
       actionQueue: buildActionQueue(db),
       waiting: buildWaiting(db),
+      deferred: buildDeferred(db),
       vacationActive: isInVacation(new Date().toISOString().slice(0, 10), vacationConfig),
       heartbeat: hb(), partial: isPartial(req), escalationCount: escCount(),
     }));
@@ -920,6 +985,7 @@ export function createDashboardApp({
     const messagesByConv = {};
     const attachmentsByMsg = {};
     const escalationsByConv = {};
+    const deferredEscalationsByConv = {};
     const signatures = {};
     const followUpByConv = {};
     const threadsByConv = {};
@@ -955,6 +1021,11 @@ export function createDashboardApp({
             const trigMsg = e.message_id ? db.getMessageById(e.message_id) : null;
             return { ...e, recipient: escalationRecipient(db, e, conv), thread_id: trigMsg?.thread_id ?? null };
           });
+        // Parked drafts (2026-10-02) are not 'open', so the query above cannot
+        // see them. Rendering them here is the same fix parked sends got in
+        // a7ec79c: a row the operator can act on must never be invisible on
+        // the page the queues point at.
+        deferredEscalationsByConv[conv.id] = db.listDeferredEscalationsForConversation(conv.id);
         threadsByConv[conv.id] = db.listThreadsForConversation(conv.id);
       }
     }
@@ -988,6 +1059,7 @@ export function createDashboardApp({
       messagesByConv,
       attachmentsByMsg,
       escalationsByConv,
+      deferredEscalationsByConv,
       signatures,
       followUpByConv,
       threadsByConv,
@@ -1050,9 +1122,16 @@ export function createDashboardApp({
         return { ...e, recipient: escalationRecipient(db, e, conv), thread_id: trigMsg?.thread_id ?? null };
       });
     const escalations = groupEscalationsByThread(openEscs, threads).get(thread.id) ?? [];
+    // Parked drafts belonging to THIS thread, grouped the same way (2026-10-02).
+    // They used to render nowhere: this page read status='open' only.
+    const deferredEscs = db.listDeferredEscalationsForConversation(conv.id).map((e) => {
+      const trigMsg = e.message_id ? db.getMessageById(e.message_id) : null;
+      return { ...e, recipient: escalationRecipient(db, e, conv), thread_id: trigMsg?.thread_id ?? null };
+    });
+    const deferred = groupEscalationsByThread(deferredEscs, threads).get(thread.id) ?? [];
 
     res.send(renderThread({
-      kommun, conv, thread, messages, attachmentsByMsg, signatures, escalations,
+      kommun, conv, thread, messages, attachmentsByMsg, signatures, escalations, deferred,
       gmailReady: !!currentGmail(),
       heartbeat: hb(), partial: isPartial(req), escalationCount: escCount(),
     }));
@@ -1465,8 +1544,9 @@ export function createDashboardApp({
 
   // --- Action endpoints (outbound email) ---
 
-  // Resolve an open escalation: send, edit-send, or skip.
-  // POST /escalations/:id  with body { action: 'send'|'edit'|'skip', body?: string, subject?: string }
+  // Resolve an open escalation: send, edit-send, skip, or park it ("defer").
+  // POST /escalations/:id  with body
+  //   { action: 'send'|'edit'|'skip'|'defer', body?, subject?, reason?, note? }
   app.post('/escalations/:id', async (req, res) => {
     if (!db) return res.status(503).send('No DB');
     const escId = parseInt(req.params.id, 10);
@@ -1493,6 +1573,25 @@ export function createDashboardApp({
         await stripSlackButtons(esc, conv.kommun_namn, 'resolved_skip');
       }
       return res.redirect(backTo(req, `/kommun/${conv.kommun_kod}`));
+    }
+
+    // Park it (2026-10-02 design). Nothing is sent and nothing is lost: the
+    // draft body stays on the row so Återuppta hands it back verbatim. Same
+    // atomic claim as skip, for the same reason — the open-check above is a
+    // stale read and a racing approve must keep its real outcome.
+    if (action === 'defer') {
+      if (db.deferEscalationIfOpen(escId, { reason: req.body.reason, note: req.body.note })) {
+        db.recordDecision({
+          escalation_id: escId, conversation_id: conv.id,
+          conversation_state: esc.previous_state ?? conv.state,
+          classifier_class: esc.classifier_class ?? null, classifier_confidence: esc.classifier_confidence ?? null,
+          draft_template: esc.draft_template, draft_body: esc.draft_body,
+          decision: 'defer', final_body: null,
+        });
+        restoreStateAfterDefer({ db, conv, esc });
+        await stripSlackButtons(esc, conv.kommun_namn, DEFERRED_ESCALATION_STATUS);
+      }
+      return res.redirect(backTo(req, `/arenden/${conv.id}`));
     }
 
     if (action !== 'send' && action !== 'edit') {
@@ -1788,6 +1887,41 @@ export function createDashboardApp({
       });
     }
     res.redirect(backTo(req, `/arenden/${esc.conversation_id}`));
+  });
+
+  // Återuppta (2026-10-02): the operator's way back from a park. The frozen
+  // draft becomes 'open' again and the case re-enters Behöver dig through the
+  // escalation arm — no state change is needed for that, which is why the
+  // park's state restore is not undone here.
+  //
+  // 409, not a silent redirect, when the row is not parked or the conversation
+  // picked up an ACTIVE escalation while it sat there (a new inbound's draft, a
+  // send in flight, a parked send). resumeEscalationIfDeferred checks both
+  // inside one transaction; a second open draft next to any of those is exactly
+  // the double-message "at most one open escalation per conversation" exists to
+  // prevent.
+  app.post('/escalations/:id/resume', (req, res) => {
+    if (!db) return res.status(503).send('No DB');
+    const escId = parseInt(req.params.id, 10);
+    const esc = db.raw.prepare('SELECT * FROM escalations WHERE id = ?').get(escId);
+    if (!esc) return res.status(404).send('Escalation not found');
+    const conv = db.getConversation(esc.conversation_id);
+    if (!conv) return res.status(404).send('Case not found');
+    if (!db.resumeEscalationIfDeferred(escId)) {
+      return res.status(409).send(escapeForError(
+        esc.status === DEFERRED_ESCALATION_STATUS
+          ? `Ärendet har redan en aktiv eskalering — pausad #${escId} kan inte återupptas nu`
+          : `Escalation ${escId} is ${esc.status}, not pausad — nothing resumed`
+      ));
+    }
+    db.recordDecision({
+      escalation_id: escId, conversation_id: conv.id,
+      conversation_state: conv.state,
+      classifier_class: esc.classifier_class ?? null, classifier_confidence: esc.classifier_confidence ?? null,
+      draft_template: esc.draft_template, draft_body: esc.draft_body,
+      decision: 'resume', final_body: null,
+    });
+    res.redirect(backTo(req, `/arenden/${conv.id}`));
   });
 
   // Dismiss a pending hänvisning with an auditable reason (2026-09-06 design).
