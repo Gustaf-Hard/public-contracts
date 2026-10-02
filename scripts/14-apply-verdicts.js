@@ -10,6 +10,7 @@ import 'dotenv/config';
 import fs from 'node:fs';
 import { openDb } from '../src/storage.js';
 import { buildOAuthClient, loadStoredToken, makeGmail } from '../src/gmail.js';
+import { makeSlackClient } from '../src/slack.js';
 import { applyVerdicts } from '../src/apply-verdicts.js';
 
 function arg(name) {
@@ -45,8 +46,13 @@ if (apply) {
 }
 
 const out = fs.createWriteStream(logPath, { flags: 'a' });
+// A parked row whose Slack message still has live buttons is a second way to
+// send the draft the batch just parked, so hand the applier the same client the
+// daemon posts with when the token is configured.
+const slackClient = process.env.SLACK_BOT_TOKEN ? makeSlackClient(process.env.SLACK_BOT_TOKEN) : null;
+
 const results = await applyVerdicts({
-  db, gmail, env: process.env, verdicts, reviewedAt, apply,
+  db, gmail, env: process.env, verdicts, reviewedAt, apply, slackClient,
   log: (r) => { out.write(JSON.stringify(r) + '\n'); console.log(`${r.esc}\t${r.verdict}\t${r.outcome}${r.error ? '\t' + r.error : ''}`); },
 });
 out.end();

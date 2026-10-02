@@ -17,15 +17,20 @@
 // the escalation exactly as a dashboard click would, and the batch moves on.
 import { createHash } from 'node:crypto';
 import { sendMessage as gmailSend } from './gmail.js';
-import { sendApprovedReply, restoreStateAfterDefer } from './send-reply.js';
+import { sendApprovedReply, deferEscalation } from './send-reply.js';
 import { DEFER_REASONS } from './storage.js';
 
 export const sha256 = (s) => createHash('sha256').update(s ?? '').digest('hex');
 
 const parseTs = (s) => (s ? new Date(s.includes('T') ? s : `${s.replace(' ', 'T')}Z`).getTime() : NaN);
 
+// `slackClient`/`slackOps` are optional: the batch runs on the box without a
+// Slack client in practice, but a parked row whose Slack message still carries
+// live buttons is a second way to send a draft the batch just parked. When
+// either is supplied the defer path strips them exactly as the dashboard does;
+// with neither it is a no-op (the DB claim is the real guard, as always).
 export async function applyVerdicts({
-  db, gmail, env, verdicts, reviewedAt, apply = false,
+  db, gmail, env, verdicts, reviewedAt, apply = false, slackClient = null, slackOps = null,
   gmailSendImpl = gmailSend, log = () => {}, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), delayMs = 2000,
 }) {
   const reviewedTs = parseTs(reviewedAt);
@@ -73,18 +78,17 @@ export async function applyVerdicts({
         continue;
       }
       if (!apply) { done('would_defer'); continue; }
-      if (!db.deferEscalationIfOpen(esc.id, { reason: v.defer_reason, note: v.defer_note })) {
+      // THE park sequence, shared with the dashboard Pausa form: claim, ledger,
+      // conversation, Slack buttons. One implementation is what makes "both
+      // surfaces park identically" a fact rather than a comment.
+      const parked = await deferEscalation({
+        db, conv, esc, reason: v.defer_reason, note: v.defer_note,
+        slackClient, slackOps, env, log: (m) => log({ esc: v.esc, verdict: v.verdict, outcome: 'slack', message: m }),
+      });
+      if (!parked) {
         done('not_open', { status: db.raw.prepare('SELECT status FROM escalations WHERE id = ?').get(esc.id)?.status });
         continue;
       }
-      db.recordDecision({
-        escalation_id: esc.id, conversation_id: conv.id,
-        conversation_state: esc.previous_state ?? conv.state,
-        classifier_class: esc.classifier_class ?? null, classifier_confidence: esc.classifier_confidence ?? null,
-        draft_template: esc.draft_template, draft_body: esc.draft_body,
-        decision: 'defer', final_body: null,
-      });
-      restoreStateAfterDefer({ db, conv, esc });
       done('deferred');
       continue;
     }

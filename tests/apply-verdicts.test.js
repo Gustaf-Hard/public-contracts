@@ -153,6 +153,46 @@ describe('applyVerdicts', () => {
     expect(db.hasActiveEscalation(convId)).toBe(false);
   });
 
+  // Round-14 finding 4: a parked row whose Slack message still carries live
+  // buttons is a second way to send the draft the batch just parked. The
+  // applier runs the dashboard's park sequence, Slack strip included.
+  it('defer strips the Slack buttons through the injected slackOps', async () => {
+    const { db, escId } = seed();
+    db.raw.prepare("UPDATE escalations SET slack_ts = 'ts-1' WHERE id = ?").run(escId);
+    const updateEscalationResolved = vi.fn(async () => {});
+    await applyVerdicts({
+      db, gmail: {}, env: { ...env, SLACK_CHANNEL_ID: 'C1' }, reviewedAt, apply: true,
+      slackOps: { updateEscalationResolved },
+      verdicts: [{ esc: escId, verdict: 'defer', defer_reason: 'avgift', draft_sha256: sha('tack för avtalen') }],
+    });
+    expect(updateEscalationResolved).toHaveBeenCalledOnce();
+    expect(updateEscalationResolved.mock.calls[0][1]).toMatchObject({
+      channel: 'C1', ts: 'ts-1', kommun_namn: 'Arboga', status: 'deferred',
+    });
+    expect(escRow(db, escId).status).toBe('deferred');
+  });
+
+  it('a Slack failure never un-parks the row or stops the batch', async () => {
+    const { db, escId } = seed();
+    db.raw.prepare("UPDATE escalations SET slack_ts = 'ts-1' WHERE id = ?").run(escId);
+    const res = await applyVerdicts({
+      db, gmail: {}, env: { ...env, SLACK_CHANNEL_ID: 'C1' }, reviewedAt, apply: true,
+      slackOps: { updateEscalationResolved: vi.fn(async () => { throw new Error('slack 500'); }) },
+      verdicts: [{ esc: escId, verdict: 'defer', defer_reason: 'avgift', draft_sha256: sha('tack för avtalen') }],
+    });
+    expect(res.at(-1).outcome).toBe('deferred');
+    expect(escRow(db, escId).status).toBe('deferred');
+  });
+
+  it('without any Slack wiring the park still happens', async () => {
+    const { db, escId } = seed();
+    db.raw.prepare("UPDATE escalations SET slack_ts = 'ts-1' WHERE id = ?").run(escId);
+    const res = await applyVerdicts({ db, gmail: {}, env, reviewedAt, apply: true,
+      verdicts: [{ esc: escId, verdict: 'defer', defer_reason: 'avgift', draft_sha256: sha('tack för avtalen') }] });
+    expect(res[0].outcome).toBe('deferred');
+    expect(escRow(db, escId).status).toBe('deferred');
+  });
+
   it('defer without a reason is refused before anything is written', async () => {
     const { db, escId } = seed();
     const res = await applyVerdicts({ db, gmail: {}, env, reviewedAt, apply: true,
