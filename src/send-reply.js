@@ -7,6 +7,7 @@ import { sendMessage as gmailSend, archiveThread } from './gmail.js';
 import { T_INITIAL } from './templates.js';
 import { resolveReplyRecipient } from './threads.js';
 import { updateEscalationResolved } from './slack.js';
+import { DEFERRED_ESCALATION_STATUS } from './storage.js';
 
 function fromHeader(env) {
   return `${env.GMAIL_FROM_NAME} <${env.GMAIL_USER_EMAIL}>`;
@@ -95,21 +96,84 @@ export function saneRestoreState(previousState, conv, db) {
 //     resume does not need the state back.
 //   - follow_up_at goes to NULL, the same as closing a case: there is no live
 //     follow-up promise behind a draft nobody sent.
-// updateConversationState re-stamps state_changed_at, which is correct here:
-// the park IS the case's latest event, and the staleness loop skips deferred
-// cases anyway, so the clock only matters once the park is over.
+// A park that changes NO state writes NO state change: updateConversationState
+// always re-stamps state_changed_at, and doing that for a DELIVERING case
+// parked over a fee dispute would reset the staleness clock of a case whose
+// real last event is weeks older than the park. Only the NEEDS_HUMAN restore is
+// a genuine state change, so only that branch goes through
+// updateConversationState; the rest patches follow_up_at alone via setFollowUp.
 export function restoreStateAfterDefer({ db, conv, esc }) {
-  const state = conv.state === 'NEEDS_HUMAN' ? saneRestoreState(esc?.previous_state, conv, db) : conv.state;
+  if (conv.state !== 'NEEDS_HUMAN') {
+    db.setFollowUp(conv.id, null);
+    return conv.state;
+  }
+  const state = saneRestoreState(esc?.previous_state, conv, db);
   db.updateConversationState(conv.id, state, { follow_up_at: null });
   return state;
 }
 
+// THE park sequence (2026-10-02 design), in one place because it has four steps
+// that must all happen or none: claim the row, write the ledger entry, move the
+// conversation, strip the Slack buttons. The dashboard Pausa form and the batch
+// applier's `defer` verdict both call this; when it lived at both call sites,
+// "the two surfaces must park identically" was a comment rather than a fact.
+//
+// Returns false when the atomic claim lost (already sent/skipped/parked by
+// another surface) and nothing at all was written — the caller must not report
+// a park that did not happen.
+export async function deferEscalation({
+  db, conv, esc, reason, note = null,
+  slackClient = null, slackOps = null, env = {}, log,
+}) {
+  if (!db.deferEscalationIfOpen(esc.id, { reason, note })) return false;
+  db.recordDecision({
+    escalation_id: esc.id, conversation_id: conv.id,
+    conversation_state: esc.previous_state ?? conv.state,
+    classifier_class: esc.classifier_class ?? null, classifier_confidence: esc.classifier_confidence ?? null,
+    draft_template: esc.draft_template, draft_body: esc.draft_body,
+    decision: 'defer', final_body: null,
+  });
+  restoreStateAfterDefer({ db, conv, esc });
+  await stripSlackButtons({
+    slackClient, slackOps, env, esc, kommun_namn: conv.kommun_namn,
+    status: DEFERRED_ESCALATION_STATUS, log,
+  });
+  return true;
+}
+
+// A send that answers the kommun ENDS the park (2026-10-02 review finding 1).
+// escalateWithDraft already supersedes a deferred row when a new inbound mints a
+// draft; the free-reply box is the other way a reply reaches the kommun without
+// going through the parked draft, and leaving the row behind left the case in
+// Pausade for ever, still blocking follow-ups, with Återuppta waiting to reopen
+// a draft the operator had already answered by hand.
+//
+// Called only AFTER Gmail accepted: a failed send sent nothing, so the park
+// still describes reality and must stay.
+export async function supersedeDeferredAfterReply({
+  db, conv, resolvedText = 'superseded: operatören svarade kommunen utan att återuppta utkastet',
+  slackClient = null, slackOps = null, env = {}, log,
+}) {
+  const rows = db.listDeferredEscalationsForConversation(conv.id);
+  for (const esc of rows) {
+    db.resolveEscalation(esc.id, { status: 'superseded', resolved_text: resolvedText });
+    await stripSlackButtons({ slackClient, slackOps, env, esc, kommun_namn: conv.kommun_namn, status: 'superseded', log });
+    log?.(`SUPERSEDED pausad escalation ${esc.id} for ${conv.kommun_namn}/${conv.role} — operator replied directly`);
+  }
+  return rows.length;
+}
+
 // Best-effort: replace the escalation's Slack message with a resolved,
 // button-less version. Never lets a Slack failure break the send path.
-async function stripSlackButtons({ slackClient, env, esc, kommun_namn, status, detail, decision = null, log }) {
-  if (!slackClient || !esc.slack_ts || !env?.SLACK_CHANNEL_ID) return;
+// `slackOps` is the injectable seam tick.js already uses
+// (slackOps.updateEscalationResolved(slackClient, {...})): it lets a caller
+// without a live Slack client — the batch applier, a test — observe or fake the
+// chat.update. Absent, the real client is used; with neither, this is a no-op.
+async function stripSlackButtons({ slackClient, slackOps = null, env, esc, kommun_namn, status, detail, decision = null, log }) {
+  const update = slackOps?.updateEscalationResolved ?? updateEscalationResolved;
+  if ((!slackClient && !slackOps) || !esc.slack_ts || !env?.SLACK_CHANNEL_ID) return;
   try {
-    await updateEscalationResolved(slackClient, {
+    await update(slackClient, {
       channel: env.SLACK_CHANNEL_ID, ts: esc.slack_ts, kommun_namn, status, detail, decision,
     });
   } catch (e) {

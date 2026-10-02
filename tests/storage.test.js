@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { openDb, ACTIVE_ESCALATION_STATUSES, DEFERRED_ESCALATION_STATUS, parseDeferReason } from '../src/storage.js';
+import { openDb, ACTIVE_ESCALATION_STATUSES, DEFERRED_ESCALATION_STATUS, DEFER_NOTE_MAX, parseDeferReason } from '../src/storage.js';
 
 let tmp, db;
 beforeEach(() => {
@@ -1733,7 +1733,7 @@ describe('deferred escalations (2026-10-02 design)', () => {
     expect(db.hasDeferredEscalation(cid)).toBe(false);
   });
 
-  it('listDeferredEscalations joins kommun/role/state, newest-parked first', () => {
+  it('listDeferredEscalations joins kommun/role/state, longest-parked first', () => {
     const first = seedDeferrable({ namn: 'Först', state: 'SENT' });
     db.deferEscalationIfOpen(first.eid, { reason: 'avgift' });
     db.raw.prepare("UPDATE escalations SET resolved_at = '2026-09-20 08:00:00' WHERE id = ?").run(first.eid);
@@ -1744,8 +1744,9 @@ describe('deferred escalations (2026-10-02 design)', () => {
     seedDeferrable({ namn: 'Öppen' });
 
     const rows = db.listDeferredEscalations();
-    expect(rows.map((r) => r.kommun_namn)).toEqual(['Senast', 'Först']);
-    expect(rows[0]).toMatchObject({ role: 'central', state: 'DELIVERING', status: 'deferred' });
+    // The Pausade list's own order, done once in SQL: oldest park on top.
+    expect(rows.map((r) => r.kommun_namn)).toEqual(['Först', 'Senast']);
+    expect(rows[1]).toMatchObject({ role: 'central', state: 'DELIVERING', status: 'deferred' });
     expect(rows[0].draft_body).toBe('utkast');
     expect(db.listDeferredEscalationsForConversation(second.cid).map((r) => r.id)).toEqual([second.eid]);
     expect(db.listDeferredEscalationsForConversation(first.cid + 9999)).toEqual([]);
@@ -1782,6 +1783,40 @@ describe('deferred escalations (2026-10-02 design)', () => {
 
   it('resumeEscalationIfDeferred is a no-op on an unknown id', () => {
     expect(db.resumeEscalationIfDeferred(987654)).toBe(false);
+  });
+
+  // A closed case has no next action to resume into, and a legacy parked row on
+  // one must not keep a finished kommun in the Pausade list either.
+  it.each(['DONE', 'DEAD_END'])('a %s case drops out of listDeferredEscalations and refuses resume', (state) => {
+    const { cid, eid } = seedDeferrable({ namn: `Stangd-${state}` });
+    db.deferEscalationIfOpen(eid, { reason: 'avgift' });
+    expect(db.listDeferredEscalations().map((r) => r.id)).toContain(eid);
+
+    db.updateConversationState(cid, state, {});
+
+    expect(db.listDeferredEscalations().map((r) => r.id)).not.toContain(eid);
+    expect(db.resumeEscalationIfDeferred(eid)).toBe(false);
+    expect(db.raw.prepare('SELECT status FROM escalations WHERE id=?').get(eid).status).toBe('deferred');
+    // Nothing is deleted: reopening the case makes it resumable again.
+    db.updateConversationState(cid, 'SENT', {});
+    expect(db.resumeEscalationIfDeferred(eid)).toBe(true);
+  });
+
+  it('the note is capped at the writer so it cannot push the reason off a queue row', () => {
+    const { eid } = seedDeferrable();
+    db.deferEscalationIfOpen(eid, { reason: 'annat', note: 'x'.repeat(DEFER_NOTE_MAX + 50) });
+    const { note } = parseDeferReason(db.raw.prepare('SELECT resolved_text t FROM escalations WHERE id=?').get(eid).t);
+    expect(note).toHaveLength(DEFER_NOTE_MAX);
+  });
+
+  it('setFollowUp changes the promise without re-stamping state_changed_at', () => {
+    const { cid } = seedDeferrable({ state: 'SENT' });
+    db.raw.prepare("UPDATE conversations SET state_changed_at = '2026-08-01 08:00:00', follow_up_at = '2026-10-20' WHERE id = ?").run(cid);
+    db.setFollowUp(cid, null);
+    const conv = db.getConversation(cid);
+    expect(conv.follow_up_at).toBeNull();
+    expect(conv.state_changed_at).toBe('2026-08-01 08:00:00');
+    expect(conv.state).toBe('SENT');
   });
 
   // The whole point of parking is that neither the deadline nor the silence is

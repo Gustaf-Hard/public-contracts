@@ -38,6 +38,10 @@ export const DEFERRED_ESCALATION_STATUS = 'deferred';
 // beslut, and everything else.
 export const DEFER_REASONS = Object.freeze(['avgift', 'sekretess', 'juridik', 'annat']);
 
+// Hard cap on the free note stored in `pausad: <reason> – <note>`. One line of
+// operator context, never a paste.
+export const DEFER_NOTE_MAX = 300;
+
 // `resolved_text` of a deferred row is `pausad: <reason>` plus an optional
 // ` – <free note>`. THE one parser for that string: every surface (the Pausade
 // section, the ärende card, the batch log) goes through this so no second
@@ -542,6 +546,15 @@ export function openDb(path) {
   // corrupts the stale-clock the follow-up rules depend on. Idempotent: writes
   // only when the computed review actually changed, so a no-op re-arm touches
   // nothing at all.
+  // Just the follow-up promise, with NO state_changed_at re-stamp — the one
+  // thing updateConversationState cannot do (it always re-stamps, by design).
+  // Used by the defer path (2026-10-02): parking a case that is NOT NEEDS_HUMAN
+  // changes no state, and re-stamping would silently reset the staleness clock
+  // of a case whose real last event is older than the park.
+  function setFollowUp(id, followUpAt = null) {
+    db.prepare('UPDATE conversations SET follow_up_at = ? WHERE id = ?').run(followUpAt, id);
+  }
+
   function setNextReview(id, { next_review_at = null, next_review_source = null }) {
     const cur = db.prepare('SELECT next_review_at, next_review_source FROM conversations WHERE id = ?').get(id);
     if (!cur) return false;
@@ -861,7 +874,11 @@ export function openDb(path) {
   // anything, and 'annat' is the honest fallback for a value we don't know.
   function deferEscalationIfOpen(id, { reason = 'annat', note = null } = {}) {
     const r = DEFER_REASONS.includes(String(reason).toLowerCase()) ? String(reason).toLowerCase() : 'annat';
-    const n = String(note ?? '').trim().replace(/\s+/g, ' ');
+    // Capped at the writer, not at the renderers: the note is a one-line
+    // operator hint that ends up in a queue row and a Slack-ish card, and an
+    // essay pasted into the form would push the reason off every surface that
+    // shows it. 300 chars is far more than "väntar på avgiftsbeslut" needs.
+    const n = String(note ?? '').trim().replace(/\s+/g, ' ').slice(0, DEFER_NOTE_MAX);
     const text = `pausad: ${r}${n ? ` – ${n}` : ''}`;
     const res = db.prepare(`
       UPDATE escalations
@@ -880,10 +897,17 @@ export function openDb(path) {
   // caller answers 409 rather than creating a second approvable draft.
   function resumeEscalationIfDeferred(id) {
     return db.transaction(() => {
-      const row = db.prepare(
-        `SELECT conversation_id FROM escalations WHERE id = ? AND status = '${DEFERRED_ESCALATION_STATUS}'`
-      ).get(id);
+      const row = db.prepare(`
+        SELECT e.conversation_id, c.state
+        FROM escalations e JOIN conversations c ON c.id = e.conversation_id
+        WHERE e.id = ? AND e.status = '${DEFERRED_ESCALATION_STATUS}'
+      `).get(id);
       if (!row) return false;
+      // A CLOSED case has no next action to resume into: reopening a draft on
+      // it would put a DONE/DEAD_END kommun back in Behöver dig with an
+      // escalation nothing will ever resolve (the caseBucket terminal-first
+      // rule would then fight it). Reopen the case first, deliberately.
+      if (row.state === 'DONE' || row.state === 'DEAD_END') return false;
       if (hasActiveEscalation(row.conversation_id)) return false;
       const r = db.prepare(`
         UPDATE escalations
@@ -904,15 +928,21 @@ export function openDb(path) {
     ).get(conversationId) != null;
   }
 
-  // Every parked row, newest-parked first, joined with what the operator needs
-  // to recognise the case. The dashboard's Pausade card/section re-sorts to
-  // oldest-parked first (the longest-parked case is the one to revisit).
+  // Every parked row on a LIVE case, longest-parked first, joined with what the
+  // operator needs to recognise it. This is the Pausade list's only source, so
+  // it sorts the way that list reads (oldest park on top — the one most likely
+  // worth revisiting) rather than making the caller re-sort.
+  //
+  // DONE/DEAD_END are excluded, as in every other queue query (round-4 H5):
+  // closing a case resolves its deferred rows, but a legacy row on an
+  // already-closed case must not keep a finished kommun in Pausade for ever.
   function listDeferredEscalations() {
     return db.prepare(`
       SELECT e.*, c.kommun_kod, c.kommun_namn, c.role, c.state
       FROM escalations e JOIN conversations c ON c.id = e.conversation_id
       WHERE e.status = '${DEFERRED_ESCALATION_STATUS}'
-      ORDER BY e.resolved_at DESC, e.id DESC
+        AND c.state NOT IN ('DONE', 'DEAD_END')
+      ORDER BY e.resolved_at, e.id
     `).all();
   }
 
@@ -2153,6 +2183,7 @@ export function openDb(path) {
     listConversationsDueForInitialSend,
     updateConversationState,
     setNextReview,
+    setFollowUp,
     recordMessage,
     listMessages,
     hasGmailMessageId,
