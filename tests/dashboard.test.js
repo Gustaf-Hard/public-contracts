@@ -641,6 +641,30 @@ describe('vendor pages', () => {
     expect(res.text).toContain('2027-07-31');
   });
 
+  // The market row for a KB company sums every vendor row that resolves to it,
+  // so the dossier must show the same set — not KPIs for 2 avtal over a table of 1.
+  it('/leverantor/:slug shows every vendor row of the same KB company', async () => {
+    const a = seedPdfAttachment({ filename: 'Avtal ILT.pdf' });
+    const msgB = db.recordMessage({
+      conversation_id: a.convId, gmail_message_id: 'gm-ilt-b', direction: 'inbound',
+      from_email: 'kommun@mala.se', to_email: 'me@x.com', subject: 'Avtal', body_text: '',
+      received_at: '2026-04-14T10:00:00Z', attachment_count: 1,
+    });
+    const b = { attId: db.recordAttachment({ message_id: msgB, filename: 'Avtal Polyglutt.pdf',
+      saved_path: join(a.contractsDir, '2418', 'Avtal Polyglutt.pdf'), mime_type: 'application/pdf', size_bytes: 13 }) };
+    const ilt = db.upsertVendor('ILT');
+    const inl = db.upsertVendor('Inläsningstjänst');
+    db.recordContract({ attachment_id: a.attId, vendor_id: ilt.id, avtalsvarde: '10 000 kr/år', valuta: 'SEK',
+      period_start: '2025-08-01', period_end: '2026-07-31', is_contract: 1, summary: 'x', confidence: 0.9 });
+    db.recordContract({ attachment_id: b.attId, vendor_id: inl.id, avtalsvarde: '20 000 kr/år', valuta: 'SEK',
+      period_start: '2025-08-01', period_end: '2027-07-31', is_contract: 1, summary: 'x', confidence: 0.9 });
+    const res = await get(appWithFakes(), `/leverantor/${ilt.slug}`);
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('<h1>ILT Education</h1>');
+    expect(res.text).toContain(`href="/attachments/${a.attId}"`);
+    expect(res.text).toContain(`href="/attachments/${b.attId}"`);
+  });
+
   it('unknown slug → 404', async () => {
     const app = appWithFakes();
     expect((await get(app, '/leverantor/nope')).status).toBe(404);

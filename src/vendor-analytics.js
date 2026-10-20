@@ -319,6 +319,14 @@ function groupingCompanyName(name) {
   return resolveCompany(name)?.canonical ?? canonicalVendorName(name);
 }
 
+// The facts of every vendor row that groups with `vendorName` — the same set
+// buildVendorRollups sums into that company's market row, so a vendor page
+// (/leverantor/ilt) shows the contracts its KPI cards count.
+export function companyFacts(facts, vendorName) {
+  const key = groupingCompanyName(vendorName).toLowerCase();
+  return facts.filter((f) => f.vendor_id != null && groupingCompanyName(f.vendor_name).toLowerCase() === key);
+}
+
 // Per-vendor market rollup. Vendor-less contracts (vendor unknown) stay in
 // the facts/explorer/completeness but do not form a vendor row here.
 // Sorted by total known annual SEK desc; vendors with no known value last.

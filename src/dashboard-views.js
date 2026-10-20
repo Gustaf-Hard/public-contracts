@@ -3296,7 +3296,7 @@ export function renderVendorDossier({ vendor, rollup = null, facts = [], product
 
   const body = `
     <div class="page-head">
-      <h1>${escapeHtml(vendor.name)}</h1>
+      <h1>${escapeHtml(rollup?.vendor_name ?? vendor.name)}</h1>
       <a href="/leverantorer" data-pane-link class="muted">← alla leverantörer</a>
     </div>
     ${stats}
@@ -3312,7 +3312,7 @@ export function renderVendorDossier({ vendor, rollup = null, facts = [], product
       ${table}
     </section>
   `;
-  return layout({ title: vendor.name, body, currentPath: '/leverantorer', heartbeat, partial, escalationCount });
+  return layout({ title: rollup?.vendor_name ?? vendor.name, body, currentPath: '/leverantorer', heartbeat, partial, escalationCount });
 }
 
 // One cell of the per-product kommun×grade drill-down. Same colour language

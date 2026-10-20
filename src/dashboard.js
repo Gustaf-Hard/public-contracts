@@ -38,7 +38,7 @@ import {
 import { resellerBySlug } from './resellers.js';
 import {
   buildContractFacts, buildVendorRollups, buildMarketSummary, buildProductRollups,
-  buildProductCoverageByKommun, slugifyProductName,
+  buildProductCoverageByKommun, slugifyProductName, companyFacts,
 } from './vendor-analytics.js';
 
 const ROLE_PRIORITY = ['central', 'utbildning', 'gymnasie', 'vuxenutbildning', 'other'];
@@ -1432,16 +1432,14 @@ export function createDashboardApp({
         heartbeat: hb(), partial: isPartial(req), escalationCount: escCount(),
       }));
     }
-    const { facts, rollups, todayIso } = vendorData(new Date());
-    const vendorFacts = facts.filter((f) => f.vendor_id === vendor.id);
+    const { facts, todayIso } = vendorData(new Date());
+    // Market rollups group by KB company (2026-07-28), so every vendor row of
+    // the company (ILT, ILT Education, Aski Raski, ...) is this page: the
+    // tables and the KPI cards both read the whole group, never one row's
+    // contracts under the group's totals.
+    const vendorFacts = companyFacts(facts, vendor.name);
     const { doneKods, resellerKods, resellerChannelsByKommun } = kommunCoverageContext();
-    // Market rollups group by CANONICAL name (2026-07-19), so the representative
-    // vendor_id may not equal this page's vendor.id (a duplicate vendor PAGE —
-    // page unification is a deferred follow-up). Fall back to a rollup built
-    // from THIS vendor's facts so the dossier KPIs stay honest (never 0-of-N).
-    const dossierRollup = rollups.find((r) => r.vendor_id === vendor.id)
-      ?? buildVendorRollups(vendorFacts, { now: new Date() })[0]
-      ?? null;
+    const dossierRollup = buildVendorRollups(vendorFacts, { now: new Date() })[0] ?? null;
     res.send(renderVendorDossier({
       vendor,
       rollup: dossierRollup,
@@ -1516,8 +1514,8 @@ export function createDashboardApp({
         heartbeat: hb(), partial: isPartial(req), escalationCount: escCount(),
       }));
     }
-    const { facts, rollups, todayIso } = vendorData(new Date());
-    const vendorFacts = facts.filter((f) => f.vendor_id === vendor.id);
+    const { facts, todayIso } = vendorData(new Date());
+    const vendorFacts = companyFacts(facts, vendor.name);
     const lineItems = db.listLineItems();
     const coverage = db.listCoverage();
     // Data-kommuner carry collection_done + reseller_channels; the drill-down
@@ -1533,7 +1531,7 @@ export function createDashboardApp({
       // Unknown product → 404 with the vendor dossier as a useful landing.
       return res.status(404).send(renderVendorDossier({
         vendor,
-        rollup: rollups.find((r) => r.vendor_id === vendor.id) ?? null,
+        rollup: buildVendorRollups(vendorFacts, { now: new Date() })[0] ?? null,
         facts: vendorFacts, productRollups, todayIso, resellerChannelsByKommun,
         heartbeat: hb(), partial: isPartial(req), escalationCount: escCount(),
       }));
