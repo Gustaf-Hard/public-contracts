@@ -221,6 +221,13 @@ describe('renderVendorDossier (surface 2)', () => {
     expect(html).toContain('förlängs automatiskt');
   });
 
+  it('renewal calendar names the products in each contract up for renewal', () => {
+    seedMarket();
+    const html = renderedDossier('skolon');
+    const cal = html.slice(html.indexOf('Förnyelsekalender'));
+    expect(cal).toMatch(/2026-10-01[\s\S]*?<span class="renewal-products">Skolon Plattform<\/span>[\s\S]*?<\/li>/);
+  });
+
   it('links every contract to its source PDF', () => {
     const { a1, a3 } = seedMarket();
     const html = renderedDossier('skolon');

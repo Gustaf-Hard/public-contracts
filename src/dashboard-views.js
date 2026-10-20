@@ -782,6 +782,7 @@ const baseCss = `
   .renewal-list { list-style: none; margin: 0; padding: 0; }
   .renewal-item { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px dashed var(--border); font-size: 13px; }
   .renewal-item:last-child { border-bottom: none; }
+  .renewal-products { color: var(--fg-muted); }
   .renewal-date { font-variant-numeric: tabular-nums; font-weight: 600; min-width: 90px; }
 
   /* ---- Phone / narrow viewport (AWS "works well on my phone", 2026-07-28) ----
@@ -3237,6 +3238,7 @@ function renewalCalendar(facts, todayIso) {
       <a href="/kommun/${escapeHtml(f.kommun_kod)}" data-pane-link>${escapeHtml(f.kommun_namn)}</a>
       ${f.auto_renews ? '<span class="pill pill-default">förlängs automatiskt</span>' : ''}
       <span class="tag">${escapeHtml(renewalWindow(f, todayIso))}</span>
+      ${(f.products ?? []).length ? `<span class="renewal-products">${escapeHtml(f.products.join(', '))}</span>` : ''}
     </li>`).join('');
   const note = unknownOrPast > 0
     ? `<p class="muted">${unknownOrPast} avtal utan känt eller framtida förnyelsedatum.</p>` : '';
