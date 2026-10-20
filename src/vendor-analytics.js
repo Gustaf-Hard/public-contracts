@@ -357,9 +357,13 @@ export function buildVendorRollups(facts, { now }) {
       .filter((f) => f.unit === 'elev' && Number.isFinite(f.unit_price_sek))
       .map((f) => f.unit_price_sek);
     // Representative identity: prefer a member that has a vendor page (slug),
-    // so the row links; fall back to the first member. The DISPLAY name is the
-    // canonical (collapses the near-dupes into one label).
-    const rep = group.find((f) => f.vendor_slug) ?? group[0];
+    // so the row links; fall back to the first member. Among slugged members a
+    // company-named one beats a product-named one, or the "ILT Education" row
+    // links to /leverantor/aski-raski. The DISPLAY name is the canonical
+    // (collapses the near-dupes into one label).
+    const rep = group.find((f) => f.vendor_slug && resolveCompany(f.vendor_name)?.matchedAs !== 'product')
+      ?? group.find((f) => f.vendor_slug)
+      ?? group[0];
     // KB category tag: a channel is shown as 'återförsäljare' regardless of
     // category; a vendor the KB does not know stays untagged (null) — never
     // guessed.
