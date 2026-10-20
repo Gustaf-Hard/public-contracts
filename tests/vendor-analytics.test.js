@@ -315,6 +315,18 @@ describe('buildVendorRollups', () => {
     // The row must link to the one member that HAS a vendor page, not a null slug.
     expect(ne[0].vendor_slug).toBe('ne');
   });
+
+  it('links a company row to the company page, not to a product-named member that sorts first', () => {
+    const collapsed = buildVendorRollups(buildContractFacts([
+      row({ contract_id: 1, vendor_id: 30, vendor_name: 'Aski Raski', vendor_slug: 'aski-raski', kommun_kod: '1980' }),
+      row({ contract_id: 2, vendor_id: 31, vendor_name: 'ILT Education', vendor_slug: 'ilt-education', kommun_kod: '0180' }),
+    ], { lanByKommunKod: LAN, now: NOW }), { now: NOW });
+    const ilt = collapsed.filter((r) => r.vendor_name === 'ILT Education');
+    expect(ilt).toHaveLength(1);
+    expect(ilt[0].contract_count).toBe(2);
+    expect(ilt[0].vendor_slug).toBe('ilt-education');
+    expect(ilt[0].vendor_id).toBe(31);
+  });
 });
 
 describe('buildMarketSummary + completeness', () => {
