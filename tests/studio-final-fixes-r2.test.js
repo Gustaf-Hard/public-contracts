@@ -103,12 +103,9 @@ describe('P1. supersede only when the newer avtal can replace the older', () => 
     expect(row(facts, old.contract_id).superseded).toBe(true);
     expect(row(facts, neu.contract_id).superseded).toBe(false);
   });
-  it('a later avtal with no known segments still replaces one with segments', () => {
-    const old = C({ period_start: '2024-01-01', products: ['Binogi'] });
-    const neu = C({ period_start: '2025-08-01', products: ['Binogi'] });
-    const facts = build([old, neu], { coverage: covFor(old.contract_id, 'Binogi', F9) });
-    expect(row(facts, old.contract_id).superseded).toBe(true);
-  });
+  // 'a later avtal with no known segments still replaces one with segments'
+  // was removed in round 3 (R1): a tilläggsavtal has that shape. See
+  // studio-final-fixes-r3.test.js.
 });
 
 // ------------------------------------------------------------------ Q2

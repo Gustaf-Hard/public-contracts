@@ -422,10 +422,11 @@ function markDuplicates(facts) {
   const byKey = groupBy(avtalList(facts).filter((a) => a.kod && a.start), (a) => `${a.kod}\u0000${a.vendor}\u0000${a.start}\u0000${a.end ?? ''}`);
   for (const list of byKey.values()) {
     if (list.length < 2) continue;
-    // The fuller copy counts: a known value, then more owner rows and
-    // products (a copy that names Microsoft beside Atea keeps both), then
+    // The fuller copy counts: a known value, then known school forms (spend
+    // per elev needs them), then more owner rows and products (a copy that names Microsoft beside Atea keeps both), then
     // the lowest id.
-    list.sort((a, b) => (isFiniteNum(b.annual) - isFiniteNum(a.annual)) || b.rows.length - a.rows.length
+    list.sort((a, b) => (isFiniteNum(b.annual) - isFiniteNum(a.annual)) || ((b.segments.length > 0) - (a.segments.length > 0))
+      || b.rows.length - a.rows.length
       || b.products.length - a.products.length || a.id - b.id);
     const kept = [];
     for (const a of list) {
@@ -439,24 +440,39 @@ function markDuplicates(facts) {
 }
 
 // Of several avtal for one kommun x company x product, a newer one replaces
-// an older one only when it can: the newer is active, starts strictly later
-// (both starts known), names every product of the older, and covers some of
-// the same school forms (or one side names none). Avtal for different school
-// forms run side by side and both count. A tie is never broken by id or by
-// a day's difference in end date: if neither is clearly newer, both count.
+// an older one only when it is clearly a renewal of it. Both must name the
+// same products (the newer every product of the older), the newer is active
+// and starts strictly later (both starts known), and the newer covers some
+// of the older's school forms: a newer avtal with no known school forms
+// never covers one that has them (a tilläggsavtal for a few modules names the
+// main product and no school forms, and must not hide the main avtal). Then
+// it must be a renewal: (a) a re-signing, the same annual value within
+// RENEWAL_VALUE_TOLERANCE or the older has no known value, or (b) the older
+// ends before, or at most RENEWAL_GAP_DAYS after, the newer starts. An older
+// avtal with no end date is replaced only under (a). Anything else is an
+// addition (tillägg, option, another module) and both count. A tie is never
+// broken by id or by a day's difference in end date.
+export const RENEWAL_VALUE_TOLERANCE = 0.02;
+export const RENEWAL_GAP_DAYS = 92;
+const addDays = (iso, k) => new Date(Date.parse(`${iso}T00:00:00Z`) + k * 86400000).toISOString().slice(0, 10);
+const newerCovers = (older, newer) => (newer.length ? !older.length || older.some((s) => newer.includes(s)) : !older.length);
+export function isRenewalOf(older, newer) {
+  const os = dayOf(older.period_start); const ns = dayOf(newer.period_start);
+  if (!os || !ns || ns <= os || !newer.active) return false;
+  if (!newerCovers(older.segments, newer.segments)) return false;
+  if (older.product_slugs.length === 0 ? newer.product_slugs.length !== 0 : !older.product_slugs.every((p) => newer.product_slugs.includes(p))) return false;
+  const ov = older._annual ?? older.annual_value_sek; const nv = newer._annual ?? newer.annual_value_sek;
+  const resigned = !isFiniteNum(ov) || (isFiniteNum(nv) && Math.abs(ov - nv) <= RENEWAL_VALUE_TOLERANCE * Math.max(Math.abs(ov), Math.abs(nv)));
+  if (resigned) return true;
+  const oe = dayOf(older.period_end);
+  return !!oe && oe <= addDays(ns, RENEWAL_GAP_DAYS);
+}
 function markSuperseded(facts) {
   const groups = groupBy(facts.filter((f) => !f.duplicate_of), (f) => `${f.kommun_kod}\u0000${companyKey(f)}`);
   for (const rows of groups.values()) {
     if (rows.length < 2) continue;
     for (const r of rows) {
-      const rs = dayOf(r.period_start);
-      if (!rs) continue;
-      r.superseded = rows.some((s) => s.contract_id !== r.contract_id && s.active
-        && dayOf(s.period_start) && dayOf(s.period_start) > rs
-        && segmentsOverlap(r.segments, s.segments)
-        && (r.product_slugs.length === 0
-          ? s.product_slugs.length === 0
-          : r.product_slugs.every((p) => s.product_slugs.includes(p))));
+      r.superseded = rows.some((s) => s.contract_id !== r.contract_id && isRenewalOf(r, s));
     }
   }
 }

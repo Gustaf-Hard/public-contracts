@@ -144,8 +144,9 @@ describe('buildStudioFacts: active and superseded', () => {
     expect(nothing.active).toBe(false);
   });
   it('the older of two avtal for kommun x company x product is superseded and leaves headline aggregates', () => {
-    const older = C({ period_start: '2025-01-01', annual_value_sek: 40000 });
-    const newer = C({ period_start: '2026-01-01', annual_value_sek: 60000 });
+    // A renewal (round 3 R1): the older ends within 92 days of the newer start.
+    const older = C({ period_start: '2025-01-01', period_end: '2026-12-31', annual_value_sek: 40000 });
+    const newer = C({ period_start: '2026-10-01', annual_value_sek: 60000 });
     const other = C({ kommun_kod: '9002', kommun_namn: 'Tvåby', period_start: '2024-01-01', annual_value_sek: 10000 });
     const facts = build([older, newer, other]);
     expect(facts.find((f) => f.contract_id === older.contract_id).superseded).toBe(true);
