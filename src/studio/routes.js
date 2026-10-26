@@ -3,16 +3,17 @@
 // getStudioData(), built once and memoised per db + day (with a short TTL so
 // newly analysed avtal show up within minutes, not tomorrow).
 
-import { buildStudioFacts, collectionStatus, dataBasis, KOMMUNER_TOTAL } from '../studio-data.js';
+import { buildStudioFacts, collectionStatus, dataBasis } from '../studio-data.js';
 import { loadKommunStats } from '../kommun-stats.js';
 import { companies } from '../catalogue.js';
-import { studioLayout, esc } from './layout.js';
-import { fmtInt, fmtPct } from './format.js';
+import { studioLayout } from './layout.js';
 import { renderGallery } from './gallery.js';
 import { companyBySlug } from '../catalogue.js';
 import { renderLeverantor } from './pages/leverantor.js';
 import { renderProdukt, findProduct } from './pages/produkt.js';
 import { renderKommun, findKommun } from './pages/kommun.js';
+import { renderMarknad, renderKategorier } from './pages/marknad.js';
+import { renderKategori, findCategory } from './pages/kategori.js';
 import { notFound } from './pages/common.js';
 import path from 'node:path';
 import { existsSync } from 'node:fs';
@@ -80,44 +81,6 @@ export function sendStudio(req, res, data, { title, body, status = 200 }) {
   }));
 }
 
-// Placeholder Marknad body until the landing page is built (Task 8).
-function renderMarknadPlaceholder({ basis }) {
-  const covered = basis.kommuner_with_avtal ?? 0;
-  const share = KOMMUNER_TOTAL ? covered / KOMMUNER_TOTAL : null;
-  const kpi = (label, num, basisText, extra = '') => `<div class="kpi${extra}">
-      <span class="kpi-label">${esc(label)}</span>
-      <span class="kpi-value"><span class="kpi-num">${esc(num)}</span></span>
-      <span class="kpi-basis">${esc(basisText)}</span>
-    </div>`;
-  return `<section class="entity-header">
-  <div class="entity-grid">
-    <div>
-      <span class="kicker">Marknad · Skolans digitala verktyg</span>
-      <h1 class="page-title">Vad Sveriges kommuner köper, av vem och till vilket pris</h1>
-      <p class="lede">Underlaget är ${esc(fmtInt(basis.active))} aktiva avtal från ${esc(fmtInt(covered))} av ${esc(fmtInt(KOMMUNER_TOTAL))} kommuner, begärda som allmänna handlingar och tolkade rad för rad.</p>
-    </div>
-    <div class="coverage-meter" aria-label="Kommuner med avtal">
-      <div class="coverage-meter-head"><span class="kpi-num">${esc(fmtPct(share))}</span><span class="kpi-unit">av kommunerna</span></div>
-      <div class="meter"><span class="meter-fill grow-x" style="width:${share == null ? 0 : (share * 100).toFixed(1)}%"></span></div>
-      <span class="kpi-basis">${esc(fmtInt(covered))} av ${esc(fmtInt(KOMMUNER_TOTAL))} kommuner har minst ett aktivt avtal hos oss</span>
-    </div>
-  </div>
-</section>
-<section class="section">
-  <div class="kpi-row">
-    ${kpi('Aktiva avtal', fmtInt(basis.active), `av ${fmtInt(basis.collected)} insamlade`)}
-    ${kpi('Kommuner med avtal', fmtInt(covered), `av ${fmtInt(KOMMUNER_TOTAL)} kommuner`)}
-    ${kpi('Insamling klar', fmtInt(basis.done), `av ${fmtInt(KOMMUNER_TOTAL)} kommuner`)}
-    ${kpi('Slutdatum okänt', fmtInt(basis.active_unknown_end), 'räknas som aktiva i fyra år från avtalsstart')}
-  </div>
-</section>
-<section class="section">
-  <div class="panel-unknown">
-    <strong>Marknadsöversikten byggs.</strong> Kategorier, största leverantörer och förnyelsevågen hamnar här. Under tiden finns underlaget sammanfattat ovan.
-  </div>
-</section>`;
-}
-
 export const UNDERLAG_TYPES = Object.freeze({
   pdf: 'application/pdf',
   docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -146,7 +109,29 @@ export function mountStudio(app, {
 
   app.get('/studio', (req, res) => {
     const data = getStudioData();
-    sendStudio(req, res, data, { title: 'Marknad', body: renderMarknadPlaceholder(data) });
+    sendStudio(req, res, data, { title: 'Marknad', body: renderMarknad(data) });
+  });
+
+  app.get('/studio/kategorier', (req, res) => {
+    const data = getStudioData();
+    sendStudio(req, res, data, { title: 'Kategorier', body: renderKategorier(data) });
+  });
+
+  app.get('/studio/kategori/:slug', (req, res) => {
+    const data = getStudioData();
+    const category = findCategory(req.params.slug);
+    if (!category) {
+      return sendStudio(req, res, data, {
+        title: 'Kategorin finns inte', status: 404,
+        body: notFound({
+          what: 'Kategorin finns inte',
+          text: 'Vi känner inte till någon kategori med den adressen. Gå till listan över kategorier.',
+          crumb: { label: 'Kategorier', href: '/studio/kategorier' },
+        }),
+      });
+    }
+    const body = renderKategori({ category, facts: data.facts, stats: data.stats, statusMap: data.statusMap, today: data.today, page: pageOf(req) });
+    sendStudio(req, res, data, { title: category.label, body });
   });
 
   // Component gallery, hand-written demo data only (never the pilot DB).

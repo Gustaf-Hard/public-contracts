@@ -21,9 +21,10 @@ const blank = (s) => typeof s !== 'string' || !s.trim();
 const ELEV_UNIT = /\belev/i;
 
 function cleanVendorName(raw) {
-  const s = String(raw).replace(/\s*\(publ\)\s*$/i, '')
+  // Studio copy has no en or em dash; a dash in an extracted name is a hyphen.
+  const s = String(raw).replace(/[\u2013\u2014]/g, '-').replace(/\s*\(publ\)\s*$/i, '')
     .replace(/[\s,]+(sverige\s+)?(ab|aktiebolag)\.?$/i, '').replace(/\s+/g, ' ').trim();
-  return s || String(raw).trim();
+  return s || String(raw).replace(/[\u2013\u2014]/g, '-').trim();
 }
 
 function minusYears(iso, years) {
@@ -236,6 +237,8 @@ export function buildStudioFacts({ contracts = [], lineItems = [], coverage = []
         kr_per_elev_basis: null,
         kr_per_elev_product_slug: null,
         attachment_id: c.attachment_id ?? null,
+        // Date the avtal reached us (YYYY-MM-DD): "senast inkomna" lists.
+        received_at: isIso(c.received_at) ? c.received_at.slice(0, 10) : null,
         _g: g,
         _owner: isOwner,
         _received_at: c.received_at ?? null,
