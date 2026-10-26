@@ -65,6 +65,7 @@ export function renderGallery({ stats = null, today = '2026-10-26', tiles = null
     const ri = bands.indexOf(row);
     const ci = segs.indexOf(col);
     if (row.key === 's' && col.key === 'Gymnasiet') return distribution([]);
+    if (row.key === 'm' && col.key === 'Gymnasiet') return null; // unknown state
     if ((row.key === 's' && ci < 2) || (row.key === 'xl' && col.key === 'Förskoleklass')) return distribution([300, 320, 340].slice(0, 2 + (ci % 2)));
     const base = 140 + ci * 55 - ri * 12;
     return distribution(Array.from({ length: 5 + ((ri * 3 + ci) % 9) }, (_, k) => base + k * 9 + (k % 3) * 14));

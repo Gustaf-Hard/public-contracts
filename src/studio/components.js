@@ -132,11 +132,12 @@ export const EVIDENCE_PAGE_SIZE = 50;
 
 const PDF_ICON = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 2.5h6.5L15.5 6.5v11h-10.5z"/><path d="M11.5 2.5v4h4"/><path d="M7.5 11h5M7.5 14h5"/></svg>';
 
-export function evidenceDrawer({ rows = [], total = 0, page = 1, pageHref = (p) => `?sida=${p}`, noun = 'avtal' } = {}) {
-  const pages = Math.max(1, Math.ceil((isNum(total) ? total : rows.length) / EVIDENCE_PAGE_SIZE));
+export function evidenceDrawer({ rows = [], total = null, page = 1, pageHref = (p) => `?sida=${p}`, noun = 'avtal' } = {}) {
+  const tot = isNum(total) ? total : rows.length;
+  const pages = Math.max(1, Math.ceil(tot / EVIDENCE_PAGE_SIZE));
   const cur = Math.min(Math.max(1, Math.trunc(page) || 1), pages);
   const from = (cur - 1) * EVIDENCE_PAGE_SIZE + 1;
-  const to = Math.min(total, from + rows.length - 1);
+  const to = Math.min(tot, from + rows.length - 1);
   const body = rows.map((r) => `<tr>
       <td data-label="Kommun">${esc(r.kommun)}</td>
       <td data-label="Period" class="nowrap">${esc(r.period ?? UNKNOWN)}</td>
@@ -157,9 +158,9 @@ export function evidenceDrawer({ rows = [], total = 0, page = 1, pageHref = (p) 
     </nav>` : '';
 
   return `<details class="evidence"${cur > 1 ? ' open' : ''}>
-  <summary><span class="ev-sum">Visa underlag (${esc(fmtInt(total))} ${esc(noun)})</span><span class="ev-hint">kommun, period, värde och källa per avtal</span></summary>
+  <summary><span class="ev-sum">Visa underlag (${esc(fmtInt(tot))} ${esc(noun)})</span><span class="ev-hint">kommun, period, värde och källa per avtal</span></summary>
   <div class="ev-body">
-    ${rows.length ? `<p class="meta">Visar ${esc(fmtInt(from))} till ${esc(fmtInt(to))} av ${esc(fmtInt(total))}</p>
+    ${rows.length ? `<p class="meta">Visar ${esc(fmtInt(from))} till ${esc(fmtInt(to))} av ${esc(fmtInt(tot))}</p>
     <table class="st-table cards ev-table">
       <thead><tr><th>Kommun</th><th>Period</th><th class="r">Värde per år</th><th>Prismodell</th><th class="r">Källa</th></tr></thead>
       <tbody>${body}</tbody>

@@ -72,6 +72,19 @@ describe('stripPlot', () => {
     noRawEvil(stripPlot({ dist: dist([1]), unit: 'kr/elev', label: EVIL }));
   });
 
+  it('says one dot per kommun by default and uses the caller dotNoun', () => {
+    expect(stripPlot({ dist: dist([100, 200, 300, 400, 500]), label: 'x' })).toContain('en punkt per kommun');
+    expect(stripPlot({ dist: dist([100, 200, 300, 400, 500]), label: 'x', dotNoun: 'avtal' })).toContain('en punkt per avtal');
+  });
+
+  it('counts the finite values it can show when the dist claims more', () => {
+    const d = { ...dist([100, 200, 300, 400, 500, 600]), n: 6 };
+    d.values = d.values.slice(0, 4).concat([{ kommun_kod: 'x', kr_per_elev: null }]);
+    const html = stripPlot({ dist: d, label: 'x' });
+    expect(html).toContain('för få avtal (n = 4)');
+    expect(html).not.toContain('<circle');
+  });
+
   it('handles a constant distribution without NaN', () => {
     const html = stripPlot({ dist: dist([250, 250, 250, 250, 250]), unit: 'kr/elev', label: 'x' });
     expect(count(html, '<circle')).toBe(5);
@@ -123,16 +136,32 @@ describe('tileMap', () => {
     noRawEvil(html);
   });
 
-  it('falls back to not-contacted for unknown classes and counts legend entries', () => {
+  it('throws on an invalid class or a throwing classOf/titleOf instead of claiming not-contacted', () => {
+    expect(() => tileMap({ tiles, classOf: (k) => (k === '1001' ? 'bogus' : 'has'), titleOf: (k) => k, legend: [] })).toThrow(/invalid class/);
+    expect(() => tileMap({ tiles, classOf: () => { throw new Error('boom'); }, titleOf: (k) => k })).toThrow(/boom/);
+    expect(() => tileMap({ tiles, classOf: () => 'has', titleOf: () => { throw new Error('title boom'); } })).toThrow(/title boom/);
+    expect(() => tileMap({ tiles, classOf: () => 'has', legend: [{ cls: 'nope', label: 'x' }] })).toThrow(/invalid class/);
+  });
+
+  it('defaults to a neutral unknown class with its own legend entry, never not-contacted', () => {
+    const html = tileMap({ tiles, legend: [{ cls: 'has', label: 'Har avtal' }] });
+    expect(html).not.toContain('t-not-contacted');
+    expect((html.match(/class="tile t-unknown[^"]*" tabindex="0"/g) || []).length).toBe(290);
+    expect(html).toContain('Status okänd');
+    expect(html).toContain('290');
+  });
+
+  it('counts legend entries, marks the highlight, and makes tiles focusable', () => {
     const html = tileMap({
       tiles,
-      classOf: (k) => (k === '1000' ? 'highlight' : k === '1001' ? 'bogus' : 'has'),
-      titleOf: (k) => k,
-      legend: [{ cls: 'has', label: 'Har avtal' }, { cls: 'not-contacted', label: 'Inte kontaktad' }],
+      classOf: (k) => (k === '1000' ? 'highlight' : 'has'),
+      titleOf: (k) => `Kommun ${k}`,
+      legend: [{ cls: 'has', label: 'Har avtal' }, { cls: 'highlight', label: 'Vald' }],
     });
     expect(html).toContain('t-highlight');
-    expect(count(html, 't-not-contacted')).toBeGreaterThanOrEqual(1);
-    expect(html).toContain('288');
+    expect(html).toContain('289');
+    expect(count(html, 'tabindex="0"')).toBe(290);
+    expect(html).not.toContain('Status okänd');
   });
 });
 
@@ -167,6 +196,31 @@ describe('other components', () => {
     expect(html).toContain('n = 2');
     expect(html).toContain('popovertarget="m1-');
     expect(html).not.toMatch(/NaN|Infinity|undefined/);
+  });
+
+  it('segmentMatrix lets cell errors propagate and marks unknown cells distinct from n = 0', () => {
+    const rows = [{ key: 'a', label: 'A' }];
+    const cols = [{ key: '1', label: '1' }, { key: '2', label: '2' }, { key: '3', label: '3' }];
+    expect(() => segmentMatrix({ rows, cols, cell: () => { throw new Error('cell boom'); } })).toThrow(/cell boom/);
+    const html = segmentMatrix({
+      rows, cols, id: 'u',
+      cell: (r, c) => (c.key === '1' ? null : c.key === '2' ? { n: 7, suppressed: false, median: null } : distribution([])),
+    });
+    expect(count(html, 'is-unknown')).toBe(2);
+    expect(html).toContain('okänt');
+    expect(html).not.toContain('n = 7');
+    expect(count(html, 'inga avtal')).toBe(1);
+  });
+
+  it('renewalTimeline throws on an invalid today', () => {
+    expect(() => renewalTimeline({ today: 'igår', lanes: [] })).toThrow(/today/);
+    expect(() => renewalTimeline({ lanes: [] })).toThrow(/today/);
+  });
+
+  it('evidenceDrawer total defaults to the rows given', () => {
+    const ev = evidenceDrawer({ rows: [{ kommun: 'A' }, { kommun: 'B' }] });
+    expect(ev).toContain('Visa underlag (2 avtal)');
+    expect(ev).toContain('Visar 1 till 2 av 2');
   });
 
   it('renewalTimeline places items inside the window and escapes titles', () => {

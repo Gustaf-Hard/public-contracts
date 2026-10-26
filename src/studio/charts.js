@@ -68,15 +68,18 @@ function swarm(xs, minGap) {
 
 export function stripPlot({
   dist, highlightKod = null, highlightLabel = null, unit = 'kr/elev', label = '',
-  nameOf = null, unknownCount = null, noun = 'avtal',
+  nameOf = null, unknownCount = null, noun = 'avtal', dotNoun = 'kommun',
 } = {}) {
   const d = dist || { n: 0, suppressed: true, values: [] };
-  const n = isNum(d.n) ? d.n : 0;
+  const values = (d.values || []).filter((v) => isNum(v.kr_per_elev));
+  // When the dist claims more than the finite values it carries, count what
+  // we can actually show; a suppressed dist carries no values, so trust d.n.
+  const nRaw = isNum(d.n) ? d.n : 0;
+  const n = d.suppressed ? nRaw : Math.min(nRaw, values.length);
   const head = `<div class="viz-head"><span class="viz-label">${esc(label)}</span><span class="viz-n">n = ${esc(fmtInt(n))}</span></div>`;
   const unknownLine = isNum(unknownCount) && unknownCount > 0
     ? `<span>utan känt pris: ${esc(fmtInt(unknownCount))}</span>` : '';
 
-  const values = (d.values || []).filter((v) => isNum(v.kr_per_elev));
   if (d.suppressed || values.length < MIN_N) {
     const title = n === 0 ? `inga ${noun} med känt pris än` : `för få ${noun} (n = ${fmtInt(n)})`;
     return `<figure class="viz strip is-suppressed">${head}
@@ -141,7 +144,7 @@ export function stripPlot({
     <span class="lg"><i class="lg-band"></i>mittersta hälften ${esc(fmtInt(d.p25))} till ${esc(fmtV(d.p75))}</span>
     <span class="lg"><i class="lg-tick"></i>median</span>
     ${hl ? `<span class="lg"><i class="lg-dot is-highlight"></i>${esc(highlightLabel || who(hl.kommun_kod))}</span>` : ''}
-    <span>en punkt per avtal, ${esc(fmtInt(n))} ${esc(noun)}</span>
+    <span>en punkt per ${esc(dotNoun)}, ${esc(fmtInt(n))} ${esc(noun)}</span>
     ${unknownLine}
   </figcaption>
 </figure>`;
@@ -160,11 +163,11 @@ function hashId(s) {
 export function segmentMatrix({ rows = [], cols = [], cell, id = null, unit = 'kr/elev', rowHead = '', caption = '' } = {}) {
   const base = String(id || hashId(JSON.stringify([rows.map((r) => r.key), cols.map((c) => c.key)]))).replace(/[^a-zA-Z0-9-]/g, '');
   const grid = rows.map((r) => cols.map((c) => {
-    let d = null;
-    try { d = cell ? cell(r, c) : null; } catch { d = null; }
-    return d || { n: 0, suppressed: true, median: null };
+    // Caller errors propagate: a broken cell() must never render as "inga avtal".
+    const d = cell ? cell(r, c) : null;
+    return d || null;
   }));
-  const medians = grid.flat().filter((d) => !d.suppressed && isNum(d.median)).map((d) => d.median).sort((a, b) => a - b);
+  const medians = grid.flat().filter((d) => d && !d.suppressed && isNum(d.median)).map((d) => d.median).sort((a, b) => a - b);
   const step = (m) => {
     if (medians.length < 2) return 2;
     const rank = medians.filter((v) => v < m).length + medians.filter((v) => v === m).length / 2;
@@ -177,11 +180,17 @@ export function segmentMatrix({ rows = [], cols = [], cell, id = null, unit = 'k
     const d = grid[i][j];
     const pid = `${base}-${i}-${j}`;
     const where = `${r.label} · ${c.label}`;
-    const n = isNum(d.n) ? d.n : 0;
+    const n = d && isNum(d.n) ? d.n : null;
     let inner;
     let cls;
     let pop;
-    if (d.suppressed || !isNum(d.median)) {
+    // Unknown: no dist, no count, or a count that should have a median but
+    // does not. Distinct from n = 0 (a known empty group) and from too few.
+    if (n == null || (n >= MIN_N && !isNum(d.median))) {
+      cls = 'sm-cell is-unknown hatch';
+      inner = `<span class="sm-few">${UNKNOWN}</span>`;
+      pop = '<p>Underlaget för den här gruppen kunde inte räknas fram. Det betyder inte att det saknas avtal.</p>';
+    } else if (d.suppressed || !isNum(d.median)) {
       cls = n === 0 ? 'sm-cell is-empty' : 'sm-cell is-few hatch';
       inner = n === 0
         ? '<span class="sm-few">inga avtal</span>'
@@ -265,7 +274,8 @@ function isoMs(s) {
 }
 
 export function renewalTimeline({ lanes = [], today, months = 24, laneHead = '' } = {}) {
-  const t0 = isoMs(today) ?? Date.now();
+  const t0 = isoMs(today);
+  if (t0 == null) throw new Error('renewalTimeline requires today as YYYY-MM-DD');
   const start = new Date(t0);
   const y0 = start.getUTCFullYear();
   const m0 = start.getUTCMonth();
@@ -338,7 +348,8 @@ export function renewalTimeline({ lanes = [], today, months = 24, laneHead = '' 
 
 // ------------------------------------------------------------------ tile map
 
-export const TILE_CLASSES = Object.freeze(['has', 'none-done', 'none-open', 'not-contacted', 'highlight']);
+export const TILE_CLASSES = Object.freeze(['has', 'none-done', 'none-open', 'not-contacted', 'highlight', 'unknown']);
+const TILE_UNKNOWN_LABEL = 'Status okänd';
 
 let tilesMemo = null;
 export function loadKommunTiles() {
@@ -346,26 +357,31 @@ export function loadKommunTiles() {
   return tilesMemo;
 }
 
-export function tileMap({ tiles, classOf = () => 'not-contacted', titleOf = (k) => k, legend = [], label = 'Karta över Sveriges kommuner' } = {}) {
+function checkTileClass(cls, where) {
+  if (!TILE_CLASSES.includes(cls)) throw new Error(`tileMap: invalid class ${JSON.stringify(cls)} for ${where}`);
+  return cls;
+}
+
+// Every claim on the map comes from the caller. Without classOf a tile is
+// 'unknown' (hatched, its own legend entry), never 'not-contacted'. A
+// throwing classOf/titleOf or an invalid class name is a caller bug and
+// propagates instead of turning into a factual claim.
+export function tileMap({ tiles, classOf = () => 'unknown', titleOf = (k) => k, legend = [], label = 'Karta över Sveriges kommuner' } = {}) {
   const t = tiles || { cols: 1, rows: 1, tiles: {} };
   const counts = Object.fromEntries(TILE_CLASSES.map((c) => [c, 0]));
   const cells = Object.entries(t.tiles).map(([kod, pos]) => {
-    let cls = null;
-    try { cls = classOf(kod); } catch { cls = null; }
-    if (!TILE_CLASSES.includes(cls)) cls = 'not-contacted';
+    const cls = checkTileClass(classOf(kod), `kommun ${kod}`);
     counts[cls]++;
-    let tip = kod;
-    try { tip = titleOf(kod) ?? kod; } catch { tip = kod; }
+    const tip = titleOf(kod) ?? kod;
     const sideCls = pos.x > t.cols * 0.6 ? ' tip-left' : pos.x < t.cols * 0.4 ? ' tip-right' : '';
-    return `<span class="tile t-${cls}${sideCls}" style="grid-column:${pos.x + 1};grid-row:${pos.y + 1}" data-tip="${esc(tip)}"></span>`;
+    return `<span class="tile t-${cls}${sideCls}" tabindex="0" role="img" aria-label="${esc(tip)}" style="grid-column:${pos.x + 1};grid-row:${pos.y + 1}" data-tip="${esc(tip)}"></span>`;
   });
-  const legendHtml = legend.length ? `<ul class="tm-legend">${legend.map((l) => {
-    const cls = TILE_CLASSES.includes(l.cls) ? l.cls : 'not-contacted';
-    return `<li><i class="tile t-${cls}"></i><span>${esc(l.label)}</span><b>${esc(fmtInt(counts[cls]))}</b></li>`;
-  }).join('')}</ul>` : '';
-  const summary = legend.map((l) => `${l.label}: ${counts[TILE_CLASSES.includes(l.cls) ? l.cls : 'not-contacted']}`).join(', ');
+  const entries = legend.map((l) => ({ cls: checkTileClass(l.cls, `legend ${l.label}`), label: l.label }));
+  if (counts.unknown > 0 && !entries.some((l) => l.cls === 'unknown')) entries.push({ cls: 'unknown', label: TILE_UNKNOWN_LABEL });
+  const legendHtml = entries.length ? `<ul class="tm-legend">${entries.map((l) => `<li><i class="tile t-${l.cls}"></i><span>${esc(l.label)}</span><b>${esc(fmtInt(counts[l.cls]))}</b></li>`).join('')}</ul>` : '';
+  const summary = entries.map((l) => `${l.label}: ${counts[l.cls]}`).join(', ');
   return `<figure class="viz tilemap">
-  <div class="tm-grid" role="img" aria-label="${esc(summary ? `${label}. ${summary}` : label)}" style="--tm-cols:${t.cols};--tm-rows:${t.rows};aspect-ratio:${t.cols}/${t.rows}">${cells.join('')}</div>
+  <div class="tm-grid" role="group" aria-label="${esc(summary ? `${label}. ${summary}` : label)}" style="--tm-cols:${t.cols};--tm-rows:${t.rows};aspect-ratio:${t.cols}/${t.rows}">${cells.join('')}</div>
   ${legendHtml}
 </figure>`;
 }

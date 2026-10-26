@@ -159,6 +159,7 @@ const COMPONENT_CSS = `
 .sm-cell.is-few:hover { box-shadow: inset 0 0 0 1px var(--line-strong), var(--shadow-2); }
 .sm-cell.is-empty { background: transparent; color: var(--ink-3); box-shadow: inset 0 0 0 1px var(--line); }
 .sm-cell.is-empty .sm-few { font-weight: 500; }
+.sm-cell.is-unknown { color: var(--ink-3); outline: 1px dashed var(--ink-3); outline-offset: -1px; }
 .seq-0 { background: var(--viz-seq-0); color: var(--seq-ink-0); }
 .seq-1 { background: var(--viz-seq-1); color: var(--seq-ink-1); }
 .seq-2 { background: var(--viz-seq-2); color: var(--seq-ink-2); }
@@ -262,14 +263,15 @@ const COMPONENT_CSS = `
 .t-none-open { background: var(--hatch), var(--surface-2); box-shadow: inset 0 0 0 1px var(--line-strong); }
 .t-not-contacted { background: transparent; box-shadow: inset 0 0 0 1px var(--line-strong); }
 .t-highlight { background: var(--viz-highlight); box-shadow: 0 0 0 2px var(--surface), 0 0 0 3.5px var(--viz-highlight); z-index: 2; }
-.tm-grid .tile:hover { z-index: 10; outline: 2px solid var(--ink); outline-offset: 1px; }
-.tm-grid .tile:hover::after {
+.t-unknown { background: var(--hatch), transparent; outline: 1px dashed var(--ink-3); outline-offset: -1px; }
+.tm-grid .tile:hover, .tm-grid .tile:focus-visible { z-index: 10; outline: 2px solid var(--ink); outline-offset: 1px; border-radius: 3px; }
+.tm-grid .tile:hover::after, .tm-grid .tile:focus-visible::after {
   content: attr(data-tip); position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
   padding: 6px 10px; border-radius: var(--r-1); background: var(--surface); color: var(--ink); border: 1px solid var(--line-strong);
   box-shadow: var(--shadow-2); font-size: var(--t-xs); font-weight: 500; white-space: nowrap; pointer-events: none;
 }
-.tm-grid .tile.tip-left:hover::after { left: auto; right: -4px; transform: none; }
-.tm-grid .tile.tip-right:hover::after { left: -4px; transform: none; }
+.tm-grid .tile.tip-left:hover::after, .tm-grid .tile.tip-left:focus-visible::after { left: auto; right: -4px; transform: none; }
+.tm-grid .tile.tip-right:hover::after, .tm-grid .tile.tip-right:focus-visible::after { left: -4px; transform: none; }
 .tm-legend { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--s-3); }
 .tm-legend li { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; gap: var(--s-3); align-items: center; font-size: var(--t-sm); color: var(--ink-2); padding-bottom: var(--s-3); border-bottom: 1px solid var(--line); }
 .tm-legend .tile { width: 16px; height: 16px; }
