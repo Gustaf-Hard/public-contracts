@@ -231,7 +231,9 @@ export function segmentMatrix({ rows = [], cols = [], cell, id = null, unit = 'k
 
 export function rankingBars({ items = [], max = 7, highlight = null, noun = '', valueHead = '' } = {}) {
   const top = Math.max(0, ...items.map((it) => (isNum(it.value) ? it.value : 0)));
-  const isHl = (it) => highlight != null && (it.label === highlight || (it.href && it.href === highlight));
+  // highlight: one label/href, or a list of them.
+  const hls = highlight == null ? [] : Array.isArray(highlight) ? highlight : [highlight];
+  const isHl = (it) => hls.some((h) => it.label === h || (it.href && it.href === h));
   const row = (it, i) => {
     const known = isNum(it.value);
     const w = known && top > 0 ? Math.max(1.5, (it.value / top) * 100) : 0;

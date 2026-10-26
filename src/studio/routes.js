@@ -12,6 +12,7 @@ import { renderGallery } from './gallery.js';
 import { companyBySlug } from '../catalogue.js';
 import { renderLeverantor } from './pages/leverantor.js';
 import { renderProdukt, findProduct } from './pages/produkt.js';
+import { renderKommun, findKommun } from './pages/kommun.js';
 import { notFound } from './pages/common.js';
 import path from 'node:path';
 import { existsSync } from 'node:fs';
@@ -178,6 +179,23 @@ export function mountStudio(app, {
     }
     const body = renderProdukt({ product: hit.product, company: hit.company, facts: data.facts, stats: data.stats, statusMap: data.statusMap, today: data.today, page: pageOf(req) });
     sendStudio(req, res, data, { title: hit.product.name, body });
+  });
+
+  app.get('/studio/kommun/:kod', (req, res) => {
+    const data = getStudioData();
+    const kommun = findKommun({ kod: req.params.kod, stats: data.stats, facts: data.facts });
+    if (!kommun) {
+      return sendStudio(req, res, data, {
+        title: 'Kommunen finns inte', status: 404,
+        body: notFound({
+          what: 'Kommunen finns inte',
+          text: 'Vi känner inte till någon kommun med den koden. Sök efter kommunens namn eller gå till listan över kommuner.',
+          crumb: { label: 'Kommuner', href: '/studio/kommuner' },
+        }),
+      });
+    }
+    const body = renderKommun({ kod: kommun.kod, kommun, stats: data.stats, facts: data.facts, statusMap: data.statusMap, today: data.today, page: pageOf(req) });
+    sendStudio(req, res, data, { title: kommun.namn, body });
   });
 
   // OPERATOR-ONLY. Serves the source file of a stored avtal, the same file as

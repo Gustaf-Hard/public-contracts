@@ -105,8 +105,8 @@ export function breadcrumb(items) {
   }).join('')}</nav>`;
 }
 
-export function notFound({ what, text }) {
-  return `${breadcrumb([{ label: 'Leverantörer', href: '/studio/leverantorer' }, { label: what }])}
+export function notFound({ what, text, crumb = { label: 'Leverantörer', href: '/studio/leverantorer' } }) {
+  return `${breadcrumb([crumb, { label: what }])}
 ${emptyPanel({ title: what, text })}`;
 }
 
