@@ -80,18 +80,22 @@ function coverageStudents(covRows, segments) {
   return { count: [...gradeCount.values()].reduce((sum, n) => sum + n, 0), invalid };
 }
 
-function newerKey(f) {
-  return [
-    (isIso(f.period_start) ? f.period_start.slice(0, 10) : isIso(f._received_at) ? f._received_at.slice(0, 10) : ''),
-    isIso(f.period_end) ? f.period_end.slice(0, 10) : '',
-    f.contract_id,
-  ];
+// a newer than b: >0, b newer: <0, undecided: 0. Only like clocks are
+// compared: period_start with period_start, received_at only when neither
+// has a start, and an unknown end is never "older" than a known one.
+function compareNewer(a, b) {
+  const day = (v) => (isIso(v) ? v.slice(0, 10) : null);
+  const as = day(a.period_start); const bs = day(b.period_start);
+  if (as && bs && as !== bs) return as > bs ? 1 : -1;
+  if (!as && !bs) {
+    const ar = day(a._received_at); const br = day(b._received_at);
+    if (ar && br && ar !== br) return ar > br ? 1 : -1;
+  }
+  const ae = day(a.period_end); const be = day(b.period_end);
+  if (ae && be && ae !== be) return ae > be ? 1 : -1;
+  return a.contract_id === b.contract_id ? 0 : a.contract_id > b.contract_id ? 1 : -1;
 }
-function isNewer(a, b) { // a newer than b
-  const ka = newerKey(a); const kb = newerKey(b);
-  for (let i = 0; i < ka.length; i++) if (ka[i] !== kb[i]) return ka[i] > kb[i];
-  return false;
-}
+function isNewer(a, b) { return compareNewer(a, b) > 0; }
 
 export function companyKey(f) {
   if (f.company_slug) return f.company_slug;
@@ -124,7 +128,13 @@ export function buildStudioFacts({ contracts = [], lineItems = [], coverage = []
       return groups.get(k);
     };
     group('');
-    const ownerOf = (r) => (r.companySlug && r.companySlug !== ownerSlug ? r.companySlug : '');
+    // Only a line that sells another company's product (or names that
+    // company outright, e.g. "Adobelicenser" from a reseller) opens an owner
+    // row for it. Add-ons, integrations, discounts, segment and noise lines
+    // stay on the avtal's vendor: "Integration ProReNata" on a Unikum avtal
+    // is Unikum's fee, not a ProReNata avtal.
+    const OWNER_KINDS = ['product', 'bundle', 'unresolved'];
+    const ownerOf = (r) => (OWNER_KINDS.includes(r.kind) && r.companySlug && r.companySlug !== ownerSlug ? r.companySlug : '');
     const productsOf = (r) => (r.kind === 'bundle' ? r.products ?? [] : ['product', 'segment'].includes(r.kind) && r.productSlug ? [r.productSlug] : []);
 
     for (const l of linesBy.get(c.contract_id) ?? []) {
@@ -196,10 +206,12 @@ export function buildStudioFacts({ contracts = [], lineItems = [], coverage = []
       const ownHasProducts = own.products.size > 0 && vendor?.role !== 'channel';
       remainderBasis = annual == null ? null : (ownHasProducts && consistent ? 'split' : 'unsplit_channel');
       values.set('', annual == null ? null : consistent ? Math.max(0, Math.round(annual - splitSum)) : annual);
-      // A channel that named nothing of its own and has nothing left over
-      // gets no row of its own.
-      if (consistent && values.get('') === 0 && own.products.size === 0 && own.lines.length === 0 && own.cov.length === 0) {
-        groups.delete('');
+      // Nothing left over is not a known 0 kr. A vendor that named nothing of
+      // its own gets no row; one that named its own products keeps its row
+      // with an unknown value (its price is not in the lines).
+      if (consistent && values.get('') === 0) {
+        if (own.products.size === 0) groups.delete('');
+        else { values.set('', null); remainderBasis = null; }
       }
     } else {
       values.set('', annual);
@@ -270,26 +282,81 @@ export function buildStudioFacts({ contracts = [], lineItems = [], coverage = []
   return facts;
 }
 
+// Pricing models whose value can be read as a price for the pupils. per_user,
+// usage, one_time and free are not; null (older rows) and 'unknown' only when
+// the avtal's own unit is elev.
+const ELEV_MODELS = new Set(['per_student', 'fixed', 'tiered']);
+// A unit that counts staff or users, not pupils.
+const STAFF_UNIT = /l[äa]rare|personal|pedagog|anv[äa]ndare|anst[äa]lld|medarbetare|\buser/i;
+const PER_MONTH_UNIT = /m[åa]n(ad|ader)?\b|\bmonth/i;
+const PER_TERM_UNIT = /termin/i;
+const near = (a, b) => Math.abs(a - b) <= 0.1 * Math.max(Math.abs(a), Math.abs(b));
+
+// Annual price per elev from a stated unit price, or null when it cannot be
+// read as one. The extraction (analyse-contract line_items) does not say
+// whether unit_price_sek is per month, per year or for the line's whole
+// period, so it is checked against amount_sek = the line's share of the
+// total price: unit x quantity x months = amount means a monthly price,
+// unit x quantity = amount over more than 12 months means the price for the
+// whole period. An explicit per-month or per-term unit is scaled to a year.
+// A period over 12 months that the amount does not explain is ambiguous and
+// gives null, so the caller falls back to value per elev.
+function annualUnitPrice({ unit_price_sek: up, unit, quantity: q, amount_sek: amt, period_months: pm }) {
+  if (!(isFiniteNum(up) && up > 0)) return null;
+  if (PER_MONTH_UNIT.test(unit ?? '')) return up * 12;
+  if (PER_TERM_UNIT.test(unit ?? '')) return up * 2;
+  const months = isFiniteNum(pm) && pm > 0 ? pm : null;
+  if (isFiniteNum(q) && q > 0 && isFiniteNum(amt) && amt > 0) {
+    const t = up * q;
+    if (months && months >= 12) {
+      if (near(t, amt)) return months === 12 ? up : (up * 12) / months;
+      if (near(t * months, amt)) return up * 12;
+      if (near((t * months) / 12, amt)) return up;
+    } else if (!months && near(t * 12, amt) && !near(t, amt)) return up * 12;
+  }
+  if (months && months > 12) return null;
+  return up;
+}
+
 function pricePerElev(r, { contract, singleRow, stats }) {
   const g = r._g;
+  const model = contract.pricing_model ?? null;
+  // Free avtal and a known 0 kr are not price points.
+  if (model === 'free' || r.annual_value_sek === 0) return;
+  const staffUnit = STAFF_UNIT.test(contract.unit ?? '')
+    || g.lines.some(({ l }) => isFiniteNum(l.amount_sek) && l.amount_sek > 0 && STAFF_UNIT.test(l.unit ?? '') && !ELEV_UNIT.test(l.unit ?? ''));
+  const elevModel = ELEV_MODELS.has(model)
+    || ((model == null || model === 'unknown') && ELEV_UNIT.test(contract.unit ?? ''));
+  if (!elevModel) return;
   // Styckpris: a product line of this row priced per elev for a period of at
   // least 12 months (or no stated period); an explicit >= 12 months wins.
   const unitLines = g.lines.filter(({ l, r: c }) => ['product', 'segment', 'bundle'].includes(c.kind)
     && ELEV_UNIT.test(l.unit ?? '') && isFiniteNum(l.unit_price_sek) && l.unit_price_sek > 0
-    && (l.period_months == null || (isFiniteNum(l.period_months) && l.period_months >= 12)));
+    && (l.period_months == null || (isFiniteNum(l.period_months) && l.period_months >= 12)))
+    .map((x) => ({ ...x, annual: annualUnitPrice(x.l) }))
+    .filter((x) => x.annual != null);
   const unitLine = unitLines.find(({ l }) => l.period_months != null) ?? unitLines[0];
   if (unitLine) {
-    r.kr_per_elev = round2(unitLine.l.unit_price_sek);
+    r.kr_per_elev = round2(unitLine.annual);
     r.kr_per_elev_basis = 'styckpris';
     r.kr_per_elev_product_slug = unitLine.r.kind === 'bundle' ? null : unitLine.r.productSlug ?? null;
     return;
   }
-  if (singleRow && ELEV_UNIT.test(contract.unit ?? '') && isFiniteNum(contract.unit_price_sek) && contract.unit_price_sek > 0) {
-    r.kr_per_elev = round2(contract.unit_price_sek);
-    r.kr_per_elev_basis = 'styckpris';
-    r.kr_per_elev_product_slug = r.product_slugs.length === 1 ? r.product_slugs[0] : null;
-    return;
+  if (singleRow && ELEV_UNIT.test(contract.unit ?? '')) {
+    const annual = annualUnitPrice({
+      unit_price_sek: contract.unit_price_sek, unit: contract.unit, quantity: contract.quantity,
+      amount_sek: contract.annual_value_sek, period_months: null,
+    });
+    if (annual != null) {
+      r.kr_per_elev = round2(annual);
+      r.kr_per_elev_basis = 'styckpris';
+      r.kr_per_elev_product_slug = r.product_slugs.length === 1 ? r.product_slugs[0] : null;
+      return;
+    }
   }
+  // Value per elev: never for a staff or user licence (a few teacher seats
+  // divided by every pupil would read as the cheapest price in Sweden).
+  if (staffUnit) return;
   if (r.segments.length === 0) return; // a kommun-wide licence without segments is not normalised
   const { count, invalid } = coverageStudents(g.cov, r.segments);
   if (invalid) return; // a negative or non-numeric count is bad data, not a fallback
@@ -302,20 +369,23 @@ function pricePerElev(r, { contract, singleRow, stats }) {
   }
   if (elever == null) return;
   r.elever_in_scope = elever;
-  if (r.annual_value_sek == null || !['stated', 'split'].includes(r.value_basis)) return;
+  if (!isFiniteNum(r.annual_value_sek) || r.annual_value_sek <= 0 || !['stated', 'split'].includes(r.value_basis)) return;
   const v = r.annual_value_sek / elever;
   if (!Number.isFinite(v)) return;
   r.kr_per_elev = round2(v);
   r.kr_per_elev_basis = basis;
 }
 
-// Of several avtal for one kommun x company x product, the newest counts.
+// Of several avtal for one kommun x company x product, the newest active one
+// counts.
 function markSuperseded(facts) {
   const groups = groupBy(facts, (f) => `${f.kommun_kod}\u0000${companyKey(f)}`);
   for (const rows of groups.values()) {
     if (rows.length < 2) continue;
     for (const r of rows) {
-      r.superseded = rows.some((s) => s.contract_id !== r.contract_id && isNewer(s, r) && (
+      // Only an active (headline-eligible) avtal can replace another: an
+      // expired or undated addendum never hides a running avtal.
+      r.superseded = rows.some((s) => s.contract_id !== r.contract_id && s.active && isNewer(s, r) && (
         r.product_slugs.length === 0
           ? s.product_slugs.length === 0
           : r.product_slugs.every((p) => s.product_slugs.includes(p))));
@@ -347,8 +417,9 @@ const byName = (a, b) => String(a.name).localeCompare(String(b.name), 'sv');
 // Per kommun: 'not_contacted' (only INITIAL), 'open', 'done', or
 // 'dead_end': every conversation closed, at least one DEAD_END, and no avtal
 // received. dead_end needs kodsWithAvtal (kommun kods with any collected
-// avtal); without it a closed kommun is 'done', as before. Consumers treat
-// dead_end as a finished collection with no avtal.
+// avtal); without it a closed kommun is 'done', as before. dead_end is NOT
+// evidence of absence: the kommun handed nothing over, so we know nothing
+// about what it buys. Only 'done' counts as a finished collection.
 export function collectionStatus(conversations = [], { kodsWithAvtal = null } = {}) {
   const by = groupBy(conversations.filter((c) => c && c.kommun_kod), (c) => c.kommun_kod);
   const out = new Map();
@@ -362,7 +433,7 @@ export function collectionStatus(conversations = [], { kodsWithAvtal = null } = 
   return out;
 }
 
-export const isCollectionFinished = (s) => s === 'done' || s === 'dead_end';
+export const isCollectionFinished = (s) => s === 'done';
 
 function quantile(sorted, q) {
   const pos = (sorted.length - 1) * q;
@@ -437,14 +508,21 @@ export function priceRowFilter({ productSlug, category, segment, kommunKods } = 
     && (!kods || kods.has(f.kommun_kod));
 }
 
+// One point per kommun: a kommun with several priced avtal in the filtered
+// set counts once, at the median of its own prices, so n is distinct
+// kommuner and one kommun (or one avtal naming five owners) can never reach
+// MIN_N alone. n_avtal says how many avtal stand behind the points.
 export function priceDistribution(facts, opts = {}) {
   const match = priceRowFilter(opts);
-  const rows = headline(facts).filter((f) => isFiniteNum(f.kr_per_elev) && match(f));
-  const d = distribution(rows.map((f) => f.kr_per_elev));
-  const values = d.suppressed ? [] : rows
-    .map((f) => ({ kommun_kod: f.kommun_kod, kr_per_elev: f.kr_per_elev }))
+  const rows = headline(facts).filter((f) => isFiniteNum(f.kr_per_elev) && f.kr_per_elev > 0 && match(f));
+  const perKommun = [...groupBy(rows, (f) => f.kommun_kod)].map(([kommun_kod, group]) => {
+    const v = group.map((f) => f.kr_per_elev).sort((a, b) => a - b);
+    return { kommun_kod, kr_per_elev: round2(quantile(v, 0.5)) };
+  });
+  const d = distribution(perKommun.map((p) => p.kr_per_elev));
+  const values = d.suppressed ? [] : perKommun
     .sort((a, b) => a.kr_per_elev - b.kr_per_elev || String(a.kommun_kod).localeCompare(String(b.kommun_kod)));
-  return { ...d, values };
+  return { ...d, n_avtal: distinct(rows, (f) => f.contract_id), values };
 }
 
 function monthKey(iso) { return iso.slice(0, 7); }
@@ -487,15 +565,25 @@ export function renewalBuckets(facts, { today, months = 24 } = {}) {
 }
 
 // allKods: the kommun universe (e.g. stats.all() kods); defaults to every
-// kommun the status map or the facts know.
+// kommun the status map or the facts know. Buckets: has (an active avtal in
+// scope), none_done (collection done and no active avtal: the only safe white
+// spot; none_done_expired lists those of them whose avtal in scope have all
+// expired or been replaced), refused (dead_end: nothing handed over, so no
+// claim either way), none_open, not_contacted.
 export function whiteSpots(facts, statusMap = new Map(), { category, allKods } = {}) {
   const kods = allKods ? [...new Set(allKods)] : [...new Set([...statusMap.keys(), ...facts.map((f) => f.kommun_kod)])];
-  const has = new Set(headline(facts).filter((f) => !category || catOf(f) === category).map((f) => f.kommun_kod));
-  const out = { has: [], none_done: [], none_open: [], not_contacted: [] };
+  const inScope = (f) => !category || catOf(f) === category;
+  const has = new Set(headline(facts).filter(inScope).map((f) => f.kommun_kod));
+  const hadAny = new Set(facts.filter(inScope).map((f) => f.kommun_kod));
+  const out = { has: [], none_done: [], none_done_expired: [], refused: [], none_open: [], not_contacted: [] };
   for (const kod of kods.filter(Boolean).sort()) {
+    const st = statusMap.get(kod);
     if (has.has(kod)) out.has.push(kod);
-    else if (isCollectionFinished(statusMap.get(kod))) out.none_done.push(kod);
-    else if (statusMap.get(kod) === 'open') out.none_open.push(kod);
+    else if (st === 'done') {
+      out.none_done.push(kod);
+      if (hadAny.has(kod)) out.none_done_expired.push(kod);
+    } else if (st === 'dead_end') out.refused.push(kod);
+    else if (st === 'open') out.none_open.push(kod);
     else out.not_contacted.push(kod);
   }
   return out;
@@ -573,6 +661,7 @@ export function dataBasis(facts, statusMap = new Map()) {
     kommuner_with_avtal: distinct(head.filter((f) => f.kommun_kod), (f) => f.kommun_kod),
     kommuner_collected: distinct(facts.filter((f) => f.kommun_kod), (f) => f.kommun_kod),
     kommuner_total: KOMMUNER_TOTAL,
+    // dead_end is counted on its own, never as a finished collection.
     done: [...statusMap.values()].filter(isCollectionFinished).length,
     dead_end: [...statusMap.values()].filter((s) => s === 'dead_end').length,
   };
