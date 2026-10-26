@@ -9,7 +9,7 @@
 
 import { readFileSync } from 'node:fs';
 import { esc } from './layout.js';
-import { fmtInt, UNKNOWN } from './format.js';
+import { fmtInt, fmtPrice, UNKNOWN } from './format.js';
 import { MIN_N } from '../studio-data.js';
 
 const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
@@ -42,7 +42,7 @@ export function niceDomain(min, max) {
 function axisTicks(ticks, x, unit) {
   return `<div class="axis-x" aria-hidden="true">${ticks.map((t, i) => {
     const edge = i === 0 ? ' is-first' : i === ticks.length - 1 ? ' is-last' : '';
-    return `<span class="axis-tick${edge}" style="left:${pct(x(t))}">${esc(fmtInt(t))}</span>`;
+    return `<span class="axis-tick${edge}" style="left:${pct(x(t))}">${esc(fmtPrice(t))}</span>`;
   }).join('')}${unit ? `<span class="axis-unit">${esc(unit)}</span>` : ''}</div>`;
 }
 
@@ -102,7 +102,7 @@ export function stripPlot({
   const bandH = (2 * maxLane + 1) * LANE_H + 12;
   const H = bandH + 20;
   const cy = H / 2;
-  const fmtV = (v) => `${fmtInt(v)} ${unit}`;
+  const fmtV = (v) => `${fmtPrice(v)} ${unit}`;
   const who = (kod) => {
     if (highlightKod != null && String(kod) === String(highlightKod) && highlightLabel) return highlightLabel;
     const nm = nameOf ? nameOf(kod) : null;
@@ -124,7 +124,7 @@ export function stripPlot({
   const hlX = hl ? xs[hlIdx] : null;
   const labelEdge = (p) => (p > 80 ? ' is-right' : p < 20 ? ' is-left' : '');
 
-  const aria = `${label}: ${n} ${noun}, median ${fmtV(d.median)}, mittersta hälften ${fmtInt(d.p25)} till ${fmtV(d.p75)}`;
+  const aria = `${label}: ${n} ${noun}, median ${fmtV(d.median)}, mittersta hälften ${fmtPrice(d.p25)} till ${fmtV(d.p75)}`;
   return `<figure class="viz strip">${head}
   <div class="strip-plot">
     <span class="strip-median-label${labelEdge(mx)}" style="left:${pct(mx)}">median <b>${esc(fmtV(d.median))}</b></span>
@@ -141,7 +141,7 @@ export function stripPlot({
     ${axisTicks(ticks, x, unit)}
   </div>
   <figcaption class="viz-foot">
-    <span class="lg"><i class="lg-band"></i>mittersta hälften ${esc(fmtInt(d.p25))} till ${esc(fmtV(d.p75))}</span>
+    <span class="lg"><i class="lg-band"></i>mittersta hälften ${esc(fmtPrice(d.p25))} till ${esc(fmtV(d.p75))}</span>
     <span class="lg"><i class="lg-tick"></i>median</span>
     ${hl ? `<span class="lg"><i class="lg-dot is-highlight"></i>${esc(highlightLabel || who(hl.kommun_kod))}</span>` : ''}
     <span>en punkt per ${esc(dotNoun)}, ${esc(fmtInt(n))} ${esc(noun)}</span>
@@ -350,7 +350,8 @@ export function renewalTimeline({ lanes = [], today, months = 24, laneHead = '' 
 
 // ------------------------------------------------------------------ tile map
 
-export const TILE_CLASSES = Object.freeze(['has', 'none-done', 'none-open', 'not-contacted', 'highlight', 'unknown']);
+// 'neutral': a kommun the map makes no claim about (e.g. outside a peer group).
+export const TILE_CLASSES = Object.freeze(['has', 'none-done', 'none-open', 'not-contacted', 'highlight', 'neutral', 'unknown']);
 const TILE_UNKNOWN_LABEL = 'Status okänd';
 
 let tilesMemo = null;

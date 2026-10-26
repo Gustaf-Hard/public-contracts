@@ -26,6 +26,13 @@ export function fmtInt(n) {
   return sign(n) + group(String(Math.round(Math.abs(n))));
 }
 
+// A price per elev: below 10 one decimal ("0,4"), so a small price never
+// reads as 0; otherwise a whole number.
+export function fmtPrice(n) {
+  if (!known(n)) return UNKNOWN;
+  return Math.abs(n) < 10 ? sign(n) + oneDecimal(Math.abs(n)) : fmtInt(n);
+}
+
 export function fmtKr(n) {
   if (!known(n)) return UNKNOWN;
   return `${fmtInt(n)} kr`;

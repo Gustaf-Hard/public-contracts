@@ -269,6 +269,30 @@ describe('buildStudioFacts: unknown and uncatalogued vendors', () => {
   });
 });
 
+describe('collectionStatus dead_end', () => {
+  const convs = [
+    { kommun_kod: '9001', state: 'DONE' }, { kommun_kod: '9001', state: 'DEAD_END' },
+    { kommun_kod: '9002', state: 'DEAD_END' },
+    { kommun_kod: '9003', state: 'DONE' },
+    { kommun_kod: '9004', state: 'DEAD_END' }, { kommun_kod: '9004', state: 'SENT' },
+  ];
+  it('a closed kommun with a DEAD_END and no avtal received is dead_end', () => {
+    const st = collectionStatus(convs, { kodsWithAvtal: new Set(['9001']) });
+    expect(st.get('9001')).toBe('done');
+    expect(st.get('9002')).toBe('dead_end');
+    expect(st.get('9003')).toBe('done');
+    expect(st.get('9004')).toBe('open');
+  });
+  it('without kodsWithAvtal a closed kommun stays done', () => {
+    expect(collectionStatus(convs).get('9002')).toBe('done');
+  });
+  it('whiteSpots and dataBasis treat dead_end as a finished collection', () => {
+    const st = collectionStatus(convs, { kodsWithAvtal: new Set(['9001']) });
+    expect(whiteSpots([], st, { allKods: ['9002'] }).none_done).toEqual(['9002']);
+    expect(dataBasis([], st)).toMatchObject({ done: 3, dead_end: 1 });
+  });
+});
+
 describe('collectionStatus and whiteSpots', () => {
   const status = collectionStatus([
     { kommun_kod: '9001', state: 'DONE' },

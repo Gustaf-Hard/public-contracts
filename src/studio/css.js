@@ -392,6 +392,7 @@ const COMPONENT_CSS = `
 .t-none-open { background: var(--hatch), var(--surface-2); box-shadow: inset 0 0 0 1px var(--line-strong); }
 .t-not-contacted { background: transparent; box-shadow: inset 0 0 0 1px var(--line-strong); }
 .t-highlight { background: var(--viz-highlight); box-shadow: 0 0 0 2px var(--surface), 0 0 0 3.5px var(--viz-highlight); z-index: 2; }
+.t-neutral { background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line); }
 .t-unknown { background: var(--hatch), transparent; outline: 1px dashed var(--ink-3); outline-offset: -1px; }
 .tm-grid .tile:hover, .tm-grid .tile:focus-visible { z-index: 10; outline: 2px solid var(--ink); outline-offset: 1px; border-radius: 3px; }
 .tm-grid .tile:hover::after, .tm-grid .tile:focus-visible::after {

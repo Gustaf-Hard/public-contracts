@@ -335,16 +335,25 @@ const byName = (a, b) => String(a.name).localeCompare(String(b.name), 'sv');
 
 // ---------------- aggregators ----------------
 
-export function collectionStatus(conversations = []) {
+// Per kommun: 'not_contacted' (only INITIAL), 'open', 'done', or
+// 'dead_end': every conversation closed, at least one DEAD_END, and no avtal
+// received. dead_end needs kodsWithAvtal (kommun kods with any collected
+// avtal); without it a closed kommun is 'done', as before. Consumers treat
+// dead_end as a finished collection with no avtal.
+export function collectionStatus(conversations = [], { kodsWithAvtal = null } = {}) {
   const by = groupBy(conversations.filter((c) => c && c.kommun_kod), (c) => c.kommun_kod);
   const out = new Map();
   for (const [kod, convs] of by) {
     if (convs.every((c) => c.state === 'INITIAL')) out.set(kod, 'not_contacted');
-    else if (convs.every((c) => c.state === 'DONE' || c.state === 'DEAD_END')) out.set(kod, 'done');
-    else out.set(kod, 'open');
+    else if (convs.every((c) => c.state === 'DONE' || c.state === 'DEAD_END')) {
+      const dead = kodsWithAvtal && !kodsWithAvtal.has(kod) && convs.some((c) => c.state === 'DEAD_END');
+      out.set(kod, dead ? 'dead_end' : 'done');
+    } else out.set(kod, 'open');
   }
   return out;
 }
+
+export const isCollectionFinished = (s) => s === 'done' || s === 'dead_end';
 
 function quantile(sorted, q) {
   const pos = (sorted.length - 1) * q;
@@ -467,7 +476,7 @@ export function whiteSpots(facts, statusMap = new Map(), { category, allKods } =
   const out = { has: [], none_done: [], none_open: [], not_contacted: [] };
   for (const kod of kods.filter(Boolean).sort()) {
     if (has.has(kod)) out.has.push(kod);
-    else if (statusMap.get(kod) === 'done') out.none_done.push(kod);
+    else if (isCollectionFinished(statusMap.get(kod))) out.none_done.push(kod);
     else if (statusMap.get(kod) === 'open') out.none_open.push(kod);
     else out.not_contacted.push(kod);
   }
@@ -546,7 +555,8 @@ export function dataBasis(facts, statusMap = new Map()) {
     kommuner_with_avtal: distinct(head.filter((f) => f.kommun_kod), (f) => f.kommun_kod),
     kommuner_collected: distinct(facts.filter((f) => f.kommun_kod), (f) => f.kommun_kod),
     kommuner_total: KOMMUNER_TOTAL,
-    done: [...statusMap.values()].filter((s) => s === 'done').length,
+    done: [...statusMap.values()].filter(isCollectionFinished).length,
+    dead_end: [...statusMap.values()].filter((s) => s === 'dead_end').length,
   };
 }
 

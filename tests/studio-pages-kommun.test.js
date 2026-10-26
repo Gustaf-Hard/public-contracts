@@ -168,7 +168,7 @@ describe('/studio/kommun/:kod', () => {
     expect(html).toContain('140 kr/elev');
     // Begreppa: three priced peers -> own number only
     expect(html).toContain('för få jämförbara kommuner');
-    expect(html).toContain('80');
+    expect(html).toMatch(/kp-own-num">80</);
     // Two lärplattformar -> overlap warning
     expect(html).toContain('id="overlapp"');
     expect(html).toMatch(/Unikum[\s\S]*Vklass/);
@@ -238,6 +238,83 @@ describe('/studio/kommun/:kod', () => {
     expect(html).not.toContain('insamling pågår');
     expect(html).not.toContain('vi har inte begärt ut avtal här än');
     noLeaks(html);
+  });
+
+  it('four priced peers (distinct kommuner) get no strip; the own price stands alone', async () => {
+    for (const [kod, p] of Object.entries({ '1440': 140, '1401': 110, '1402': 120, '1407': 150, '1415': 170 })) {
+      seedContract({ kod, vendor: 'ILT Education AB', lines: [{ product_name: 'Polyglutt', unit: 'elev', unit_price_sek: p, period_months: 12 }] });
+    }
+    const html = (await body('/studio/kommun/1440')).text;
+    expect(html).toMatch(/kp-own-num">140</);
+    expect(html).toContain('4 liknande och 4 kommuner totalt med känt pris');
+    expect(html).not.toContain('strip-dot');
+    expect(html).not.toContain('class="viz strip"');
+  });
+
+  it('five priced peers get the strip with the kommun highlighted', async () => {
+    for (const [kod, p] of Object.entries({ '1440': 140, '1401': 110, '1402': 120, '1407': 150, '1415': 170, '1441': 190 })) {
+      seedContract({ kod, vendor: 'ILT Education AB', lines: [{ product_name: 'Polyglutt', unit: 'elev', unit_price_sek: p, period_months: 12 }] });
+    }
+    const html = (await body('/studio/kommun/1440')).text;
+    expect(html).toContain('Polyglutt hos 5 liknande kommuner');
+    expect((html.match(/class="mark strip-dot/g) || []).length).toBe(6);
+    expect(html).toContain('strip-dot fade-in is-highlight');
+  });
+
+  it('too few peers but enough other kommuner falls back to all kommuner, the kommun excluded from n', async () => {
+    const prices = { '1440': 140, '1401': 110, '1402': 120, '0560': 150, '0180': 170 };
+    for (const [kod, p] of Object.entries(prices)) {
+      seedContract({ kod, vendor: 'ILT Education AB', lines: [{ product_name: 'Polyglutt', unit: 'elev', unit_price_sek: p, period_months: 12 }] });
+    }
+    let html = (await body('/studio/kommun/1440')).text;
+    expect(html).not.toContain('strip-dot');
+    expect(html).toContain('4 kommuner totalt');
+    seedContract({ kod: '1482', vendor: 'ILT Education AB', lines: [{ product_name: 'Polyglutt', unit: 'elev', unit_price_sek: 160, period_months: 12 }] });
+    html = (await body('/studio/kommun/1440')).text;
+    expect(html).toContain('Jämfört med alla kommuner (för få liknande)');
+    expect(html).toContain('Bara 3 liknande kommuner har känt pris');
+    expect(html).toContain('Här jämförs med 5 andra kommuner');
+    expect(html).not.toContain('i liknande kommuner</span>');
+    for (const name of ['Härryda', 'Partille', 'Kungälv', 'Boxholm', 'Stockholm']) expect(html).not.toContain(name);
+  });
+
+  it('peer spend medians use only peers whose collection is done', async () => {
+    seedAle();
+    let html = (await body('/studio/kommun/1440')).text;
+    const kop = () => html.slice(html.indexOf('id="kop"'), html.indexOf('id="pris"'));
+    expect(kop()).toContain('för få liknande med klar insamling');
+    expect(kop()).not.toContain('liknande med klar insamling:');
+    for (const kod of ['1401', '1402', '1407', '1415', '1441', '1482']) db.raw.prepare('UPDATE conversations SET state = ? WHERE kommun_kod = ?').run('DONE', kod);
+    html = (await body('/studio/kommun/1440')).text;
+    expect(kop()).toContain('median bland 6 liknande med klar insamling: 100 kr/elev');
+    expect(kop()).toContain('bara de 6 av 7 där insamlingen är klar');
+  });
+
+  it('a kommun that closed with a dead end and no avtal is not shown as delivered', async () => {
+    seedAle();
+    conversation('0560', 'DEAD_END');
+    const html = (await body('/studio/kommun/0560')).text;
+    expect(html).toContain('Inga avtal utlämnade');
+    expect(html).toContain('kommunen har inte lämnat ut avtal');
+    expect(html).not.toContain('insamling klar');
+    expect(html).not.toMatch(/tolkade|inlagda/);
+    noLeaks(html);
+  });
+
+  it('avtal from a kommun with only an INITIAL conversation is not called not contacted', async () => {
+    seedContract({ kod: '0560', vendor: 'ILT Education AB', lines: [{ product_name: 'Polyglutt' }] });
+    conversation('0560', 'INITIAL');
+    const html = (await body('/studio/kommun/0560')).text;
+    expect(html).toContain('Polyglutt');
+    expect(html).not.toContain('vi har inte begärt ut avtal här än');
+    expect(html).toContain('Status okänd');
+  });
+
+  it('hostile vendor names are escaped', async () => {
+    seedContract({ kod: '1440', vendor: '<script>alert(1)</script> "Evil" AB', value: 90000, model: 'fixed' });
+    const html = (await body('/studio/kommun/1440')).text;
+    expect(html).not.toContain('<script>alert');
+    expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
   });
 
   it('an unknown kod is a 404 studio page', async () => {

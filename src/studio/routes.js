@@ -53,7 +53,7 @@ export function makeStudioData({ db, statsLoader = loadKommunStats, now = () => 
         today,
       })
       : [];
-    const statusMap = collectionStatus(db ? db.listAllConversations() : []);
+    const statusMap = collectionStatus(db ? db.listAllConversations() : [], { kodsWithAvtal: new Set(facts.map((f) => f.kommun_kod)) });
     const basis = { ...dataBasis(facts, statusMap), updated: today };
     const data = { facts, stats, statusMap, basis, today, searchOptions: buildSearchOptions(stats) };
     memo = { db, today, at: ms, data };
