@@ -5,7 +5,7 @@
 // percentiles are suppressed below MIN_N.
 
 import { classifyVendor, classifyLine, companyBySlug, productBySlug } from './catalogue.js';
-import { GRADE_LEVELS, contractLengthMonths, mapUnitToGradeLevels, normalizeAnnualValue } from './vendor-analytics.js';
+import { GRADE_LEVELS, contractLengthMonths, mapUnitToGradeLevels, normalizeAnnualValue, unitPeriodsPerYear } from './vendor-analytics.js';
 import { computeNextReviewDate } from './contract-lifecycle.js';
 
 export const MIN_N = 5;
@@ -280,8 +280,6 @@ export function buildStudioFacts({ contracts = [], lineItems = [], coverage = []
 const ELEV_MODELS = new Set(['per_student', 'fixed', 'tiered']);
 // A unit that counts staff or users, not pupils.
 const STAFF_UNIT = /l[äa]rare|personal|pedagog|anv[äa]ndare|anst[äa]lld|medarbetare|\buser/i;
-const PER_MONTH_UNIT = /m[åa]n(ad|ader)?\b|\bmonth/i;
-const PER_TERM_UNIT = /termin/i;
 const near = (a, b) => Math.abs(a - b) <= 0.1 * Math.max(Math.abs(a), Math.abs(b));
 
 // Annual price per elev from a stated unit price, or null when it cannot be
@@ -295,8 +293,10 @@ const near = (a, b) => Math.abs(a - b) <= 0.1 * Math.max(Math.abs(a), Math.abs(b
 // gives null, so the caller falls back to value per elev.
 function annualUnitPrice({ unit_price_sek: up, unit, quantity: q, amount_sek: amt, period_months: pm }) {
   if (!(isFiniteNum(up) && up > 0)) return null;
-  if (PER_MONTH_UNIT.test(unit ?? '')) return up * 12;
-  if (PER_TERM_UNIT.test(unit ?? '')) return up * 2;
+  // Per month or per term, by the same rule normalizeAnnualValue uses for
+  // the avtal's annual value.
+  const periods = unitPeriodsPerYear(unit);
+  if (periods > 1) return up * periods;
   const months = isFiniteNum(pm) && pm > 0 ? pm : null;
   if (isFiniteNum(q) && q > 0 && isFiniteNum(amt) && amt > 0) {
     const t = up * q;

@@ -38,6 +38,14 @@ describe('normalizeAnnualValue — structured fields take precedence', () => {
     }, { now: NOW })).toBe(170000);
   });
 
+  it('scales a per-month unit price to a year (r2 P8): 10 kr per elev and month x 500 = 60 000', () => {
+    expect(normalizeAnnualValue({ pricing_model: 'per_student', unit: 'elev/månad', unit_price_sek: 10, quantity: 500 }, { now: NOW })).toBe(60000);
+    expect(normalizeAnnualValue({ pricing_model: 'per_user', unit: 'användare per månad', unit_price_sek: 10, quantity: 500 }, { now: NOW })).toBe(60000);
+    expect(normalizeAnnualValue({ pricing_model: 'per_student', unit: 'elev och termin', unit_price_sek: 10, quantity: 500 }, { now: NOW })).toBe(10000);
+    // Words that only contain the letters are not a period.
+    expect(normalizeAnnualValue({ pricing_model: 'per_student', unit: 'huvudmannalicens', unit_price_sek: 10, quantity: 500 }, { now: NOW })).toBe(5000);
+  });
+
   it('ignores a negative or non-finite analyser value', () => {
     expect(normalizeAnnualValue({ annual_value_sek: -5 }, { now: NOW })).toBeNull();
     expect(normalizeAnnualValue({ annual_value_sek: NaN }, { now: NOW })).toBeNull();

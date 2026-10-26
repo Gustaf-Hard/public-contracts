@@ -182,11 +182,23 @@ function parseAvtalsvardeText(text, { periodStart = null, now = null } = {}) {
   return null;
 }
 
+// How many of the unit's periods make a year: 12 for a per-month unit
+// ("elev/månad", "månad", "per month"), 2 for a per-term unit, else 1.
+const PER_MONTH_UNIT = /(^|[\s/])(m[åa]n|m[åa]nad|m[åa]nader|month)\b/i;
+const PER_TERM_UNIT = /termin/i;
+export function unitPeriodsPerYear(unit) {
+  const u = String(unit ?? '');
+  if (PER_MONTH_UNIT.test(u)) return 12;
+  if (PER_TERM_UNIT.test(u)) return 2;
+  return 1;
+}
+
 // Normalize one contract row to SEK per year. Precedence:
 //   1. analyser-provided annual_value_sek (finite, >= 0 — an explicit 0 is
 //      a true zero, e.g. "Ingen årlig abonnemangskostnad")
 //   2. pricing_model 'free' → 0
-//   3. unit_price_sek × quantity for per-unit models
+//   3. unit_price_sek × quantity for per-unit models (× 12 for a per-month
+//      unit, × 2 for a per-term unit)
 //   4. conservative parse of the raw avtalsvarde text (pre-backfill rows)
 // Returns null when genuinely unknown — never 0 for unknown, never a guess.
 export function normalizeAnnualValue(contract, { now = null } = {}) {
@@ -203,7 +215,9 @@ export function normalizeAnnualValue(contract, { now = null } = {}) {
   if ((contract.pricing_model === 'per_student' || contract.pricing_model === 'per_user')
       && Number.isFinite(contract.unit_price_sek) && contract.unit_price_sek > 0
       && Number.isFinite(contract.quantity) && contract.quantity > 0) {
-    return Math.round(contract.unit_price_sek * contract.quantity);
+    // A unit priced per month ("elev/månad") or per term is scaled to a
+    // year, the same way the studio annualises the unit price itself.
+    return Math.round(contract.unit_price_sek * contract.quantity * unitPeriodsPerYear(contract.unit));
   }
 
   // Text fallback is SEK-only; a foreign valuta makes "kr"-looking text suspect.

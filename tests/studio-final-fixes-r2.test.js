@@ -199,3 +199,18 @@ describe('Q1. styckpris: the main elev line, and the period rule on the avtal le
     expect(row(build([c]), c.contract_id)).toMatchObject({ kr_per_elev: 240, kr_per_elev_basis: 'styckpris' });
   });
 });
+
+// ------------------------------------------------------------------ P8
+describe('P8. an annual value derived from a monthly unit price is x 12', () => {
+  it('per_student, elev/månad, 10 kr x 500 elever and no stated value: 60 000 kr a year, 120 kr/elev', () => {
+    const c = C({ vendor_name: 'Quiculum', pricing_model: 'per_student', unit: 'elev/månad', unit_price_sek: 10, quantity: 500, annual_value_sek: null });
+    expect(row(build([c]), c.contract_id)).toMatchObject({ annual_value_sek: 60000, kr_per_elev: 120, kr_per_elev_basis: 'styckpris' });
+  });
+});
+describe('P8. the unit period rule is shared', () => {
+  it('a "huvudman" unit is not a monthly price', () => {
+    const c = C({ vendor_name: 'Quiculum', pricing_model: 'per_student', annual_value_sek: 40000 });
+    const facts = build([c], { lineItems: [LI(c.contract_id, 'Quiculum', 40000, { unit: 'elev huvudman', unit_price_sek: 100, quantity: 400, period_months: 12 })] });
+    expect(row(facts, c.contract_id).kr_per_elev).toBe(100);
+  });
+});
