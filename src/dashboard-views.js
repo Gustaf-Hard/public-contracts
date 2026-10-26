@@ -640,6 +640,19 @@ const baseCss = `
   .chart { width: 100%; height: auto; display: block; margin-bottom: var(--sp-2); }
   .ch-title { font-size: 13px; font-weight: 600; margin: var(--sp-4) 0 var(--sp-1); }
   .ch-tick { fill: var(--fg-muted); font-size: 11px; }
+  .ch-wrap { position: relative; }
+  .ch-wrap .chart { margin-bottom: var(--sp-2); }
+  .ch-hover { position: absolute; inset: 0; }
+  .ch-col { position: absolute; outline: none; border-radius: 4px; }
+  .ch-col:hover, .ch-col:focus-visible { background: color-mix(in srgb, var(--fg) 6%, transparent); z-index: 2; }
+  .ch-col:hover::after, .ch-col:focus-visible::after { content: ''; position: absolute; top: 0; bottom: 0; left: 50%; border-left: 1px solid var(--fg-muted); opacity: .5; }
+  .ch-tip { display: none; position: absolute; top: 0; left: 100%; margin-left: 6px; min-width: 190px; padding: 8px 10px;
+    background: var(--bg-elev); color: var(--fg); border: 1px solid var(--border); border-radius: 6px; box-shadow: var(--shadow);
+    font-size: 12px; line-height: 1.5; white-space: nowrap; pointer-events: none; font-variant-numeric: tabular-nums; }
+  .ch-col-right .ch-tip { left: auto; right: 100%; margin-left: 0; margin-right: 6px; }
+  .ch-col:hover .ch-tip, .ch-col:focus-visible .ch-tip { display: block; }
+  .ch-tip strong { font-size: 13px; }
+  .ch-tip-head { font-weight: 600; margin-bottom: 2px; }
   .ch-table { margin-top: var(--sp-4); }
   .ch-table td, .ch-table th { font-variant-numeric: tabular-nums; }
   .timing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--sp-3); }
@@ -2645,11 +2658,10 @@ function velocityChart(weeks) {
   const bars = weeks.map((wk, i) => {
     const h = (wk.contracts / maxBar) * barsH;
     const y = padT + barsH - h;
-    const label = `${weekLabel(wk)} (${wk.week_start}): ${wk.contracts} avtal, ${wk.kommuner} kommuner`;
     // A zero week draws no bar but keeps its slot, so a gap looks like a gap.
     return wk.contracts === 0
-      ? `<g><title>${escapeHtml(label)}</title><rect x="${x(i).toFixed(1)}" y="${padT + barsH - 2}" width="${barW.toFixed(1)}" height="2" fill="var(--border)"/></g>`
-      : `<g><title>${escapeHtml(label)}</title><rect x="${x(i).toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" rx="4" fill="var(--chart-series)"/></g>`;
+      ? `<rect x="${x(i).toFixed(1)}" y="${padT + barsH - 2}" width="${barW.toFixed(1)}" height="2" fill="var(--border)"/>`
+      : `<rect x="${x(i).toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" rx="4" fill="var(--chart-series)"/>`;
   }).join('');
 
   const ticks = weeks.map((wk, i) => (i % tickEvery === 0
@@ -2662,18 +2674,45 @@ function velocityChart(weeks) {
   }).join(' ');
   const cumDots = weeks.map((wk, i) => {
     const cy = padT + lineH - (wk.cumulative / maxCum) * lineH;
-    return `<g><title>${escapeHtml(`${weekLabel(wk)}: ${wk.cumulative} avtal totalt`)}</title>`
-      + `<circle cx="${(x(i) + barW / 2).toFixed(1)}" cy="${cy.toFixed(1)}" r="4" fill="var(--chart-series)"/></g>`;
+    return `<circle cx="${(x(i) + barW / 2).toFixed(1)}" cy="${cy.toFixed(1)}" r="4" fill="var(--chart-series)"/>`;
   }).join('');
+
+  // Hover layer (2026-10-26): one HTML column per week over each chart, the
+  // whole slot and plot height as hit target, tooltip shown by CSS on :hover /
+  // :focus. HTML rather than SVG because SVG has no z-index: a tooltip drawn in
+  // week i would sit under week i+1's bar. Both charts show the same readout
+  // (one tooltip, every figure for that week). No JS, so the pane swap is safe.
+  const weekEnd = (start) => {
+    const d = new Date(`${start}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + 6);
+    return d.toISOString().slice(0, 10);
+  };
+  const hoverLayer = (plotH) => {
+    const H = padT + plotH + axisH;
+    const pct = (v, of) => `${((v / of) * 100).toFixed(3)}%`;
+    return `<div class="ch-hover">${weeks.map((wk, i) => {
+      const side = i >= weeks.length / 2 ? ' ch-col-right' : '';
+      return `<div class="ch-col${side}" tabindex="0" style="left:${pct(padL + i * slot, w)};width:${pct(slot, w)};top:${pct(padT, H)};height:${pct(plotH, H)}">`
+        + `<div class="ch-tip" role="tooltip">`
+        + `<div class="ch-tip-head">${escapeHtml(weekLabel(wk))} <span class="muted">${escapeHtml(wk.week_start)} till ${escapeHtml(weekEnd(wk.week_start))}</span></div>`
+        + `<div><strong>${wk.contracts}</strong> avtal <span class="muted">från ${wk.kommuner} kommuner</span></div>`
+        + `<div><strong>${wk.cumulative}</strong> totalt</div>`
+        + `</div></div>`;
+    }).join('')}</div>`;
+  };
 
   const totalAvtal = weeks.length ? weeks[weeks.length - 1].cumulative : 0;
   return `
     <h3 class="ch-title">Avtal per vecka</h3>
+    <div class="ch-wrap">
     <svg class="chart" viewBox="0 0 ${w} ${padT + barsH + axisH}" role="img"
          aria-label="Stapeldiagram: antal avtal mottagna per vecka, ${weeks.length} veckor, som mest ${maxBar} på en vecka.">
       ${gridLines(barsH, maxBar)}${bars}${ticks}
     </svg>
+    ${hoverLayer(barsH)}
+    </div>
     <h3 class="ch-title">Kumulativt</h3>
+    <div class="ch-wrap">
     <svg class="chart" viewBox="0 0 ${w} ${padT + lineH + axisH}" role="img"
          aria-label="Linjediagram: totalt antal avtal över tid, ${totalAvtal} avtal totalt.">
       ${gridLines(lineH, maxCum)}
@@ -2682,7 +2721,9 @@ function velocityChart(weeks) {
       ${weeks.map((wk, i) => (i % tickEvery === 0
         ? `<text x="${(x(i) + barW / 2).toFixed(1)}" y="${padT + lineH + 13}" text-anchor="middle" class="ch-tick">${escapeHtml(weekLabel(wk))}</text>`
         : '')).join('')}
-    </svg>`;
+    </svg>
+    ${hoverLayer(lineH)}
+    </div>`;
 }
 
 // "median · spann min–max · n av N kontaktade". An empty sample renders "—",

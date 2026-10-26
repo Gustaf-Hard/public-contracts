@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { openDb } from '../src/storage.js';
 import { createDashboardApp, buildActionQueue, buildWaiting, buildDeferred, applyFilter, buildOverviewRows, contentDisposition, escalationActionLabel, deferredLabel, caseTooltip } from '../src/dashboard.js';
-import { layout, renderEscalationForm, renderOverview, renderArenden } from '../src/dashboard-views.js';
+import { layout, renderEscalationForm, renderOverview, renderArenden, renderVelocity } from '../src/dashboard-views.js';
 
 let tmp, db, dbPath, muniPath;
 
@@ -2640,5 +2640,33 @@ describe('overview Pausade list folds after three rows', () => {
     const html = renderOverview({ ...base, deferred: parked(3) });
     expect(html).toContain('Kommun3');
     expect(html).not.toContain('<details class="queue-fold">');
+  });
+});
+
+// 2026-10-26: hovering the Takt charts shows the week's figures. Native <title>
+// was slow, plain and only hit the painted mark (a zero week was a 2px target);
+// an HTML column per week over each chart carries a CSS-only tooltip.
+describe('/takt chart hover', () => {
+  const t = { median: null, min: null, max: null, n: 0, of: 0 };
+  const facts = {
+    weeks: [
+      { iso_week: '2026-W39', week_start: '2026-09-21', contracts: 0, kommuner: 0, cumulative: 10 },
+      { iso_week: '2026-W40', week_start: '2026-09-28', contracts: 259, kommuner: 31, cumulative: 269 },
+    ],
+    timings: { first_human_reply: t, first_contract: t },
+    funnel: { contacted: 0, human_replied: 0, delivered: 0 },
+    silent: [], files: { avtal: 0, total: 0, by_type: [] },
+  };
+
+  it('gives every week, zero weeks included, a focusable hover column with its dates and figures', () => {
+    const html = renderVelocity({ facts });
+    const cols = html.match(/<div class="ch-col[^"]*" tabindex="0"/g) ?? [];
+    expect(cols).toHaveLength(4); // 2 weeks × 2 charts
+    expect(html).toContain('v.40');
+    expect(html).toContain('2026-09-28 till 2026-10-04');
+    expect(html).toMatch(/<strong>259<\/strong> avtal/);
+    expect(html).toContain('31 kommuner');
+    expect(html).toMatch(/<strong>269<\/strong> totalt/);
+    expect(html).toMatch(/<strong>0<\/strong> avtal/);
   });
 });
