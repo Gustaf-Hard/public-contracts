@@ -95,6 +95,11 @@ export function renewalRows({ facts, stats, today, query }) {
     const products = [...new Set(fs.flatMap((f) => f.product_slugs))].map((slug) => ({ slug, name: productName(slug) })).filter((p) => p.name);
     const known = fs.filter((f) => isNum(f.annual_value_sek));
     const s = statsOf(stats, f0.kommun_kod);
+    // A samverkansavtal (r4 W3): every member copy shows the whole avtal's
+    // value as "samverkan", never as one member's known value, with the
+    // kommuner whose copy we hold.
+    const joint = fs.find((f) => f.joint)?.joint ?? null;
+    const wholeKnown = fs.filter((f) => f.joint && isNum(f.joint.whole_value_sek));
     const cats = [...new Set(fs.map((f) => f.category ?? UNKNOWN_CATEGORY))];
     return {
       contract_id: f0.contract_id,
@@ -107,11 +112,14 @@ export function renewalRows({ facts, stats, today, query }) {
       category: cats.find((c) => c !== UNKNOWN_CATEGORY) ?? UNKNOWN_CATEGORY,
       categories: cats,
       channel: f0.channel_slug,
-      value: known.length ? known.reduce((sum, f) => sum + f.annual_value_sek, 0) : null,
+      value: joint ? (wholeKnown.length ? wholeKnown.reduce((sum, f) => sum + f.joint.whole_value_sek, 0) : null)
+        : known.length ? known.reduce((sum, f) => sum + f.annual_value_sek, 0) : null,
+      avtal_key: f0.avtal_key ?? String(f0.contract_id),
+      joint: joint ? { members: joint.kommun_kods.map(nameOf).sort((a, b) => a.localeCompare(b, 'sv')) } : null,
       // An unsplit channel row carries everything the split could not place
       // (the whole avtal when the split was inconsistent), so with every
       // row of the avtal present the known sum is the avtal's whole value.
-      valuePartial: known.length > 0 && known.length < fs.length
+      valuePartial: !joint && known.length > 0 && known.length < fs.length
         && !(fs.length === rowsPer.get(f0.contract_id) && known.some((f) => f.value_basis === 'unsplit_channel')),
       date: f0.next_renewal.slice(0, 10),
       period_end: isIso(f0.period_end) ? f0.period_end.slice(0, 10) : null,
@@ -144,7 +152,7 @@ const ownersText = (r) => r.owners.map((o) => (o.unsplit ? `${o.name} (ej förde
 const CSV_HEAD = [
   'Kommun', 'Leverantör', 'Produkter', 'Kategori', 'Län', 'Kommungrupp', 'Kanal',
   'Känt årsvärde (kr)', 'Värdet gäller', 'Förnyas eller löper ut', 'Avtalet slutar',
-  'Förlängning möjlig till', 'Förlängs automatiskt', 'Sista uppsägningsdag',
+  'Förlängning möjlig till', 'Förlängs automatiskt', 'Sista uppsägningsdag', 'Samverkansavtal, kopior från',
 ];
 
 function csvCell(v) {
@@ -167,12 +175,13 @@ export function renewalsCsv(rows) {
       r.kommungrupp ?? '',
       r.channel ? companyLabel(r.channel) : 'Direkt',
       r.value == null ? '' : Math.round(r.value),
-      r.value == null ? 'okänt' : r.valuePartial ? 'delvis känt' : 'känt',
+      r.joint ? 'samverkan' : r.value == null ? 'okänt' : r.valuePartial ? 'delvis känt' : 'känt',
       r.date,
       r.period_end ?? '',
       r.extension_option_until ?? '',
       r.auto_renews == null ? '' : r.auto_renews ? 'ja' : 'nej',
       r.last_cancellation_date ?? '',
+      r.joint ? r.joint.members.join(', ') : '',
     ].map(csvCell).join(';'));
   }
   return `﻿${lines.join('\r\n')}\r\n`;
@@ -254,6 +263,11 @@ export function renewalChart({ rows, today, months }) {
 // ------------------------------------------------------------------ list
 
 function valueHtml(r) {
+  if (r.joint) {
+    const who = `samverkansavtal, kopior från ${r.joint.members.join(', ')}, andel okänd`;
+    return r.value == null ? `<span class="fx-val is-unknown">värde okänt<small>${esc(who)}</small></span>`
+      : `<span class="fx-val"><b>${esc(fmtKrCompact(r.value))}</b>/år<small>${esc(`hela avtalet, ${who}`)}</small></span>`;
+  }
   if (r.value == null) return '<span class="fx-val is-unknown">värde okänt</span>';
   return `<span class="fx-val"><b>${esc(fmtKrCompact(r.value))}</b>/år${r.valuePartial ? '<small>delvis känt</small>' : ''}</span>`;
 }
@@ -336,7 +350,8 @@ export function renderFornyelser({ facts, stats, today, query, page = 1 }) {
 
   const kommuner = new Set(rows.map((r) => r.kommun_kod)).size;
   const known = rows.filter((r) => r.value != null);
-  const value = known.reduce((s, r) => s + r.value, 0);
+  // A samverkansavtal is one avtal: its whole value counts once.
+  const value = [...new Map(known.map((r) => [r.avtal_key ?? String(r.contract_id), r.value])).values()].reduce((s, v) => s + v, 0);
   const counts = new Map();
   for (const r of rows) counts.set(r.date.slice(0, 7), (counts.get(r.date.slice(0, 7)) ?? 0) + 1);
   const peak = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0];

@@ -316,6 +316,16 @@ function addMonthsIso(iso, k) {
   return t.toISOString().slice(0, 10);
 }
 
+// A renewal lane item's value: a samverkansavtal shows the whole avtal on
+// every copy, labelled, never as one member's value (r4 W3).
+export function laneValue(f) {
+  if (f.joint) {
+    const w = f.joint.whole_value_sek;
+    return { value: isNum(w) ? w : null, valueLabel: isNum(w) ? `${fmtKrCompact(w)}/år, hela samverkansavtalet` : 'samverkansavtal, värde okänt' };
+  }
+  return { value: isNum(f.annual_value_sek) ? f.annual_value_sek : null, valueLabel: isNum(f.annual_value_sek) ? `${fmtKrCompact(f.annual_value_sek)}/år` : null };
+}
+
 // Lanes per kommun, soonest first. Returns { html, inWindow, unknownDate }.
 export function renewalSection({ rows, today, nameOf, titleOf }) {
   const head = byContract(headline(rows));
@@ -357,8 +367,7 @@ export function renewalSection({ rows, today, nameOf, titleOf }) {
       sub: `${fs.length === 1 ? 'förnyas' : `${fmtInt(fs.length)} avtal, först`} ${fs[0].next_renewal.slice(0, 10)}`,
       items: fs.map((f) => ({
         date: f.next_renewal.slice(0, 10),
-        value: isNum(f.annual_value_sek) ? f.annual_value_sek : null,
-        valueLabel: isNum(f.annual_value_sek) ? `${fmtKrCompact(f.annual_value_sek)}/år` : null,
+        ...laneValue(f),
         title: titleOf(f),
       })),
     })),
@@ -385,8 +394,9 @@ function periodText(f, today) {
 
 // "samverkansavtal (3 kommuner), andel okänd": we do not know each member's
 // share, so a value shown with it is the whole avtal's.
+// The count is the kommuner whose copy we hold, not the members (r4 X1).
 export function jointText(f) {
-  return f.joint ? `samverkansavtal (${fmtInt(f.joint.n_kommuner)} kommuner), andel okänd` : '';
+  return f.joint ? `samverkansavtal, kopior från ${fmtInt(f.joint.n_kommuner)} kommuner, andel okänd` : '';
 }
 // "2,3 mkr/år för hela avtalet" for a samverkansavtal, else null.
 export function jointValueText(f) {

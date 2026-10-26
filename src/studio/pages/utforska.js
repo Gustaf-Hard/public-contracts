@@ -176,7 +176,7 @@ function periodText(f) {
 
 function valueCell(f) {
   // A samverkansavtal: the whole avtal's value on every copy, never a share.
-  if (f.joint && isNum(f.joint.whole_value_sek)) return `${esc(fmtKrCompact(f.joint.whole_value_sek))}<small>hela samverkansavtalet, ${esc(String(f.joint.n_kommuner))} kommuner, andel okänd</small>`;
+  if (f.joint && isNum(f.joint.whole_value_sek)) return `${esc(fmtKrCompact(f.joint.whole_value_sek))}<small>hela samverkansavtalet, kopior från ${esc(String(f.joint.n_kommuner))} kommuner, andel okänd</small>`;
   if (!isNum(f.annual_value_sek)) return `<span class="muted">${UNKNOWN}</span>`;
   const base = esc(fmtKrCompact(f.annual_value_sek));
   if (f.value_basis === 'split') return `${base}<small>egen del</small>`;

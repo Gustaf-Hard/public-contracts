@@ -183,11 +183,11 @@ describe('R3. a samverkansavtal is shown whole, with andel okänd, and never as 
     expect(priceDistribution(facts, { productSlug: 'ist-administration' }).n).toBe(0);
   });
 
-  it('both member pages say samverkansavtal (2 kommuner), andel okänd, show the whole value as the whole avtal, and give no ert pris', () => {
+  it('both member pages say samverkansavtal, kopior från 2 kommuner, andel okänd (r4 X1), show the whole value as the whole avtal, and give no ert pris', () => {
     const { facts } = ggvv();
     for (const kod of ['0662', '0617']) {
       const html = text(renderKommun({ kod, stats, facts, statusMap: new Map([[kod, 'done']]), today: TODAY }));
-      expect(html).toContain('samverkansavtal (2 kommuner), andel okänd');
+      expect(html).toContain('samverkansavtal, kopior från 2 kommuner, andel okänd');
       expect(html).toMatch(/2 mkr\/år för hela avtalet/);
       expect(html).not.toContain('ert pris');
       // The kommun's known spend leaves the samverkansavtal out.

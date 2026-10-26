@@ -16,7 +16,7 @@ import { segmentMatrix, renewalTimeline, loadKommunTiles } from '../charts.js';
 import {
   isNum, headline, byContract, byAvtal, distinctCount, kommunNamer, productNames, productHref, companyHref,
   section, breadcrumb, priceStrip, medianText, evidenceSection, renewalTileProps, peerGroupKods,
-  modelLabel, safeAll, nOf, RENEWAL_MONTHS, isIso, coverageMap, noneStatusText,
+  modelLabel, safeAll, nOf, RENEWAL_MONTHS, isIso, coverageMap, noneStatusText, laneValue,
 } from './common.js';
 import { knownValue, shareBar, topThree, vendorRankings } from './marknad.js';
 
@@ -132,8 +132,7 @@ function renewalLanes({ rows, today, nameOf }) {
       sub: `${nOf(l.fs.length, 'avtal', 'avtal')}, först ${l.fs[0].next_renewal.slice(0, 10)}`,
       items: l.fs.map((f) => ({
         date: f.next_renewal.slice(0, 10),
-        value: isNum(f.annual_value_sek) ? f.annual_value_sek : null,
-        valueLabel: isNum(f.annual_value_sek) ? `${fmtKrCompact(f.annual_value_sek)}/år` : null,
+        ...laneValue(f),
         title: [nameOf(f.kommun_kod), productNames(f).join(', ')].filter(Boolean).join(', '),
       })),
     })),
