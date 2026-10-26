@@ -34,13 +34,19 @@
         return res.text();
       })
       .then(function (html) {
-        content().innerHTML = html;
-        content().dataset.path = clean;
+        var swap = function () {
+          content().innerHTML = html;
+          content().dataset.path = clean;
+          content().scrollTop = 0;
+          window.scrollTo(0, 0);
+          markActive(clean);
+          initExplorerIfPresent();
+        };
         if (push) history.pushState({ url: clean }, '', clean);
-        content().scrollTop = 0;
-        window.scrollTo(0, 0);
-        markActive(clean);
-        initExplorerIfPresent();
+        // Progressive: a cross-fade (and the studio entity-header morph) where
+        // the browser supports view transitions, a plain swap everywhere else.
+        if (document.startViewTransition) document.startViewTransition(swap);
+        else swap();
       })
       .catch(function () { location.href = url; });
   }
@@ -51,6 +57,17 @@
       var href = links[i].getAttribute('href');
       var active = href === '/' ? url === '/' : url.indexOf(href) === 0;
       links[i].classList.toggle('active', active);
+    }
+    // Studio nav (rail + phone tab bar): the first entry of data-nav-match is
+    // the item's own href (exact), the rest are path prefixes.
+    var path = url.split('?')[0].replace(/\/+$/, '') || '/';
+    var studio = document.querySelectorAll('[data-nav-match]');
+    for (var j = 0; j < studio.length; j++) {
+      var parts = studio[j].getAttribute('data-nav-match').split('|');
+      var cur = path === parts[0];
+      for (var k = 1; k < parts.length && !cur; k++) cur = path.indexOf(parts[k]) === 0;
+      if (cur) studio[j].setAttribute('aria-current', 'page');
+      else studio[j].removeAttribute('aria-current');
     }
   }
 
@@ -200,12 +217,20 @@
 
   // Light/dark theme toggle, persisted in localStorage (applied pre-paint by
   // the inline bootstrap in <head>).
+  // The stored value is always explicit ('light' or 'dark') so the studio's
+  // `:root:not([data-theme="light"])` OS-dark rule can be opted out of. Only
+  // the studio follows the OS setting, so only there does "no choice yet"
+  // count as dark when the OS is dark.
   document.addEventListener('click', function (e) {
     if (!(e.target.closest && e.target.closest('[data-theme-toggle]'))) return;
-    var dark = document.documentElement.getAttribute('data-theme') === 'dark';
-    if (dark) document.documentElement.removeAttribute('data-theme');
-    else document.documentElement.setAttribute('data-theme', 'dark');
-    try { localStorage.setItem('pilot-theme', dark ? '' : 'dark'); } catch (_) {}
+    var root = document.documentElement;
+    var t = root.getAttribute('data-theme');
+    var osDark = document.body.hasAttribute('data-studio') &&
+      window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    var dark = t === 'dark' || (t !== 'light' && osDark);
+    var next = dark ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('pilot-theme', next); } catch (_) {}
   });
 
   window.addEventListener('popstate', function (e) {
@@ -283,6 +308,8 @@
   // sidebar escalation badge fresh WITHOUT touching the open pane. Skips while a
   // field is focused so it can never disturb a half-typed reply.
   setInterval(function () {
+    // The studio has no badge, pill or health modal to keep fresh.
+    if (document.body.hasAttribute('data-studio')) return;
     var ae = document.activeElement;
     if (ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)) return;
     fetch('/api/escalation-count', { headers: { 'X-Partial': '1' } })

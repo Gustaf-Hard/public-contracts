@@ -8,6 +8,7 @@ import path from 'node:path';
 import { readFileSync, existsSync } from 'node:fs';
 import { openDb, ACTIVE_ESCALATION_STATUSES, REQUEUED_REASON_PREFIX, DEFERRED_ESCALATION_STATUS } from './storage.js';
 import { buildVelocityFacts } from './collection-velocity.js';
+import { mountStudio } from './studio/routes.js';
 import { buildPipeline, kommunStage } from './pipeline.js';
 import { effectiveFollowUp, TERMINAL_STATES } from './conversation.js';
 import { resolveVacationConfig, isInVacation } from './vacation.js';
@@ -861,6 +862,8 @@ export function createDashboardApp({
   slackClient = process.env.SLACK_BOT_TOKEN ? makeSlackClient(process.env.SLACK_BOT_TOKEN) : null,
   vacationConfig = loadVacationConfig(),
   authDeps = {},
+  // Mediagraf Studio deps (statsLoader, now); tests inject fixtures here.
+  studioDeps = {},
 } = {}) {
   const app = express();
   // An injected client (tests) is used as-is. Otherwise the client is rebuilt
@@ -905,6 +908,9 @@ export function createDashboardApp({
   mountAuthRoutes(app, { env, tokenPath: TOKEN_PATH, ...authDeps });
   app.use(requireAuth({ env }));
   app.use(express.static('public'));
+  // Mediagraf Studio: operator-only market view behind the same auth gate,
+  // with its own layout and no links back into the back office.
+  mountStudio(app, { db, ...studioDeps });
   // Pipeline health drives the heartbeat pill + the health modal (one object,
   // already threaded everywhere as `heartbeat`).
   const hb = () => (db && typeof db.getTickHealth === 'function' ? db.getTickHealth() : null);

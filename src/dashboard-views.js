@@ -307,6 +307,7 @@ const baseCss = `
   }
   .sidebar .nav-item:hover { background: var(--bg-elev-2); color: var(--fg); text-decoration: none; }
   .sidebar .nav-item.active { background: var(--bg-elev-2); color: var(--fg); }
+  .sidebar .nav-item-studio { margin-top: 8px; border-top: 1px solid var(--border); border-radius: 0 0 var(--r-2) var(--r-2); padding-top: 12px; color: var(--accent); }
   .sidebar .nav-item .nav-badge {
     background: var(--bad); color: #fff; font-size: 11px; font-weight: 600;
     min-width: 18px; text-align: center; padding: 1px 6px; border-radius: 999px;
@@ -936,6 +937,7 @@ export function layout({ title, body, currentPath = '/', heartbeat = null, parti
       ${navItem('/pipeline', 'Pipeline')}
       ${navItem('/takt', 'Takt')}
       ${navItem('/activity', 'Aktivitet')}
+      <a href="/studio" class="nav-item nav-item-studio" title="Mediagraf Studio, marknadsvyn">Studio ↗</a>
     </nav>
     <div class="sidebar-foot">
       ${renderHeartbeatPill(heartbeat)}
