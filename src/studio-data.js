@@ -50,7 +50,8 @@ const round2 = (x) => Math.round(x * 100) / 100;
 // of one product is ambiguous and gives null. Products agreeing on a grade
 // cover the same pupils (counted once); disagreeing is ambiguous. Every
 // product's rows need a count, and the counted grades must be exactly the
-// row's segments. Returns { count, invalid } (invalid: a stated count <= 0).
+// row's segments. Returns { count, invalid } (invalid: a stated count < 0 or
+// not a number; 0 counts as not stated).
 function coverageStudents(covRows, segments) {
   let invalid = false;
   let complete = true;
@@ -61,7 +62,9 @@ function coverageStudents(covRows, segments) {
     const seen = new Set();
     for (const r of rows) {
       const n = r.student_count;
-      if (n == null) { complete = false; continue; }
+      // 0 is how extraction writes "count not stated": unknown, not bad
+      // data, so the row may still fall back to Skolverket elever.
+      if (n == null || n === 0) { complete = false; continue; }
       if (!(isFiniteNum(n) && n > 0)) { invalid = true; continue; }
       if (seen.has(n)) complete = false;
       seen.add(n);
@@ -280,7 +283,7 @@ function pricePerElev(r, { contract, singleRow, stats }) {
   }
   if (r.segments.length === 0) return; // a kommun-wide licence without segments is not normalised
   const { count, invalid } = coverageStudents(g.cov, r.segments);
-  if (invalid) return; // a stated 0 or negative count is bad data, not a fallback
+  if (invalid) return; // a negative or non-numeric count is bad data, not a fallback
   let elever = null; let basis = null;
   if (count != null) {
     elever = count; basis = 'avtalets_elevantal';
@@ -406,13 +409,19 @@ export function marketByCategory(facts) {
   return out.sort((a, b) => b.value_known_sek - a.value_known_sek || b.n_avtal - a.n_avtal || a.category.localeCompare(b.category));
 }
 
-export function priceDistribution(facts, { productSlug, category, segment, kommunKods } = {}) {
+// The row filter of priceDistribution without the price itself, so a page
+// can count the avtal the plot could have shown ("utan känt pris").
+export function priceRowFilter({ productSlug, category, segment, kommunKods } = {}) {
   const kods = kommunKods ? new Set(kommunKods) : null;
-  const rows = headline(facts).filter((f) => isFiniteNum(f.kr_per_elev)
-    && (!productSlug || (f.product_slugs.length === 1 && f.product_slugs[0] === productSlug) || f.kr_per_elev_product_slug === productSlug)
+  return (f) => (!productSlug || (f.product_slugs.length === 1 && f.product_slugs[0] === productSlug) || f.kr_per_elev_product_slug === productSlug)
     && (!category || catOf(f) === category)
     && (!segment || f.segments.includes(segment))
-    && (!kods || kods.has(f.kommun_kod)));
+    && (!kods || kods.has(f.kommun_kod));
+}
+
+export function priceDistribution(facts, opts = {}) {
+  const match = priceRowFilter(opts);
+  const rows = headline(facts).filter((f) => isFiniteNum(f.kr_per_elev) && match(f));
   const d = distribution(rows.map((f) => f.kr_per_elev));
   const values = d.suppressed ? [] : rows
     .map((f) => ({ kommun_kod: f.kommun_kod, kr_per_elev: f.kr_per_elev }))
@@ -430,18 +439,22 @@ function addMonths(ym, k) {
 export function renewalBuckets(facts, { today, months = 24 } = {}) {
   if (!isIso(today)) throw new Error('renewalBuckets requires today as YYYY-MM-DD');
   const first = monthKey(today);
-  const buckets = Array.from({ length: months }, (_, i) => ({ month: addMonths(first, i), n: 0, value_known_sek: 0, byCategory: {} }));
+  // value_known_sek sums known values only; n_known says how many of n
+  // carried one, so an unknown value is never read as 0.
+  const buckets = Array.from({ length: months }, (_, i) => ({ month: addMonths(first, i), n: 0, n_known: 0, value_known_sek: 0, byCategory: {} }));
   const index = new Map(buckets.map((b, i) => [b.month, i]));
   for (const f of headline(facts)) {
     if (!isIso(f.next_renewal) || f.next_renewal.slice(0, 10) < today) continue;
     const i = index.get(monthKey(f.next_renewal));
     if (i == null) continue;
     const b = buckets[i];
-    const v = isFiniteNum(f.annual_value_sek) ? f.annual_value_sek : 0;
-    b.n += 1; b.value_known_sek += v;
+    const known = isFiniteNum(f.annual_value_sek);
     const cat = catOf(f);
-    b.byCategory[cat] ??= { n: 0, value_known_sek: 0 };
-    b.byCategory[cat].n += 1; b.byCategory[cat].value_known_sek += v;
+    b.byCategory[cat] ??= { n: 0, n_known: 0, value_known_sek: 0 };
+    for (const t of [b, b.byCategory[cat]]) {
+      t.n += 1;
+      if (known) { t.n_known += 1; t.value_known_sek += f.annual_value_sek; }
+    }
   }
   return buckets;
 }

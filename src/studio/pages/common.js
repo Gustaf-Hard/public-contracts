@@ -6,7 +6,7 @@
 import { esc } from '../layout.js';
 import { fmtInt, fmtKrCompact, UNKNOWN } from '../format.js';
 import { CATEGORIES, companyBySlug, productBySlug } from '../../catalogue.js';
-import { companyShares, priceDistribution, whiteSpots, MIN_N } from '../../studio-data.js';
+import { companyShares, priceDistribution, priceRowFilter, whiteSpots, MIN_N } from '../../studio-data.js';
 import { evidenceDrawer, EVIDENCE_PAGE_SIZE, emptyPanel } from '../components.js';
 import { stripPlot, rankingBars, renewalTimeline, tileMap } from '../charts.js';
 
@@ -114,19 +114,9 @@ ${emptyPanel({ title: what, text })}`;
 
 export function priceStrip({ facts, filter, label, nameOf, noun = 'avtal' }) {
   const dist = priceDistribution(facts, filter);
-  const all = byContract(headline(facts).filter(filterRows(filter)));
+  const all = byContract(headline(facts).filter(priceRowFilter(filter)));
   const unknownCount = all.filter((f) => !isNum(f.kr_per_elev)).length;
   return stripPlot({ dist, label, nameOf, unknownCount, noun, dotNoun: 'avtal', unit: 'kr/elev' });
-}
-
-// The same row filter priceDistribution applies, minus the price itself, so
-// "utan känt pris" counts the avtal the plot could have shown.
-function filterRows({ productSlug, category, segment, kommunKods } = {}) {
-  const kods = kommunKods ? new Set(kommunKods) : null;
-  return (f) => (!productSlug || f.product_slugs.includes(productSlug) || f.kr_per_elev_product_slug === productSlug)
-    && (!category || (f.category ?? 'okand') === category)
-    && (!segment || f.segments.includes(segment))
-    && (!kods || kods.has(f.kommun_kod));
 }
 
 export function medianText(dist) {
@@ -193,6 +183,30 @@ export function footprintMap({ tiles, rows, statusMap, stats, entity, nameOf }) 
 }
 
 // ------------------------------------------------------------------ renewals
+
+// "Förnyas inom 12 mån" KPI input. Unknown when no active avtal has a dated
+// next renewal; the value line never reads an unknown value as 0.
+export function renewalTileProps({ avtal, buckets, today }) {
+  const dated = avtal.filter((f) => isIso(f.next_renewal) && f.next_renewal.slice(0, 10) >= today).length;
+  const n = buckets.reduce((s, b) => s + b.n, 0);
+  const nKnown = buckets.reduce((s, b) => s + b.n_known, 0);
+  const value = buckets.reduce((s, b) => s + b.value_known_sek, 0);
+  if (!dated) {
+    return {
+      label: 'Förnyas inom 12 mån', value: null, state: 'unknown',
+      reason: avtal.length ? 'Inget aktivt avtal anger slutdatum eller förlängning.' : 'Inga aktiva avtal.',
+      basis: '',
+    };
+  }
+  const valueText = !n ? '' : nKnown === 0 ? ', värde okänt' : nKnown < n
+    ? `, ${fmtKrCompact(value)}/år känt för ${fmtInt(nKnown)} av ${fmtInt(n)}`
+    : `, ${fmtKrCompact(value)}/år`;
+  return {
+    label: 'Förnyas inom 12 mån', value: n, unit: 'avtal', state: dated < avtal.length ? 'partial' : 'known',
+    basis: `${fmtInt(dated)} av ${fmtInt(avtal.length)} med känt slutdatum${valueText}`,
+    spark: n ? buckets.map((b) => b.n) : null,
+  };
+}
 
 export const RENEWAL_MONTHS = 24;
 export const MAX_LANES = 14;

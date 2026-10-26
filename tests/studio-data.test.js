@@ -208,11 +208,29 @@ describe('buildStudioFacts: kr_per_elev', () => {
     const [f] = build([c], { coverage: [COV(c.contract_id, 'Polylino', '4-6', null)] });
     expect(f).toMatchObject({ elever_in_scope: 1000, kr_per_elev: 100, kr_per_elev_basis: 'skolverket' });
   });
-  it('student_count 0 gives null, never Infinity', () => {
-    const c = C();
+  it('student_count 0 means not stated: falls back to Skolverket, never Infinity', () => {
+    const c = C({ annual_value_sek: 100000 });
+    const [f] = build([c], { coverage: [COV(c.contract_id, 'Polylino', '4-6', 0)] });
+    expect(f).toMatchObject({ elever_in_scope: 1000, kr_per_elev: 100, kr_per_elev_basis: 'skolverket' });
+  });
+  it('Binogi-shaped avtal: coverage 4-6 and 7-9 with student_count 0 priced from Skolverket elever', () => {
+    const c = C({ vendor_name: 'Binogi AB', annual_value_sek: 200000 });
+    const [f] = build([c], { coverage: [COV(c.contract_id, 'Binogi.se', '4-6', 0), COV(c.contract_id, 'Binogi.se', '7-9', 0)] });
+    expect(f.segments).toEqual(['4-6', '7-9']);
+    expect(f.kr_per_elev_basis).toBe('skolverket');
+    expect(Number.isFinite(f.kr_per_elev)).toBe(true);
+    expect(f.kr_per_elev).toBeCloseTo(200000 / f.elever_in_scope, 2);
+  });
+  it('student_count 0 with Skolverket elever missing gives null', () => {
+    const c = C({ kommun_kod: '9004', kommun_namn: 'Fyrby', annual_value_sek: 100000 });
     const [f] = build([c], { coverage: [COV(c.contract_id, 'Polylino', '4-6', 0)] });
     expect(f.kr_per_elev).toBe(null);
     expect(f.kr_per_elev_basis).toBe(null);
+  });
+  it('a negative student_count blocks kr/elev', () => {
+    const c = C({ annual_value_sek: 100000 });
+    const [f] = build([c], { coverage: [COV(c.contract_id, 'Polylino', '4-6', -5)] });
+    expect(f.kr_per_elev).toBe(null);
   });
   it('no segments gives null', () => {
     const [f] = build([C()]);
@@ -322,9 +340,17 @@ describe('renewals, co-occurrence, profile, basis', () => {
     expect(b).toHaveLength(24);
     expect(b[0].month).toBe('2026-10');
     const jan = b.find((x) => x.month === '2027-01');
-    expect(jan).toMatchObject({ n: 2, value_known_sek: 15000 });
-    expect(jan.byCategory.laromedel).toEqual({ n: 1, value_known_sek: 10000 });
+    expect(jan).toMatchObject({ n: 2, n_known: 2, value_known_sek: 15000 });
+    expect(jan.byCategory.laromedel).toEqual({ n: 1, n_known: 1, value_known_sek: 10000 });
     expect(b.reduce((s, x) => s + x.n, 0)).toBe(3);
+  });
+  it('renewalBuckets never counts an unknown value as 0', () => {
+    const b = renewalBuckets(build([
+      C({ kommun_kod: '9001', period_end: '2027-03-31', annual_value_sek: null }),
+      C({ kommun_kod: '9002', period_end: '2027-03-15', annual_value_sek: 4000 }),
+    ]), { today: TODAY, months: 24 });
+    const mar = b.find((x) => x.month === '2027-03');
+    expect(mar).toMatchObject({ n: 2, n_known: 1, value_known_sek: 4000 });
   });
   it('coOccurrence lists other companies in the same kommuner', () => {
     expect(coOccurrence(facts, 'ilt')).toEqual([

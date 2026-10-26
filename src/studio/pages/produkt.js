@@ -12,7 +12,7 @@ import { rankingBars, segmentMatrix, loadKommunTiles } from '../charts.js';
 import {
   headline, distinctCount, byContract, categoryLabel, kommunNamer, productNames,
   companyHref, productHref, section, breadcrumb, priceStrip, medianText, categoryContext,
-  footprintMap, renewalSection, evidenceSection, peerGroupKods, MIN_N,
+  footprintMap, renewalSection, evidenceSection, renewalTileProps, peerGroupKods, MIN_N,
 } from './common.js';
 
 function substitutes({ facts, product, category }) {
@@ -59,7 +59,7 @@ export function renderProdukt({ product, company, facts, stats, statusMap, today
   const soleRows = rows.filter((f) => f.product_slugs.length === 1);
   const on = new Set(soleRows.flatMap((f) => f.segments));
   const segs = STRIP_SEGMENTS.filter((s) => on.has(s.key));
-  const nPriced = priceDistribution(facts, { productSlug: slug }).n;
+  const nPriced = dist.n;
 
   const answer = `${product.whatItIs} ${avtal.length
     ? `Finns i aktiva avtal hos ${fmtInt(kommuner)} ${kommuner === 1 ? 'kommun' : 'kommuner'}.`
@@ -80,10 +80,9 @@ export function renderProdukt({ product, company, facts, stats, statusMap, today
   const upcoming = avtal.filter((f) => typeof f.next_renewal === 'string' && f.next_renewal.slice(0, 10) >= today)
     .sort((a, b) => a.next_renewal.localeCompare(b.next_renewal));
   const buckets = renewalBuckets(byContract(all), { today, months: 12 });
-  const in12 = buckets.reduce((sum, b) => sum + b.n, 0);
   const kpis = `<div class="kpi-row">
     ${kpiTile({ label: 'Aktiva avtal', value: avtal.length, unit: 'avtal', state: avtal.length ? 'known' : 'unknown', reason: 'Inga aktiva avtal nämner produkten.', basis: `${fmtInt(byContract(all).length)} insamlade totalt` })}
-    ${kpiTile({ label: 'Förnyas inom 12 mån', value: in12, unit: 'avtal', state: avtal.length ? 'known' : 'unknown', reason: 'Inga aktiva avtal.', basis: in12 ? 'avtal som nämner produkten' : 'inga kända slutdatum inom ett år', spark: in12 ? buckets.map((b) => b.n) : null })}
+    ${kpiTile(renewalTileProps({ avtal, buckets, today }))}
     ${kpiTile({ label: 'Mittersta hälften', value: dist.suppressed ? null : `${fmtInt(dist.p25)} till ${fmtInt(dist.p75)}`, unit: 'kr/elev', state: dist.suppressed ? 'unknown' : 'known', reason: `${medianText(dist)}, spridningen visas från ${MIN_N}.`, basis: dist.suppressed ? '' : 'hälften av avtalen ligger här' })}
     ${kpiTile({ label: 'Nästa förnyelse', value: upcoming.length ? upcoming[0].next_renewal.slice(0, 10) : null, state: upcoming.length ? 'known' : 'unknown', reason: 'Inget aktivt avtal anger slutdatum eller förlängning.', basis: upcoming.length ? nameOf(upcoming[0].kommun_kod) : '' })}
   </div>`;

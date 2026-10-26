@@ -117,6 +117,24 @@ function renderMarknadPlaceholder({ basis }) {
 </section>`;
 }
 
+export const UNDERLAG_TYPES = Object.freeze({
+  pdf: 'application/pdf',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+});
+
+// Type of a stored avtal file from its stored extension, else its MIME type.
+// null for anything outside pdf/docx/xlsx.
+export function underlagType({ filename, saved_path, mime_type } = {}) {
+  const extOf = (s) => (/\.([a-z0-9]+)$/i.exec(String(s ?? '')) || [])[1]?.toLowerCase() ?? null;
+  let ext = extOf(filename) ?? extOf(saved_path);
+  if (!ext || !UNDERLAG_TYPES[ext]) {
+    const byMime = Object.entries(UNDERLAG_TYPES).find(([, m]) => m === String(mime_type ?? '').toLowerCase());
+    ext = byMime ? byMime[0] : null;
+  }
+  return ext && UNDERLAG_TYPES[ext] ? { ext, mime: UNDERLAG_TYPES[ext] } : null;
+}
+
 const pageOf = (req) => Math.max(1, parseInt(req.query.sida, 10) || 1);
 
 export function mountStudio(app, {
@@ -162,24 +180,29 @@ export function mountStudio(app, {
     sendStudio(req, res, data, { title: hit.product.name, body });
   });
 
-  // OPERATOR-ONLY. Serves the source PDF of a stored avtal, the same file as
+  // OPERATOR-ONLY. Serves the source file of a stored avtal, the same file as
   // the back office /attachments/:id, but never its filename (which can carry
   // a person's name). Must be replaced by a redacted or metadata-only view
   // before the studio is opened to anyone outside the auth gate (spec §8).
+  // Only pdf, docx and xlsx are served; a PDF opens inline, an Office file
+  // downloads, and nosniff stops the browser guessing another type.
   app.get('/studio/underlag/:attachmentId', (req, res) => {
     const id = /^\d+$/.test(req.params.attachmentId) ? Number(req.params.attachmentId) : null;
     if (!db || id == null) return res.status(404).send('Not found');
     const att = db.raw.prepare(`
-      SELECT a.id, a.saved_path, a.mime_type FROM attachments a
+      SELECT a.id, a.saved_path, a.mime_type, a.filename FROM attachments a
       JOIN contracts c ON c.attachment_id = a.id
       WHERE a.id = ? AND c.is_contract = 1
     `).get(id);
     if (!att) return res.status(404).send('Not found');
+    const type = underlagType(att);
+    if (!type) return res.status(404).send('Not found');
     const base = path.resolve(contractsDir);
     const full = path.resolve(att.saved_path);
     if (!full.startsWith(base + path.sep) || !existsSync(full)) return res.status(404).send('Not found');
-    res.set('Content-Type', att.mime_type || 'application/pdf');
-    res.set('Content-Disposition', `inline; filename="avtal-${att.id}.pdf"`);
+    res.set('Content-Type', type.mime);
+    res.set('Content-Disposition', `${type.ext === 'pdf' ? 'inline' : 'attachment'}; filename="avtal-${att.id}.${type.ext}"`);
+    res.set('X-Content-Type-Options', 'nosniff');
     res.set('Cache-Control', 'private, no-store');
     res.set('X-Robots-Tag', 'noindex');
     res.sendFile(full);

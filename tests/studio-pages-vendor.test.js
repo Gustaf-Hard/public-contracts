@@ -46,6 +46,7 @@ let seq = 0;
 function seedContract({
   kod, vendor, value = 100000, start = '2025-08-01', end = '2027-07-31', model = 'per_student',
   lines = [], filename = 'Avtal_Anna_Andersson.pdf', state = 'DELIVERING',
+  mime = 'application/pdf', savedPath = null, writeFile = true, isContract = 1,
 }) {
   const namn = KOMMUNER.find((k) => k[0] === kod)[1];
   const existing = db.raw.prepare('SELECT id FROM conversations WHERE kommun_kod = ?').get(kod);
@@ -60,16 +61,19 @@ function seedContract({
     subject: 'Avtal', body_text: 'Hej, se bifogat. Anna Andersson', classification: null,
     classification_confidence: null, received_at: '2026-04-13T10:00:00Z', attachment_count: 1,
   });
-  const saved = join(contractsDir, kod, `${seq}.pdf`);
-  mkdirSync(join(contractsDir, kod), { recursive: true });
-  writeFileSync(saved, `%PDF-1.4 fixture ${seq}\n`);
+  const ext = filename.split('.').pop();
+  const saved = savedPath ?? join(contractsDir, kod, `${seq}.${ext}`);
+  if (writeFile) {
+    mkdirSync(join(saved, '..'), { recursive: true });
+    writeFileSync(saved, ext === 'pdf' ? `%PDF-1.4 fixture ${seq}\n` : `PK fixture ${seq}\n`);
+  }
   const attId = db.recordAttachment({
-    message_id: msgId, filename, saved_path: saved, mime_type: 'application/pdf', size_bytes: 20,
+    message_id: msgId, filename, saved_path: saved, mime_type: mime, size_bytes: 20,
   });
   const v = db.upsertVendor(vendor);
   const cid = db.recordContract({
     attachment_id: attId, vendor_id: v.id, annual_value_sek: value, pricing_model: model,
-    period_start: start, period_end: end, is_contract: 1, summary: 'Licens', confidence: 0.9,
+    period_start: start, period_end: end, is_contract: isContract, summary: 'Licens', confidence: 0.9,
   });
   if (lines.length) db.replaceContractLineItems(cid, lines);
   return { cid, attId };
@@ -196,6 +200,35 @@ describe('/studio/leverantor/:slug', () => {
     noLeaks(html);
   });
 
+  it('renewal tile is unknown, not 0, when no active avtal has an end date', async () => {
+    seedContract({ kod: '2480', vendor: 'Binogi AB', value: 60000, start: '2025-01-01', end: null });
+    const html = (await get(app(), '/studio/leverantor/binogi')).text;
+    expect(html).toMatch(/<div class="kpi is-unknown hatch">\s*<span class="kpi-label">Förnyas inom 12 mån<\/span>/);
+  });
+
+  it('renewal tile says värde okänt rather than 0 kr when the renewing avtal has no value', async () => {
+    seedContract({ kod: '2480', vendor: 'Binogi AB', value: null, end: '2027-01-31' });
+    seedContract({ kod: '1440', vendor: 'Binogi AB', value: 50000, end: null, start: '2025-01-01' });
+    const html = (await get(app(), '/studio/leverantor/binogi')).text;
+    const tile = html.slice(html.indexOf('Förnyas inom 12 mån'), html.indexOf('Förnyas inom 12 mån') + 2500);
+    expect(tile).toContain('1 av 2 med känt slutdatum, värde okänt');
+    expect(tile).not.toContain('0 kr');
+  });
+
+  it('a value-per-elev price (Skolverket elever, no styckpris line) gets its product strip', async () => {
+    for (const kod of ['1440', '0560', '0180', '1480', '1280']) {
+      const { cid } = seedContract({ kod, vendor: 'Binogi AB', value: 180000, model: 'fixed' });
+      db.replaceContractCoverage(cid, [
+        { product_name: 'Binogi', grade_level: '4-6', status: 'full', student_count: 0 },
+        { product_name: 'Binogi', grade_level: '7-9', status: 'full', student_count: 0 },
+      ]);
+    }
+    const html = (await get(app(), '/studio/leverantor/binogi')).text;
+    expect(html).toContain('Binogi, pris per elev och år');
+    expect(html).toContain('median <b>100 kr/elev</b>');
+    expect(html).not.toContain('Så ser Läromedel ut');
+  });
+
   it('an unknown slug is a 404 studio page', async () => {
     const r = await get(app(), '/studio/leverantor/finns-inte');
     expect(r.status).toBe(404);
@@ -253,7 +286,41 @@ describe('/studio/underlag/:attachmentId', () => {
     expect(r.status).toBe(200);
     expect(r.headers.get('content-type')).toMatch(/^application\/pdf/);
     expect(r.buf.toString('utf8')).toMatch(/^%PDF-1\.4 fixture/);
-    expect(r.headers.get('content-disposition') ?? '').not.toContain('Anna');
+    expect(r.headers.get('content-disposition')).toBe(`inline; filename="avtal-${attId}.pdf"`);
+    expect(r.headers.get('x-content-type-options')).toBe('nosniff');
+  });
+
+  it('serves a docx avtal as a download with its own type, never as a PDF', async () => {
+    const { attId } = seedContract({
+      kod: '1440', vendor: 'Binogi AB', filename: 'Avtal_Anna_Andersson.docx',
+      mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    });
+    const r = await get(app(), `/studio/underlag/${attId}`);
+    expect(r.status).toBe(200);
+    expect(r.headers.get('content-type')).toMatch(/^application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document/);
+    expect(r.headers.get('content-disposition')).toBe(`attachment; filename="avtal-${attId}.docx"`);
+    expect(r.headers.get('x-content-type-options')).toBe('nosniff');
+  });
+
+  it('refuses a file type outside pdf, docx and xlsx', async () => {
+    const { attId } = seedContract({ kod: '1440', vendor: 'Binogi AB', filename: 'avtal.html', mime: 'text/html' });
+    expect((await get(app(), `/studio/underlag/${attId}`)).status).toBe(404);
+  });
+
+  it('refuses an attachment whose analysis says it is not an avtal', async () => {
+    const { attId } = seedContract({ kod: '1440', vendor: 'Binogi AB', isContract: 0 });
+    expect((await get(app(), `/studio/underlag/${attId}`)).status).toBe(404);
+  });
+
+  it('refuses a saved path outside the contracts directory', async () => {
+    const outside = join(tmp, 'elsewhere', 'avtal.pdf');
+    const { attId } = seedContract({ kod: '1440', vendor: 'Binogi AB', savedPath: outside });
+    expect((await get(app(), `/studio/underlag/${attId}`)).status).toBe(404);
+  });
+
+  it('is a 404 when the file is missing on disk', async () => {
+    const { attId } = seedContract({ kod: '1440', vendor: 'Binogi AB', writeFile: false });
+    expect((await get(app(), `/studio/underlag/${attId}`)).status).toBe(404);
   });
 
   it('refuses attachments that are not a stored avtal, and unknown ids', async () => {

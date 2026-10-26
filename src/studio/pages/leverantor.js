@@ -12,7 +12,7 @@ import { rankingBars, loadKommunTiles } from '../charts.js';
 import {
   isNum, headline, distinctCount, sumKnown, byContract, categoryLabel, kommunNamer, productNames,
   companyHref, productHref, section, breadcrumb, priceStrip, medianText, categoryContext,
-  footprintMap, renewalSection, evidenceSection, MIN_N, nOf,
+  footprintMap, renewalSection, evidenceSection, renewalTileProps, MIN_N, nOf,
 } from './common.js';
 import { STRIP_SEGMENTS } from '../components.js';
 
@@ -136,9 +136,10 @@ function channels({ rows, facts, slug, company }) {
 
   let resold = '';
   if (company.role === 'channel') {
-    const via = byContract(headline(facts).filter((f) => f.channel_slug === slug && f.company_slug && f.company_slug !== slug));
+    const viaRows = headline(facts).filter((f) => f.channel_slug === slug && f.company_slug && f.company_slug !== slug);
+    const via = byContract(viaRows);
     const by = new Map();
-    for (const f of headline(facts).filter((x) => x.channel_slug === slug && x.company_slug && x.company_slug !== slug)) {
+    for (const f of viaRows) {
       if (!by.has(f.company_slug)) by.set(f.company_slug, { name: f.company_name, kods: new Set() });
       by.get(f.company_slug).kods.add(f.kommun_kod);
     }
@@ -190,7 +191,12 @@ export function renderLeverantor({ company, facts, stats, statusMap, today, page
 
   // KPI row: main product's median, renewal pressure.
   const priced = new Map();
-  for (const f of avtal) if (isNum(f.kr_per_elev) && f.kr_per_elev_product_slug) priced.set(f.kr_per_elev_product_slug, (priced.get(f.kr_per_elev_product_slug) ?? 0) + 1);
+  // Same attribution as priceDistribution: the styckpris line's product, or
+  // the avtal's only product (a value-per-elev price has no line product).
+  for (const f of avtal) {
+    const p = f.kr_per_elev_product_slug ?? (f.product_slugs.length === 1 ? f.product_slugs[0] : null);
+    if (isNum(f.kr_per_elev) && p) priced.set(p, (priced.get(p) ?? 0) + 1);
+  }
   const mainSlug = [...priced.entries()].sort((a, b) => b[1] - a[1])[0]?.[0]
     ?? company.products.find((p) => rows.some((f) => f.product_slugs.includes(p.slug)))?.slug ?? null;
   const mainName = company.products.find((p) => p.slug === mainSlug)?.name ?? null;
@@ -199,10 +205,8 @@ export function renderLeverantor({ company, facts, stats, statusMap, today, page
   const upcoming = avtal.filter((f) => typeof f.next_renewal === 'string' && f.next_renewal.slice(0, 10) >= today)
     .sort((a, b) => a.next_renewal.localeCompare(b.next_renewal));
   const buckets = renewalBuckets(all, { today, months: 12 });
-  const in12 = buckets.reduce((s, b) => s + b.n, 0);
-  const in12value = buckets.reduce((s, b) => s + b.value_known_sek, 0);
   const kpis = `<div class="kpi-row">
-    ${kpiTile({ label: 'Aktiva avtal', value: avtal.length, unit: avtal.length === 1 ? 'avtal' : 'avtal', basis: `${fmtInt(byContract(all).length)} insamlade totalt`, state: avtal.length ? 'known' : 'unknown', reason: 'Inga aktiva avtal i underlaget.' })}
+    ${kpiTile({ label: 'Aktiva avtal', value: avtal.length, unit: 'avtal', basis: `${fmtInt(byContract(all).length)} insamlade totalt`, state: avtal.length ? 'known' : 'unknown', reason: 'Inga aktiva avtal i underlaget.' })}
     ${kpiTile({
     label: mainName ? `Median per elev, ${mainName}` : 'Median per elev',
     value: mainDist.suppressed ? null : fmtInt(mainDist.median),
@@ -218,15 +222,7 @@ export function renderLeverantor({ company, facts, stats, statusMap, today, page
     reason: 'Inget aktivt avtal anger slutdatum eller förlängning.',
     basis: upcoming.length ? `${nameOf(upcoming[0].kommun_kod)}, ${upcoming[0].next_renewal.slice(0, 10)}` : '',
   })}
-    ${kpiTile({
-    label: 'Förnyas inom 12 mån',
-    value: in12,
-    unit: in12 === 1 ? 'avtal' : 'avtal',
-    state: avtal.length ? 'known' : 'unknown',
-    reason: 'Inga aktiva avtal.',
-    basis: in12 ? `känt värde ${fmtKrCompact(in12value)}/år` : 'inga kända slutdatum inom ett år',
-    spark: in12 ? buckets.map((b) => b.n) : null,
-  })}
+    ${kpiTile(renewalTileProps({ avtal, buckets, today }))}
   </div>`;
 
   // Prices: one strip per product with known prices (most priced first).
