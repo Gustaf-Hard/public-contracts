@@ -4,7 +4,7 @@
 // (active and not superseded). Unknown is null, never 0; medians and
 // percentiles are suppressed below MIN_N.
 
-import { classifyVendor, classifyLine, companyBySlug, productBySlug, normName } from './catalogue.js';
+import { classifyVendor, classifyLine, companyBySlug, productBySlug, normName, companies } from './catalogue.js';
 import { GRADE_LEVELS, contractLengthMonths, mapUnitToGradeLevels, normalizeAnnualValue, unitPeriodsPerYear } from './vendor-analytics.js';
 import { computeNextReviewDate } from './contract-lifecycle.js';
 
@@ -815,14 +815,36 @@ export const inRequest = (category) => REQUEST_CATEGORIES.includes(category);
 
 // Words in a non-avtal document's summary that point to a category, for
 // documents with no vendor or product we can classify (an order history
-// "digitala läromedel per skola och leverantör"). Matched on normName text.
+// "digitala läromedel per skola och leverantör"). Matched on normName text,
+// each word anchored at a word start, so "sekretessbedömning" is not prov
+// (r4 X2). The stödverktyg words are the ones the summaries use ("bildstöd",
+// "talsyntes"); product names are matched separately (catalogueHits).
 const CATEGORY_WORDS = {
   laromedel: /\blaromed|\blarmedel/,
-  larplattform: /larplattform|\blms\b|learning management/,
-  skoladministration: /skoladministrat|elevadministrat|elevregister|schemalagg/,
-  prov: /\bprov\b|provverktyg|digitala prov|bedomning/,
-  stodverktyg: /stodverktyg|talsyntes|lasstod|skrivstod/,
+  larplattform: /\blarplattform|\blms\b|learning management/,
+  skoladministration: /\bskoladministrat|\belevadministrat|\belevregister|\bschemalagg/,
+  prov: /\bprov\b|\bprovverktyg|\bprovplattform|\bbedomning/,
+  stodverktyg: /\bstodverktyg|\btalsyntes|\blasstod|\bskrivstod|\bbildstod|\blasverktyg|\bskrivverktyg|\btext till tal\b|\btal till text\b/,
 };
+// Catalogue company and product names (normName, at least 5 characters) a
+// summary may name: "Trelson / Provplattform" in a sammanställning, "Widgit
+// Online" in an order history. Built once.
+let nameIndex = null;
+function catalogueHits(text) {
+  if (!nameIndex) {
+    nameIndex = [];
+    for (const c of companies()) {
+      const add = (name, category) => {
+        const n = normName(name);
+        if (n.length >= 5) nameIndex.push({ n: ` ${n} `, slug: c.slug, category: category ?? c.category ?? null });
+      };
+      add(c.canonical, c.category);
+      for (const p of c.products ?? []) add(p.name, p.category);
+    }
+  }
+  const t = ` ${text} `;
+  return nameIndex.filter((e) => t.includes(e.n));
+}
 // An unread inline image with a generic name is a signature logo or a
 // pasted picture, not underlag: image001.png, image (2).png, Outlook-abc12,
 // a bare uuid. Any other unread file counts, whatever its type.
@@ -868,6 +890,10 @@ export function underlagEvidence({ unread = [], documents = [] } = {}) {
     }
     const text = normName(d.summary);
     for (const [cat, re] of Object.entries(CATEGORY_WORDS)) if (re.test(text)) e.categories.add(cat);
+    for (const h of catalogueHits(text)) {
+      e.companies.add(h.slug);
+      if (h.category) e.categories.add(h.category);
+    }
   }
   return { unreadKods, docs };
 }
