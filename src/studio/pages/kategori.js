@@ -68,30 +68,36 @@ function whiteSpotMap({ ws, label, nameOf, tiles }) {
   const cls = new Map();
   for (const k of ws.has) cls.set(k, 'has');
   for (const k of ws.none_done) cls.set(k, 'none-done');
+  for (const k of ws.refused) cls.set(k, 'refused');
   for (const k of ws.none_open) cls.set(k, 'none-open');
   for (const k of ws.not_contacted) cls.set(k, 'not-contacted');
   const lower = label.toLowerCase();
+  const expired = new Set(ws.none_done_expired ?? []);
   const what = {
     has: `har aktivt avtal i ${lower}`,
     'none-done': `inget aktivt avtal i ${lower}, insamlingen klar`,
+    refused: 'inga avtal utlämnade, vi vet inte vad kommunen köper',
     'none-open': `insamlingen pågår, inget aktivt avtal i ${lower} än`,
     'not-contacted': 'inte kontaktad än',
   };
+  const tip = (kod) => (expired.has(kod) ? `inget aktivt avtal i ${lower}, bara utgångna eller ersatta, insamlingen klar` : what[cls.get(kod)]);
   const map = tileMap({
     tiles,
     classOf: (kod) => cls.get(kod) ?? 'unknown',
-    titleOf: (kod) => `${nameOf(kod)}: ${what[cls.get(kod)] ?? 'status okänd'}`,
+    titleOf: (kod) => `${nameOf(kod)}: ${tip(kod) ?? 'status okänd'}`,
     legend: [
       { cls: 'has', label: 'Har aktivt avtal i kategorin' },
       { cls: 'none-done', label: 'Inget aktivt avtal, insamling klar' },
+      { cls: 'refused', label: 'Inga avtal utlämnade' },
       { cls: 'none-open', label: 'Insamling pågår' },
       { cls: 'not-contacted', label: 'Inte kontaktad' },
     ],
     label: `Kommuner med avtal i ${lower}`,
   });
+  const nExp = expired.size;
   const side = `<div class="ws-side">
-    <p class="ws-big"><b>${esc(fmtInt(ws.none_done.length))}</b> ${ws.none_done.length === 1 ? 'kommun' : 'kommuner'} har lämnat ut sina avtal och är utan aktivt avtal i ${esc(lower)}.</p>
-    <p class="meta">Det är de säkra vita fläckarna. I ${esc(nOf(ws.none_open.length, 'kommun', 'kommuner'))} pågår insamlingen, där kan avtal fortfarande komma in. ${ws.not_contacted.length ? `${esc(nOf(ws.not_contacted.length, 'kommun', 'kommuner'))} har vi inte kontaktat än.` : ''}</p>
+    <p class="ws-big"><b>${esc(fmtInt(ws.none_done.length))}</b> ${ws.none_done.length === 1 ? 'kommun har' : 'kommuner har'} klar insamling och inget aktivt avtal i ${esc(lower)}.</p>
+    <p class="meta">Det är de säkra vita fläckarna.${nExp ? ` ${esc(nOf(nExp, 'av dem har', 'av dem har'))} utgångna eller ersatta avtal i ${esc(lower)}, så de köper i kategorin men det nya avtalet finns inte hos oss.` : ''} I ${esc(nOf(ws.none_open.length, 'kommun', 'kommuner'))} pågår insamlingen, där kan avtal fortfarande komma in.${ws.refused?.length ? ` ${esc(nOf(ws.refused.length, 'kommun', 'kommuner'))} har inte lämnat ut några avtal, där vet vi inte vad de köper.` : ''}${ws.not_contacted.length ? ` ${esc(nOf(ws.not_contacted.length, 'kommun', 'kommuner'))} har vi inte kontaktat än.` : ''}</p>
   </div>`;
   return `<div class="ws card"><div class="ws-map">${map}</div>${side}</div>`;
 }
@@ -186,7 +192,7 @@ function productCards({ facts, category, rows, kommunerTotal }) {
   <div class="pc-price${priced ? '' : ' is-unknown hatch'}">
     ${priced
       ? `<span class="pc-price-num">${esc(fmtPrice(dist.median))}</span><span class="pc-price-unit">kr/elev, median</span><span class="meta">mittersta hälften ${esc(fmtPrice(dist.p25))} till ${esc(fmtPrice(dist.p75))}, n = ${esc(fmtInt(dist.n))}</span>`
-      : `<span class="pc-price-few">${esc(medianText(dist))}</span><span class="meta">median visas från ${MIN_N} avtal med känt pris per elev</span>`}
+      : `<span class="pc-price-few">${esc(medianText(dist))}</span><span class="meta">median visas från ${MIN_N} kommuner med känt pris per elev</span>`}
   </div>
 </article>`;
   }).join('');
@@ -222,7 +228,7 @@ export function renderKategori({ category, facts, stats, statusMap, today, page 
     facts: [
       { label: 'Känt årsvärde', value: kv.value == null ? null : fmtKrCompact(kv.value), sub: kv.total ? `känt för ${fmtInt(kv.known)} av ${fmtInt(kv.total)} avtal` : 'inga aktiva avtal' },
       { label: 'Kommuner', value: kommuner, unit: `av ${fmtInt(KOMMUNER_TOTAL)}`, sub: 'med minst ett aktivt avtal' },
-      { label: 'Median per elev', value: dist.suppressed ? null : fmtPrice(dist.median), unit: dist.suppressed ? '' : 'kr/elev', sub: dist.suppressed ? medianText(dist) : `n = ${fmtInt(dist.n)} avtal med känt pris` },
+      { label: 'Median per elev', value: dist.suppressed ? null : fmtPrice(dist.median), unit: dist.suppressed ? '' : 'kr/elev', sub: dist.suppressed ? medianText(dist) : `n = ${fmtInt(dist.n)} kommuner med känt pris` },
     ],
     viz: avtal.length ? shareBar(topThree(facts, slug)) : '',
   });
@@ -233,7 +239,7 @@ export function renderKategori({ category, facts, stats, statusMap, today, page 
     ${kpiTile({ label: 'Aktiva avtal', value: avtal.length, unit: 'avtal', basis: `${fmtInt(byContract(all).length)} insamlade totalt`, state: avtal.length ? 'known' : 'unknown', reason: 'Inga aktiva avtal i kategorin än.' })}
     ${kpiTile({ label: 'Leverantörer', value: shares.length, unit: 'leverantörer', basis: shares.length ? `${fmtInt(shares.filter((s) => s.slug).length)} i katalogen, ${fmtInt(shares.filter((s) => s.n_known).length)} med känt värde` : '', state: shares.length ? 'known' : 'unknown', reason: 'Inga leverantörer med aktiva avtal än.' })}
     ${kpiTile(renewalTileProps({ avtal, buckets: renewalBuckets(all, { today, months: 12 }), today }))}
-    ${kpiTile({ label: 'Säkra vita fläckar', value: ws.none_done.length, unit: 'kommuner', basis: 'insamlingen klar, inget aktivt avtal i kategorin', state: 'known' })}
+    ${kpiTile({ label: 'Säkra vita fläckar', value: ws.none_done.length, unit: 'kommuner', basis: `insamlingen klar, inget aktivt avtal i kategorin${ws.refused.length ? `; ${fmtInt(ws.refused.length)} utan utlämnade avtal räknas inte` : ''}`, state: 'known' })}
   </div>`;
 
   // Matrix: SKR huvudgrupp x segment, "Alla" on both axes.
@@ -256,7 +262,7 @@ export function renderKategori({ category, facts, stats, statusMap, today, page 
   });
   const priceBody = `<div class="grid-12">
     <div class="span-12 card">${priceStrip({ facts, filter: { category: slug }, label: `${label}, pris per elev och år`, nameOf })}</div>
-    <div class="span-12 card">${matrix}</div>
+    <div class="span-12 card">${matrix}<p class="meta sm-note">En punkt per kommun i varje ruta. Ett avtal som gäller flera segment räknas i varje segment det omfattar.</p></div>
   </div>`;
 
   const renew = renewalLanes({ rows, today, nameOf });
@@ -269,7 +275,7 @@ export function renderKategori({ category, facts, stats, statusMap, today, page 
 ${header}
 <section class="section">${kpis}</section>
 ${section({ id: 'andelar', kicker: 'Andelar', title: `Vem säljer ${lower}`, note: 'aktiva avtal, andel av känt värde och av kommunerna med avtal i kategorin', body: vendorRankings({ facts, category: slug }) })}
-${section({ id: 'pris', kicker: 'Pris', title: 'Pris per elev och år', note: 'en punkt per avtal; matrisen visar median per kommungrupp och segment, klicka en ruta för spridning', body: priceBody })}
+${section({ id: 'pris', kicker: 'Pris', title: 'Pris per elev och år', note: 'en punkt per kommun; matrisen visar median per kommungrupp och segment, klicka en ruta för spridning', body: priceBody })}
 ${section({ id: 'prismodell', kicker: 'Prismodell', title: 'Hur kategorin prissätts', note: 'andel av aktiva avtal per prismodell', body: `<div class="card">${modelMix({ facts, category: slug })}</div>` })}
 ${section({ id: 'vita-flackar', kicker: 'Vita fläckar', title: `Kommuner utan avtal i ${lower}`, note: 'håll över en ruta för namn; "insamling pågår" betyder inte att avtal saknas', body: whiteSpotMap({ ws, label, nameOf, tiles }) })}
 ${section({ id: 'fornyelser', kicker: 'Förnyelser', title: 'Avtal som förnyas eller löper ut, per leverantör', note: renew.basis, body: `<div class="card">${renew.html}</div>` })}

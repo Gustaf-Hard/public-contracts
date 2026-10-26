@@ -35,7 +35,7 @@ function noRawEvil(html) {
 describe('stripPlot', () => {
   it('hides dots and median below MIN_N and says why', () => {
     const html = stripPlot({ dist: dist([100, 200, 300, 400]), unit: 'kr/elev', label: 'Pris per elev' });
-    expect(html).toContain('för få avtal (n = 4)');
+    expect(html).toContain('för få kommuner (n = 4)');
     expect(html).not.toContain('<circle');
     expect(html).toContain('hatch');
     expect(html).not.toMatch(/NaN|Infinity|undefined/);
@@ -81,7 +81,7 @@ describe('stripPlot', () => {
     const d = { ...dist([100, 200, 300, 400, 500, 600]), n: 6 };
     d.values = d.values.slice(0, 4).concat([{ kommun_kod: 'x', kr_per_elev: null }]);
     const html = stripPlot({ dist: d, label: 'x' });
-    expect(html).toContain('för få avtal (n = 4)');
+    expect(html).toContain('för få kommuner (n = 4)');
     expect(html).not.toContain('<circle');
   });
 
@@ -332,7 +332,7 @@ describe('gallery route', () => {
     for (const cls of ['entity-header', 'kpi', 'strip', 'sm-grid', 'rank', 'tl-', 'tilemap', 'seg-strip', 'filter-bar', 'panel-unknown', 'evidence']) {
       expect(text).toContain(cls);
     }
-    expect(text).toContain('för få avtal (n = 4)');
+    expect(text).toContain('för få kommuner (n = 4)');
     expect(text).not.toMatch(/NaN|Infinity|undefined/);
     expect(text).not.toMatch(/[–—]/);
   });

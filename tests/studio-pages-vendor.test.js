@@ -173,7 +173,7 @@ describe('/studio/leverantor/:slug', () => {
     expect([...pos].sort((a, b) => a - b)).toEqual(pos);
     // Polyglutt: n = 5 priced -> plot with median; Begreppa: n = 4 -> hatched.
     expect(html).toContain('median <b>150 kr/elev</b>');
-    expect(html).toContain('för få avtal (n = 4)');
+    expect(html).toContain('för få kommuner (n = 4)');
     // Radish competes (same category, shared kommuner); Unikum is bought alongside.
     const comp = html.slice(html.indexOf('id="konkurrenter"'), html.indexOf('id="fornyelser"'));
     expect(comp).toMatch(/Konkurrerar med[\s\S]*Radish[\s\S]*Köps ofta tillsammans med[\s\S]*Unikum/);
@@ -192,7 +192,7 @@ describe('/studio/leverantor/:slug', () => {
     const html = r.text;
     expect(html).toContain('Binogi');
     expect(html).toContain('kpi is-unknown hatch');
-    expect(html).toContain('inga avtal med känt pris än');
+    expect(html).toContain('inget känt pris per elev än');
     // the category around it: Läromedel prices and the other vendors there
     expect(html).toContain('Så ser Läromedel ut');
     expect(html).toContain('ILT Education');

@@ -68,7 +68,7 @@ function swarm(xs, minGap) {
 
 export function stripPlot({
   dist, highlightKod = null, highlightLabel = null, unit = 'kr/elev', label = '',
-  nameOf = null, unknownCount = null, noun = 'avtal', dotNoun = 'kommun',
+  nameOf = null, unknownCount = null, freeCount = null, noun = 'kommuner', dotNoun = 'kommun',
 } = {}) {
   const d = dist || { n: 0, suppressed: true, values: [] };
   const values = (d.values || []).filter((v) => isNum(v.kr_per_elev));
@@ -77,11 +77,13 @@ export function stripPlot({
   const nRaw = isNum(d.n) ? d.n : 0;
   const n = d.suppressed ? nRaw : Math.min(nRaw, values.length);
   const head = `<div class="viz-head"><span class="viz-label">${esc(label)}</span><span class="viz-n">n = ${esc(fmtInt(n))}</span></div>`;
-  const unknownLine = isNum(unknownCount) && unknownCount > 0
-    ? `<span>utan känt pris: ${esc(fmtInt(unknownCount))}</span>` : '';
+  const unknownLine = [
+    isNum(unknownCount) && unknownCount > 0 ? `<span>avtal utan känt pris: ${esc(fmtInt(unknownCount))}</span>` : '',
+    isNum(freeCount) && freeCount > 0 ? `<span>${esc(fmtInt(freeCount))} ${freeCount === 1 ? 'kostnadsfritt avtal ingår' : 'kostnadsfria avtal ingår'} inte</span>` : '',
+  ].join('');
 
   if (d.suppressed || values.length < MIN_N) {
-    const title = n === 0 ? `inga ${noun} med känt pris än` : `för få ${noun} (n = ${fmtInt(n)})`;
+    const title = n === 0 ? 'inget känt pris per elev än' : `för få ${noun} (n = ${fmtInt(n)})`;
     return `<figure class="viz strip is-suppressed">${head}
   <div class="strip-empty hatch" role="note">
     <span class="strip-ghost" aria-hidden="true"><i></i><i></i><i></i></span>
@@ -197,7 +199,7 @@ export function segmentMatrix({ rows = [], cols = [], cell, id = null, unit = 'k
       inner = n === 0
         ? '<span class="sm-few">inga avtal</span>'
         : `<span class="sm-few">för få</span><span class="sm-n">n = ${esc(fmtInt(n))}</span>`;
-      pop = `<p>${n === 0 ? 'Inga avtal med känt pris i den här gruppen än.' : `För få avtal (n = ${esc(fmtInt(n))}). Medianen visas när minst ${MIN_N} avtal har känt pris per elev.`}</p>`;
+      pop = `<p>${n === 0 ? 'Inga avtal med känt pris i den här gruppen än.' : `För få kommuner (n = ${esc(fmtInt(n))}). Medianen visas när minst ${MIN_N} kommuner har känt pris per elev.`}</p>`;
     } else {
       cls = `sm-cell seq-${step(d.median)}`;
       inner = `<span class="sm-med">${esc(fmtInt(d.median))}</span><span class="sm-n">n = ${esc(fmtInt(n))}</span>`;
@@ -205,7 +207,7 @@ export function segmentMatrix({ rows = [], cols = [], cell, id = null, unit = 'k
         <div><dt>Median</dt><dd><b>${esc(fmtInt(d.median))} ${esc(unit)}</b></dd></div>
         <div><dt>Mittersta hälften</dt><dd>${esc(fmtInt(d.p25))} till ${esc(fmtInt(d.p75))} ${esc(unit)}</dd></div>
         <div><dt>Spann</dt><dd>${esc(fmtInt(d.min))} till ${esc(fmtInt(d.max))} ${esc(unit)}</dd></div>
-        <div><dt>Underlag</dt><dd>${esc(fmtInt(n))} avtal med känt pris</dd></div>
+        <div><dt>Underlag</dt><dd>${esc(fmtInt(n))} kommuner med känt pris</dd></div>
       </dl>`;
     }
     pops.push(`<div popover id="${pid}" class="sm-pop"><p class="pop-title">${esc(where)}</p>${pop}</div>`);
@@ -216,7 +218,7 @@ export function segmentMatrix({ rows = [], cols = [], cell, id = null, unit = 'k
     <span>lägre${medians.length ? ` <b>${esc(fmtInt(medians[0]))}</b>` : ''}</span>
     <span class="sm-ramp">${Array.from({ length: SEQ_STEPS }, (_, k) => `<i class="seq-${k}"></i>`).join('')}</span>
     <span>högre${medians.length ? ` <b>${esc(fmtInt(medians[medians.length - 1]))}</b>` : ''} median ${esc(unit)}</span>
-    <span class="lg"><i class="lg-hatch"></i>för få avtal (under ${MIN_N})</span>
+    <span class="lg"><i class="lg-hatch"></i>för få kommuner (under ${MIN_N})</span>
     ${anyUnknown ? `<span class="lg"><i class="lg-hatch lg-unknown"></i>${UNKNOWN}, underlaget kunde inte räknas fram</span>` : ''}
   </div>`;
 
@@ -355,7 +357,9 @@ export function renewalTimeline({ lanes = [], today, months = 24, laneHead = '' 
 
 // 'neutral': a kommun the map makes no claim about (e.g. outside a peer group).
 // 'has-open': collection still open but avtal have come in (Kommuner directory).
-export const TILE_CLASSES = Object.freeze(['has', 'has-open', 'none-done', 'none-open', 'not-contacted', 'highlight', 'neutral', 'unknown']);
+// 'refused': the kommun closed the request without handing anything over
+// (dead_end), so the map claims nothing about what it buys.
+export const TILE_CLASSES = Object.freeze(['has', 'has-open', 'none-done', 'refused', 'none-open', 'not-contacted', 'highlight', 'neutral', 'unknown']);
 const TILE_UNKNOWN_LABEL = 'Status okänd';
 
 let tilesMemo = null;

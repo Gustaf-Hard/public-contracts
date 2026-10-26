@@ -425,7 +425,7 @@ describe('/studio/om', () => {
     expect(r.status).toBe(200);
     // 7 collected, 6 active (one expired), from 3 kommuner
     expect(r.text).toContain('Därför är bara 6 av 7 insamlade avtal aktiva');
-    expect(r.text).toContain('minst 5 avtal');
+    expect(r.text).toContain('minst 5 kommuner');
     expect(r.text).toContain('Styckpris');
     expect(r.text).toContain('Skolverkets elevantal');
     expect(r.text).toContain('kommungrupp');

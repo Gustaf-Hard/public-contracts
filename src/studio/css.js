@@ -667,6 +667,8 @@ const COMPONENT_CSS = `
 .t-has { background: var(--viz-1); }
 .t-has-open { background: var(--tile-has-open); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--viz-1) 60%, transparent); }
 .t-none-done { background: var(--tile-none); }
+/* dead_end: grey like none-done but hatched, so it never reads as "insamling klar" or as a pale "pågår" tile. */
+.t-refused { background: var(--hatch), color-mix(in oklab, var(--tile-none) 55%, var(--surface)); box-shadow: inset 0 0 0 1px var(--tile-none); }
 .t-none-open { background: var(--hatch), var(--surface-2); box-shadow: inset 0 0 0 1px var(--line-strong); }
 .t-not-contacted { background: transparent; box-shadow: inset 0 0 0 1px var(--line-strong); }
 .t-highlight { background: var(--viz-highlight); box-shadow: 0 0 0 2px var(--surface), 0 0 0 3.5px var(--viz-highlight); z-index: 2; }

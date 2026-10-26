@@ -107,7 +107,7 @@ ${othersHtml}`;
 export const KOMMUN_STATUS = Object.freeze({
   done: { label: 'Insamling klar', tile: 'has', chip: 'is-done' },
   open: { label: 'Insamling pågår', tile: 'none-open', chip: 'is-open' },
-  dead_end: { label: 'Inga avtal utlämnade', tile: 'none-done', chip: 'is-none' },
+  dead_end: { label: 'Inga avtal utlämnade', tile: 'refused', chip: 'is-none' },
   not_contacted: { label: 'Inte kontaktad', tile: 'not-contacted', chip: 'is-none' },
   unknown: { label: 'Status okänd', tile: 'unknown', chip: 'is-none' },
 });
@@ -153,7 +153,7 @@ export function renderKommuner({ facts, stats, statusMap = new Map(), tiles, que
       { cls: 'has', label: 'Insamling klar' },
       { cls: 'has-open', label: 'Pågår, avtal har kommit in' },
       { cls: 'none-open', label: 'Pågår, inga avtal än' },
-      { cls: 'none-done', label: 'Inga avtal utlämnade' },
+      { cls: 'refused', label: 'Inga avtal utlämnade' },
       { cls: 'not-contacted', label: 'Inte kontaktad' },
     ],
     label: 'Insamlingens status per kommun',
@@ -180,7 +180,7 @@ export function renderKommuner({ facts, stats, statusMap = new Map(), tiles, que
 
   const withAvtal = rows.filter((r) => r.n).length;
   const finished = rows.filter((r) => isCollectionFinished(r.status)).length;
-  const answer = `Vi har aktiva avtal från ${fmtInt(withAvtal)} av ${fmtInt(KOMMUNER_TOTAL)} kommuner. Insamlingen är avslutad i ${fmtInt(finished)} och pågår i ${fmtInt(byStatus('open'))}${byStatus('not_contacted') ? `, ${fmtInt(byStatus('not_contacted'))} har vi inte kontaktat än` : ''}.`;
+  const answer = `Vi har aktiva avtal från ${fmtInt(withAvtal)} av ${fmtInt(KOMMUNER_TOTAL)} kommuner. Insamlingen är klar i ${fmtInt(finished)} och pågår i ${fmtInt(byStatus('open'))}${byStatus('dead_end') ? `, ${fmtInt(byStatus('dead_end'))} har inte lämnat ut några avtal` : ''}${byStatus('not_contacted') ? `, ${fmtInt(byStatus('not_contacted'))} har vi inte kontaktat än` : ''}.`;
 
   return `<section class="entity-header">
   <div class="entity-grid">

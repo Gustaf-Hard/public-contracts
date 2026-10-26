@@ -10,7 +10,7 @@ import { companyShares, coOccurrence, priceDistribution, renewalBuckets } from '
 import { entityHeader, kpiTile, segmentStrip, emptyPanel } from '../components.js';
 import { rankingBars, loadKommunTiles } from '../charts.js';
 import {
-  isNum, headline, distinctCount, sumKnown, byContract, categoryLabel, kommunNamer, productNames,
+  isNum, headline, distinctCount, sumKnown, byContract, consolidateByContract, categoryLabel, kommunNamer, productNames,
   companyHref, productHref, section, breadcrumb, priceStrip, medianText, categoryContext,
   footprintMap, renewalSection, evidenceSection, renewalTileProps, MIN_N, nOf,
 } from './common.js';
@@ -54,7 +54,7 @@ function productCards({ company, rows, facts, kommunerTotal }) {
   <div class="pc-price${priced ? '' : ' is-unknown hatch'}">
     ${priced
       ? `<span class="pc-price-num">${esc(fmtInt(dist.median))}</span><span class="pc-price-unit">kr/elev, median</span><span class="meta">mittersta hälften ${esc(fmtInt(dist.p25))} till ${esc(fmtInt(dist.p75))}, n = ${esc(fmtInt(dist.n))}</span>`
-      : `<span class="pc-price-few">${esc(medianText(dist))}</span><span class="meta">median visas från ${MIN_N} avtal med känt pris per elev</span>`}
+      : `<span class="pc-price-few">${esc(medianText(dist))}</span><span class="meta">median visas från ${MIN_N} kommuner med känt pris per elev</span>`}
   </div>
   <div class="pc-seg">${segmentStrip(segments)}</div>
 </article>`;
@@ -144,7 +144,7 @@ function channels({ rows, facts, slug, company }) {
       by.get(f.company_slug).kods.add(f.kommun_kod);
     }
     const resItems = [...by.entries()].map(([s, v]) => ({
-      label: v.name, href: companyHref(s), value: v.kods.size, valueLabel: `${fmtInt(v.kods.size)} kommuner`,
+      label: v.name, href: companyHref(s), value: v.kods.size, valueLabel: nOf(v.kods.size, 'kommun', 'kommuner'),
     })).sort((a, b) => b.value - a.value || a.label.localeCompare(b.label, 'sv'));
     resold = `<div class="span-6 card"><div class="viz-head"><span class="viz-label">Leverantörer som köps via ${esc(company.canonical)}</span><span class="viz-n">${esc(fmtInt(via.length))} avtal</span></div>
     ${resItems.length ? rankingBars({ items: resItems, max: 6, noun: 'leverantörer' }) : emptyPanel({ title: 'Inga andra leverantörer namngivna i avtalen än' })}</div>`;
@@ -158,13 +158,25 @@ function channels({ rows, facts, slug, company }) {
 
 export function renderLeverantor({ company, facts, stats, statusMap, today, page = 1 }) {
   const slug = company.slug;
+  // Owner rows: what the company itself sells (product cards, prices, share).
   const all = facts.filter((f) => f.company_slug === slug);
   const rows = headline(all);
-  const avtal = byContract(rows);
+  // A reseller's avtal are also the ones it is the vendor of, where every
+  // product belongs to someone else (channel_slug), added up per avtal so a
+  // fully allocated avtal still counts and a split one shows its whole value.
+  const isChannel = company.role === 'channel';
+  // Only avtal the reseller is the vendor of are added up; where its own
+  // product sits in another vendor's avtal, only its own row counts.
+  const avtalAll = isChannel
+    ? [...consolidateByContract(facts.filter((f) => f.channel_slug === slug)),
+      ...all.filter((f) => f.channel_slug !== slug)]
+    : all;
+  const avtalRows = isChannel ? headline(avtalAll) : rows;
+  const avtal = byContract(avtalRows);
   const nameOf = kommunNamer(stats, facts);
   const category = company.category ?? rows.map((f) => f.category).find(Boolean) ?? null;
   const catLabel = categoryLabel(category);
-  const kommuner = distinctCount(rows, (f) => f.kommun_kod);
+  const kommuner = distinctCount(avtalRows, (f) => f.kommun_kod);
   const known = avtal.filter((f) => isNum(f.annual_value_sek));
   const value = known.length ? sumKnown(known) : null;
   // A share of 0 % from an unknown value would be a false claim.
@@ -173,7 +185,7 @@ export function renderLeverantor({ company, facts, stats, statusMap, today, page
   const roleWord = company.role === 'channel' ? 'Återförsäljare' : 'Leverantör';
   const answer = avtal.length
     ? `${company.canonical} har aktiva avtal med ${nOf(kommuner, 'kommun', 'kommuner')} i vårt underlag${value != null ? `, med ett känt årsvärde på ${fmtKrCompact(value)}` : ''}.${company.note ? ` ${company.note}` : ''}`
-    : `Vi har inga aktiva avtal med ${company.canonical} än.${all.length ? ` ${fmtInt(byContract(all).length)} äldre avtal finns i underlaget.` : ''}`;
+    : `Vi har inga aktiva avtal med ${company.canonical} än.${avtalAll.length ? ` ${fmtInt(byContract(avtalAll).length)} äldre avtal finns i underlaget.` : ''}`;
 
   const header = entityHeader({
     kicker: category ? `${roleWord} · ${catLabel}` : roleWord,
@@ -183,8 +195,8 @@ export function renderLeverantor({ company, facts, stats, statusMap, today, page
       { label: 'Kommuner', value: kommuner, sub: 'med minst ett aktivt avtal' },
       { label: 'Känt årsvärde', value: value == null ? null : fmtKrCompact(value), sub: basisLine(known.length, avtal.length) },
       category
-        ? { label: `Andel av ${catLabel.toLowerCase()}`, value: share == null ? null : fmtPct(share), sub: share == null ? 'leverantörens värde är okänt' : 'av känt årsvärde i kategorin' }
-        : { label: 'Aktiva avtal', value: avtal.length, sub: `${fmtInt(byContract(all).length)} insamlade` },
+        ? { label: `Andel av ${catLabel.toLowerCase()}`, value: share == null ? null : fmtPct(share), sub: share == null ? 'leverantörens värde är okänt' : isChannel ? 'egna produkter, av känt årsvärde i kategorin' : 'av känt årsvärde i kategorin' }
+        : { label: 'Aktiva avtal', value: avtal.length, sub: `${fmtInt(byContract(avtalAll).length)} insamlade` },
     ],
     viz: segmentStrip(unionSegments(rows)),
   });
@@ -193,7 +205,8 @@ export function renderLeverantor({ company, facts, stats, statusMap, today, page
   const priced = new Map();
   // Same attribution as priceDistribution: the styckpris line's product, or
   // the avtal's only product (a value-per-elev price has no line product).
-  for (const f of avtal) {
+  const ownAvtal = byContract(rows);
+  for (const f of ownAvtal) {
     const p = f.kr_per_elev_product_slug ?? (f.product_slugs.length === 1 ? f.product_slugs[0] : null);
     if (isNum(f.kr_per_elev) && p) priced.set(p, (priced.get(p) ?? 0) + 1);
   }
@@ -201,19 +214,19 @@ export function renderLeverantor({ company, facts, stats, statusMap, today, page
     ?? company.products.find((p) => rows.some((f) => f.product_slugs.includes(p.slug)))?.slug ?? null;
   const mainName = company.products.find((p) => p.slug === mainSlug)?.name ?? null;
   const mainDist = mainSlug ? priceDistribution(facts, { productSlug: mainSlug }) : { n: 0, suppressed: true };
-  const nPriced = avtal.filter((f) => isNum(f.kr_per_elev)).length;
+  const nPriced = ownAvtal.filter((f) => isNum(f.kr_per_elev)).length;
   const upcoming = avtal.filter((f) => typeof f.next_renewal === 'string' && f.next_renewal.slice(0, 10) >= today)
     .sort((a, b) => a.next_renewal.localeCompare(b.next_renewal));
-  const buckets = renewalBuckets(all, { today, months: 12 });
+  const buckets = renewalBuckets(avtalAll, { today, months: 12 });
   const kpis = `<div class="kpi-row">
-    ${kpiTile({ label: 'Aktiva avtal', value: avtal.length, unit: 'avtal', basis: `${fmtInt(byContract(all).length)} insamlade totalt`, state: avtal.length ? 'known' : 'unknown', reason: 'Inga aktiva avtal i underlaget.' })}
+    ${kpiTile({ label: 'Aktiva avtal', value: avtal.length, unit: 'avtal', basis: `${fmtInt(byContract(avtalAll).length)} insamlade totalt`, state: avtal.length ? 'known' : 'unknown', reason: 'Inga aktiva avtal i underlaget.' })}
     ${kpiTile({
     label: mainName ? `Median per elev, ${mainName}` : 'Median per elev',
     value: mainDist.suppressed ? null : fmtInt(mainDist.median),
     unit: 'kr/elev',
     state: mainDist.suppressed ? 'unknown' : 'known',
     reason: mainDist.n ? `För få avtal med känt pris (n = ${fmtInt(mainDist.n)}), medianen visas från ${MIN_N}.` : 'Inget avtal anger pris per elev än.',
-    basis: `pris per elev känt för ${fmtInt(nPriced)} av ${fmtInt(avtal.length)} avtal`,
+    basis: `pris per elev känt för ${fmtInt(nPriced)} av ${fmtInt(ownAvtal.length)} avtal${isChannel ? ' med egna produkter' : ''}`,
   })}
     ${kpiTile({
     label: 'Nästa förnyelse',
@@ -235,11 +248,11 @@ export function renderLeverantor({ company, facts, stats, statusMap, today, page
 
   const tiles = safeTiles();
   const renew = renewalSection({
-    rows: all, today, nameOf,
+    rows: avtalAll, today, nameOf,
     titleOf: (f) => productNames(f).join(', ') || company.canonical,
   });
   const ev = evidenceSection({
-    rows: all, today, page, nameOf,
+    rows: avtalAll, today, page, nameOf,
     pageHref: (p) => `/studio/leverantor/${encodeURIComponent(slug)}?sida=${p}#underlag`,
   });
 
@@ -247,11 +260,11 @@ export function renderLeverantor({ company, facts, stats, statusMap, today, page
 ${header}
 <section class="section">${kpis}</section>
 ${section({ id: 'produkter', kicker: 'Produkter', title: `Det här köper kommunerna av ${company.canonical}`, note: rows.some((f) => f.product_slugs.length) ? `stapeln visar andel av leverantörens ${nOf(kommuner, 'kommun', 'kommuner')}, segment från avtal som gäller enbart produkten` : '', body: productCards({ company, rows, facts, kommunerTotal: kommuner }) })}
-${section({ id: 'karta', kicker: 'Var', title: 'Kommuner med avtal', note: `${nOf(kommuner, 'kommun', 'kommuner')}, håll över en ruta för namn`, body: `<div class="card map-card">${footprintMap({ tiles, rows: all, statusMap, stats, entity: company.canonical, nameOf })}</div>` })}
-${section({ id: 'pris', kicker: 'Pris', title: 'Pris per elev och år', note: `en punkt per avtal, kommunens namn när du håller över`, body: priceBody })}
+${section({ id: 'karta', kicker: 'Var', title: 'Kommuner med avtal', note: `${nOf(kommuner, 'kommun', 'kommuner')}, håll över en ruta för namn`, body: `<div class="card map-card">${footprintMap({ tiles, rows: avtalAll, statusMap, stats, entity: company.canonical, nameOf })}</div>` })}
+${section({ id: 'pris', kicker: 'Pris', title: 'Pris per elev och år', note: `en punkt per kommun, kommunens namn när du håller över`, body: priceBody })}
 ${section({ id: 'konkurrenter', kicker: 'Grannar', title: 'Andra leverantörer i samma kommuner', body: competitors({ rows, facts, slug, category }) })}
 ${section({ id: 'fornyelser', kicker: 'Förnyelser', title: 'Avtal som förnyas eller löper ut', note: renew.basis, body: `<div class="card">${renew.html}</div>` })}
-${section({ id: 'kanaler', kicker: 'Kanal', title: 'Direkt eller via återförsäljare', body: channels({ rows, facts, slug, company }) })}
+${section({ id: 'kanaler', kicker: 'Kanal', title: 'Direkt eller via återförsäljare', body: channels({ rows: avtalRows, facts, slug, company }) })}
 ${section({ id: 'underlag', kicker: 'Underlag', title: 'Avtalen bakom siffrorna', note: `${fmtInt(ev.active)} aktiva, ${fmtInt(ev.old)} utgångna eller ersatta`, body: ev.html })}`;
 }
 

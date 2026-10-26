@@ -160,11 +160,11 @@ describe('/studio (Marknad)', () => {
     noLeaks(r.text);
   });
 
-  it('"Insamling klar" says how many of the finished kommuner released no avtal', async () => {
+  it('"Insamling klar" counts done only and names the kommuner that released no avtal apart', async () => {
     seedMarket();
     conversation('0180', 'DEAD_END'); // Stockholm: closed without avtal
     const html = (await body('/studio')).text;
-    expect(html).toMatch(/Insamling klar<\/dt><dd><b>1<\/b> kommun, varav 1 utan utlämnade avtal/);
+    expect(html).toMatch(/Insamling klar<\/dt><dd><b>0<\/b> kommuner, och 1 utan utlämnade avtal/);
   });
 
   it('known market value never counts the unknown Unikum value as 0', async () => {

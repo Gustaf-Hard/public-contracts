@@ -26,6 +26,45 @@ export function byContract(rows) {
   return [...m.values()];
 }
 
+// One row per avtal with the avtal's whole known value: a channel avtal has
+// one fact row per owner company (remainder, ILT, Magma ...), and a page that
+// shows whole avtal (a kommun's total, its evidence, a reseller's footprint)
+// must add them up, never keep only the first. Product slugs and segments are
+// the union; the value is null only when no row of the avtal has one. Price
+// per elev belongs to an owner row, so the consolidated row carries none.
+export function consolidateByContract(rows) {
+  const m = new Map();
+  for (const f of rows) {
+    if (!m.has(f.contract_id)) m.set(f.contract_id, []);
+    m.get(f.contract_id).push(f);
+  }
+  return [...m.values()].map((group) => {
+    if (group.length === 1) return group[0];
+    const base = group.find((f) => f.company_slug && f.company_slug === f.channel_slug) ?? group[0];
+    const known = group.filter((f) => isNum(f.annual_value_sek));
+    // The avtal's vendor: the channel, even when its own row was dropped for
+    // having nothing left over.
+    const vendorName = base.channel_slug
+      ? group.find((f) => f.company_slug === base.channel_slug)?.company_name ?? companyBySlug(base.channel_slug)?.canonical ?? base.company_name
+      : base.company_name;
+    return {
+      ...base,
+      company_slug: base.channel_slug ?? base.company_slug,
+      company_name: vendorName,
+      product_slugs: [...new Set(group.flatMap((f) => f.product_slugs))],
+      segments: [...new Set(group.flatMap((f) => f.segments))],
+      annual_value_sek: known.length ? known.reduce((s, f) => s + f.annual_value_sek, 0) : null,
+      value_basis: known.length ? 'stated' : null,
+      // Replaced only when every owner row of the avtal is.
+      superseded: group.every((f) => f.superseded),
+      kr_per_elev: null,
+      kr_per_elev_basis: null,
+      kr_per_elev_product_slug: null,
+      owner_rows: group.length,
+    };
+  });
+}
+
 export function categoryLabel(slug) {
   if (!slug) return 'Okänd kategori';
   return CATEGORIES.find((c) => c.slug === slug)?.label ?? 'Okänd kategori';
@@ -112,16 +151,26 @@ ${emptyPanel({ title: what, text })}`;
 
 // ------------------------------------------------------------------ prices
 
-export function priceStrip({ facts, filter, label, nameOf, noun = 'avtal' }) {
+// Free avtal and a known 0 kr are not price points (studio-data
+// pricePerElev); they are counted apart, not as "utan känt pris".
+export const isFreeRow = (f) => f.pricing_model === 'free' || f.annual_value_sek === 0;
+export function freeNote(n) {
+  return n ? `${nOf(n, 'kostnadsfritt avtal ingår', 'kostnadsfria avtal ingår')} inte i prisjämförelsen.` : '';
+}
+
+// n is distinct kommuner (one point per kommun, studio-data
+// priceDistribution); the unknown and free counts are avtal.
+export function priceStrip({ facts, filter, label, nameOf }) {
   const dist = priceDistribution(facts, filter);
   const all = byContract(headline(facts).filter(priceRowFilter(filter)));
-  const unknownCount = all.filter((f) => !isNum(f.kr_per_elev)).length;
-  return stripPlot({ dist, label, nameOf, unknownCount, noun, dotNoun: 'avtal', unit: 'kr/elev' });
+  const free = all.filter(isFreeRow).length;
+  const unknownCount = all.filter((f) => !isNum(f.kr_per_elev) && !isFreeRow(f)).length;
+  return stripPlot({ dist, label, nameOf, unknownCount, freeCount: free, noun: 'kommuner', dotNoun: 'kommun', unit: 'kr/elev' });
 }
 
 export function medianText(dist) {
   if (!dist || dist.suppressed || !isNum(dist.median)) {
-    return dist?.n ? `för få avtal (n = ${fmtInt(dist.n)})` : 'inget känt pris per elev';
+    return dist?.n ? `för få kommuner (n = ${fmtInt(dist.n)})` : 'inget känt pris per elev';
   }
   return `median ${fmtInt(dist.median)} kr/elev`;
 }
@@ -160,11 +209,13 @@ export function footprintMap({ tiles, rows, statusMap, stats, entity, nameOf }) 
   const cls = new Map();
   for (const k of ws.has) cls.set(k, 'has');
   for (const k of ws.none_done) cls.set(k, 'none-done');
+  for (const k of ws.refused) cls.set(k, 'refused');
   for (const k of ws.none_open) cls.set(k, 'none-open');
   for (const k of ws.not_contacted) cls.set(k, 'not-contacted');
   const what = {
     has: `har aktivt avtal med ${entity}`,
     'none-done': `inget aktivt avtal med ${entity}, insamlingen klar`,
+    refused: 'inga avtal utlämnade, vi vet inte vad kommunen köper',
     'none-open': 'insamlingen pågår, inget aktivt avtal med ' + entity + ' än',
     'not-contacted': 'inte kontaktad än',
   };
@@ -175,6 +226,7 @@ export function footprintMap({ tiles, rows, statusMap, stats, entity, nameOf }) 
     legend: [
       { cls: 'has', label: `Har aktivt avtal med ${entity}` },
       { cls: 'none-done', label: 'Inget aktivt avtal, insamling klar' },
+      { cls: 'refused', label: 'Inga avtal utlämnade' },
       { cls: 'none-open', label: 'Insamling pågår' },
       { cls: 'not-contacted', label: 'Inte kontaktad' },
     ],

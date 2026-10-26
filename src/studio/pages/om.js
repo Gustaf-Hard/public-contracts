@@ -94,7 +94,7 @@ export function renderOm({ facts, stats, statusMap = new Map(), basis = {}, toda
       <dl class="eh-facts">
         <div class="eh-fact"><dt>Insamlade avtal</dt><dd class="eh-val">${esc(num(b.collected))}</dd><dd class="eh-sub">från ${esc(nOfU(b.kommuner_collected, 'kommun', 'kommuner'))}</dd></div>
         <div class="eh-fact"><dt>Aktiva avtal</dt><dd class="eh-val">${esc(num(b.active))}</dd><dd class="eh-sub">i ${esc(nOfU(b.kommuner_with_avtal, 'kommun', 'kommuner'))}</dd></div>
-        <div class="eh-fact"><dt>Insamling klar</dt><dd class="eh-val">${esc(fmtInt(finished))}</dd><dd class="eh-sub">av ${esc(fmtInt(KOMMUNER_TOTAL))} kommuner${sc.dead_end ? `, varav ${esc(fmtInt(sc.dead_end))} utan utlämnade avtal` : ''}</dd></div>
+        <div class="eh-fact"><dt>Insamling klar</dt><dd class="eh-val">${esc(fmtInt(finished))}</dd><dd class="eh-sub">av ${esc(fmtInt(KOMMUNER_TOTAL))} kommuner${sc.dead_end ? `, och ${esc(fmtInt(sc.dead_end))} utan utlämnade avtal` : ''}</dd></div>
       </dl>
     </div>
   </div>
@@ -103,8 +103,8 @@ export function renderOm({ facts, stats, statusMap = new Map(), basis = {}, toda
   const insamling = `<div class="om-prose">
   ${p('Vi skickar en begäran om allmänna handlingar enligt offentlighetsprincipen till varje kommuns registrator och ber om kommunens gällande avtal för skolans digitala verktyg: läromedel, lärplattformar, skoladministration, prov, stödverktyg och elevhälsa. Avtalen som kommer tillbaka läses rad för rad: leverantör, produkter, period, årsvärde, prismodell och vilka skolformer avtalet gäller.')}
   ${p('Leverantörs- och produktnamn i avtalen skrivs på många sätt. En katalog läser varje namn som ett företag, en produkt, ett tillägg, en rabatt eller ett segment, så att samma produkt räknas som en.')}
-  ${p(`I dag är insamlingen klar i ${nOf(finished, 'kommun', 'kommuner')} och pågår i ${fmtInt(open)}${notContacted ? `. I ${nOf(notContacted, 'kommun', 'kommuner')} har vi inte begärt ut avtal än` : ''}${sc.unknown ? `. För ${nOf(sc.unknown, 'kommun', 'kommuner')} vet vi inte hur långt insamlingen har kommit` : ''}. ${sc.dead_end ? `${nOf(sc.dead_end, 'kommun', 'kommuner')} har avslutat ärendet utan att lämna ut några avtal. De räknas som klara men utan underlag, och studion skriver aldrig att de saknar avtal.` : ''}`)}
-  ${p('Att en kommun saknar avtal i en kategori betyder bara något när insamlingen där är klar. Kartorna skiljer därför på tre saker: inget aktivt avtal och insamlingen klar, insamlingen pågår, och inte kontaktad än.')}
+  ${p(`I dag är insamlingen klar i ${nOf(finished, 'kommun', 'kommuner')} och pågår i ${fmtInt(open)}${notContacted ? `. I ${nOf(notContacted, 'kommun', 'kommuner')} har vi inte begärt ut avtal än` : ''}${sc.unknown ? `. För ${nOf(sc.unknown, 'kommun', 'kommuner')} vet vi inte hur långt insamlingen har kommit` : ''}. ${sc.dead_end ? `${nOf(sc.dead_end, 'kommun', 'kommuner')} har avslutat ärendet utan att lämna ut några avtal. De räknas inte som klara: vi vet inte vad de köper, så de är aldrig vita fläckar och ingår inte bland liknande kommuner med klar insamling. På kartorna är de streckade som "Inga avtal utlämnade".` : ''}`)}
+  ${p('Att en kommun saknar avtal i en kategori betyder bara något när insamlingen där är klar. Kartorna skiljer därför på fyra saker: inget aktivt avtal och insamlingen klar, inga avtal utlämnade, insamlingen pågår, och inte kontaktad än. En kommun med klar insamling vars avtal i kategorin har gått ut har inget aktivt avtal där, men köper troligen i kategorin.')}
 </div>`;
 
   const aktiv = `<div class="grid-12">
@@ -127,29 +127,29 @@ export function renderOm({ facts, stats, statusMap = new Map(), basis = {}, toda
   const krElev = `<div class="om-prose">
   ${p('Pris per elev och år går bara att jämföra när vi vet både vad avtalet kostar och hur många elever det gäller. Vi räknar på ett av tre sätt, i den här ordningen:')}
   <ol class="om-steps">
-    <li><b>Styckpris.</b> Avtalet anger ett pris per elev och år. Det priset används som det är. <span class="muted">${esc(nOf(kb.styckpris, 'avtalsrad', 'avtalsrader'))}.</span></li>
+    <li><b>Styckpris.</b> Avtalet anger ett pris per elev. Ett pris per månad eller termin räknas om till ett år, och ett pris för en period längre än ett år delas upp per år när radens belopp visar det. Går det inte att avgöra används priset inte. <span class="muted">${esc(nOf(kb.styckpris, 'avtalsrad', 'avtalsrader'))}.</span></li>
     <li><b>Avtalets elevantal.</b> Avtalet anger hur många elever det gäller. Årsvärdet delas med det antalet. <span class="muted">${esc(nOf(kb.avtalets_elevantal, 'avtalsrad', 'avtalsrader'))}.</span></li>
     <li><b>Skolverkets elevantal.</b> Avtalet anger vilka skolformer det gäller men inte hur många elever. Årsvärdet delas med antalet elever i kommunens egna skolor i de skolformerna${laar ? `, läsåret ${esc(laar)}` : ''}. <span class="muted">${esc(nOf(kb.skolverket, 'avtalsrad', 'avtalsrader'))}.</span></li>
   </ol>
-  ${p(`Ett avtal för hela kommunen utan angivna skolformer räknas inte om till pris per elev, eftersom vi då skulle gissa. Av ${fmtInt(kb.rows)} aktiva avtalsrader har ${fmtInt(kb.priced)} ett pris per elev.`)}
+  ${p(`Ett avtal för hela kommunen utan angivna skolformer räknas inte om till pris per elev, eftersom vi då skulle gissa. Inte heller licenser per användare, per lärare eller personal, avtal efter användning och engångsbelopp: de är inte ett pris för eleverna. Kostnadsfria avtal och avtal på 0 kr ingår inte i prisjämförelsen. Av ${fmtInt(kb.rows)} aktiva avtalsrader har ${fmtInt(kb.priced)} ett pris per elev.`)}
   ${p('Årsvärdet är avtalets värde omräknat till ett år. Okänt värde räknas aldrig som noll, och varje summa visar hur många avtal värdet är känt för.')}
 </div>`;
 
   const minN = `<div class="om-prose">
-  ${p(`Median, kvartiler och prisprickar visas bara när minst ${MIN_N} avtal har känt pris per elev. Med färre visar vi en streckad ruta med texten "för få avtal" och antalet, och inga enskilda prickar. Det gäller prisdiagrammen, cellerna i prismatriserna och medianpriserna på kategori- och produktkorten.`)}
+  ${p(`Prisdiagrammen visar en punkt per kommun. Har en kommun flera avtal med känt pris i samma jämförelse räknas den en gång, med medianen av sina egna priser. Median, kvartiler och prisprickar visas bara när minst ${MIN_N} kommuner har känt pris per elev. Med färre visar vi en streckad ruta med texten "för få kommuner" och antalet, och inga enskilda prickar. Det gäller prisdiagrammen, cellerna i prismatriserna och medianpriserna på kategori- och produktkorten. Ett avtal som gäller flera skolformer räknas i varje skolform det omfattar.`)}
   ${p(`På en kommuns sida räknas jämförelserna i kommuner. Kommunens pris för en produkt jämförs med liknande kommuner när minst ${MIN_N} av dem har känt pris för produkten. Är de färre jämför vi med alla kommuner med känt pris, och är också de färre än ${MIN_N} visas bara kommunens eget pris, utan jämförelse. Medianen för vad liknande kommuner lägger per elev och kategori visas från ${MIN_N} kommuner.`)}
   ${p('Kommuners priser visas aldrig som en topplista. På en kommuns sida syns andra kommuner bara som en anonym fördelning. Enskilda avtal med värde finns i underlaget, eftersom avtalen är allmänna handlingar.')}
 </div>`;
 
   const peers = `<div class="om-prose">
   ${p(`Liknande kommuner är de som hör till samma kommungrupp enligt SKR:s indelning, till exempel storstäder, pendlingskommuner nära större stad eller landsbygdskommuner. Har en kommun ingen kommungrupp jämför vi med kommuner av samma storlek efter folkmängd: ${sizeBandsText()}.`)}
-  ${p('Hur mycket en kommun lägger per elev och år i varje kategori jämförs bara med liknande kommuner där insamlingen är klar. En kommun som fortfarande skickar avtal skulle annars dra ned medianen med kostnader vi inte har sett än.')}
+  ${p('Hur mycket en kommun lägger per elev och år i varje kategori jämförs bara med liknande kommuner där insamlingen är klar, och i en kategori bara när alla deras aktiva avtal där har känt värde. En kommun som fortfarande skickar avtal, eller vars värde bara delvis är känt, skulle annars dra ned medianen med kostnader vi inte har sett. Summan delas med elever i förskoleklass till åk 9, och avtal som bara gäller förskola, gymnasiet eller komvux räknas inte där.')}
   ${p('Priset för en enskild produkt jämförs däremot med alla liknande kommuner som har ett känt pris per elev för produkten, även om insamlingen där pågår. Ett pris per elev påverkas inte av att kommunen ännu inte har skickat sina andra avtal.')}
 </div>`;
 
   const kanal = `<div class="om-prose">
   ${p('Många kommuner köper via en återförsäljare eller en portal, till exempel Skolon, Läromedia eller Atea, och ett sådant avtal kan innehålla produkter från flera leverantörer. Vi delar då avtalet per leverantör efter beloppen på avtalets rader. Det som inte går att fördela ligger kvar på återförsäljaren och märks "ej fördelat".')}
-  ${p('Ett delat avtal räknas fortfarande som ett avtal i antalet avtal och förnyelser, men en gång per leverantör när vi räknar en leverantörs kommuner.')}
+  ${p('Ett delat avtal räknas fortfarande som ett avtal i antalet avtal och förnyelser, men en gång per leverantör när vi räknar en leverantörs kommuner. På en kommuns sida och en återförsäljares sida räknas hela avtalets värde. Tillägg som integrationer, uppstart eller migrering räknas till leverantören vars avtal det är, inte till företaget som nämns i raden.')}
 </div>`;
 
   const kallor = `<div class="om-prose">
@@ -167,7 +167,7 @@ export function renderOm({ facts, stats, statusMap = new Map(), basis = {}, toda
 ${section({ id: 'insamling', kicker: 'Insamling', title: 'Hur avtalen samlas in', body: insamling })}
 ${section({ id: 'aktiva', kicker: 'Aktiva avtal', title: 'Vilka avtal som räknas', body: aktiv })}
 ${section({ id: 'kr-elev', kicker: 'Pris per elev', title: 'Hur kr per elev räknas', body: krElev })}
-${section({ id: 'for-fa', kicker: 'För få avtal', title: `Inget visas under ${MIN_N} avtal`, body: minN })}
+${section({ id: 'for-fa', kicker: 'För få kommuner', title: `Inget visas under ${MIN_N} kommuner`, body: minN })}
 ${section({ id: 'liknande', kicker: 'Liknande kommuner', title: 'Vem en kommun jämförs med', body: peers })}
 ${section({ id: 'kanaler', kicker: 'Återförsäljare', title: 'Avtal via en kanal', body: kanal })}
 ${section({ id: 'kallor', kicker: 'Källor', title: 'Källor och uppdatering', body: kallor })}`;

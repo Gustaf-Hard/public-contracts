@@ -116,7 +116,7 @@ export function categoryCards({ facts, includeEmpty = false }) {
   <div class="ct-share"><span class="ct-sub">Största leverantörer, andel av känt värde</span>${shareBar(topThree(facts, c.slug), { compact: true })}</div>
   <div class="ct-price${priced ? '' : ' is-unknown hatch'}">${priced
     ? `median <b>${esc(fmtPrice(dist.median))}</b> kr/elev <span class="meta">n = ${esc(fmtInt(dist.n))}</span>`
-    : `<span>${esc(dist.n ? `för få avtal med pris per elev (n = ${fmtInt(dist.n)})` : 'inget känt pris per elev')}</span><span class="meta">median visas från ${MIN_N}</span>`}</div>
+    : `<span>${esc(dist.n ? `för få kommuner med pris per elev (n = ${fmtInt(dist.n)})` : 'inget känt pris per elev')}</span><span class="meta">median visas från ${MIN_N}</span>`}</div>
 </a>`;
   }).join('');
   const unk = market.get(UNKNOWN_CATEGORY);
@@ -303,7 +303,7 @@ export function renderMarknad({ facts, stats, statusMap, today, basis }) {
       ${completenessRing({ covered })}
       <dl class="mk-facts">
         <div><dt>Kommuner med avtal</dt><dd><b>${esc(fmtInt(covered))}</b> av ${esc(fmtInt(KOMMUNER_TOTAL))}</dd></div>
-        <div><dt>Insamling klar</dt><dd><b>${esc(fmtInt(b.done ?? 0))}</b> ${(b.done ?? 0) === 1 ? 'kommun' : 'kommuner'}${b.dead_end ? `, varav ${esc(fmtInt(b.dead_end))} utan utlämnade avtal` : ''}</dd></div>
+        <div><dt>Insamling klar</dt><dd><b>${esc(fmtInt(b.done ?? 0))}</b> ${(b.done ?? 0) === 1 ? 'kommun' : 'kommuner'}${b.dead_end ? `, och ${esc(fmtInt(b.dead_end))} utan utlämnade avtal` : ''}</dd></div>
         <div><dt>Aktiva avtal</dt><dd><b>${esc(fmtInt(active))}</b> av ${esc(fmtInt(collected))} insamlade</dd></div>
       </dl>
     </div>

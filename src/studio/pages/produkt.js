@@ -71,7 +71,7 @@ export function renderProdukt({ product, company, facts, stats, statusMap, today
     answer,
     facts: [
       { label: 'Kommuner', value: kommuner, sub: 'med minst ett aktivt avtal' },
-      { label: 'Median per elev', value: dist.suppressed ? null : fmtInt(dist.median), unit: dist.suppressed ? '' : 'kr/elev', sub: dist.suppressed ? medianText(dist) : `n = ${fmtInt(dist.n)} avtal med känt pris` },
+      { label: 'Median per elev', value: dist.suppressed ? null : fmtInt(dist.median), unit: dist.suppressed ? '' : 'kr/elev', sub: dist.suppressed ? medianText(dist) : `n = ${fmtInt(dist.n)} kommuner med känt pris` },
       { label: 'Pris per elev känt', value: nPriced, unit: `av ${fmtInt(avtal.length)}`, sub: 'aktiva avtal' },
     ],
     viz: segmentStrip(segs.map((s) => s.key)),
@@ -83,7 +83,7 @@ export function renderProdukt({ product, company, facts, stats, statusMap, today
   const kpis = `<div class="kpi-row">
     ${kpiTile({ label: 'Aktiva avtal', value: avtal.length, unit: 'avtal', state: avtal.length ? 'known' : 'unknown', reason: 'Inga aktiva avtal nämner produkten.', basis: `${fmtInt(byContract(all).length)} insamlade totalt` })}
     ${kpiTile(renewalTileProps({ avtal, buckets, today }))}
-    ${kpiTile({ label: 'Mittersta hälften', value: dist.suppressed ? null : `${fmtInt(dist.p25)} till ${fmtInt(dist.p75)}`, unit: 'kr/elev', state: dist.suppressed ? 'unknown' : 'known', reason: `${medianText(dist)}, spridningen visas från ${MIN_N}.`, basis: dist.suppressed ? '' : 'hälften av avtalen ligger här' })}
+    ${kpiTile({ label: 'Mittersta hälften', value: dist.suppressed ? null : `${fmtInt(dist.p25)} till ${fmtInt(dist.p75)}`, unit: 'kr/elev', state: dist.suppressed ? 'unknown' : 'known', reason: `${medianText(dist)}, spridningen visas från ${MIN_N}.`, basis: dist.suppressed ? '' : 'hälften av kommunerna ligger här' })}
     ${kpiTile({ label: 'Nästa förnyelse', value: upcoming.length ? upcoming[0].next_renewal.slice(0, 10) : null, state: upcoming.length ? 'known' : 'unknown', reason: 'Inget aktivt avtal anger slutdatum eller förlängning.', basis: upcoming.length ? nameOf(upcoming[0].kommun_kod) : '' })}
   </div>`;
 
@@ -125,7 +125,7 @@ export function renderProdukt({ product, company, facts, stats, statusMap, today
           ...(c.key === '*' ? {} : { segment: c.key }),
           ...(r.kods ? { kommunKods: r.kods } : {}),
         }),
-      })}</div>`,
+      })}<p class="meta sm-note">En punkt per kommun i varje ruta. Ett avtal som gäller flera segment räknas i varje segment det omfattar.</p></div>`,
     });
   }
 
@@ -139,7 +139,7 @@ export function renderProdukt({ product, company, facts, stats, statusMap, today
   return `${breadcrumb([{ label: 'Leverantörer', href: '/studio/leverantorer' }, { label: company.canonical, href: companyHref(company.slug) }, { label: product.name }])}
 ${header}
 <section class="section">${kpis}</section>
-${section({ id: 'pris', kicker: 'Pris', title: 'Pris per elev och år', note: 'en punkt per avtal; per segment räknas bara avtal som gäller enbart produkten', body: priceBody })}
+${section({ id: 'pris', kicker: 'Pris', title: 'Pris per elev och år', note: 'en punkt per kommun; per segment räknas bara avtal som gäller enbart produkten', body: priceBody })}
 ${matrix}
 ${section({ id: 'karta', kicker: 'Var', title: 'Kommuner som använder produkten', note: `${fmtInt(kommuner)} kommuner med aktivt avtal, håll över en ruta för namn`, body: `<div class="card map-card">${footprintMap({ tiles, rows: all, statusMap, stats, entity: product.name, nameOf })}</div>` })}
 ${section({ id: 'alternativ', kicker: 'Alternativ', title: 'Produkter som gör samma jobb', body: substitutes({ facts, product, category }) })}
