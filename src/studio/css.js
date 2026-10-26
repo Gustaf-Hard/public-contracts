@@ -40,6 +40,53 @@ const DARK_TOKENS = `
   --rail-bg: #121517;
 `;
 
+
+// Entity page styles (Task 6: leverantör, produkt). Same tokens; no new colours.
+const PAGE_CSS = `
+/* ---------- breadcrumb ---------- */
+.crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-bottom: var(--s-4); font-size: var(--t-sm); color: var(--ink-3); }
+.crumbs a { color: var(--ink-2); }
+.crumbs [aria-current] { color: var(--ink); font-weight: 500; }
+.crumb-sep { color: var(--line-strong); }
+
+.card-lede { margin: -4px 0 var(--s-3); }
+.map-card { max-width: 760px; }
+.tl-rest { margin-top: var(--s-3); }
+/* hidden tooltips near the right edge must not widen the page on a phone */
+.st-content { overflow-x: clip; }
+@media (max-width: 760px) {
+  .ev-table.cards td[data-label="Period"] { grid-column: 1 / -1; white-space: normal; }
+}
+.tl .tip { white-space: normal; width: max-content; max-width: min(240px, 70vw); }
+
+/* ---------- product cards ---------- */
+.pc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--s-4); }
+.pc { display: flex; flex-direction: column; gap: var(--s-3); padding: var(--s-4) var(--s-5) var(--s-5); min-width: 0; }
+.pc-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-3); }
+.pc-name { font-family: var(--font-display); font-size: var(--t-xl); font-weight: 500; letter-spacing: -.012em; line-height: 1.15; min-width: 0; overflow-wrap: anywhere; }
+.pc-name a { color: var(--ink); }
+.pc-name a:hover { color: var(--accent); }
+.pc-what { font-size: var(--t-sm); color: var(--ink-2); line-height: 1.45; }
+.pc-reach { display: flex; flex-direction: column; gap: 6px; margin-top: auto; }
+.pc-reach-row { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-3); font-size: var(--t-sm); color: var(--ink-2); }
+.pc-reach-row b { font-size: var(--t-lg); color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+.pc-meter { height: 8px; background: var(--surface-3); }
+.pc-price { display: grid; grid-template-columns: auto 1fr; align-items: baseline; column-gap: 8px; row-gap: 2px; padding: var(--s-3); border-radius: var(--r-2); background: var(--surface-2); border: 1px solid var(--line); }
+.pc-price .meta { grid-column: 1 / -1; }
+.pc-price-num { font-family: var(--font-display); font-size: var(--t-2xl); font-weight: 500; line-height: 1; font-variant-numeric: lining-nums tabular-nums; }
+.pc-price-unit { font-size: var(--t-sm); color: var(--ink-2); }
+.pc-price.is-unknown { border-style: dashed; border-color: var(--line-strong); }
+.pc-price-few { grid-column: 1 / -1; font-weight: 600; color: var(--ink-2); }
+.pc-seg .seg-strip { flex-wrap: wrap; row-gap: 4px; max-width: 100%; }
+.pc-foot { margin-top: var(--s-3); }
+
+/* ---------- market context around a thin entity ---------- */
+.ctx-wrap { margin-top: var(--s-5); padding-top: var(--s-5); border-top: 1px dashed var(--line-strong); }
+.ctx-lede { font-size: var(--t-md); color: var(--ink-2); }
+.ctx-lede b { color: var(--ink); font-weight: 600; }
+.ctx { row-gap: var(--s-4); align-items: start; }
+`;
+
 // Component styles (Task 5). Chart rules: marks wear --viz-*, text wears ink
 // tokens, unknown is always the hatch, never a colour. Hover detail is CSS
 // only (.tip shown on :hover / :focus-visible), so pane swaps need no script.
@@ -685,4 +732,5 @@ p { margin: 0; }
 @keyframes st-fade-up { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 @keyframes st-grow-y { from { transform: scaleY(0); } to { transform: scaleY(1); } }
 @keyframes st-grow-x { from { transform: scaleX(0); } to { transform: scaleX(1); } }
-${COMPONENT_CSS}`;
+${COMPONENT_CSS}
+${PAGE_CSS}`;

@@ -910,7 +910,7 @@ export function createDashboardApp({
   app.use(express.static('public'));
   // Mediagraf Studio: operator-only market view behind the same auth gate,
   // with its own layout and no links back into the back office.
-  mountStudio(app, { db, ...studioDeps });
+  mountStudio(app, { db, contractsDir, ...studioDeps });
   // Pipeline health drives the heartbeat pill + the health modal (one object,
   // already threaded everywhere as `heartbeat`).
   const hb = () => (db && typeof db.getTickHealth === 'function' ? db.getTickHealth() : null);

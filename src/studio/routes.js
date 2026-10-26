@@ -9,6 +9,12 @@ import { companies } from '../catalogue.js';
 import { studioLayout, esc } from './layout.js';
 import { fmtInt, fmtPct } from './format.js';
 import { renderGallery } from './gallery.js';
+import { companyBySlug } from '../catalogue.js';
+import { renderLeverantor } from './pages/leverantor.js';
+import { renderProdukt, findProduct } from './pages/produkt.js';
+import { notFound } from './pages/common.js';
+import path from 'node:path';
+import { existsSync } from 'node:fs';
 
 export const STUDIO_DATA_TTL_MS = 5 * 60 * 1000;
 
@@ -111,7 +117,12 @@ function renderMarknadPlaceholder({ basis }) {
 </section>`;
 }
 
-export function mountStudio(app, { db, statsLoader = loadKommunStats, now = () => new Date() } = {}) {
+const pageOf = (req) => Math.max(1, parseInt(req.query.sida, 10) || 1);
+
+export function mountStudio(app, {
+  db, statsLoader = loadKommunStats, now = () => new Date(),
+  contractsDir = process.env.PILOT_CONTRACTS_DIR ?? 'data/contracts',
+} = {}) {
   const getStudioData = makeStudioData({ db, statsLoader, now });
 
   app.get('/studio', (req, res) => {
@@ -123,6 +134,55 @@ export function mountStudio(app, { db, statsLoader = loadKommunStats, now = () =
   app.get('/studio/_komponenter', (req, res) => {
     const data = getStudioData();
     sendStudio(req, res, data, { title: 'Komponenter', body: renderGallery({ stats: data.stats, today: data.today }) });
+  });
+
+  app.get('/studio/leverantor/:slug', (req, res) => {
+    const data = getStudioData();
+    const company = companyBySlug(req.params.slug);
+    if (!company || company.hiddenInStudio) {
+      return sendStudio(req, res, data, {
+        title: 'Leverantören finns inte', status: 404,
+        body: notFound({ what: 'Leverantören finns inte', text: 'Vi känner inte till någon leverantör med den adressen. Sök efter namnet eller gå till listan över leverantörer.' }),
+      });
+    }
+    const body = renderLeverantor({ company, facts: data.facts, stats: data.stats, statusMap: data.statusMap, today: data.today, page: pageOf(req) });
+    sendStudio(req, res, data, { title: company.canonical, body });
+  });
+
+  app.get('/studio/produkt/:slug', (req, res) => {
+    const data = getStudioData();
+    const hit = findProduct(req.params.slug);
+    if (!hit) {
+      return sendStudio(req, res, data, {
+        title: 'Produkten finns inte', status: 404,
+        body: notFound({ what: 'Produkten finns inte', text: 'Vi känner inte till någon produkt med den adressen. Sök efter namnet eller gå till leverantören.' }),
+      });
+    }
+    const body = renderProdukt({ product: hit.product, company: hit.company, facts: data.facts, stats: data.stats, statusMap: data.statusMap, today: data.today, page: pageOf(req) });
+    sendStudio(req, res, data, { title: hit.product.name, body });
+  });
+
+  // OPERATOR-ONLY. Serves the source PDF of a stored avtal, the same file as
+  // the back office /attachments/:id, but never its filename (which can carry
+  // a person's name). Must be replaced by a redacted or metadata-only view
+  // before the studio is opened to anyone outside the auth gate (spec §8).
+  app.get('/studio/underlag/:attachmentId', (req, res) => {
+    const id = /^\d+$/.test(req.params.attachmentId) ? Number(req.params.attachmentId) : null;
+    if (!db || id == null) return res.status(404).send('Not found');
+    const att = db.raw.prepare(`
+      SELECT a.id, a.saved_path, a.mime_type FROM attachments a
+      JOIN contracts c ON c.attachment_id = a.id
+      WHERE a.id = ? AND c.is_contract = 1
+    `).get(id);
+    if (!att) return res.status(404).send('Not found');
+    const base = path.resolve(contractsDir);
+    const full = path.resolve(att.saved_path);
+    if (!full.startsWith(base + path.sep) || !existsSync(full)) return res.status(404).send('Not found');
+    res.set('Content-Type', att.mime_type || 'application/pdf');
+    res.set('Content-Disposition', `inline; filename="avtal-${att.id}.pdf"`);
+    res.set('Cache-Control', 'private, no-store');
+    res.set('X-Robots-Tag', 'noindex');
+    res.sendFile(full);
   });
 
   return { getStudioData };
