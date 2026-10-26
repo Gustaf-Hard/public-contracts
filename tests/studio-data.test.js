@@ -376,6 +376,17 @@ describe('renewals, co-occurrence, profile, basis', () => {
     const mar = b.find((x) => x.month === '2027-03');
     expect(mar).toMatchObject({ n: 2, n_known: 1, value_known_sek: 4000 });
   });
+  it('renewalBuckets counts a two-owner avtal once and sums its split values', () => {
+    const c = C({
+      vendor_name: 'Läromedia Bokhandel Örebro AB', annual_value_sek: 100000, period_end: '2027-02-28', products: ['Polylino', 'Magma'],
+    });
+    const solo = C({ kommun_kod: '9002', period_end: '2027-02-10', annual_value_sek: null });
+    const f = build([c, solo], { lineItems: [LI(c.contract_id, 'Polylino', 30000), LI(c.contract_id, 'Magma', 50000)] });
+    expect(f.filter((x) => x.contract_id === c.contract_id).length).toBeGreaterThan(1);
+    const feb = renewalBuckets(f, { today: TODAY, months: 24 }).find((x) => x.month === '2027-02');
+    expect(feb).toMatchObject({ n: 2, n_known: 1, value_known_sek: 100000 });
+    expect(feb.byCategory.laromedel).toEqual({ n: 2, n_known: 1, value_known_sek: 100000 });
+  });
   it('coOccurrence lists other companies in the same kommuner', () => {
     expect(coOccurrence(facts, 'ilt')).toEqual([
       { slug: 'gleerups', name: 'Gleerups', kommuner: 1 },

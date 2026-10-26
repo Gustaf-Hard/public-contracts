@@ -16,14 +16,13 @@ import { segmentMatrix, renewalTimeline, tileMap, loadKommunTiles } from '../cha
 import {
   isNum, headline, byContract, distinctCount, kommunNamer, productNames, productHref, companyHref,
   section, breadcrumb, priceStrip, medianText, evidenceSection, renewalTileProps, peerGroupKods,
-  modelLabel, safeAll, nOf, RENEWAL_MONTHS,
+  modelLabel, safeAll, nOf, RENEWAL_MONTHS, isIso,
 } from './common.js';
 import { knownValue, shareBar, topThree, vendorRankings } from './marknad.js';
 
 const MAX_LANES = 10;
 const MAX_CARDS = 12;
 const catOf = (f) => f.category ?? UNKNOWN_CATEGORY;
-const isIso = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}/.test(s);
 
 export function findCategory(slug) {
   return CATEGORIES.find((c) => c.slug === slug) ?? null;
@@ -65,9 +64,7 @@ function modelMix({ facts, category }) {
 
 // ------------------------------------------------------------ white spots
 
-function whiteSpotMap({ facts, statusMap, stats, category, label, nameOf, tiles }) {
-  const allKods = safeAll(stats).map((r) => r.kod);
-  const ws = whiteSpots(facts, statusMap, { category, allKods: allKods.length ? allKods : Object.keys(tiles?.tiles ?? {}) });
+function whiteSpotMap({ ws, label, nameOf, tiles }) {
   const cls = new Map();
   for (const k of ws.has) cls.set(k, 'has');
   for (const k of ws.none_done) cls.set(k, 'none-done');
@@ -76,8 +73,8 @@ function whiteSpotMap({ facts, statusMap, stats, category, label, nameOf, tiles 
   const lower = label.toLowerCase();
   const what = {
     has: `har aktivt avtal i ${lower}`,
-    'none-done': `inget avtal i ${lower}, insamlingen klar`,
-    'none-open': `insamlingen pågår, inget avtal i ${lower} än`,
+    'none-done': `inget aktivt avtal i ${lower}, insamlingen klar`,
+    'none-open': `insamlingen pågår, inget aktivt avtal i ${lower} än`,
     'not-contacted': 'inte kontaktad än',
   };
   const map = tileMap({
@@ -93,7 +90,7 @@ function whiteSpotMap({ facts, statusMap, stats, category, label, nameOf, tiles 
     label: `Kommuner med avtal i ${lower}`,
   });
   const side = `<div class="ws-side">
-    <p class="ws-big"><b>${esc(fmtInt(ws.none_done.length))}</b> ${ws.none_done.length === 1 ? 'kommun' : 'kommuner'} har lämnat ut sina avtal utan något i ${esc(lower)}.</p>
+    <p class="ws-big"><b>${esc(fmtInt(ws.none_done.length))}</b> ${ws.none_done.length === 1 ? 'kommun' : 'kommuner'} har lämnat ut sina avtal och är utan aktivt avtal i ${esc(lower)}.</p>
     <p class="meta">Det är de säkra vita fläckarna. I ${esc(nOf(ws.none_open.length, 'kommun', 'kommuner'))} pågår insamlingen, där kan avtal fortfarande komma in. ${ws.not_contacted.length ? `${esc(nOf(ws.not_contacted.length, 'kommun', 'kommuner'))} har vi inte kontaktat än.` : ''}</p>
   </div>`;
   return `<div class="ws card"><div class="ws-map">${map}</div>${side}</div>`;
@@ -274,7 +271,7 @@ ${header}
 ${section({ id: 'andelar', kicker: 'Andelar', title: `Vem säljer ${lower}`, note: 'aktiva avtal, andel av känt värde och av kommunerna med avtal i kategorin', body: vendorRankings({ facts, category: slug }) })}
 ${section({ id: 'pris', kicker: 'Pris', title: 'Pris per elev och år', note: 'en punkt per avtal; matrisen visar median per kommungrupp och segment, klicka en ruta för spridning', body: priceBody })}
 ${section({ id: 'prismodell', kicker: 'Prismodell', title: 'Hur kategorin prissätts', note: 'andel av aktiva avtal per prismodell', body: `<div class="card">${modelMix({ facts, category: slug })}</div>` })}
-${section({ id: 'vita-flackar', kicker: 'Vita fläckar', title: `Kommuner utan avtal i ${lower}`, note: 'håll över en ruta för namn; "insamling pågår" betyder inte att avtal saknas', body: whiteSpotMap({ facts, statusMap, stats, category: slug, label, nameOf, tiles }) })}
+${section({ id: 'vita-flackar', kicker: 'Vita fläckar', title: `Kommuner utan avtal i ${lower}`, note: 'håll över en ruta för namn; "insamling pågår" betyder inte att avtal saknas', body: whiteSpotMap({ ws, label, nameOf, tiles }) })}
 ${section({ id: 'fornyelser', kicker: 'Förnyelser', title: 'Avtal som förnyas eller löper ut, per leverantör', note: renew.basis, body: `<div class="card">${renew.html}</div>` })}
 ${section({ id: 'produkter', kicker: 'Produkter', title: `Produkter i ${lower}`, note: 'efter antal kommuner med aktivt avtal', body: productCards({ facts, category: slug, rows, kommunerTotal: kommuner }) })}
 ${section({ id: 'underlag', kicker: 'Underlag', title: 'Avtalen bakom siffrorna', note: `${fmtInt(ev.active)} aktiva, ${fmtInt(ev.old)} utgångna eller ersatta`, body: ev.html })}`;

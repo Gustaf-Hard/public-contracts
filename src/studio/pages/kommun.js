@@ -16,7 +16,7 @@ import { stripPlot, rankingBars, renewalTimeline, tileMap, niceDomain, loadKommu
 import {
   isNum, headline, sumKnown, byContract, categoryLabel, modelLabel, productName, productNames,
   companyHref, productHref, section, breadcrumb, medianText, evidenceSection, renewalTileProps,
-  safeAll, nOf, MIN_N,
+  safeAll, nOf, MIN_N, isIso,
 } from './common.js';
 
 // Elever the per-elev spend is divided by: kommunal regi, förskoleklass to åk 9.
@@ -49,7 +49,6 @@ export function tenderCue(renewal, today) {
   return start <= today ? 'upphandla nu' : `upphandla ${monthsUntil(start, today)}`;
 }
 
-const isIso = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}/.test(s);
 const catOf = (f) => f.category ?? UNKNOWN_CATEGORY;
 const catName = (c) => (c === UNKNOWN_CATEGORY ? 'Okänd kategori' : categoryLabel(c));
 const catOrder = (c) => { const i = CATEGORIES.findIndex((x) => x.slug === c); return i < 0 ? 99 : i; };

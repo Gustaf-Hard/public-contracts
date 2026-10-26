@@ -11,7 +11,7 @@ import { kpiTile, emptyPanel } from '../components.js';
 import { rankingBars } from '../charts.js';
 import {
   isNum, headline, byContract, categoryLabel, companyHref, kommunHref, kommunNamer,
-  section, renewalTileProps, nOf,
+  section, renewalTileProps, nOf, isIso,
 } from './common.js';
 
 export const ADDA_MONTH = '2027-01';
@@ -19,7 +19,6 @@ export const ADDA_NOTE = 'Addas ramavtal Digitala läromedel 2022 löper ut 31 j
 export const WAVE_MONTHS = 24;
 const MONTHS_SV = ['jan', 'feb', 'mar', 'apr', 'maj', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'];
 const MONTHS_LONG = ['januari', 'februari', 'mars', 'april', 'maj', 'juni', 'juli', 'augusti', 'september', 'oktober', 'november', 'december'];
-const isIso = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}/.test(s);
 const LATEST_MAX = 8;
 
 // Known value over the distinct avtal of some rows: { value, known, total }.

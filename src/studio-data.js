@@ -451,10 +451,21 @@ function addMonths(ym, k) {
 export function renewalBuckets(facts, { today, months = 24 } = {}) {
   if (!isIso(today)) throw new Error('renewalBuckets requires today as YYYY-MM-DD');
   const first = monthKey(today);
-  // value_known_sek sums known values only; n_known says how many of n
-  // carried one, so an unknown value is never read as 0.
+  // n and n_known count distinct avtal (a channel avtal has one row per
+  // owner company, and is still one avtal); value_known_sek sums the rows'
+  // known values, which add up to the avtal's value when it is split.
+  // n_known says how many of n carried a value, so unknown is never 0.
   const buckets = Array.from({ length: months }, (_, i) => ({ month: addMonths(first, i), n: 0, n_known: 0, value_known_sek: 0, byCategory: {} }));
   const index = new Map(buckets.map((b, i) => [b.month, i]));
+  const ids = new Map(); // tally -> { all: Set, known: Set }
+  const tally = (t, f, known) => {
+    if (!ids.has(t)) ids.set(t, { all: new Set(), known: new Set() });
+    const s = ids.get(t);
+    s.all.add(f.contract_id);
+    if (known) { s.known.add(f.contract_id); t.value_known_sek += f.annual_value_sek; }
+    t.n = s.all.size;
+    t.n_known = s.known.size;
+  };
   for (const f of headline(facts)) {
     if (!isIso(f.next_renewal) || f.next_renewal.slice(0, 10) < today) continue;
     const i = index.get(monthKey(f.next_renewal));
@@ -463,10 +474,8 @@ export function renewalBuckets(facts, { today, months = 24 } = {}) {
     const known = isFiniteNum(f.annual_value_sek);
     const cat = catOf(f);
     b.byCategory[cat] ??= { n: 0, n_known: 0, value_known_sek: 0 };
-    for (const t of [b, b.byCategory[cat]]) {
-      t.n += 1;
-      if (known) { t.n_known += 1; t.value_known_sek += f.annual_value_sek; }
-    }
+    tally(b, f, known);
+    tally(b.byCategory[cat], f, known);
   }
   return buckets;
 }

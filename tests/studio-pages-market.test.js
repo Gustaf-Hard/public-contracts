@@ -216,10 +216,18 @@ describe('/studio (Marknad)', () => {
     noLeaks(r.text);
   });
 
-  it('escapes hostile vendor names', async () => {
-    seedContract({ kod: '1440', vendor: '<script>alert(1)</script> "Evil" AB', value: 90000, model: 'fixed' });
-    const html = (await body('/studio')).text;
-    expect(html).not.toContain('<script>alert');
+  it('escapes hostile vendor names, in text and in attributes', async () => {
+    // A Polyglutt line puts the avtal in läromedel; the unsplit remainder
+    // stays on the hostile vendor, which then leads the category.
+    seedContract({ kod: '1440', vendor: '<script>alert(1)</script> "Evil" AB', value: 90000, model: 'fixed', lines: [{ product_name: 'Polyglutt' }] });
+    for (const path of ['/studio', '/studio/kategorier', '/studio/kategori/laromedel']) {
+      const html = (await body(path)).text;
+      expect(html, path).not.toContain('<script>alert');
+      expect(html, path).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
+      expect(html, path).not.toMatch(/"Evil"/);
+      // inside an attribute (share bar aria-label) the quotes are entities
+      expect(html, path).toMatch(/aria-label="[^"]*&quot;Evil&quot;[^"]*"/);
+    }
   });
 });
 
@@ -252,6 +260,21 @@ describe('/studio/kategori/:slug', () => {
     expect(html).toContain('t-none-done');
     expect(html).toContain('t-none-open');
     noLeaks(html);
+  });
+
+  it('white-spot legend counts add up to the tiles, and an expired avtal is not "has"', async () => {
+    seedMarket();
+    const html = (await body('/studio/kategori/larplattform')).text;
+    const map = html.slice(html.indexOf('id="vita-flackar"'), html.indexOf('id="fornyelser"'));
+    const tiles = (map.match(/<span class="tile t-/g) || []).length;
+    expect(tiles).toBeGreaterThan(200);
+    const legend = map.slice(map.indexOf('tm-legend'), map.indexOf('</ul>', map.indexOf('tm-legend')));
+    const counts = [...legend.matchAll(/<b>([\d\s\u00a0]+)<\/b>/g)].map((m) => Number(m[1].replace(/\D/g, '')));
+    expect(counts.reduce((a, b) => a + b, 0)).toBe(tiles);
+    // Öckerö: only an expired Vklass avtal in lärplattform, collection open
+    expect(map).toMatch(/class="tile t-none-open[^"]*"[^>]*aria-label="Öckerö: insamlingen pågår/);
+    expect(map).not.toMatch(/class="tile t-has[^"]*"[^>]*aria-label="Öckerö/);
+    expect(map).toMatch(/class="tile t-has[^"]*"[^>]*aria-label="Partille/);
   });
 
   it('has the segment matrix, pricing-model mix, renewal lanes per company and product cards', async () => {

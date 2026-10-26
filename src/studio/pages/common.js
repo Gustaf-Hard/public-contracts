@@ -16,7 +16,7 @@ export const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
 export const headline = (facts) => facts.filter((f) => f.active && !f.superseded);
 export const distinctCount = (rows, fn) => new Set(rows.map(fn).filter((x) => x != null)).size;
 export const sumKnown = (rows) => rows.reduce((s, f) => s + (isNum(f.annual_value_sek) ? f.annual_value_sek : 0), 0);
-const isIso = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}/.test(s);
+export const isIso = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}/.test(s);
 
 // One value per avtal: on a company page each avtal has one row, but keep
 // the guard so a product page never double-counts an avtal.
