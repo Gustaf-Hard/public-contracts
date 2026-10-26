@@ -60,7 +60,7 @@ export const COMPANIES = [
       'Aski Raski', 'Polyglutt Home Access'], watchlist: true, checklist: true },
   { canonical: 'Binogi', slug: 'binogi', role: 'service', category: 'läromedel',
     aliases: ['binogi'], probeLabel: 'Binogi',
-    products: ['Binogi.se', 'Språkprojektet'], watchlist: true, checklist: true },
+    products: ['Binogi.se', 'Språkprojektet'], singleProduct: 'Binogi', watchlist: true, checklist: true },
 
   // ---- Services: skoladministration / lärplattform ----
   { canonical: 'Tietoevry', slug: 'tietoevry', role: 'service', category: 'skoladministration',
@@ -258,6 +258,19 @@ export function resolveCompany(name) {
     if (hit) return { canonical: c.canonical, slug: c.slug, role: c.role, category: c.category ?? null, matchedAs: 'product', product: hit };
   }
   return null;
+}
+
+// The product name to show for `productName` on a contract with `vendorName`.
+// A company marked `singleProduct` sells one product however the contract
+// words it (Binogi: "Binogi.se", "Språkprojektet", "Binogi.se årskurs 7-9"...),
+// so every name folds into that one; discount lines stay what they are.
+// Read-time only, like resolveCompany: nothing in the DB is renamed.
+export function canonicalProductName(vendorName, productName) {
+  if (productName == null) return productName;
+  const slug = resolveCompany(vendorName)?.slug;
+  const single = slug ? companyBySlug(slug)?.singleProduct : null;
+  if (!single || /^\s*rabatt/i.test(productName)) return productName;
+  return single;
 }
 
 // Final cross-check list: the companies we ask a kommun to confirm against

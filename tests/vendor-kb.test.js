@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveCompany, normalizeVendorName, companyBySlug, probeName, COMPANIES } from '../src/vendor-kb.js';
+import { resolveCompany, normalizeVendorName, companyBySlug, probeName, COMPANIES, canonicalProductName } from '../src/vendor-kb.js';
 
 describe('normalizeVendorName', () => {
   it('folds Swedish letters, lowercases, collapses punctuation/space', () => {
@@ -85,5 +85,22 @@ describe('probeName', () => {
 describe('resolveCompany — Tieto\'s old name', () => {
   it('TietoEnator resolves to Tietoevry', () => {
     expect(resolveCompany('TietoEnator Healthcare & Welfare')?.canonical).toBe('Tietoevry');
+  });
+});
+
+// 2026-10-26: Binogi sells one product; contracts name it a dozen ways
+// (Binogi.se, Språkprojektet, "Binogi.se årskurs 7-9"...).
+describe('canonicalProductName', () => {
+  it('folds every product of a single-product company to its one name', () => {
+    for (const raw of ['Binogi.se', 'Språkprojektet', 'Binogi (Språkprojektet, digitalt läromedel)', 'Binogi.se årskurs 7-9', 'Studi.se']) {
+      expect(canonicalProductName('Binogi', raw)).toBe('Binogi');
+    }
+    expect(canonicalProductName('Binogi AB', 'Binogi.se digitala läromedel')).toBe('Binogi');
+  });
+
+  it('leaves discount lines and other companies untouched', () => {
+    expect(canonicalProductName('Binogi', 'Rabatt')).toBe('Rabatt');
+    expect(canonicalProductName('ILT Education', 'Polyglutt')).toBe('Polyglutt');
+    expect(canonicalProductName('Okänd AB', 'Något')).toBe('Något');
   });
 });

@@ -370,3 +370,11 @@ describe('buildContractFacts — company_name (2026-10-26)', () => {
     expect(none.company_name).toBeNull();
   });
 });
+
+describe('buildContractFacts — single-product companies (2026-10-26)', () => {
+  it('folds Binogi product names into one, deduplicated', () => {
+    const [f] = buildContractFacts([{ contract_id: 1, vendor_id: 1, vendor_name: 'Binogi', kommun_kod: '1', kommun_namn: 'A',
+      products: ['Binogi.se', 'Språkprojektet'] }], { now: new Date('2026-10-26T00:00:00Z') });
+    expect(f.products).toEqual(['Binogi']);
+  });
+});

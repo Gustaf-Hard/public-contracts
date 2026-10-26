@@ -380,3 +380,16 @@ describe('avg annual per kommun (vendor rollup KPI)', () => {
     expect(rollups[0].avg_annual_per_kommun).toBeNull();
   });
 });
+
+describe('buildProductRollups — single-product company (2026-10-26)', () => {
+  it('rolls Binogi line items and coverage named per grade into one product', () => {
+    const facts = [{ contract_id: 1, vendor_name: 'Binogi', kommun_kod: '1', kommun_namn: 'A', products: ['Binogi'] }];
+    const li = [
+      { contract_id: 1, product_name: 'Binogi.se årskurs 4-6', amount_sek: 100 },
+      { contract_id: 1, product_name: 'Binogi.se årskurs 7-9', amount_sek: 200 },
+    ];
+    const cov = [{ contract_id: 1, product_name: 'Binogi Språkprojektet', grade_level: 'åk 7-9', coverage: 'full' }];
+    const names = buildProductRollups(facts, li, cov).map((r) => r.product_name ?? r.name);
+    expect(names).toEqual(['Binogi']);
+  });
+});

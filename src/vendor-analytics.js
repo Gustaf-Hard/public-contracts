@@ -11,7 +11,7 @@
 
 import { computeNextReviewDate } from './contract-lifecycle.js';
 import { canonicalVendorName } from './vendor-aliases.js';
-import { resolveCompany, companyBySlug, PROBE_CATEGORIES } from './vendor-kb.js';
+import { resolveCompany, companyBySlug, PROBE_CATEGORIES, canonicalProductName } from './vendor-kb.js';
 
 // ---- Grade-level coverage schema (2026-07-10-product-intelligence design) ----
 
@@ -264,7 +264,7 @@ export function buildContractFacts(rows, { lanByKommunKod = new Map(), now }) {
     contract_length_months: contractLengthMonths(r.period_start, r.period_end),
     auto_renews: toBoolOrNull(r.auto_renews),
     next_review_date: computeNextReviewDate(r, now),
-    products: r.products ?? [],
+    products: [...new Set((r.products ?? []).map((p) => canonicalProductName(r.vendor_name, p)))],
     attachment_id: r.attachment_id,
     filename: r.filename ?? null,
     received_at: r.received_at ?? null,
@@ -440,8 +440,11 @@ export function buildVendorRollups(facts, { now }) {
 // only lacking kommuner are in-progress or reseller-procuring → unknown.
 export function buildProductRollups(facts, lineItems = [], coverage = [], { doneKods = null, resellerKods = null } = {}) {
   const factById = new Map(facts.map((f) => [f.contract_id, f]));
-  const li = lineItems.filter((r) => factById.has(r.contract_id));
-  const cov = coverage.filter((r) => factById.has(r.contract_id));
+  // Line items and coverage name products as the contract worded them; fold
+  // them through the same canonicalProductName as the facts' products.
+  const canon = (r) => ({ ...r, product_name: canonicalProductName(factById.get(r.contract_id).vendor_name, r.product_name) });
+  const li = lineItems.filter((r) => factById.has(r.contract_id)).map(canon);
+  const cov = coverage.filter((r) => factById.has(r.contract_id)).map(canon);
 
   // Product universe: named on contracts, in line items, or in coverage.
   const names = new Set();
