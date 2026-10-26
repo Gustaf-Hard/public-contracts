@@ -2613,3 +2613,32 @@ describe('Pausade — deferred escalations on the dashboard', () => {
     expect(deferredLabel({ resolved_text: null, resolved_at: null })).toBe('Pausad (annat)');
   });
 });
+
+// 2026-10-26: Pausade grew to 50 rows and pushed the rest of the overview
+// below the fold. The three longest-parked stay visible; the rest fold into a
+// native <details> ("Visa alla N"), no JS.
+describe('overview Pausade list folds after three rows', () => {
+  const base = {
+    summary: { in_pilot: 0, delivering: 0, done: 0, dead_end: 0, contracts: 0, avg_reply_days: null },
+    rows: [], totalKommuner: 0, filter: 'all',
+  };
+  const parked = (n) => Array.from({ length: n }, (_, i) => ({
+    conv_id: i + 1, kommun_namn: `Kommun${i + 1}`, role: 'central', since: '2026-10-02 00:00:00', label: `Pausad (avgift) ${i + 1}`,
+  }));
+
+  it('shows three rows and folds the rest behind "Visa alla"', () => {
+    const html = renderOverview({ ...base, deferred: parked(5) });
+    const [visible, folded = ''] = html.split('<details class="queue-fold">');
+    expect(visible).toContain('Kommun3');
+    expect(visible).not.toContain('Kommun4');
+    expect(folded).toContain('Visa alla 5');
+    expect(folded).toContain('Kommun4');
+    expect(folded).toContain('Kommun5');
+  });
+
+  it('renders no fold when three or fewer are parked', () => {
+    const html = renderOverview({ ...base, deferred: parked(3) });
+    expect(html).toContain('Kommun3');
+    expect(html).not.toContain('<details class="queue-fold">');
+  });
+});

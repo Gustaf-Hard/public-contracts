@@ -432,6 +432,10 @@ const baseCss = `
     background: var(--bg-elev); color: var(--fg); border: 1px solid var(--border); border-radius: 4px; }
   .queue-more { display: block; margin-top: 8px; font-size: 12px; color: var(--fg-muted); }
   .queue-more:hover { color: var(--fg); }
+  details.queue-fold { background: none; padding: 0; margin: 0; }
+  details.queue-fold > summary { cursor: pointer; list-style: none; }
+  details.queue-fold > summary::-webkit-details-marker { display: none; }
+  details.queue-fold[open] > summary { margin-bottom: 8px; }
   .cat-pill { display: inline-flex; align-items: center; gap: 5px; }
   .cat-pill .cat-n { font-size: 11px; padding: 0 5px; border-radius: 8px; background: var(--bg-elev-2); color: var(--fg-muted); }
   .cat-pill.active .cat-n { background: rgba(255,255,255,.25); color: white; }
@@ -1052,11 +1056,21 @@ export function renderOverview({ summary, rows, filter, sort, order, totalKommun
   // Right below Behöver dig, same queueRow shape, yellow rather than red, and
   // no ageAlert — a long park is the point, not a failure. Longest-parked
   // first (buildDeferred's order), label from deferredLabel.
+  //
+  // Only the three longest-parked show; the rest fold into a native <details>
+  // (2026-10-26: 50 parks pushed the rest of the overview below the fold).
+  const DEFERRED_SHOWN = 3;
+  const deferredRow = (d) => queueRow(d, `<span class="q-action">${escapeHtml(d.label)}</span>`);
+  const deferredFold = deferred.length > DEFERRED_SHOWN
+    ? `<details class="queue-fold"><summary class="queue-more">Visa alla ${deferred.length}</summary>
+        <div class="queue queue-warn">${deferred.slice(DEFERRED_SHOWN).map(deferredRow).join('')}</div>
+      </details>`
+    : '';
   const deferredSection = deferred.length === 0 ? '' : `
     <section class="board-section">
       <h2>Pausade <span class="count">${deferred.length}</span></h2>
-      <div class="queue queue-warn">${deferred.map((d) =>
-        queueRow(d, `<span class="q-action">${escapeHtml(d.label)}</span>`)).join('')}</div>
+      <div class="queue queue-warn">${deferred.slice(0, DEFERRED_SHOWN).map(deferredRow).join('')}</div>
+      ${deferredFold}
     </section>`;
 
   // Only the 10 most overdue render here — the full set duplicates the kommun
