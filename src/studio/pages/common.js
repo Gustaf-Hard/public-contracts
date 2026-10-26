@@ -33,6 +33,19 @@ export function byContract(rows) {
   return [...m.values()];
 }
 
+// One row per avtal for COUNTS across kommuner: a samverkansavtal delivered
+// by several kommuner shares one avtal_key and is one avtal. Prefers the copy
+// that carries the value (the counted copy of a samverkansavtal).
+export function byAvtal(rows) {
+  const m = new Map();
+  for (const f of rows) {
+    const k = f.avtal_key ?? String(f.contract_id);
+    const cur = m.get(k);
+    if (!cur || (!isNum(cur.annual_value_sek) && isNum(f.annual_value_sek))) m.set(k, f);
+  }
+  return [...m.values()];
+}
+
 // One row per avtal with the avtal's whole known value: a channel avtal has
 // one fact row per owner company (remainder, ILT, Magma ...), and a page that
 // shows whole avtal (a kommun's total, its evidence, a reseller's footprint)

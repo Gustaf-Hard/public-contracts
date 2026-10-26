@@ -14,7 +14,7 @@ import {
 import { entityHeader, kpiTile, emptyPanel, STRIP_SEGMENTS } from '../components.js';
 import { segmentMatrix, renewalTimeline, tileMap, loadKommunTiles } from '../charts.js';
 import {
-  isNum, headline, byContract, distinctCount, kommunNamer, productNames, productHref, companyHref,
+  isNum, headline, byContract, byAvtal, distinctCount, kommunNamer, productNames, productHref, companyHref,
   section, breadcrumb, priceStrip, medianText, evidenceSection, renewalTileProps, peerGroupKods,
   modelLabel, safeAll, nOf, RENEWAL_MONTHS, isIso,
 } from './common.js';
@@ -50,7 +50,7 @@ function modelMix({ facts, category }) {
   const segs = items.map((m) => `<i class="mm-seg ${cls(m)}${cls(m) === 'm-unknown' ? ' hatch' : ''}" style="flex-basis:${((m.n / total) * 100).toFixed(2)}%"><span class="tip" role="tooltip"><strong>${esc(name(m))}</strong><span>${esc(nOf(m.n, 'avtal', 'avtal'))}, ${esc(fmtPct(m.n / total))}</span></span></i>`).join('');
   const legend = items.map((m) => {
     // Median annual value per avtal for the model, from MIN_N known values.
-    const vals = byContract(rows.filter((f) => (f.pricing_model ?? UNKNOWN_CATEGORY) === m.model)).map((f) => f.annual_value_sek).filter(isNum);
+    const vals = byAvtal(rows.filter((f) => (f.pricing_model ?? UNKNOWN_CATEGORY) === m.model)).map((f) => f.annual_value_sek).filter(isNum);
     const d = distribution(vals);
     const med = d.suppressed ? (vals.length ? `värde känt för ${fmtInt(vals.length)}, för få för median` : 'värde okänt') : `median ${fmtKrCompact(d.median)}/år per avtal (n = ${fmtInt(d.n)})`;
     return `<li><i class="mm-sw ${cls(m)}${cls(m) === 'm-unknown' ? ' hatch' : ''}"></i><span class="mm-name">${esc(name(m))}</span><b>${esc(fmtPct(m.n / total))}</b><span class="mm-n">${esc(nOf(m.n, 'avtal', 'avtal'))}</span><span class="mm-med">${esc(med)}</span></li>`;
@@ -139,13 +139,15 @@ function wsBasis(ws) {
 // ------------------------------------------------------------ renewals
 
 function renewalLanes({ rows, today, nameOf }) {
-  const head = byContract(rows);
+  // Counts are avtal: a samverkansavtal from two kommuner is one.
+  const head = byAvtal(rows);
   const [y, m, d] = today.split('-').map(Number);
   const until = new Date(Date.UTC(y, m - 1 + RENEWAL_MONTHS, d)).toISOString().slice(0, 10);
   const dated = rows.filter((f) => isIso(f.next_renewal) && f.next_renewal.slice(0, 10) >= today);
   const inWindow = dated.filter((f) => f.next_renewal.slice(0, 10) <= until);
-  const datedIds = new Set(dated.map((f) => f.contract_id));
-  const unknownDate = head.filter((f) => !datedIds.has(f.contract_id)).length;
+  const avtalKey = (f) => f.avtal_key ?? String(f.contract_id);
+  const datedIds = new Set(dated.map(avtalKey));
+  const unknownDate = head.filter((f) => !datedIds.has(avtalKey(f))).length;
   const byCo = new Map();
   for (const f of inWindow) {
     const k = companyKey(f);
@@ -157,7 +159,7 @@ function renewalLanes({ rows, today, nameOf }) {
     .sort((a, b) => b.fs.length - a.fs.length || a.fs[0].next_renewal.localeCompare(b.fs[0].next_renewal) || a.name.localeCompare(b.name, 'sv'));
   const shown = lanes.slice(0, MAX_LANES);
   const basis = [
-    `${fmtInt(distinctCount(inWindow, (f) => f.contract_id))} av ${nOf(head.length, 'aktivt avtal', 'aktiva avtal')} förnyas eller löper ut inom ${RENEWAL_MONTHS} mån`,
+    `${fmtInt(distinctCount(inWindow, avtalKey))} av ${nOf(head.length, 'aktivt avtal', 'aktiva avtal')} förnyas eller löper ut inom ${RENEWAL_MONTHS} mån`,
     unknownDate ? `${fmtInt(unknownDate)} utan känt slutdatum` : '',
   ].filter(Boolean).join(', ');
   if (!shown.length) {
@@ -202,7 +204,7 @@ function productCards({ facts, category, rows, kommunerTotal }) {
       if (p.category !== category) continue;
       const pr = rows.filter((f) => f.product_slugs.includes(p.slug));
       if (!pr.length) continue;
-      cards.push({ p, c, kommuner: distinctCount(pr, (f) => f.kommun_kod), dist: priceDistribution(facts, { productSlug: p.slug }), n: byContract(pr).length });
+      cards.push({ p, c, kommuner: distinctCount(pr, (f) => f.kommun_kod), dist: priceDistribution(facts, { productSlug: p.slug }), n: byAvtal(pr).length });
     }
   }
   cards.sort((a, b) => b.kommuner - a.kommuner || a.p.name.localeCompare(b.p.name, 'sv'));
@@ -242,7 +244,8 @@ export function renderKategori({ category, facts, stats, statusMap, today, page 
   const lower = label.toLowerCase();
   const all = facts.filter((f) => catOf(f) === slug);
   const rows = headline(all);
-  const avtal = byContract(rows);
+  // Avtal counts by avtal_key: a samverkansavtal is one avtal (as on Marknad).
+  const avtal = byAvtal(rows);
   const nameOf = kommunNamer(stats, facts);
   const kv = knownValue(rows);
   const kommuner = distinctCount(rows, (f) => f.kommun_kod);
@@ -271,7 +274,7 @@ export function renderKategori({ category, facts, stats, statusMap, today, page 
   const ws = whiteSpots(facts, statusMap, { category: slug, allKods: kods.length ? kods : Object.keys(tiles?.tiles ?? {}), underlag });
   const requested = inRequest(slug);
   const kpis = `<div class="kpi-row">
-    ${kpiTile({ label: 'Aktiva avtal', value: avtal.length, unit: 'avtal', basis: `${fmtInt(byContract(all).length)} insamlade totalt`, state: avtal.length ? 'known' : 'unknown', reason: 'Inga aktiva avtal i kategorin än.' })}
+    ${kpiTile({ label: 'Aktiva avtal', value: avtal.length, unit: 'avtal', basis: `${fmtInt(byAvtal(all).length)} insamlade totalt`, state: avtal.length ? 'known' : 'unknown', reason: 'Inga aktiva avtal i kategorin än.' })}
     ${kpiTile({ label: 'Leverantörer', value: shares.length, unit: 'leverantörer', basis: shares.length ? `${fmtInt(shares.filter((s) => s.slug).length)} i katalogen, ${fmtInt(shares.filter((s) => s.n_known).length)} med känt värde` : '', state: shares.length ? 'known' : 'unknown', reason: 'Inga leverantörer med aktiva avtal än.' })}
     ${kpiTile(renewalTileProps({ avtal, buckets: renewalBuckets(all, { today, months: 12 }), today }))}
     ${requested

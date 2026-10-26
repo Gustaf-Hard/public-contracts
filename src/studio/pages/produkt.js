@@ -6,11 +6,11 @@
 import { esc } from '../layout.js';
 import { fmtInt } from '../format.js';
 import { companies, productBySlug } from '../../catalogue.js';
-import { priceDistribution, renewalBuckets } from '../../studio-data.js';
+import { priceDistribution, priceRowFilter, renewalBuckets } from '../../studio-data.js';
 import { entityHeader, kpiTile, segmentStrip, emptyPanel, STRIP_SEGMENTS } from '../components.js';
 import { rankingBars, segmentMatrix, loadKommunTiles } from '../charts.js';
 import {
-  headline, distinctCount, byContract, categoryLabel, kommunNamer, productNames,
+  isNum, headline, distinctCount, byContract, byAvtal, categoryLabel, kommunNamer, productNames,
   companyHref, productHref, section, breadcrumb, priceStrip, medianText, categoryContext,
   footprintMap, renewalSection, evidenceSection, renewalTileProps, peerGroupKods, MIN_N,
 } from './common.js';
@@ -47,7 +47,7 @@ export function renderProdukt({ product, company, facts, stats, statusMap, today
   const slug = product.slug;
   const all = facts.filter((f) => f.product_slugs.includes(slug) || f.kr_per_elev_product_slug === slug);
   const rows = headline(all);
-  const avtal = byContract(rows);
+  const avtal = byAvtal(rows);
   const nameOf = kommunNamer(stats, facts);
   const category = product.category ?? company.category ?? null;
   const catLabel = categoryLabel(category);
@@ -59,6 +59,9 @@ export function renderProdukt({ product, company, facts, stats, statusMap, today
   const soleRows = rows.filter((f) => f.product_slugs.length === 1);
   const on = new Set(soleRows.flatMap((f) => f.segments));
   const segs = STRIP_SEGMENTS.filter((s) => on.has(s.key));
+  // Priced AVTAL for the coverage KPI; dist.n counts kommuner (one point per
+  // kommun) and stays the n of the distribution.
+  const pricedAvtal = byAvtal(rows.filter((f) => isNum(f.kr_per_elev) && f.kr_per_elev > 0 && priceRowFilter({ productSlug: slug })(f))).length;
   const nPriced = dist.n;
 
   const answer = `${product.whatItIs} ${avtal.length
@@ -72,7 +75,7 @@ export function renderProdukt({ product, company, facts, stats, statusMap, today
     facts: [
       { label: 'Kommuner', value: kommuner, sub: 'med minst ett aktivt avtal' },
       { label: 'Median per elev', value: dist.suppressed ? null : fmtInt(dist.median), unit: dist.suppressed ? '' : 'kr/elev', sub: dist.suppressed ? medianText(dist) : `n = ${fmtInt(dist.n)} kommuner med känt pris` },
-      { label: 'Pris per elev känt', value: nPriced, unit: `av ${fmtInt(avtal.length)}`, sub: 'aktiva avtal' },
+      { label: 'Pris per elev känt', value: pricedAvtal, unit: `av ${fmtInt(avtal.length)}`, sub: 'aktiva avtal' },
     ],
     viz: segmentStrip(segs.map((s) => s.key)),
   });
@@ -81,7 +84,7 @@ export function renderProdukt({ product, company, facts, stats, statusMap, today
     .sort((a, b) => a.next_renewal.localeCompare(b.next_renewal));
   const buckets = renewalBuckets(byContract(all), { today, months: 12 });
   const kpis = `<div class="kpi-row">
-    ${kpiTile({ label: 'Aktiva avtal', value: avtal.length, unit: 'avtal', state: avtal.length ? 'known' : 'unknown', reason: 'Inga aktiva avtal nämner produkten.', basis: `${fmtInt(byContract(all).length)} insamlade totalt` })}
+    ${kpiTile({ label: 'Aktiva avtal', value: avtal.length, unit: 'avtal', state: avtal.length ? 'known' : 'unknown', reason: 'Inga aktiva avtal nämner produkten.', basis: `${fmtInt(byAvtal(all).length)} insamlade totalt` })}
     ${kpiTile(renewalTileProps({ avtal, buckets, today }))}
     ${kpiTile({ label: 'Mittersta hälften', value: dist.suppressed ? null : `${fmtInt(dist.p25)} till ${fmtInt(dist.p75)}`, unit: 'kr/elev', state: dist.suppressed ? 'unknown' : 'known', reason: `${medianText(dist)}, spridningen visas från ${MIN_N}.`, basis: dist.suppressed ? '' : 'hälften av kommunerna ligger här' })}
     ${kpiTile({ label: 'Nästa förnyelse', value: upcoming.length ? upcoming[0].next_renewal.slice(0, 10) : null, state: upcoming.length ? 'known' : 'unknown', reason: 'Inget aktivt avtal anger slutdatum eller förlängning.', basis: upcoming.length ? nameOf(upcoming[0].kommun_kod) : '' })}

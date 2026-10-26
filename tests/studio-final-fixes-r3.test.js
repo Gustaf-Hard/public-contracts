@@ -357,3 +357,27 @@ describe('R2. no absence claim while underlag sits unread, or for a category we 
     });
   });
 });
+
+// ------------------------------------------------------------------ R4
+describe('R4. category and product counts are avtal, not copies or kommuner', () => {
+  it('a samverkansavtal from two kommuner is one active avtal on the category page, as on Marknad', () => {
+    const mk = (kod) => C({ vendor_name: 'IST', kommun_kod: kod, annual_value_sek: 1500000, period_start: '2023-01-01', period_end: '2029-12-31', products: ['IST Administration'] });
+    const facts = build([mk('0662'), mk('0617')]);
+    expect(marketByCategory(facts).find((m) => m.category === 'skoladministration').n_avtal).toBe(1);
+    const t = text(renderKategori({ category: findCategory('skoladministration'), facts, stats, statusMap: new Map(), today: TODAY }));
+    expect(t).toMatch(/Aktiva avtal 1 avtal 1 insamlade totalt/);
+    expect(t).toMatch(/känt för 1 av 1 avtal/);
+  });
+
+  it('product price coverage counts priced avtal: two priced avtal in one kommun are 2 of 2', () => {
+    const line = (id, p) => ({ contract_id: id, product_name: 'Polylino', amount_sek: null, unit_price_sek: p, unit: 'elev', quantity: null, period_months: 12 });
+    const a = C({ vendor_name: 'ILT Education AB', annual_value_sek: 50000, pricing_model: 'per_student', products: ['Polylino'] });
+    const b = C({ vendor_name: 'ILT Education AB', annual_value_sek: 70000, period_start: '2025-01-01', period_end: '2028-07-31', pricing_model: 'per_student', products: ['Polylino'] });
+    const facts = build([a, b], { lineItems: [line(a.contract_id, 60), line(b.contract_id, 80)], coverage: [...covFor(a.contract_id, 'Polylino', ['1-3']), ...covFor(b.contract_id, 'Polylino', ['4-6'])] });
+    expect(head(facts)).toHaveLength(2);
+    const hit = productBySlug('polylino');
+    const t = text(renderProdukt({ product: hit.product, company: hit.company, facts, stats, statusMap: new Map(), today: TODAY }));
+    expect(t).toMatch(/Pris per elev känt 2 av 2 aktiva avtal/);
+    expect(priceDistribution(facts, { productSlug: 'polylino' }).n).toBe(1);
+  });
+});
