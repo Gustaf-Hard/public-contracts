@@ -6,7 +6,7 @@
 import { esc } from '../layout.js';
 import { fmtInt, fmtKrCompact, UNKNOWN } from '../format.js';
 import { CATEGORIES, companyBySlug, productBySlug } from '../../catalogue.js';
-import { companyShares, priceDistribution, priceRowFilter, whiteSpots, MIN_N } from '../../studio-data.js';
+import { companyShares, priceDistribution, priceRowFilter, whiteSpots, inRequest, MIN_N } from '../../studio-data.js';
 import { evidenceDrawer, EVIDENCE_PAGE_SIZE, emptyPanel } from '../components.js';
 import { stripPlot, rankingBars, renewalTimeline, tileMap } from '../charts.js';
 
@@ -209,22 +209,30 @@ export function categoryContext({ facts, category, highlightSlug = null, nameOf 
 
 // Footprint: `has` comes from the entity's own active avtal; every other
 // kommun says what we know about collection there, never "no avtal" unless
-// collection is done.
-export function footprintMap({ tiles, rows, statusMap, stats, entity, nameOf }) {
+// collection is done, the entity's category is part of our request, and we
+// hold no underlag from the kommun that we have not gone through or that
+// names the entity or its category (whiteSpots scope).
+export function footprintMap({ tiles, rows, statusMap, stats, entity, nameOf, underlag = null, scope = null }) {
   const allKods = safeAll(stats).map((r) => r.kod);
-  const ws = whiteSpots(rows, statusMap, { allKods: allKods.length ? allKods : Object.keys(tiles?.tiles ?? {}) });
+  const ws = whiteSpots(rows, statusMap, { allKods: allKods.length ? allKods : Object.keys(tiles?.tiles ?? {}), underlag, scope: scope ?? { category: null, companySlug: null } });
+  const requested = !scope || (scope.category ? inRequest(scope.category) : !scope.companySlug);
   const cls = new Map();
   for (const k of ws.has) cls.set(k, 'has');
   for (const k of ws.none_done) cls.set(k, 'none-done');
   for (const k of ws.none_done_expired) cls.set(k, 'expired');
+  for (const k of [...ws.unreviewed, ...ws.none_done_uncertain]) cls.set(k, 'unknown');
+  for (const k of ws.not_in_request) cls.set(k, 'neutral');
   for (const k of [...ws.refused, ...ws.partial]) cls.set(k, 'refused');
   for (const k of ws.none_open) cls.set(k, 'none-open');
   for (const k of ws.not_contacted) cls.set(k, 'not-contacted');
   const partial = new Set(ws.partial);
+  const unreviewed = new Set(ws.unreviewed);
   const what = {
     has: `har aktivt avtal med ${entity}`,
     'none-done': `inget avtal med ${entity}, insamlingen klar`,
     expired: `avtalet med ${entity} har löpt ut eller ersatts, insamlingen klar`,
+    unknown: 'underlag ej genomgånget, vi säger inget om avtal saknas',
+    neutral: 'ingår inte i vår begäran, vi vet inte om avtal finns',
     refused: 'inga avtal utlämnade, vi vet inte vad kommunen köper',
     'none-open': 'insamlingen pågår, inget aktivt avtal med ' + entity + ' än',
     'not-contacted': 'inte kontaktad än',
@@ -232,11 +240,12 @@ export function footprintMap({ tiles, rows, statusMap, stats, entity, nameOf }) 
   return tileMap({
     tiles,
     classOf: (kod) => cls.get(kod) ?? 'unknown',
-    titleOf: (kod) => `${nameOf(kod)}: ${partial.has(kod) ? 'delvis utlämnat, vi vet inte allt kommunen köper' : what[cls.get(kod)] ?? 'status okänd'}`,
+    titleOf: (kod) => `${nameOf(kod)}: ${partial.has(kod) ? 'delvis utlämnat, vi vet inte allt kommunen köper' : unreviewed.has(kod) ? what.unknown : cls.get(kod) === 'unknown' ? 'status okänd' : what[cls.get(kod)] ?? 'status okänd'}`,
     legend: [
       { cls: 'has', label: `Har aktivt avtal med ${entity}` },
-      { cls: 'none-done', label: 'Inget avtal, insamling klar' },
+      ...(requested ? [{ cls: 'none-done', label: 'Inget avtal, insamling klar' }] : [{ cls: 'neutral', label: 'Ingår inte i begäran, insamling klar' }]),
       { cls: 'expired', label: 'Avtalet har löpt ut' },
+      ...(ws.unreviewed.length ? [{ cls: 'unknown', label: 'Underlag ej genomgånget, eller status okänd' }] : []),
       { cls: 'refused', label: 'Inga eller inte alla avtal utlämnade' },
       { cls: 'none-open', label: 'Insamling pågår' },
       { cls: 'not-contacted', label: 'Inte kontaktad' },

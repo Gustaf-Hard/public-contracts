@@ -236,7 +236,7 @@ describe('P4. a safe white spot has no avtal at all in the category', () => {
     expect(t).toContain('1 kommun har klar insamling där avtalet i lärplattform har löpt ut eller ersatts.');
     expect(t).toContain('ett läge att höra av sig');
     expect(t).toContain('1 kommun med klar insamling har aktiva avtal med okänd kategori');
-    expect(t).toMatch(/Säkra vita fläckar 1 kommuner insamlingen klar, inga avtal alls i kategorin; räknas inte: 1 där avtalet har löpt ut, 1 med avtal av okänd kategori/);
+    expect(t).toMatch(/Säkra vita fläckar 1 kommuner insamlingen klar, inga avtal alls i kategorin och inget ogenomgånget underlag; räknas inte: 1 där avtalet har löpt ut, 1 med avtal av okänd kategori/);
     expect(html).toMatch(/class="tile t-expired[^"]*"[^>]*aria-label="Testby 1: avtalet i lärplattform har löpt ut/);
   });
 });

@@ -156,7 +156,7 @@ function channels({ rows, facts, slug, company }) {
 </div>`;
 }
 
-export function renderLeverantor({ company, facts, stats, statusMap, today, page = 1 }) {
+export function renderLeverantor({ company, facts, stats, statusMap, today, page = 1, underlag = null }) {
   const slug = company.slug;
   // Owner rows: what the company itself sells (product cards, prices, share).
   const all = facts.filter((f) => f.company_slug === slug);
@@ -260,7 +260,7 @@ export function renderLeverantor({ company, facts, stats, statusMap, today, page
 ${header}
 <section class="section">${kpis}</section>
 ${section({ id: 'produkter', kicker: 'Produkter', title: `Det här köper kommunerna av ${company.canonical}`, note: rows.some((f) => f.product_slugs.length) ? `stapeln visar andel av leverantörens ${nOf(kommuner, 'kommun', 'kommuner')}, segment från avtal som gäller enbart produkten` : '', body: productCards({ company, rows, facts, kommunerTotal: kommuner }) })}
-${section({ id: 'karta', kicker: 'Var', title: 'Kommuner med avtal', note: `${nOf(kommuner, 'kommun', 'kommuner')}, håll över en ruta för namn`, body: `<div class="card map-card">${footprintMap({ tiles, rows: avtalAll, statusMap, stats, entity: company.canonical, nameOf })}</div>` })}
+${section({ id: 'karta', kicker: 'Var', title: 'Kommuner med avtal', note: `${nOf(kommuner, 'kommun', 'kommuner')}, håll över en ruta för namn`, body: `<div class="card map-card">${footprintMap({ tiles, rows: avtalAll, statusMap, stats, entity: company.canonical, nameOf, underlag, scope: { category: company.category ?? null, companySlug: company.slug } })}</div>` })}
 ${section({ id: 'pris', kicker: 'Pris', title: 'Pris per elev och år', note: `en punkt per kommun, kommunens namn när du håller över`, body: priceBody })}
 ${section({ id: 'konkurrenter', kicker: 'Grannar', title: 'Andra leverantörer i samma kommuner', body: competitors({ rows, facts, slug, category }) })}
 ${section({ id: 'fornyelser', kicker: 'Förnyelser', title: 'Avtal som förnyas eller löper ut', note: renew.basis, body: `<div class="card">${renew.html}</div>` })}

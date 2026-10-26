@@ -4,7 +4,7 @@
 // (active and not superseded). Unknown is null, never 0; medians and
 // percentiles are suppressed below MIN_N.
 
-import { classifyVendor, classifyLine, companyBySlug, productBySlug } from './catalogue.js';
+import { classifyVendor, classifyLine, companyBySlug, productBySlug, normName } from './catalogue.js';
 import { GRADE_LEVELS, contractLengthMonths, mapUnitToGradeLevels, normalizeAnnualValue, unitPeriodsPerYear } from './vendor-analytics.js';
 import { computeNextReviewDate } from './contract-lifecycle.js';
 
@@ -699,33 +699,122 @@ export function renewalBuckets(facts, { today, months = 24 } = {}) {
   return buckets;
 }
 
+// The categories our request asks for (T-INITIAL: lärplattformar och LMS,
+// digitala läromedel och licenser, administrativa system kopplade till
+// undervisning). Only for these can a finished collection with no avtal be
+// read as "no avtal": elevhälsa journal systems, övrigt and unknown are not
+// part of the request, so a kommun owes us nothing there.
+export const REQUEST_CATEGORIES = Object.freeze(['laromedel', 'larplattform', 'skoladministration', 'prov', 'stodverktyg']);
+export const inRequest = (category) => REQUEST_CATEGORIES.includes(category);
+
+// Words in a non-avtal document's summary that point to a category, for
+// documents with no vendor or product we can classify (an order history
+// "digitala läromedel per skola och leverantör"). Matched on normName text.
+const CATEGORY_WORDS = {
+  laromedel: /\blaromed|\blarmedel/,
+  larplattform: /larplattform|\blms\b|learning management/,
+  skoladministration: /skoladministrat|elevadministrat|elevregister|schemalagg/,
+  prov: /\bprov\b|provverktyg|digitala prov|bedomning/,
+  stodverktyg: /stodverktyg|talsyntes|lasstod|skrivstod/,
+};
+// An unread inline image with a generic name is a signature logo or a
+// pasted picture, not underlag: image001.png, image (2).png, Outlook-abc12,
+// a bare uuid. Any other unread file counts, whatever its type.
+const GENERIC_IMAGE = /^(image\d*( \(\d+\))?|outlook-[a-z0-9]+|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(\.[a-z0-9]+)?$/i;
+const isImage = (u) => /^image\//i.test(u.mime_type ?? '') || /\.(png|jpe?g|gif|bmp|heic|webp|tiff?)$/i.test(u.filename ?? '');
+
+// What we hold per kommun that is not an analysed avtal (storage
+// listStudioUnderlag), reduced to what an absence claim must respect:
+//   unreadKods: kommuner with an unread file (no contracts row, pending or
+//     parked analysis), so we have not seen everything they sent.
+//   docs: Map(kod -> { categories, companies }) from non-avtal documents
+//     (invoices, order lists, sammanställningar): the categories and
+//     companies their vendor, product and line names or summary point to.
+// Pure: no filename or text leaves this function.
+export function underlagEvidence({ unread = [], documents = [] } = {}) {
+  const unreadKods = new Set();
+  for (const u of unread) {
+    if (!u?.kommun_kod) continue;
+    const name = String(u.filename ?? '').trim();
+    if (isImage(u) && GENERIC_IMAGE.test(name)) continue;
+    unreadKods.add(u.kommun_kod);
+  }
+  const docs = new Map();
+  for (const d of documents) {
+    if (!d?.kommun_kod) continue;
+    if (!docs.has(d.kommun_kod)) docs.set(d.kommun_kod, { categories: new Set(), companies: new Set() });
+    const e = docs.get(d.kommun_kod);
+    const vendor = blank(d.vendor_name) ? null : classifyVendor(d.vendor_name);
+    if (vendor) {
+      e.companies.add(vendor.slug);
+      if (vendor.category) e.categories.add(vendor.category);
+    }
+    for (const name of [...(d.products ?? []), ...(d.lines ?? [])]) {
+      if (blank(name)) continue;
+      const r = classifyLine(vendor?.slug ?? null, name);
+      if (r.companySlug) e.companies.add(r.companySlug);
+      const cats = (r.kind === 'bundle' ? r.products ?? [] : [r.productSlug]).map(productCategory).filter(Boolean);
+      for (const c of cats) e.categories.add(c);
+      if (!cats.length && r.companySlug) {
+        const cc = companyBySlug(r.companySlug)?.category;
+        if (cc) e.categories.add(cc);
+      }
+    }
+    const text = normName(d.summary);
+    for (const [cat, re] of Object.entries(CATEGORY_WORDS)) if (re.test(text)) e.categories.add(cat);
+  }
+  return { unreadKods, docs };
+}
+
 // allKods: the kommun universe (e.g. stats.all() kods); defaults to every
 // kommun the status map or the facts know. Buckets, each kommun in one:
 //   has: an active avtal in scope.
-//   none_done: the safe white spot. Collection done, no avtal at all in
-//     scope (active, expired or replaced) and, with a category, no active
-//     avtal of unknown category (that avtal may be the one in scope).
+//   none_done: the safe white spot. Collection done, the scope is part of
+//     our request, no avtal at all in scope (active, expired or replaced),
+//     no active avtal of unknown category (with a category), no unread file
+//     from the kommun and no non-avtal document pointing to the scope.
 //   none_done_expired: done, and every avtal in scope has expired or been
 //     replaced ("avtalet har löpt ut"): they buy here, a sales opening, not
 //     a white spot.
+//   unreviewed: done, nothing in scope, but we hold underlag we have not
+//     gone through (an unread file, or an invoice, order list or
+//     sammanställning naming the scope): "underlag ej genomgånget".
 //   none_done_uncertain: done, nothing in scope, but an active avtal of
 //     unknown category.
+//   not_in_request: done, nothing in scope, and the scope is outside our
+//     request (elevhälsa, övrigt, unknown): no claim either way.
 //   refused: dead_end, nothing handed over, so no claim either way.
 //   partial: part of the request ended without avtal ("delvis utlämnat").
 //   none_open, not_contacted.
-export function whiteSpots(facts, statusMap = new Map(), { category, allKods } = {}) {
+// scope: { category, companySlug } the absence would be about, for the
+// evidence checks; defaults to { category }. A footprint map (one company
+// or product) passes its own category and company. underlag: the result
+// of underlagEvidence; without it no evidence check runs.
+export function whiteSpots(facts, statusMap = new Map(), { category, allKods, underlag = null, scope = null } = {}) {
   const kods = allKods ? [...new Set(allKods)] : [...new Set([...statusMap.keys(), ...facts.map((f) => f.kommun_kod)])];
   const inScope = (f) => !category || catOf(f) === category;
   const has = new Set(headline(facts).filter(inScope).map((f) => f.kommun_kod));
   const hadAny = new Set(facts.filter(inScope).map((f) => f.kommun_kod));
   const unknownCat = new Set(category && category !== UNKNOWN_CATEGORY
     ? headline(facts).filter((f) => f.category == null).map((f) => f.kommun_kod) : []);
-  const out = { has: [], none_done: [], none_done_expired: [], none_done_uncertain: [], refused: [], partial: [], none_open: [], not_contacted: [] };
+  const sc = scope ?? { category: category ?? null, companySlug: null };
+  // With neither a category nor a company the map is "any avtal": every
+  // category we ask for is in scope.
+  const requested = sc.category ? inRequest(sc.category) : !sc.companySlug;
+  const pointsHere = (kod) => {
+    const d = underlag?.docs?.get(kod);
+    if (!d) return false;
+    if (!sc.category && !sc.companySlug) return d.categories.size > 0 || d.companies.size > 0;
+    return (sc.category && d.categories.has(sc.category)) || (sc.companySlug && d.companies.has(sc.companySlug));
+  };
+  const out = { has: [], none_done: [], none_done_expired: [], unreviewed: [], none_done_uncertain: [], not_in_request: [], refused: [], partial: [], none_open: [], not_contacted: [] };
   for (const kod of kods.filter(Boolean).sort()) {
     const st = statusMap.get(kod);
     if (has.has(kod)) out.has.push(kod);
     else if (st === 'done') {
       if (hadAny.has(kod)) out.none_done_expired.push(kod);
+      else if (!requested) out.not_in_request.push(kod);
+      else if (underlag && (underlag.unavailable || underlag.unreadKods?.has(kod) || pointsHere(kod))) out.unreviewed.push(kod);
       else if (unknownCat.has(kod)) out.none_done_uncertain.push(kod);
       else out.none_done.push(kod);
     } else if (st === 'dead_end') out.refused.push(kod);

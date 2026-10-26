@@ -1895,6 +1895,56 @@ export function openDb(path) {
     return rows.map((r) => ({ ...r, products: prodMap.get(r.contract_id) ?? [] }));
   }
 
+  // Mediagraf Studio: what we hold per kommun that is NOT an analysed avtal,
+  // so the studio never claims "inget avtal i X, insamlingen klar" while the
+  // evidence sits unread on our own disk (the same honesty rule as the
+  // T_REQUEST_MISSING gate). Read-only, no schema change.
+  //   unread: every stored attachment with no contracts row, pending or
+  //     parked (analysis_attempts is ignored on purpose: a parked file is
+  //     still unread). The studio decides which file types count
+  //     (studio-data underlagEvidence); filename and type never leave it.
+  //   documents: analysed documents that are not avtal (is_contract = 0:
+  //     invoices, order lists, sammanställningar, bilagor) with their vendor,
+  //     summary, product and line names, for the categories they point to.
+  function listStudioUnderlag() {
+    const unread = db.prepare(`
+      SELECT conv.kommun_kod AS kommun_kod, a.id AS attachment_id, a.filename AS filename, a.mime_type AS mime_type
+      FROM attachments a
+      JOIN messages m ON m.id = a.message_id
+      JOIN conversations conv ON conv.id = m.conversation_id
+      LEFT JOIN contracts c ON c.attachment_id = a.id
+      WHERE c.id IS NULL AND conv.kommun_kod IS NOT NULL
+      ORDER BY a.id
+    `).all();
+    const docs = db.prepare(`
+      SELECT c.id AS contract_id, conv.kommun_kod AS kommun_kod, c.document_type AS document_type,
+             v.name AS vendor_name, c.summary AS summary
+      FROM contracts c
+      JOIN attachments a ON a.id = c.attachment_id
+      JOIN messages m ON m.id = a.message_id
+      JOIN conversations conv ON conv.id = m.conversation_id
+      LEFT JOIN vendors v ON v.id = c.vendor_id
+      WHERE c.is_contract = 0 AND conv.kommun_kod IS NOT NULL
+      ORDER BY c.id
+    `).all();
+    const prodMap = productsForContractIds(docs.map((d) => d.contract_id));
+    const lines = new Map();
+    if (docs.length) {
+      for (const l of db.prepare(`
+        SELECT li.contract_id AS contract_id, li.product_name AS product_name
+        FROM contract_line_items li JOIN contracts c ON c.id = li.contract_id
+        WHERE c.is_contract = 0 ORDER BY li.contract_id, li.id
+      `).all()) {
+        if (!lines.has(l.contract_id)) lines.set(l.contract_id, []);
+        lines.get(l.contract_id).push(l.product_name);
+      }
+    }
+    return {
+      unread,
+      documents: docs.map((d) => ({ ...d, products: prodMap.get(d.contract_id) ?? [], lines: lines.get(d.contract_id) ?? [] })),
+    };
+  }
+
   // Every kommun we hold ANY stored contract for (is_contract=1, any vendor)
   // — the row universe for the product-coverage drill-down. `collection_done`
   // says whether we may draw confident negative conclusions ("not sold to
@@ -2274,6 +2324,7 @@ export function openDb(path) {
     listContractsForVendor,
     listContractsForKommun,
     listContractFacts,
+    listStudioUnderlag,
     listKommunerWithContracts,
     listConversationsDueForRefresh,
     listVendorsOverview,

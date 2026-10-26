@@ -3,7 +3,7 @@
 // getStudioData(), built once and memoised per db + day (with a short TTL so
 // newly analysed avtal show up within minutes, not tomorrow).
 
-import { buildStudioFacts, collectionStatus, dataBasis } from '../studio-data.js';
+import { buildStudioFacts, collectionStatus, dataBasis, underlagEvidence } from '../studio-data.js';
 import { loadKommunStats } from '../kommun-stats.js';
 import { companies } from '../catalogue.js';
 import { studioLayout } from './layout.js';
@@ -61,7 +61,11 @@ export function makeStudioData({ db, statsLoader = loadKommunStats, now = () => 
       : [];
     const statusMap = collectionStatus(db ? db.listAllConversations() : [], { kodsWithAvtal: new Set(facts.map((f) => f.kommun_kod)) });
     const basis = { ...dataBasis(facts, statusMap), updated: today };
-    const data = { facts, stats, statusMap, basis, today, searchOptions: buildSearchOptions(stats) };
+    // What we hold but have not read, or that is not an avtal: an absence
+    // claim ("inga avtal, insamlingen klar") must respect it. Fails closed:
+    // if it cannot be read, no kommun is a safe white spot.
+    const underlag = db ? safe(() => underlagEvidence(db.listStudioUnderlag()), null) ?? { unavailable: true } : { unavailable: true };
+    const data = { facts, stats, statusMap, basis, today, underlag, searchOptions: buildSearchOptions(stats) };
     memo = { db, today, at: ms, data };
     return data;
   };
@@ -135,7 +139,7 @@ export function mountStudio(app, {
         }),
       });
     }
-    const body = renderKategori({ category, facts: data.facts, stats: data.stats, statusMap: data.statusMap, today: data.today, page: pageOf(req) });
+    const body = renderKategori({ category, facts: data.facts, stats: data.stats, statusMap: data.statusMap, underlag: data.underlag, today: data.today, page: pageOf(req) });
     sendStudio(req, res, data, { title: category.label, body });
   });
 
@@ -154,7 +158,7 @@ export function mountStudio(app, {
         body: notFound({ what: 'Leverantören finns inte', text: 'Vi känner inte till någon leverantör med den adressen. Sök efter namnet eller gå till listan över leverantörer.' }),
       });
     }
-    const body = renderLeverantor({ company, facts: data.facts, stats: data.stats, statusMap: data.statusMap, today: data.today, page: pageOf(req) });
+    const body = renderLeverantor({ company, facts: data.facts, stats: data.stats, statusMap: data.statusMap, underlag: data.underlag, today: data.today, page: pageOf(req) });
     sendStudio(req, res, data, { title: company.canonical, body });
   });
 
@@ -167,7 +171,7 @@ export function mountStudio(app, {
         body: notFound({ what: 'Produkten finns inte', text: 'Vi känner inte till någon produkt med den adressen. Sök efter namnet eller gå till leverantören.' }),
       });
     }
-    const body = renderProdukt({ product: hit.product, company: hit.company, facts: data.facts, stats: data.stats, statusMap: data.statusMap, today: data.today, page: pageOf(req) });
+    const body = renderProdukt({ product: hit.product, company: hit.company, facts: data.facts, stats: data.stats, statusMap: data.statusMap, underlag: data.underlag, today: data.today, page: pageOf(req) });
     sendStudio(req, res, data, { title: hit.product.name, body });
   });
 

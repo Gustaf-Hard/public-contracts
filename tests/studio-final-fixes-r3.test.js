@@ -1,7 +1,13 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { openDb } from '../src/storage.js';
+import { makeStudioData } from '../src/studio/routes.js';
+import { footprintMap } from '../src/studio/pages/common.js';
 import {
   buildStudioFacts, companyShares, marketByCategory, dataBasis, whiteSpots, priceDistribution, isRenewalOf,
-  // underlagEvidence,
+  underlagEvidence,
 } from '../src/studio-data.js';
 import { loadKommunStats } from '../src/kommun-stats.js';
 import { renderKommun, perElevByCategory } from '../src/studio/pages/kommun.js';
@@ -211,5 +217,143 @@ describe('R3. a samverkansavtal is shown whole, with andel okänd, and never as 
     const c = C({ vendor_name: 'Tempus', kommun_kod: '0665', annual_value_sek: 99000, pricing_model: 'per_student', products: ['Tempus Barn'] });
     const f2 = build([c], { lineItems: [line(c.contract_id)] });
     expect(row(f2, c.contract_id).kr_per_elev).toBe(75);
+  });
+});
+
+// ------------------------------------------------------------------ R2
+describe('R2. no absence claim while underlag sits unread, or for a category we never asked for', () => {
+  // Three done kommuner with no läromedel avtal; one has an unread file,
+  // one an order list naming digitala läromedel, one nothing at all.
+  const kods = ['0114', '0115', '0117', '0120'];
+  const status = new Map(kods.map((k) => [k, 'done']));
+  const facts = build([C({ kommun_kod: '0120', vendor_name: 'IST', products: ['IST Administration'] })]);
+
+  it('underlagEvidence: an unread file counts whatever its type, a generic inline image does not', () => {
+    const ev = underlagEvidence({
+      unread: [
+        { kommun_kod: '0114', filename: 'order-history.csv', mime_type: 'application/octet-stream' },
+        { kommun_kod: '0115', filename: 'image001.png', mime_type: 'image/png' },
+        { kommun_kod: '0115', filename: 'Outlook-qx1y2z3', mime_type: 'image/jpg' },
+        { kommun_kod: '0115', filename: 'image (2).png', mime_type: 'image/png' },
+        { kommun_kod: '0117', filename: 'Avtalstid.png', mime_type: 'image/png' },
+      ],
+    });
+    expect([...ev.unreadKods].sort()).toEqual(['0114', '0117']);
+  });
+
+  it('underlagEvidence: an order list with no vendor points to its category by its summary; an invoice line by its product', () => {
+    const ev = underlagEvidence({
+      documents: [
+        { kommun_kod: '0114', document_type: 'följebrev_sammanställning', vendor_name: null, summary: 'Orderhistorik med beställningar av digitala läromedel och licenser per skola.', products: [], lines: [] },
+        { kommun_kod: '0115', document_type: 'övrigt', vendor_name: null, summary: 'Faktura för en kommunlicens.', products: [], lines: ['Kunskapsmatrisen och Exam.net'] },
+      ],
+    });
+    expect([...ev.docs.get('0114').categories]).toEqual(['laromedel']);
+    expect(ev.docs.get('0115').categories.has('prov')).toBe(true);
+    expect(ev.docs.get('0115').companies.has('teachiq')).toBe(true);
+  });
+
+  it('a kommun with an unread file is underlag ej genomgånget in every category; an order list only in its own', () => {
+    const underlag = underlagEvidence({
+      unread: [{ kommun_kod: '0114', filename: 'order.csv', mime_type: 'text/csv' }],
+      documents: [{ kommun_kod: '0115', vendor_name: null, summary: 'Inköp av digitala läromedel via en återförsäljare.', products: [], lines: [] }],
+    });
+    const lm = whiteSpots(facts, status, { category: 'laromedel', allKods: kods, underlag });
+    expect(lm.none_done).toEqual(['0117', '0120']);
+    expect(lm.unreviewed).toEqual(['0114', '0115']);
+    const lp = whiteSpots(facts, status, { category: 'larplattform', allKods: kods, underlag });
+    expect(lp.unreviewed).toEqual(['0114']);
+    expect(lp.none_done).toEqual(['0115', '0117', '0120']);
+  });
+
+  it('fails closed: when the underlag cannot be read, no kommun is a safe white spot', () => {
+    const ws = whiteSpots(facts, status, { category: 'laromedel', allKods: kods, underlag: { unavailable: true } });
+    expect(ws.none_done).toEqual([]);
+    expect(ws.unreviewed).toEqual(kods);
+  });
+
+  it('elevhälsa, övrigt and unknown are outside the request: never a white spot', () => {
+    for (const category of ['elevhalsa', 'ovrigt', 'okand']) {
+      const ws = whiteSpots(facts, status, { category, allKods: kods, underlag: underlagEvidence({}) });
+      expect(ws.none_done).toEqual([]);
+      expect(ws.not_in_request.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('the elevhälsa page shows no safe white spots and says the category is not part of the request', () => {
+    const html = renderKategori({ category: findCategory('elevhalsa'), facts, stats, statusMap: status, today: TODAY, underlag: underlagEvidence({}) });
+    const t = text(html);
+    expect(t).toContain('Elevhälsa ingår inte i vår begäran.');
+    expect(t).toMatch(/Säkra vita fläckar okänt Elevhälsa ingår inte i vår begäran, så vi säger inget om var avtal saknas/);
+    expect(html).not.toContain('class="tile t-none-done');
+    expect(t).not.toContain('Det är de säkra vita fläckarna');
+  });
+
+  it('the läromedel page counts an order-list kommun apart, hatched, not as a safe white spot', () => {
+    const underlag = underlagEvidence({ documents: [{ kommun_kod: '0115', vendor_name: null, summary: 'Inköp av digitala läromedel.', products: [], lines: [] }] });
+    const html = renderKategori({ category: findCategory('laromedel'), facts, stats, statusMap: status, today: TODAY, underlag });
+    const t = text(html);
+    expect(t).toContain('3 kommuner har klar insamling och inga avtal alls i läromedel.');
+    expect(t).toContain('1 kommun med klar insamling har skickat underlag vi inte har gått igenom än');
+    expect(t).toMatch(/räknas inte: 1 med underlag ej genomgånget/);
+    expect(html).toMatch(/class="tile t-unknown[^"]*"[^>]*aria-label="Testby 2: underlag ej genomgånget/);
+  });
+
+  it('a footprint map for an elevhälsa company claims no absence', () => {
+    const pr = build([C({ kommun_kod: '0120', vendor_name: 'ProReNata AB', products: [] })]);
+    const tiles = { cols: 2, rows: 2, tiles: { '0114': { x: 0, y: 0 }, '0115': { x: 1, y: 0 }, '0117': { x: 0, y: 1 }, '0120': { x: 1, y: 1 } } };
+    const html = footprintMap({ tiles, rows: pr, statusMap: status, stats, entity: 'Prorenata', nameOf: (k) => k, underlag: underlagEvidence({}), scope: { category: 'elevhalsa', companySlug: 'prorenata' } });
+    expect(html).not.toContain('t-none-done');
+    expect(html).toContain('Ingår inte i begäran');
+    const lm = footprintMap({ tiles, rows: [], statusMap: status, stats, entity: 'Binogi', nameOf: (k) => k, underlag: underlagEvidence({ unread: [{ kommun_kod: '0114', filename: 'x.pdf', mime_type: 'application/pdf' }] }), scope: { category: 'laromedel', companySlug: 'binogi' } });
+    expect((lm.match(/class="tile t-none-done[^"]*" tabindex/g) || []).length).toBe(3);
+    expect(lm).toMatch(/aria-label="0114: underlag ej genomgånget/);
+  });
+
+  describe('storage listStudioUnderlag and makeStudioData', () => {
+    let tmp; let db;
+    beforeEach(() => {
+      tmp = mkdtempSync(join(tmpdir(), 'studio-underlag-'));
+      db = openDb(join(tmp, 'pilot.db'));
+      db.migrate();
+    });
+    afterEach(() => { db.close(); rmSync(tmp, { recursive: true, force: true }); });
+    let n = 0;
+    const attach = (kod, filename, mime) => {
+      const conv = db.raw.prepare('SELECT id FROM conversations WHERE kommun_kod = ?').get(kod)?.id ?? db.createConversation({
+        kommun_kod: kod, kommun_namn: `Testby ${kod}`, role: 'central', contact_email: 'registrator@example.se', scheduled_send_at: '2026-04-01T08:00:00Z',
+      });
+      db.raw.prepare("UPDATE conversations SET state = 'DONE' WHERE id = ?").run(conv);
+      const msg = db.recordMessage({
+        conversation_id: conv, gmail_message_id: `gm-u-${++n}`, direction: 'inbound', from_email: 'registrator@example.se', to_email: 'me@example.com',
+        subject: 'Underlag', body_text: 'Se bifogat.', classification: null, classification_confidence: null, received_at: '2026-09-01T10:00:00Z', attachment_count: 1,
+      });
+      return db.recordAttachment({ message_id: msg, filename, saved_path: join(tmp, `${n}.bin`), mime_type: mime, size_bytes: 10 });
+    };
+
+    it('lists pending and parked unread files, and non-avtal documents with their lines; avtal are left out', () => {
+      attach('0114', 'Avtal.pdf', 'application/pdf');
+      const parked = attach('0115', 'Skannad.pdf', 'application/pdf');
+      db.recordAnalysisFailure(parked, { reason: 'zero text', permanent: true });
+      const inv = attach('0117', 'Faktura.pdf', 'application/pdf');
+      const docId = db.recordContract({ attachment_id: inv, is_contract: 0, document_type: 'övrigt', summary: 'Faktura för en kommunlicens.', confidence: 0.9 });
+      db.replaceContractLineItems(docId, [{ product_name: 'Kunskapsmatrisen och Exam.net' }]);
+      const av = attach('0120', 'Huvudavtal.pdf', 'application/pdf');
+      db.recordContract({ attachment_id: av, is_contract: 1, summary: 'Avtal', confidence: 0.9 });
+      const u = db.listStudioUnderlag();
+      expect(u.unread.map((r) => r.kommun_kod).sort()).toEqual(['0114', '0115']);
+      expect(u.documents).toHaveLength(1);
+      expect(u.documents[0]).toMatchObject({ kommun_kod: '0117', document_type: 'övrigt', lines: ['Kunskapsmatrisen och Exam.net'] });
+      const data = makeStudioData({ db, statsLoader: () => stats, now: () => new Date('2026-10-26T12:00:00Z') })();
+      expect([...data.underlag.unreadKods].sort()).toEqual(['0114', '0115']);
+      expect(data.underlag.docs.get('0117').categories.has('prov')).toBe(true);
+    });
+
+    it('makeStudioData fails closed when the db cannot list underlag', () => {
+      const broken = { ...db, listStudioUnderlag: () => { throw new Error('no table'); } };
+      for (const k of ['listContractFacts', 'listLineItems', 'listCoverage', 'listAllConversations']) broken[k] = db[k];
+      const data = makeStudioData({ db: broken, statsLoader: () => stats, now: () => new Date('2026-10-26T12:00:00Z') })();
+      expect(data.underlag).toEqual({ unavailable: true });
+    });
   });
 });

@@ -315,7 +315,7 @@ describe('collectionStatus and whiteSpots', () => {
     const facts = build([C({ kommun_kod: '9001' })]);
     const ws = whiteSpots(facts, status, { category: 'laromedel', allKods: ['9001', '9002', '9003', '9004', '9005'] });
     expect(ws).toEqual({
-      has: ['9001'], none_done: [], none_done_expired: [], none_done_uncertain: [], refused: [], partial: ['9002'],
+      has: ['9001'], none_done: [], none_done_expired: [], unreviewed: [], none_done_uncertain: [], not_in_request: [], refused: [], partial: ['9002'],
       none_open: ['9003'], not_contacted: ['9004', '9005'],
     });
   });

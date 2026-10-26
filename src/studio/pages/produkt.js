@@ -43,7 +43,7 @@ function substitutes({ facts, product, category }) {
   ${rankingBars({ items, max: 8, noun: 'produkter' })}</div>`;
 }
 
-export function renderProdukt({ product, company, facts, stats, statusMap, today, page = 1 }) {
+export function renderProdukt({ product, company, facts, stats, statusMap, today, page = 1, underlag = null }) {
   const slug = product.slug;
   const all = facts.filter((f) => f.product_slugs.includes(slug) || f.kr_per_elev_product_slug === slug);
   const rows = headline(all);
@@ -141,7 +141,7 @@ ${header}
 <section class="section">${kpis}</section>
 ${section({ id: 'pris', kicker: 'Pris', title: 'Pris per elev och år', note: 'en punkt per kommun; per segment räknas bara avtal som gäller enbart produkten', body: priceBody })}
 ${matrix}
-${section({ id: 'karta', kicker: 'Var', title: 'Kommuner som använder produkten', note: `${fmtInt(kommuner)} kommuner med aktivt avtal, håll över en ruta för namn`, body: `<div class="card map-card">${footprintMap({ tiles, rows: all, statusMap, stats, entity: product.name, nameOf })}</div>` })}
+${section({ id: 'karta', kicker: 'Var', title: 'Kommuner som använder produkten', note: `${fmtInt(kommuner)} kommuner med aktivt avtal, håll över en ruta för namn`, body: `<div class="card map-card">${footprintMap({ tiles, rows: all, statusMap, stats, entity: product.name, nameOf, underlag, scope: { category: product.category ?? company.category ?? null, companySlug: company.slug } })}</div>` })}
 ${section({ id: 'alternativ', kicker: 'Alternativ', title: 'Produkter som gör samma jobb', body: substitutes({ facts, product, category }) })}
 ${section({ id: 'fornyelser', kicker: 'Förnyelser', title: 'Avtal som förnyas eller löper ut', note: renew.basis, body: `<div class="card">${renew.html}</div>` })}
 ${section({ id: 'underlag', kicker: 'Underlag', title: 'Avtalen bakom siffrorna', note: `${fmtInt(ev.active)} aktiva, ${fmtInt(ev.old)} utgångna eller ersatta`, body: ev.html })}`;
