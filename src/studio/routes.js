@@ -8,6 +8,7 @@ import { loadKommunStats } from '../kommun-stats.js';
 import { companies } from '../catalogue.js';
 import { studioLayout, esc } from './layout.js';
 import { fmtInt, fmtPct } from './format.js';
+import { renderGallery } from './gallery.js';
 
 export const STUDIO_DATA_TTL_MS = 5 * 60 * 1000;
 
@@ -116,6 +117,12 @@ export function mountStudio(app, { db, statsLoader = loadKommunStats, now = () =
   app.get('/studio', (req, res) => {
     const data = getStudioData();
     sendStudio(req, res, data, { title: 'Marknad', body: renderMarknadPlaceholder(data) });
+  });
+
+  // Component gallery, hand-written demo data only (never the pilot DB).
+  app.get('/studio/_komponenter', (req, res) => {
+    const data = getStudioData();
+    sendStudio(req, res, data, { title: 'Komponenter', body: renderGallery({ stats: data.stats, today: data.today }) });
   });
 
   return { getStudioData };
