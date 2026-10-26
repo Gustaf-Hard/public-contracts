@@ -120,24 +120,33 @@ async function guarded(key, url, fn) {
   }
 }
 
-async function fetchGrundskola(codes) {
-  const url = `${SIRIS}?pFormat=json&pExportID=6&pAr=${START_YEAR}`;
-  const j = await getJson(url);
-  const acc = {}; // kod -> { '1-3': n, ..., masked: n }
-  for (const row of j.data) {
+// Kommunal grundskola elever per kommun and band from SIRIS export 6 rows.
+// A band starts unknown (null) and becomes a number only when a school
+// reports a count in it: a band no school reports is missing, not 0 pupils,
+// so a kommun with 1-3 and 4-6 but no 7-9 data never gets an exact-looking
+// F-9 total. Masked cells ("..", under 5 pupils) are counted per band.
+export function accumulateGrundskola(rows, codes) {
+  const acc = {}; // kod -> { '1-3': n|null, ..., masked: n, maskedByBand }
+  for (const row of rows) {
     const s = row.skola;
     const kod = s['Kommun-kod'];
     if (!codes.has(kod)) continue;
-    acc[kod] ??= { '1-3': 0, '4-6': 0, '7-9': 0, masked: 0, maskedByBand: { '1-3': 0, '4-6': 0, '7-9': 0 } };
+    acc[kod] ??= { '1-3': null, '4-6': null, '7-9': null, masked: 0, maskedByBand: { '1-3': 0, '4-6': 0, '7-9': 0 } };
     if (s['Typ av huvudman'] !== 'Kommunal') continue;
     for (let g = 1; g <= 9; g++) {
       const { n, masked } = parseCell(s[`Elever, årskurs ${g}`]);
       const band = g <= 3 ? '1-3' : g <= 6 ? '4-6' : '7-9';
-      if (n != null) acc[kod][band] += n;
+      if (n != null) acc[kod][band] = (acc[kod][band] ?? 0) + n;
       if (masked) { acc[kod].masked += 1; acc[kod].maskedByBand[band] += 1; }
     }
   }
   return acc;
+}
+
+async function fetchGrundskola(codes) {
+  const url = `${SIRIS}?pFormat=json&pExportID=6&pAr=${START_YEAR}`;
+  const j = await getJson(url);
+  return accumulateGrundskola(j.data, codes);
 }
 
 async function fetchGymnasium(codes) {
