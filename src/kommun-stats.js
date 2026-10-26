@@ -24,6 +24,14 @@ export function sizeBand(folkmangd) {
   return SIZE_BANDS.find((b) => b.max == null || folkmangd < b.max).key;
 }
 
+const GRUNDSKOLA_BANDS = Object.freeze(['1-3', '4-6', '7-9']);
+
+function maskedBandsOf(r) {
+  const by = r.grundskola_masked_by_band;
+  if (by && typeof by === 'object') return new Set(Object.keys(by).filter((k) => Number(by[k]) > 0));
+  return Number(r.grundskola_masked_cells) > 0 ? new Set(GRUNDSKOLA_BANDS) : new Set();
+}
+
 class KommunStats {
   constructor(data) {
     this.data = data;
@@ -38,6 +46,10 @@ class KommunStats {
         kommungrupp: r.kommungrupp ?? null,
         peers: Array.isArray(r.peers) ? r.peers : [],
         elever: r.elever ?? {},
+        // Skolverket masks grundskola cells under 5 pupils; a band with a
+        // masked cell is a lower bound, not a count. Per band when the
+        // snapshot says which; otherwise any masked cell marks all three.
+        maskedBands: maskedBandsOf(r),
       });
     }
   }
@@ -62,7 +74,9 @@ class KommunStats {
 
   // Sum of kommunal-regi elever over the requested grades. Introduktions-
   // programmet is part of Gymnasiet (counted once); Högskola is 0 elever.
-  // null when the kommun is unknown or any needed grade is null/unknown.
+  // null when the kommun is unknown or any needed grade is null/unknown or
+  // has masked cells (the sum would be a lower bound, so a price per elev
+  // divided by it would be too high).
   eleverIn(kod, grades) {
     const me = this.get(kod);
     if (!me) return null;
@@ -74,7 +88,7 @@ class KommunStats {
     let sum = 0;
     for (const g of need) {
       const v = me.elever[g];
-      if (typeof v !== 'number' || !Number.isFinite(v)) return null;
+      if (typeof v !== 'number' || !Number.isFinite(v) || me.maskedBands.has(g)) return null;
       sum += v;
     }
     return sum;

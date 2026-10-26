@@ -128,13 +128,13 @@ async function fetchGrundskola(codes) {
     const s = row.skola;
     const kod = s['Kommun-kod'];
     if (!codes.has(kod)) continue;
-    acc[kod] ??= { '1-3': 0, '4-6': 0, '7-9': 0, masked: 0 };
+    acc[kod] ??= { '1-3': 0, '4-6': 0, '7-9': 0, masked: 0, maskedByBand: { '1-3': 0, '4-6': 0, '7-9': 0 } };
     if (s['Typ av huvudman'] !== 'Kommunal') continue;
     for (let g = 1; g <= 9; g++) {
       const { n, masked } = parseCell(s[`Elever, årskurs ${g}`]);
       const band = g <= 3 ? '1-3' : g <= 6 ? '4-6' : '7-9';
       if (n != null) acc[kod][band] += n;
-      if (masked) acc[kod].masked += 1;
+      if (masked) { acc[kod].masked += 1; acc[kod].maskedByBand[band] += 1; }
     }
   }
   return acc;
@@ -293,6 +293,7 @@ async function main() {
       },
       // grundskola cells under 5 pupils are masked by Skolverket; sums are lower bounds
       grundskola_masked_cells: g ? g.masked : null,
+      grundskola_masked_by_band: g ? g.maskedByBand : null,
     };
   }
 

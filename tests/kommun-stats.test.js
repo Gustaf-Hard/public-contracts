@@ -62,4 +62,25 @@ describe('KommunStats', () => {
     expect(ks().eleverIn('9999', ['7-9'])).toBe(null);
     expect(ks().peersOf('9999')).toEqual([]);
   });
+  // Skolverket masks grundskola cells under 5 pupils; a band with a masked
+  // cell is a lower bound, never an exact denominator.
+  it('a band with masked cells gives null for that band, the others stay', () => {
+    const data = fixture();
+    data.kommuner['0001'].grundskola_masked_cells = 1;
+    data.kommuner['0001'].grundskola_masked_by_band = { '1-3': 0, '4-6': 1, '7-9': 0 };
+    const s = loadKommunStats({ data });
+    expect(s.eleverIn('0001', ['4-6'])).toBe(null);
+    expect(s.eleverIn('0001', ['1-3', '4-6', '7-9'])).toBe(null);
+    expect(s.eleverIn('0001', ['1-3', '7-9'])).toBe(80);
+    expect(s.get('0001').maskedBands.has('4-6')).toBe(true);
+  });
+  it('without per-band data any masked cell nulls every grundskola band, not förskola or gymnasiet', () => {
+    const data = fixture();
+    data.kommuner['0001'].grundskola_masked_cells = 2;
+    const s = loadKommunStats({ data });
+    for (const b of ['1-3', '4-6', '7-9']) expect(s.eleverIn('0001', [b])).toBe(null);
+    expect(s.eleverIn('0001', ['Förskola', 'Gymnasiet'])).toBe(300);
+    data.kommuner['0001'].grundskola_masked_cells = 0;
+    expect(loadKommunStats({ data }).eleverIn('0001', ['4-6'])).toBe(40);
+  });
 });
