@@ -232,8 +232,8 @@ describe('W4. a samverkansavtal needs document evidence, not equal list prices',
     expect(marketByCategory(facts).find((m) => m.category === 'laromedel')).toMatchObject({ n_avtal: 2, value_known_sek: 200000 });
   });
 
-  it('the same document (equal size, the same file name, or the same summary) is one avtal', () => {
-    for (const ev of [{ size_bytes: 333 }, { filename: 'Samverkan.pdf' }, { summary: 'Gemensamt avtal för två kommuner.' }]) {
+  it('the same document (equal size, with or without the same file name, or the same summary) is one avtal', () => {
+    for (const ev of [{ size_bytes: 333 }, { filename: 'Samverkan.pdf', size_bytes: 334 }, { summary: 'Gemensamt avtal för två kommuner.' }]) {
       const facts = build([binogi('0114', 'Upplands Väsby', ev), binogi('0115', 'Vallentuna', ev)]);
       expect(marketByCategory(facts).find((m) => m.category === 'laromedel')).toMatchObject({ n_avtal: 1, value_known_sek: 100000 });
     }

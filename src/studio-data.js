@@ -500,8 +500,8 @@ function markSuperseded(facts) {
 
 // A samverkansavtal delivered by several kommuner: the same vendor, start,
 // end and annual value in different kommuner of one län, AND evidence that
-// the copies are one document (sameDocument: equal file size, the same file
-// name, or the same summary text) or that the avtal itself names the other
+// the copies are one document (sameDocument: equal file size or the same
+// summary text) or that the avtal itself names the other
 // kommun (namesOther: one copy's summary names the other copy's kommun, as a
 // GGVV avtal "med Gnosjö, Vaggeryd och Värnamo" does), is one avtal. Equal
 // list prices alone are two avtal (r4 W4). We
@@ -509,16 +509,19 @@ function markSuperseded(facts) {
 // two of four members), so nothing is allocated: every copy carries
 // joint.whole_value_sek (the whole avtal's value), the lowest-id copy keeps
 // it as annual_value_sek so market totals count it once, the other copies
-// have no value of their own (annual_value_sek null). The value stays on an
-// active, non-superseded copy (the lowest such id); when no copy is one, no
-// copy carries the value and the market does not count it (r4 W5). No copy has a price
+// have no value of their own (annual_value_sek null). Each owner company's
+// value stays on an active, non-superseded copy of that company's row (the
+// lowest such id); when no copy is one, no copy carries it and the market
+// does not count it (r4 W5, r5 V5). No copy has a price
 // per elev: the whole value over one member's elever is not that member's
 // price. avtal_key is the same on every copy, so avtal counts count it once.
 // Kommun pages show it as "samverkansavtal (N kommuner), andel okänd" and
 // leave it out of the kommun's spend and of peer comparisons.
+// A shared file name alone is not evidence: vendors send the same
+// "Avtal.pdf" or "skola24.pdf" to many kommuner (r5 V3). Equal size (with or
+// without the same name) or the same summary text is.
 export function sameDocument(a = {}, b = {}) {
-  return (a.size != null && a.size === b.size) || (a.name != null && a.name === b.name)
-    || (a.summary != null && a.summary === b.summary);
+  return (a.size != null && a.size === b.size) || (a.summary != null && a.summary === b.summary);
 }
 const names = (doc, kommun) => !!(doc.summary && kommun
   && new RegExp(`(^| )${kommun.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}s?( |$)`).test(normName(doc.summary)));
@@ -540,15 +543,27 @@ function allocateJoint(facts) {
       }
       if (members.length < 2) continue;
       for (const m of members) used.add(m.id);
-      const carriers = members.filter((m) => m.live).map((m) => m.id);
-      const primary = carriers.length ? Math.min(...carriers) : null;
+      // The carrier is chosen per owner company (r5 V5): supersede works per
+      // kommun x company, so a copy whose ILT row was replaced can still be
+      // live through its Binogi row. Each company's share stays on the
+      // lowest-id copy whose row for that company is active and not
+      // superseded.
+      const ownerOf = (f) => f.company_slug ?? `name:${f.company_name}`;
+      const primary = new Map();
+      for (const m of [...members].sort((a, b) => a.id - b.id)) {
+        for (const f of m.rows) {
+          const ck = ownerOf(f);
+          if (f.active && !f.superseded && !primary.has(ck)) primary.set(ck, m.id);
+        }
+      }
       const key = `joint:${Math.min(...members.map((m) => m.id))}`;
       const kods = members.map((m) => m.kod).sort();
       for (const m of members) {
         for (const f of m.rows) {
+          const here = primary.get(ownerOf(f)) === m.id;
           f.avtal_key = key;
-          f.joint = { n_kommuner: members.length, kommun_kods: kods, whole_value_sek: f.annual_value_sek, counted_here: m.id === primary };
-          if (m.id !== primary) { f.annual_value_sek = null; f.value_basis = null; }
+          f.joint = { n_kommuner: members.length, kommun_kods: kods, whole_value_sek: f.annual_value_sek, counted_here: here };
+          if (!here) { f.annual_value_sek = null; f.value_basis = null; }
           f.kr_per_elev = null; f.kr_per_elev_basis = null; f.kr_per_elev_product_slug = null;
         }
       }
