@@ -1250,3 +1250,55 @@ describe('queue hygiene digest (2026-09-12 design)', () => {
     expect(digest).toContain('…och 5 till');
   });
 });
+
+// 2026-10-26: a skip resolved the escalation and left the conversation exactly
+// as stale as before, so the next daily run re-minted the same draft, usually
+// within minutes (30 of 45 open T_FOLLOWUP_CLOSE drafts live were re-mints of
+// a draft the operator had just skipped). The operator's skip is a look at the
+// case; the staleness clock restarts from it.
+describe('runDailyFollowup — a skip restarts the staleness clock', () => {
+  function seedSkip(convId, template, decidedAt) {
+    const escId = db.recordEscalation({
+      conversation_id: convId, message_id: null, reason: 'stale', draft_template: template,
+      draft_subject: 'Re: x', draft_body: 'x', previous_state: 'DELIVERING',
+    });
+    db.resolveEscalation(escId, { status: 'resolved_skip' });
+    // decided_at is SQLite datetime('now') format: 'YYYY-MM-DD HH:MM:SS' UTC.
+    db.recordDecision({
+      escalation_id: escId, conversation_id: convId, conversation_state: 'DELIVERING',
+      classifier_class: 'followup_stale', classifier_confidence: null,
+      draft_template: template, draft_body: 'x', decision: 'skip', final_body: null,
+      decided_at: decidedAt,
+    });
+  }
+
+  it('does not re-mint T_FOLLOWUP_CLOSE the same day the operator skipped it', async () => {
+    const id = seedConv({ state: 'DELIVERING', receiptSent: 1, stateChangedAt: '2026-05-20T00:00:00Z' });
+    seedSkip(id, 'T_FOLLOWUP_CLOSE', '2026-06-24 08:40:00');
+    await runDailyFollowup(deps());
+    expect(db.listOpenEscalationsForConversation(id)).toHaveLength(0);
+  });
+
+  it('drafts again once the threshold has passed since the skip', async () => {
+    const id = seedConv({ state: 'DELIVERING', receiptSent: 1, stateChangedAt: '2026-05-20T00:00:00Z' });
+    seedSkip(id, 'T_FOLLOWUP_CLOSE', '2026-06-09 08:40:00'); // 15 days before now
+    await runDailyFollowup(deps());
+    const escs = db.listOpenEscalationsForConversation(id);
+    expect(escs).toHaveLength(1);
+    expect(escs[0].draft_template).toBe('T_FOLLOWUP_CLOSE');
+  });
+
+  it('a skipped nudge is not re-minted the next day either', async () => {
+    const id = seedConv({ stateChangedAt: '2026-06-01T00:00:00Z' });
+    seedSkip(id, 'T_FOLLOWUP_NUDGE', '2026-06-23 10:00:00');
+    await runDailyFollowup(deps());
+    expect(db.listOpenEscalationsForConversation(id)).toHaveLength(0);
+  });
+
+  it('a skip older than the state change does not move the clock', async () => {
+    const id = seedConv({ state: 'DELIVERING', receiptSent: 1, stateChangedAt: '2026-06-01T00:00:00Z' });
+    seedSkip(id, 'T_RECEIPT', '2026-05-01 10:00:00');
+    await runDailyFollowup(deps());
+    expect(db.listOpenEscalationsForConversation(id)[0]?.draft_template).toBe('T_FOLLOWUP_CLOSE');
+  });
+});

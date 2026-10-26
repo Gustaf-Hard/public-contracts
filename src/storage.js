@@ -754,6 +754,20 @@ export function openDb(path) {
     `).all(conversationId).map((r) => r.decided_at);
   }
 
+  // The newest operator `skip` in a conversation, as an ISO-8601 UTC string, or
+  // null. runDailyFollowup restarts its staleness clock from it: a skip is the
+  // operator looking at the case and choosing to send nothing, and without this
+  // the next daily run re-minted the very draft that was just skipped
+  // (2026-10-26: 30 of 45 open T_FOLLOWUP_CLOSE drafts live).
+  function latestSkipAt(conversationId) {
+    const row = db.prepare(`
+      SELECT MAX(decided_at) AS t FROM decisions
+      WHERE conversation_id = ? AND decision = 'skip'
+    `).get(conversationId);
+    const ms = timestampMs(row?.t);
+    return Number.isNaN(ms) ? null : new Date(ms).toISOString();
+  }
+
   // Read-only view for the on-demand edit-review report
   // (scripts/08-review-edits.js): every operator edit joined to its
   // conversation, newest first.
@@ -2219,6 +2233,7 @@ export function openDb(path) {
     claimConversationForInitialSend,
     transaction,
     recordDecision,
+    latestSkipAt,
     listDecisions,
     listOperatorDecisionTimes,
     listEditDecisions,

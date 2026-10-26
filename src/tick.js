@@ -1655,9 +1655,17 @@ export async function runDailyFollowup(deps) {
     // change so a conversation quiet across the summer doesn't accrue stale
     // days it can't help. staleAction stays pure/unchanged — it just sees a
     // smaller `days`.
-    const raw = daysBetween(new Date(conv.state_changed_at), now);
-    const vac = conv.state_changed_at
-      ? vacationDaysBetween(conv.state_changed_at.slice(0, 10), todayIso, cfg)
+    //
+    // The clock starts at the later of the state change and the operator's
+    // latest skip (2026-10-26): a skip resolves the draft but leaves the case
+    // exactly as stale as before, so without this the next run re-minted it.
+    const skippedAt = db.latestSkipAt(conv.id);
+    const clockStart = skippedAt && (!conv.state_changed_at || Date.parse(skippedAt) > Date.parse(conv.state_changed_at))
+      ? skippedAt
+      : conv.state_changed_at;
+    const raw = daysBetween(new Date(clockStart), now);
+    const vac = clockStart
+      ? vacationDaysBetween(clockStart.slice(0, 10), todayIso, cfg)
       : 0;
     const days = Math.max(0, raw - vac);
     const action = staleAction(conv.state, days, conv.followup_count, {
