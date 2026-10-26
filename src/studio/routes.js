@@ -21,7 +21,7 @@ import { renderLeverantorer, renderKommuner, renderSearch, exactSearchHit } from
 import { renderOm } from './pages/om.js';
 import { loadKommunTiles } from './charts.js';
 import path from 'node:path';
-import { existsSync } from 'node:fs';
+import { existsSync, realpathSync } from 'node:fs';
 
 export const STUDIO_DATA_TTL_MS = 5 * 60 * 1000;
 
@@ -251,8 +251,15 @@ export function mountStudio(app, {
     if (!att) return res.status(404).send('Not found');
     const type = underlagType(att);
     if (!type) return res.status(404).send('Not found');
-    const base = path.resolve(contractsDir);
-    const full = path.resolve(att.saved_path);
+    // Canonical paths on both sides: a symlink inside the contracts dir that
+    // points outside it must not pass the prefix check.
+    let base; let full;
+    try {
+      base = realpathSync(path.resolve(contractsDir));
+      full = realpathSync(path.resolve(att.saved_path));
+    } catch {
+      return res.status(404).send('Not found');
+    }
     if (!full.startsWith(base + path.sep) || !existsSync(full)) return res.status(404).send('Not found');
     res.set('Content-Type', type.mime);
     res.set('Content-Disposition', `${type.ext === 'pdf' ? 'inline' : 'attachment'}; filename="avtal-${att.id}.${type.ext}"`);

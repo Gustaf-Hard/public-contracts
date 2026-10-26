@@ -66,6 +66,20 @@ describe('dashboard behind the auth gate', () => {
     expect(r.status).toBe(200);
   });
 
+  // The studio is mounted after the gate; /studio/underlag streams original
+  // avtal files, so a reordered mount must fail here, not in production.
+  it('refuses unauthenticated /studio and /studio/underlag/:id', async () => {
+    const a = app(AUTH_ENV);
+    const page = await req(a, '/studio');
+    expect(page.status).toBe(302);
+    expect(page.location).toBe('/auth/login');
+    const partial = await req(a, '/studio/kommuner?partial=1');
+    expect(partial.status).not.toBe(200);
+    const file = await req(a, '/studio/underlag/1');
+    expect(file.status).not.toBe(200);
+    expect([302, 401, 403]).toContain(file.status);
+  });
+
   it('leaves the dashboard open when AUTH_ENABLED is unset (loopback default)', async () => {
     const r = await req(app({}), '/');
     expect(r.status).toBe(200);

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { openDb } from '../src/storage.js';
@@ -316,6 +316,22 @@ describe('/studio/underlag/:attachmentId', () => {
     const outside = join(tmp, 'elsewhere', 'avtal.pdf');
     const { attId } = seedContract({ kod: '1440', vendor: 'Binogi AB', savedPath: outside });
     expect((await get(app(), `/studio/underlag/${attId}`)).status).toBe(404);
+  });
+
+  it('refuses a saved path that escapes the contracts directory through a symlink', async () => {
+    const outsideDir = join(tmp, 'elsewhere');
+    mkdirSync(outsideDir, { recursive: true });
+    writeFileSync(join(outsideDir, 'secret.pdf'), '%PDF-1.4 outside\n');
+    symlinkSync(outsideDir, join(contractsDir, 'link'));
+    const { attId } = seedContract({ kod: '1440', vendor: 'Binogi AB', savedPath: join(contractsDir, 'link', 'secret.pdf'), writeFile: false });
+    const r = await get(app(), `/studio/underlag/${attId}`);
+    expect(r.status).toBe(404);
+    expect(r.text).not.toContain('outside');
+  });
+
+  it('still serves a file inside the contracts directory (both sides canonicalised, so a symlinked tmp dir is fine)', async () => {
+    const { attId } = seedContract({ kod: '1440', vendor: 'Binogi AB' });
+    expect((await get(app(), `/studio/underlag/${attId}`)).status).toBe(200);
   });
 
   it('is a 404 when the file is missing on disk', async () => {
