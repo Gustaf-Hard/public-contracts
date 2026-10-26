@@ -759,7 +759,18 @@ export function priceDistribution(facts, opts = {}) {
   const d = distribution(perKommun.map((p) => p.kr_per_elev));
   const values = d.suppressed ? [] : perKommun
     .sort((a, b) => a.kr_per_elev - b.kr_per_elev || String(a.kommun_kod).localeCompare(String(b.kommun_kod)));
-  return { ...d, n_avtal: distinct(rows, avtalOf), values };
+  return { ...d, n_avtal: distinct(rows, avtalOf), n_held: heldAvtal(facts, opts), values };
+}
+
+// Headline avtal in a price cell's scope, priced or not, counting every avtal
+// that names the product (a bundle too). A cell with no known price over
+// held avtal says "inget känt pris", never "inga avtal" (r5 V2).
+export function heldAvtal(facts, { productSlug, category, segment, kommunKods } = {}) {
+  const kods = kommunKods ? new Set(kommunKods) : null;
+  return distinct(headline(facts).filter((f) => (!productSlug || f.product_slugs.includes(productSlug) || f.kr_per_elev_product_slug === productSlug)
+    && (!category || catOf(f) === category)
+    && (!segment || f.segments.includes(segment))
+    && (!kods || kods.has(f.kommun_kod))), avtalOf);
 }
 
 function monthKey(iso) { return iso.slice(0, 7); }

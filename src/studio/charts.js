@@ -162,10 +162,13 @@ function hashId(s) {
   return `sm${(h >>> 0).toString(36)}`;
 }
 
-export function segmentMatrix({ rows = [], cols = [], cell, id = null, unit = 'kr/elev', rowHead = '', caption = '' } = {}) {
+// held(r, c), optional: the avtal the underlag holds in the cell's scope,
+// priced or not; else the dist's n_held. Unknown counts as held, so a cell
+// says "inga avtal i underlaget" only when it is known to hold none (r5 V2).
+export function segmentMatrix({ rows = [], cols = [], cell, held = null, id = null, unit = 'kr/elev', rowHead = '', caption = '' } = {}) {
   const base = String(id || hashId(JSON.stringify([rows.map((r) => r.key), cols.map((c) => c.key)]))).replace(/[^a-zA-Z0-9-]/g, '');
   const grid = rows.map((r) => cols.map((c) => {
-    // Caller errors propagate: a broken cell() must never render as "inga avtal".
+    // Caller errors propagate: a broken cell() must never render as an empty group.
     const d = cell ? cell(r, c) : null;
     return d || null;
   }));
@@ -195,11 +198,15 @@ export function segmentMatrix({ rows = [], cols = [], cell, id = null, unit = 'k
       inner = `<span class="sm-few">${UNKNOWN}</span>`;
       pop = '<p>Underlaget för den här gruppen kunde inte räknas fram. Det betyder inte att det saknas avtal.</p>';
     } else if (d.suppressed || !isNum(d.median)) {
+      const h = held ? held(r, c) : d.n_held;
+      const none = n === 0 && isNum(h) && h === 0;
       cls = n === 0 ? 'sm-cell is-empty' : 'sm-cell is-few hatch';
       inner = n === 0
-        ? '<span class="sm-few">inga avtal</span>'
+        ? `<span class="sm-few">${none ? 'inga avtal i underlaget' : 'inget känt pris'}</span>`
         : `<span class="sm-few">för få</span><span class="sm-n">n = ${esc(fmtInt(n))}</span>`;
-      pop = `<p>${n === 0 ? 'Inga avtal med känt pris i den här gruppen än.' : `För få kommuner (n = ${esc(fmtInt(n))}). Medianen visas när minst ${MIN_N} kommuner har känt pris per elev.`}</p>`;
+      pop = `<p>${n > 0 ? `För få kommuner (n = ${esc(fmtInt(n))}). Medianen visas när minst ${MIN_N} kommuner har känt pris per elev.`
+        : none ? 'Inga avtal i underlaget i den här gruppen än.'
+          : isNum(h) ? `${esc(fmtInt(h))} avtal i underlaget, inget med känt pris per elev än.` : 'Inget avtal med känt pris per elev i den här gruppen än.'}</p>`;
     } else {
       cls = `sm-cell seq-${step(d.median)}`;
       inner = `<span class="sm-med">${esc(fmtInt(d.median))}</span><span class="sm-n">n = ${esc(fmtInt(n))}</span>`;

@@ -154,6 +154,33 @@ describe('V1. a kommun\'s price for a product is one avtal\'s own price, never a
   });
 });
 
+// ------------------------------------------------------------------ V2
+describe('V2. a price cell with no known price over held avtal says "inget känt pris"', () => {
+  it('the kategori matrix over one unpriced avtal never says "inga avtal"', () => {
+    const facts = build([C({ annual_value_sek: null, products: ['Binogi'] })], { coverage: [] });
+    const html = renderKategori({ category: findCategory('laromedel'), facts, stats, statusMap: done(KODS), today: TODAY, underlag: underlagEvidence({}) });
+    const cells = new Map([...html.matchAll(/aria-label="([^"]*)"><span class="sm-few">([^<]*)<\/span>/g)].map((m) => [m[1], m[2]]));
+    expect(cells.get('Alla kommuner · Alla segment')).toBe('inget känt pris');
+    // Kommungrupper where the underlag holds no avtal at all may say so.
+    for (const [where, c] of cells) if (where !== 'Alla kommuner · Alla segment') expect(c).toBe('inga avtal i underlaget');
+    expect(html).not.toMatch(/>inga avtal</);
+  });
+
+  it('heldAvtal counts a bundle naming the product; the matrix says "inga avtal i underlaget" only for a known empty cell', () => {
+    const facts = build([C({ vendor_name: 'ILT Education AB', products: ['Polylino', 'Polyglutt Home Access'] })]);
+    expect(heldAvtal(facts, { productSlug: 'polyglutt-home-access' })).toBe(1);
+    expect(heldAvtal(facts, { productSlug: 'polyglutt-home-access', kommunKods: ['0115'] })).toBe(0);
+    const empty = { n: 0, suppressed: true, median: null };
+    const html = segmentMatrix({
+      rows: [{ key: 'a', label: 'A' }, { key: 'b', label: 'B' }], cols: [{ key: '*', label: 'Alla' }], id: 'v2',
+      cell: () => empty, held: (r) => (r.key === 'a' ? 1 : 0),
+    });
+    expect(html.match(/>inget känt pris</g)).toHaveLength(1);
+    expect(html.match(/>inga avtal i underlaget</g)).toHaveLength(1);
+    expect(html).toContain('1 avtal i underlaget, inget med känt pris per elev än.');
+  });
+});
+
 // ------------------------------------------------------------------ V3
 describe('V3. a shared generic file name alone is not one document', () => {
   it('two independent Binogi avtal both named "Avtal.pdf" stay two avtal with their own prices', () => {

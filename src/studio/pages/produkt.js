@@ -6,7 +6,7 @@
 import { esc } from '../layout.js';
 import { fmtInt } from '../format.js';
 import { companies, productBySlug } from '../../catalogue.js';
-import { priceDistribution, priceRowFilter, renewalBuckets } from '../../studio-data.js';
+import { heldAvtal, priceDistribution, priceRowFilter, renewalBuckets } from '../../studio-data.js';
 import { entityHeader, kpiTile, segmentStrip, emptyPanel, STRIP_SEGMENTS } from '../components.js';
 import { rankingBars, segmentMatrix, loadKommunTiles } from '../charts.js';
 import {
@@ -124,6 +124,13 @@ export function renderProdukt({ product, company, facts, stats, statusMap, today
         cols: mCols,
         rowHead: 'Kommungrupp',
         cell: (r, c) => priceDistribution(c.key === '*' ? facts : sole, {
+          productSlug: slug,
+          ...(c.key === '*' ? {} : { segment: c.key }),
+          ...(r.kods ? { kommunKods: r.kods } : {}),
+        }),
+        // Held avtal count every avtal naming the product, bundles too, also
+        // in the segment columns whose prices count sole avtal only.
+        held: (r, c) => heldAvtal(facts, {
           productSlug: slug,
           ...(c.key === '*' ? {} : { segment: c.key }),
           ...(r.kods ? { kommunKods: r.kods } : {}),

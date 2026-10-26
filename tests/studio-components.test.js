@@ -211,7 +211,9 @@ describe('other components', () => {
     expect(html).toContain('okänt');
     expect(html).toContain('lg-unknown'); // the legend names the unknown swatch
     expect(html).not.toContain('n = 7');
-    expect(count(html, 'inga avtal')).toBe(1);
+    // n = 0 with no held count: no known price, never an absence claim (r5 V2).
+    expect(count(html, 'inga avtal')).toBe(0);
+    expect(count(html, '>inget känt pris<')).toBe(1);
   });
 
   it('renewalTimeline throws on an invalid today', () => {
