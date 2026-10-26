@@ -1,5 +1,5 @@
 // tests/explorer-core.test.js
-// Pure slice-and-dice logic behind the /leverantorer explorer
+// Pure slice-and-dice logic behind the /avtal explorer
 // (2026-07-09-vendor-data-center-design.md Part 3). The DOM glue in
 // public/explorer.js stays untested by design; everything decision-shaped
 // lives here in public/explorer-core.js and is exercised directly.

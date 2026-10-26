@@ -602,12 +602,12 @@ describe('handoff tasks (2026-09-06 design)', () => {
 });
 
 describe('vendor pages', () => {
-  it('/leverantorer is the market overview + explorer (data center)', async () => {
+  it('/leverantorer is the market overview; the explorer lives on /avtal', async () => {
     seedVendorWithContract();
     const app = appWithFakes();
     const res = await get(app, '/leverantorer');
     expect(res.status).toBe(200);
-    expect(res.text).toContain('data-explorer');
+    expect((await get(app, '/avtal')).text).toContain('data-explorer');
     expect(res.text).toContain('Skolon');
     expect(res.text).toContain('href="/leverantor/skolon"');
     expect(res.text).toContain('Skolon Plattform');

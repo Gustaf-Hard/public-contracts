@@ -5,7 +5,7 @@
   'use strict';
   var content = function () { return document.getElementById('content'); };
 
-  // The /leverantorer explorer ships as an ES module (explorer.js over the
+  // The /avtal explorer ships as an ES module (explorer.js over the
   // pure explorer-core.js). Scripts inside innerHTML never execute, so both
   // the initial full load and every pane swap must (re-)init it from here.
   // The module is cached after the first import; initExplorer() is

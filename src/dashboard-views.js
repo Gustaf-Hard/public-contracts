@@ -932,6 +932,7 @@ export function layout({ title, body, currentPath = '/', heartbeat = null, parti
       ${navItem('/arenden', 'Ärenden')}
       ${navItem('/escalations', 'Eskaleringar', escBadge)}
       ${navItem('/leverantorer', 'Leverantörer')}
+      ${navItem('/avtal', 'Avtal')}
       ${navItem('/pipeline', 'Pipeline')}
       ${navItem('/takt', 'Takt')}
       ${navItem('/activity', 'Aktivitet')}
@@ -3080,15 +3081,28 @@ export function renderVendorMarket({ summary, rollups = [], facts = [], sort = n
   const body = `
     <div class="page-head"><h1>Leverantörer</h1><span class="muted">marknadsöversikt · ${facts.length} avtal</span></div>
     ${stats}
-    <p class="muted honesty-note">Summor bygger enbart på avtal med känd årskostnad — okända värden visas som ”okänt” och hittas i utforskaren nedan.</p>
+    <p class="muted honesty-note">Summor bygger enbart på avtal med känd årskostnad — okända värden visas som ”okänt” och hittas under <a href="/avtal" data-pane-link>Avtal</a>.</p>
     <section class="board-section">
       <h2>Marknadsöversikt <span class="count">${shownRollups.length}</span></h2>
       ${pillBar}
       ${table}
+      <a class="queue-more" href="/avtal" data-pane-link>Utforska alla ${facts.length} avtal →</a>
     </section>
-    ${renderExplorer(facts, todayIso)}
   `;
   return layout({ title: 'Leverantörer', body, currentPath: '/leverantorer', heartbeat, partial, escalationCount });
+}
+
+// ---- Avtal page (/avtal): the contract explorer on its own page (2026-10-26;
+// it used to sit under the market table on /leverantorer). Same facts, same
+// explorer.js; app.js loads it for any page carrying [data-explorer]. ----
+export function renderContracts({ facts = [], todayIso, heartbeat = null, partial = false, escalationCount = 0 }) {
+  const body = `
+    <div class="page-head"><h1>Avtal</h1><span class="muted">alla mottagna avtal · ${facts.length}</span></div>
+    ${facts.length === 0
+      ? '<div class="empty-state">Inga avtal ännu — avtal analyseras när kommuner levererar.</div>'
+      : renderExplorer(facts, todayIso)}
+  `;
+  return layout({ title: 'Avtal', body, currentPath: '/avtal', heartbeat, partial, escalationCount });
 }
 
 // ---- Ramavtal page (/ramavtal/:slug) — a framework agreement as a first-class

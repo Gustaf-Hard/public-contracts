@@ -30,6 +30,7 @@ import {
   renderPipeline,
   renderCompose,
   renderVendorMarket,
+  renderContracts,
   renderVendorDossier,
   renderProductCoverage,
   renderRamavtal,
@@ -1419,6 +1420,12 @@ export function createDashboardApp({
       summary, rollups: sortVendorRollups(rollups, { sort, order }), facts, sort, order, kategori, todayIso,
       heartbeat: hb(), partial: isPartial(req), escalationCount: escCount(),
     }));
+  });
+
+  app.get('/avtal', (req, res) => {
+    const { facts, todayIso } = vendorData(new Date());
+    res.set('Content-Type', 'text/html; charset=utf-8');
+    res.send(renderContracts({ facts, todayIso, heartbeat: hb(), partial: isPartial(req), escalationCount: escCount() }));
   });
 
   app.get('/leverantor/:slug', (req, res) => {

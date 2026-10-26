@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { openDb } from '../src/storage.js';
 import { createDashboardApp, sortVendorRollups } from '../src/dashboard.js';
-import { renderVendorMarket, renderVendorDossier } from '../src/dashboard-views.js';
+import { renderVendorMarket, renderVendorDossier, renderContracts } from '../src/dashboard-views.js';
 import { buildContractFacts, buildVendorRollups, buildMarketSummary } from '../src/vendor-analytics.js';
 
 const NOW = new Date('2026-07-09T12:00:00Z');
@@ -115,6 +115,10 @@ describe('renderVendorMarket (surface 1 + 3)', () => {
       facts, todayIso: TODAY,
     });
   }
+  // The explorer moved to its own page, /avtal (2026-10-26).
+  function renderedAvtal() {
+    return renderContracts({ facts: factsFromDb(), todayIso: TODAY });
+  }
 
   it('shows market KPIs with an honest completeness line', () => {
     seedMarket();
@@ -135,7 +139,7 @@ describe('renderVendorMarket (surface 1 + 3)', () => {
 
   it('embeds the contract-facts dataset as parseable JSON with today anchor', () => {
     seedMarket();
-    const html = rendered();
+    const html = renderedAvtal();
     const m = html.match(/<script type="application\/json" data-contract-facts>(.*?)<\/script>/s);
     expect(m).toBeTruthy();
     const facts = JSON.parse(m[1]);
@@ -152,7 +156,7 @@ describe('renderVendorMarket (surface 1 + 3)', () => {
       db.raw.prepare('SELECT id FROM contracts WHERE attachment_id = ?').get(a1).id,
       db.upsertProduct(skolon.id, '</script><script>alert(1)</script>'),
     );
-    const html = rendered();
+    const html = renderedAvtal();
     const blob = html.match(/<script type="application\/json" data-contract-facts>(.*?)<\/script>/s)[1];
     expect(blob).not.toContain('</script');
     expect(JSON.parse(blob).some((f) => f.products.some((p) => p.includes('alert(1)')))).toBe(true);
@@ -160,7 +164,7 @@ describe('renderVendorMarket (surface 1 + 3)', () => {
 
   it('renders explorer controls, group-by and an initial full row set', () => {
     seedMarket();
-    const html = rendered();
+    const html = renderedAvtal();
     expect(html).toContain('data-x-filter="lan"');
     expect(html).toContain('data-x-filter="pricing_model"');
     expect(html).toContain('data-x-filter="renewal_window"');
@@ -171,6 +175,13 @@ describe('renderVendorMarket (surface 1 + 3)', () => {
     expect(html).toContain('Stockholm');
     // Unknown values render as okänt, never 0 kr.
     expect(html).toMatch(/okänt/);
+  });
+
+  it('the market page no longer carries the explorer; it links to /avtal', () => {
+    seedMarket();
+    const html = rendered();
+    expect(html).not.toContain('data-explorer');
+    expect(html).toContain('href="/avtal"');
   });
 
   it('empty dataset renders an empty state, not fabricated zeros as values', () => {
@@ -277,10 +288,18 @@ describe('routes', () => {
     seedMarket();
     const res = await get(appWithFakes(), '/leverantorer');
     expect(res.status).toBe(200);
-    expect(res.text).toContain('data-contract-facts');
     expect(res.text).toContain('Skolon');
     expect(res.text).toContain('Radish');
     expect(res.text).toContain('årlig kostnad känd för 2 av 3 avtal');
+  });
+
+  it('GET /avtal serves the contract explorer with facts from the DB, under its own nav item', async () => {
+    seedMarket();
+    const res = await get(appWithFakes(), '/avtal');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('data-contract-facts');
+    expect(res.text).toContain('data-explorer');
+    expect(res.text).toMatch(/<a href="\/avtal" data-pane-link class="nav-item active">Avtal/);
   });
 
   it('GET /leverantorer?sort=vendor_name&order=asc orders the rollup table', async () => {
