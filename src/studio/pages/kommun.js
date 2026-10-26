@@ -11,11 +11,12 @@ import { esc } from '../layout.js';
 import { fmtInt, fmtKrCompact, fmtPrice, basisLine, monthsUntil } from '../format.js';
 import { CATEGORIES, companyBySlug, productBySlug } from '../../catalogue.js';
 import { kommunProfile, priceDistribution, priceRowFilter, distribution, renewalBuckets, UNKNOWN_CATEGORY } from '../../studio-data.js';
+import { GRADE_LEVELS as GRADE_ORDER } from '../../vendor-analytics.js';
 import { entityHeader, kpiTile, emptyPanel } from '../components.js';
 import { stripPlot, rankingBars, renewalTimeline, tileMap, niceDomain, loadKommunTiles } from '../charts.js';
 import {
   isNum, headline, sumKnown, byContract, consolidateByContract, categoryLabel, modelLabel, productName, productNames,
-  companyHref, productHref, section, breadcrumb, medianText, evidenceSection, renewalTileProps,
+  companyHref, productHref, section, breadcrumb, medianText, evidenceSection, renewalTileProps, jointText,
   safeAll, nOf, MIN_N, isIso,
 } from './common.js';
 
@@ -90,33 +91,44 @@ const pricedProduct = (f) => f.kr_per_elev_product_slug ?? (f.product_slugs.leng
 
 // ------------------------------------------------------------ spend vs peers
 
-// An avtal counts toward spend per elev F-9 when it covers a F-9 segment or
-// states no segment; one that only covers förskola, gymnasiet or komvux has
-// other pupils and is left out (a kommun with its own gymnasium would
-// otherwise look dearer per pupil than one in a gymnasieförbund).
-export const inF9 = (f) => !f.segments.length || f.segments.some((s) => F9.includes(s));
+// An owner row counts toward spend per elev when both its value and the
+// pupils it covers (elever_in_scope, from its own school forms) are known.
+export const hasScope = (f) => isNum(f.elever_in_scope) && f.elever_in_scope > 0 && f.segments.length > 0;
 
-// Known spend per elev F-9 per category, for one kommun. Map(cat -> kr/elev).
-// completeOnly: a category counts only when every F-9 avtal there has a
-// known value (a peer's partial sum would pull the median down).
-export function perElevByCategory(rows, elever, { completeOnly = false } = {}) {
-  const out = new Map();
-  if (!elever) return out;
-  const partial = new Set();
+// Known spend per elev per category for one kommun, in the school forms the
+// avtal cover: the known value of every avtal with known value and known
+// school forms, divided by the kommun's elever in the union of those school
+// forms (two läromedel avtal for the same pupils are not twice the pupils).
+// eleverIn(segments) gives the kommun's elever. Returns
+// Map(cat -> { perElev, value, elever, counted, leftOut }); perElev is null
+// when the elever are unknown. completeOnly (peers): a category with any
+// avtal left out is dropped, a partial sum would pull the median down.
+export function perElevByCategory(rows, { eleverIn, completeOnly = false } = {}) {
+  const by = new Map();
   for (const f of rows) {
-    if (!inF9(f)) continue;
     const c = catOf(f);
-    if (!isNum(f.annual_value_sek)) { partial.add(c); continue; }
-    out.set(c, (out.get(c) ?? 0) + f.annual_value_sek);
+    if (!by.has(c)) by.set(c, { value: 0, segs: new Set(), counted: 0, leftOut: 0 });
+    const e = by.get(c);
+    if (isNum(f.annual_value_sek) && hasScope(f)) {
+      e.value += f.annual_value_sek; e.counted += 1;
+      for (const g of f.segments) e.segs.add(g);
+    } else e.leftOut += 1;
   }
-  if (completeOnly) for (const c of partial) out.delete(c);
-  for (const [c, v] of out) out.set(c, v / elever);
+  const out = new Map();
+  for (const [c, e] of by) {
+    if (completeOnly && e.leftOut) continue;
+    if (!e.counted) { out.set(c, { perElev: null, value: null, elever: null, counted: 0, leftOut: e.leftOut }); continue; }
+    let elever = null;
+    try { const n = eleverIn?.(GRADE_ORDER.filter((g) => e.segs.has(g))); elever = isNum(n) && n > 0 ? n : null; } catch { elever = null; }
+    out.set(c, { perElev: elever ? e.value / elever : null, value: e.value, elever, counted: e.counted, leftOut: e.leftOut });
+  }
   return out;
 }
 
+const eleverFor = (stats, kod) => (segs) => stats?.eleverIn?.(kod, segs);
+
 function spendSection({ kommun, profile, head, peers, stats, mine, statusMap }) {
-  const elever = safeElever(stats, kommun.kod);
-  const own = perElevByCategory(mine, elever);
+  const ownMap = perElevByCategory(mine, { eleverIn: eleverFor(stats, kommun.kod) });
   // Peer medians use only peers whose collection is done: a peer still
   // sending avtal would pull the median down with spend we have not seen.
   const donePeers = peers.filter((k) => statusMap.get(k) === 'done');
@@ -134,14 +146,13 @@ function spendSection({ kommun, profile, head, peers, stats, mine, statusMap }) 
       if (!peerAny.has(c)) peerAny.set(c, new Set());
       peerAny.get(c).add(kod);
     }
-    for (const [c, v] of perElevByCategory(rows, safeElever(stats, kod), { completeOnly: true })) {
+    for (const [c, v] of perElevByCategory(rows, { eleverIn: eleverFor(stats, kod), completeOnly: true })) {
+      if (!isNum(v.perElev)) continue;
       if (!peerVals.has(c)) peerVals.set(c, []);
-      peerVals.get(c).push(v);
+      peerVals.get(c).push(v.perElev);
     }
   }
   const spend = new Map(profile.spendByCategory.map((s) => [s.category, s]));
-  // Own categories where every active avtal is outside F-9.
-  const outOfF9 = new Set([...spend.keys()].filter((c) => mine.filter((f) => catOf(f) === c).every((f) => !inF9(f))));
   const cats = [...new Set([...spend.keys(), ...peerAny.keys()])]
     // With own avtal, a category only peers buy is shown when there is a
     // peer median to show; otherwise it is a row of nothing.
@@ -156,7 +167,8 @@ function spendSection({ kommun, profile, head, peers, stats, mine, statusMap }) 
   const rows = cats.map((c) => {
     const s = spend.get(c) ?? null;
     const d = distribution(peerVals.get(c) ?? []);
-    return { c, s, own: own.get(c) ?? null, d };
+    const m = ownMap.get(c) ?? null;
+    return { c, s, m, own: m?.perElev ?? null, d };
   });
   const plotted = rows.flatMap((r) => [r.own, r.d.suppressed ? null : r.d.p75].filter(isNum));
   const top = Math.max(1, ...plotted);
@@ -166,12 +178,13 @@ function spendSection({ kommun, profile, head, peers, stats, mine, statusMap }) 
   const kr = (v) => `${fmtPrice(v)} kr/elev`;
   const hasOwn = mine.length > 0;
 
-  const li = rows.map(({ c, s, own: o, d }, i) => {
+  const li = rows.map(({ c, s, m, own: o, d }, i) => {
     const ownKnown = isNum(o);
     const few = d.suppressed;
     const nPeers = peerAny.get(c)?.size ?? 0;
+    const left = m?.leftOut ? `, ${fmtInt(m.leftOut)} utan känt värde eller skolformer räknas inte` : '';
     const name = `<div class="sc-name"><b>${esc(catName(c))}</b><small>${esc(s
-      ? `${nOf(s.n_avtal, 'avtal', 'avtal')}${!s.n_known ? ', värde okänt' : s.n_known < s.n_avtal ? `, värde känt för ${fmtInt(s.n_known)}` : ''}`
+      ? `${nOf(s.n_avtal, 'avtal', 'avtal')}${!s.n_known ? ', värde okänt' : s.n_known < s.n_avtal ? `, värde känt för ${fmtInt(s.n_known)}` : ''}${left}`
       : hasOwn ? 'inga aktiva avtal här' : `${fmtInt(nPeers)} liknande köper här`)}</small></div>`;
     let bar = '';
     if (ownKnown) bar = `<span class="sc-bar grow-x" style="width:${p(o)};--i:${i}"></span>`;
@@ -179,7 +192,7 @@ function spendSection({ kommun, profile, head, peers, stats, mine, statusMap }) 
     const band = few ? '' : `<span class="sc-iqr" style="left:${p(d.p25)};width:${(Math.max(0.6, x(d.p75) - x(d.p25))).toFixed(2)}%"></span>`;
     const tick = few ? '' : `<span class="sc-med" style="left:${p(d.median)}" tabindex="0"><span class="tip" role="tooltip"><strong>${esc(kr(d.median))}</strong><span>median bland ${esc(fmtInt(d.n))} liknande med klar insamling</span><span>mittersta hälften ${esc(fmtPrice(d.p25))} till ${esc(kr(d.p75))}</span></span></span>`;
     const ownText = ownKnown ? `<b>${esc(kr(o))}</b>`
-      : s ? `<b class="muted">${outOfF9.has(c) ? 'gäller inte F-9' : s.n_known && !elever ? 'elevantal saknas' : 'värde okänt'}</b>`
+      : s ? `<b class="muted">${m?.counted ? 'elevantal saknas' : s.n_known ? 'skolformer okända' : 'värde okänt'}</b>`
         : hasOwn ? '<b class="muted">inget avtal</b>' : '';
     const peerText = few
       ? `<small class="sc-few">för få liknande med klar insamling (n = ${esc(fmtInt(d.n))})</small>`
@@ -187,16 +200,14 @@ function spendSection({ kommun, profile, head, peers, stats, mine, statusMap }) 
     return `<li class="sc-row">${name}<div class="sc-track${few ? ' is-few hatch' : ''}">${band}${bar}${tick}</div><div class="sc-val">${ownText}${peerText}</div></li>`;
   }).join('');
 
-  const axis = `<div class="sc-axis-row"><span></span><div class="axis-x" aria-hidden="true">${ticks.map((t, i) => `<span class="axis-tick${i === 0 ? ' is-first' : i === ticks.length - 1 ? ' is-last' : ''}" style="left:${p(t)}">${esc(fmtPrice(t))}</span>`).join('')}<span class="axis-unit">kr per elev och år</span></div><span></span></div>`;
+  const axis = `<div class="sc-axis-row"><span></span><div class="axis-x" aria-hidden="true">${ticks.map((t, i) => `<span class="axis-tick${i === 0 ? ' is-first' : i === ticks.length - 1 ? ' is-last' : ''}" style="left:${p(t)}">${esc(fmtPrice(t))}</span>`).join('')}<span class="axis-unit">kr per elev och år, i avtalens skolformer</span></div><span></span></div>`;
   const foot = `<figcaption class="viz-foot">
     ${hasOwn ? `<span class="lg"><i class="lg-dot is-highlight sq"></i>${esc(kommun.namn)}</span>` : ''}
     ${rows.some((r) => !r.d.suppressed) ? `<span class="lg"><i class="lg-band"></i>mittersta hälften bland liknande med klar insamling</span>
     <span class="lg"><i class="lg-tick"></i>median bland dem</span>` : ''}
     <span class="lg"><i class="lg-hatch"></i>för få (under ${MIN_N} kommuner)</span>
   </figcaption>`;
-  const lede = elever
-    ? `Känt årsvärde delat med kommunens ${fmtInt(elever)} elever i förskoleklass till åk 9 (kommunal regi). Avtal som bara gäller förskola, gymnasiet eller komvux räknas inte här. Liknande kommuner räknas på samma sätt, men bara de ${fmtInt(donePeers.length)} av ${fmtInt(peers.length)} där insamlingen är klar, och i en kategori bara när alla deras aktiva avtal där har känt värde. Era egna avtal utan känt värde räknas inte, så era summor är golv, inte tak.`
-    : `Elevantalet saknas för kommunen, så dess egna staplar visas inte. Liknande kommuner räknas per elev i förskoleklass till åk 9, bara där insamlingen är klar (${fmtInt(donePeers.length)} av ${fmtInt(peers.length)}) och i en kategori bara när alla deras aktiva avtal där har känt värde.`;
+  const lede = `Känt årsvärde per elev i de skolformer avtalen gäller: summan av avtal med känt värde och kända skolformer, delat med kommunens elever i de skolformerna (Skolverket, kommunal regi). Liknande kommuner räknas på samma sätt, men bara de ${fmtInt(donePeers.length)} av ${fmtInt(peers.length)} där insamlingen är klar, och i en kategori bara när alla deras aktiva avtal där har känt värde och kända skolformer.${hasOwn ? ' Era egna avtal utan känt värde eller utan kända skolformer räknas inte, raden säger hur många.' : ''}`;
   return `<figure class="viz sc card">
   <div class="viz-head"><span class="viz-label">${hasOwn ? 'Ert årsvärde per elev mot liknande kommuner' : 'Vad liknande kommuner lägger per elev'}</span><span class="viz-n">${esc(nOf(peers.length, 'liknande kommun', 'liknande kommuner'))}</span></div>
   <p class="meta card-lede">${esc(lede)}</p>
@@ -208,8 +219,24 @@ function spendSection({ kommun, profile, head, peers, stats, mine, statusMap }) 
 
 // ------------------------------------------------------------ price per avtal
 
+// The peers' distribution with the kommun's own price drawn on top. The
+// median, quartiles and n are the peers' alone: the kommun's own price is
+// never part of the benchmark it is compared with.
+export function withOwnPoint(dist, kod, value) {
+  if (!dist || dist.suppressed || !isNum(value)) return dist;
+  const values = [...dist.values.filter((v) => v.kommun_kod !== kod), { kommun_kod: kod, kr_per_elev: value }]
+    .sort((a, b) => a.kr_per_elev - b.kr_per_elev);
+  return { ...dist, values, min: Math.min(dist.min, value), max: Math.max(dist.max, value) };
+}
+
 function priceRows({ kommun, mine, facts, peers, today }) {
-  const avtal = byContract(mine).sort((a, b) => catOrder(catOf(a)) - catOrder(catOf(b)) || String(a.company_name).localeCompare(String(b.company_name), 'sv'));
+  const order = (a, b) => catOrder(catOf(a)) - catOrder(catOf(b)) || String(a.company_name).localeCompare(String(b.company_name), 'sv');
+  // Every priced owner row is a price (ILT and Magma inside one Läromedia
+  // avtal are two prices); an avtal with no priced row is listed once, whole.
+  const pricedRows = mine.filter((f) => isNum(f.kr_per_elev)).sort(order);
+  const pricedIds = new Set(pricedRows.map((f) => f.contract_id));
+  const avtal = consolidateByContract(mine);
+  const unpricedAvtal = avtal.filter((f) => !pricedIds.has(f.contract_id)).sort(order);
   // Thresholds and labels count DISTINCT kommuner with a known price, never
   // avtal rows; the kommun itself is never one of its own comparison set.
   const head0 = headline(facts);
@@ -220,7 +247,7 @@ function priceRows({ kommun, mine, facts, peers, today }) {
   const priced = [];
   const unpriced = [];
   let comparable = 0;
-  for (const f of avtal) {
+  for (const f of [...pricedRows, ...unpricedAvtal]) {
     const slug = pricedProduct(f);
     const pname = (slug && productName(slug)) || productNames(f).join(', ') || f.company_name;
     const peerK = slug ? pricedKods({ productSlug: slug, kommunKods: peers }) : new Set();
@@ -232,9 +259,12 @@ function priceRows({ kommun, mine, facts, peers, today }) {
   const head = (f, pname, slug) => {
     const href = slug ? productHref(slug) : null;
     const comp = companyHref(f.company_slug);
+    const via = f.channel_slug && f.channel_slug !== f.company_slug ? companyBySlug(f.channel_slug)?.canonical ?? null : null;
     const bits = [
       catName(catOf(f)),
       isNum(f.annual_value_sek) ? `${fmtKrCompact(f.annual_value_sek)}/år` : 'årsvärde okänt',
+      via ? `via ${via}` : null,
+      f.joint ? jointText(f) : null,
       modelLabel(f.pricing_model),
       isIso(f.next_renewal) && f.next_renewal.slice(0, 10) >= today ? `förnyas ${f.next_renewal.slice(0, 10)}` : null,
     ].filter(Boolean);
@@ -247,18 +277,18 @@ function priceRows({ kommun, mine, facts, peers, today }) {
 
   // Comparable prices get a full row with the anonymous strip; the rest of
   // the priced avtal become compact tiles (own price, why no comparison).
-  const mineStrip = (dist, label) => stripPlot({
-    dist, label, highlightKod: kommun.kod, highlightLabel: kommun.namn, nameOf: null, noun: 'kommuner', dotNoun: 'kommun', unit: 'kr/elev',
+  const mineStrip = (dist, label, own) => stripPlot({
+    dist: withOwnPoint(dist, kommun.kod, own), label, highlightKod: kommun.kod, highlightLabel: kommun.namn, nameOf: null, noun: 'kommuner', dotNoun: 'kommun', unit: 'kr/elev',
   });
   const big = [];
   const small = [];
   for (const it of priced) {
-    const { slug, pname, peerK, otherK } = it;
+    const { f, slug, pname, peerK, otherK } = it;
     if (slug && peerK.size >= MIN_N) {
-      big.push({ it, viz: mineStrip(priceDistribution(facts, { productSlug: slug, kommunKods: [...peerK, kommun.kod] }), `${pname} hos ${fmtInt(peerK.size)} liknande kommuner`) });
+      big.push({ it, viz: mineStrip(priceDistribution(facts, { productSlug: slug, kommunKods: [...peerK] }), `${pname} hos ${fmtInt(peerK.size)} liknande kommuner`, f.kr_per_elev) });
     } else if (slug && otherK.size >= MIN_N) {
       const few = `${peerK.size ? `Bara ${nOf(peerK.size, 'liknande kommun', 'liknande kommuner')} har` : 'Ingen liknande kommun har'} känt pris för ${pname}, för få jämförbara kommuner. Här jämförs med ${fmtInt(otherK.size)} andra kommuner.`;
-      big.push({ it, fallback: true, viz: `<p class="kp-few">${esc(few)}</p>${mineStrip(priceDistribution(facts, { productSlug: slug, kommunKods: [...otherK, kommun.kod] }), 'Jämfört med alla kommuner (för få liknande)')}` });
+      big.push({ it, fallback: true, viz: `<p class="kp-few">${esc(few)}</p>${mineStrip(priceDistribution(facts, { productSlug: slug, kommunKods: [...otherK] }), 'Jämfört med alla kommuner (för få liknande)', f.kr_per_elev)}` });
     } else {
       small.push({
         it,
@@ -279,7 +309,7 @@ function priceRows({ kommun, mine, facts, peers, today }) {
   const tile = ({ it, why }) => `<li class="kp-tile">${head(it.f, it.pname, it.slug)}${own(it.f)}<p class="kp-why">${esc(why)}</p></li>`;
   const smallRest = small.slice(MAX_PRICE_TILES);
   const tiles = small.length
-    ? `<ul class="kp-tiles">${small.slice(0, MAX_PRICE_TILES).map(tile).join('')}</ul>${smallRest.length ? fold(`Visa ${nOf(smallRest.length, 'avtal', 'avtal')} till`, `<ul class="kp-tiles">${smallRest.map(tile).join('')}</ul>`) : ''}`
+    ? `<ul class="kp-tiles">${small.slice(0, MAX_PRICE_TILES).map(tile).join('')}</ul>${smallRest.length ? fold(`Visa ${nOf(smallRest.length, 'pris', 'priser')} till`, `<ul class="kp-tiles">${smallRest.map(tile).join('')}</ul>`) : ''}`
     : '';
 
   const rest = unpriced.map(({ f, slug, pname, peerK, otherK }) => {
@@ -293,11 +323,11 @@ function priceRows({ kommun, mine, facts, peers, today }) {
   let html = '';
   if (avtal.length) {
     html = `${cards ? `<div class="kp-list">${cards}</div>` : ''}
-    ${tiles ? `<div class="card kp-rest"><div class="viz-head"><span class="viz-label">Känt pris, för få att jämföra</span><span class="viz-n">${esc(nOf(small.length, 'avtal', 'avtal'))}</span></div>${tiles}</div>` : ''}
+    ${tiles ? `<div class="card kp-rest"><div class="viz-head"><span class="viz-label">Känt pris, för få att jämföra</span><span class="viz-n">${esc(nOf(small.length, 'pris', 'priser'))}</span></div>${tiles}</div>` : ''}
     ${!priced.length ? emptyPanel({ title: 'Inget av avtalen anger pris per elev', text: 'Vi räknar pris per elev när avtalet anger ett styckpris, eller ett årsvärde och vilka skolformer det gäller.' }) : ''}
     ${rest ? `<div class="card kp-rest">${fold(`${nOf(unpriced.length, 'avtal', 'avtal')} utan känt pris per elev`, `<p class="meta card-lede">Avtalet anger inget styckpris, eller inte vilka skolformer det gäller. Där andra kommuner har känt pris för produkten visas deras median.</p><ul class="kp-rest-list">${rest}</ul>`, 'is-card-fold')}</div>` : ''}`;
   }
-  return { html, priced: priced.length, comparable, total: avtal.length };
+  return { html, priced: priced.length, pricedAvtal: pricedIds.size, comparable, total: avtal.length };
 }
 
 // ------------------------------------------------------------ overlap
@@ -531,8 +561,8 @@ export function renderKommun({ kod, kommun = null, stats, facts, statusMap = new
   const kpis = avtal.length ? `<section class="section"><div class="kpi-row">
     ${kpiTile({ label: 'Nästa förnyelse', value: upcoming.length ? monthsUntil(upcoming[0].next_renewal, today) : null, state: upcoming.length ? 'known' : 'unknown', reason: 'Inget aktivt avtal anger slutdatum eller förlängning.', basis: upcoming.length ? `${upcoming[0].company_name}, ${tenderCue(upcoming[0].next_renewal.slice(0, 10), today)}` : '' })}
     ${kpiTile(renewalTileProps({ avtal, buckets: renewalBuckets(all, { today, months: 12 }), today }))}
-    ${kpiTile({ label: 'Pris per elev känt', value: priceInfo.priced, unit: `av ${fmtInt(avtal.length)}`, state: priceInfo.priced ? (priceInfo.priced < avtal.length ? 'partial' : 'known') : 'unknown', reason: 'Inget av avtalen anger pris per elev.', basis: 'aktiva avtal' })}
-    ${kpiTile({ label: 'Går att jämföra', value: priceInfo.comparable, unit: `av ${fmtInt(priceInfo.priced)}`, state: priceInfo.comparable ? 'known' : 'unknown', reason: priceInfo.priced ? `För få jämförbara kommuner, vi jämför från ${MIN_N}.` : 'Inget pris per elev att jämföra.', basis: `minst ${MIN_N} andra kommuner med känt pris` })}
+    ${kpiTile({ label: 'Pris per elev känt', value: priceInfo.pricedAvtal, unit: `av ${fmtInt(avtal.length)}`, state: priceInfo.pricedAvtal ? (priceInfo.pricedAvtal < avtal.length ? 'partial' : 'known') : 'unknown', reason: 'Inget av avtalen anger pris per elev.', basis: priceInfo.priced > priceInfo.pricedAvtal ? `aktiva avtal, ${fmtInt(priceInfo.priced)} priser i dem` : 'aktiva avtal' })}
+    ${kpiTile({ label: 'Går att jämföra', value: priceInfo.comparable, unit: `av ${fmtInt(priceInfo.priced)}`, state: priceInfo.comparable ? 'known' : 'unknown', reason: priceInfo.priced ? `För få jämförbara kommuner, vi jämför från ${MIN_N}.` : 'Inget pris per elev att jämföra.', basis: `priser, minst ${MIN_N} andra kommuner med känt pris` })}
   </div></section>` : '';
 
   const renew = renewals({ kommun: k, mine, head, peers, today, status });

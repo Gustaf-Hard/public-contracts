@@ -283,6 +283,11 @@ describe('/studio/kommun/:kod', () => {
 
   it('peer spend medians use only peers whose collection is done', async () => {
     seedAle();
+    // Spend per elev needs each avtal's school forms (r2 P5): every avtal
+    // here covers förskoleklass to åk 9, 3 000 elever in the fixture.
+    for (const { id } of db.raw.prepare('SELECT id FROM contracts').all()) {
+      db.replaceContractCoverage(id, ['Förskoleklass', '1-3', '4-6', '7-9'].map((g) => ({ product_name: 'Licens', grade_level: g, status: 'full', student_count: 0 })));
+    }
     let html = (await body('/studio/kommun/1440')).text;
     const kop = () => html.slice(html.indexOf('id="kop"'), html.indexOf('id="pris"'));
     expect(kop()).toContain('för få liknande med klar insamling');
@@ -326,7 +331,7 @@ describe('/studio/kommun/:kod', () => {
     const tiles = html.slice(html.indexOf('Känt pris, för få att jämföra'));
     const visible = tiles.slice(0, tiles.indexOf('<details class="kn-fold">'));
     expect((visible.match(/class="kp-tile"/g) || []).length).toBe(6);
-    expect(tiles).toMatch(/<summary>Visa 2 avtal till<\/summary>/);
+    expect(tiles).toMatch(/<summary>Visa 2 priser till<\/summary>/);
   });
 
   it('hostile vendor names are escaped', async () => {

@@ -336,6 +336,12 @@ const shortPeriod = (l) => isFiniteNum(l.period_months) && l.period_months > 0 &
 function pricePerElev(r, { contract, singleRow, stats }) {
   const g = r._g;
   const model = contract.pricing_model ?? null;
+  // The pupils the row covers, whatever the pricing model: a kommun page
+  // divides known spend by the elever in the school forms its avtal cover
+  // (spend per elev is not a price, so a staff licence or a per-user avtal
+  // still counts there). Price per elev below has its own, stricter rules.
+  const scope = scopeElever(r, g, stats);
+  if (scope) r.elever_in_scope = scope.elever;
   // Free avtal and a known 0 kr are not price points.
   if (model === 'free' || r.annual_value_sek === 0) return;
   const staffUnit = STAFF_UNIT.test(contract.unit ?? '')
@@ -343,12 +349,6 @@ function pricePerElev(r, { contract, singleRow, stats }) {
   const elevModel = ELEV_MODELS.has(model)
     || ((model == null || model === 'unknown') && ELEV_UNIT.test(contract.unit ?? ''));
   if (!elevModel) return;
-  // The pupils the row covers, also for a styckpris row: spend per elev on a
-  // kommun page divides known value by them. Never for a staff or user
-  // licence (a few teacher seats divided by every pupil would read as the
-  // cheapest price in Sweden).
-  const scope = staffUnit ? null : scopeElever(r, g, stats);
-  if (scope) r.elever_in_scope = scope.elever;
   // Styckpris: a product line of this row priced per elev for a period of at
   // least 12 months (or no stated period). Of several, the main line: an
   // explicit >= 12 months first, then the largest amount (the all-subject
@@ -383,6 +383,8 @@ function pricePerElev(r, { contract, singleRow, stats }) {
       return;
     }
   }
+  // Value per elev: never for a staff or user licence (a few teacher seats
+  // divided by every pupil would read as the cheapest price in Sweden).
   if (staffUnit || !scope) return;
   if (!isFiniteNum(r.annual_value_sek) || r.annual_value_sek <= 0 || !['stated', 'split'].includes(r.value_basis)) return;
   const v = r.annual_value_sek / scope.elever;
@@ -499,13 +501,12 @@ function allocateJoint(facts, stats) {
           f.joint = { n_kommuner: members.length, kommun_kods: kods, share: round2(share * 10000) / 10000, by: byElever ? 'elever' : 'jamnt' };
           if (isFiniteNum(full)) f.annual_value_sek = Math.round(full * share);
           if (f.kr_per_elev_basis === 'styckpris') continue; // a unit price is the same for every member
+          const valuePerElev = f.kr_per_elev != null;
           f.kr_per_elev = null; f.kr_per_elev_basis = null;
-          if (!byElever || !isFiniteNum(full) || full <= 0 || !['stated', 'split'].includes(f.value_basis) || f.elever_in_scope == null) {
-            if (!byElever) f.elever_in_scope = null;
-            continue;
-          }
+          if (!byElever) { f.elever_in_scope = null; continue; } // an even split has no per-elev reading
           const all = members.map((x) => elever(x.kod, f.segments));
-          if (all.some((n) => n == null)) continue;
+          if (f.elever_in_scope != null && all[i] != null) f.elever_in_scope = all[i];
+          if (!valuePerElev || !isFiniteNum(full) || full <= 0 || all.some((n) => n == null)) continue;
           f.kr_per_elev = round2(full / all.reduce((x, n) => x + n, 0));
           f.kr_per_elev_basis = 'skolverket';
           f.elever_in_scope = all[i];

@@ -3,7 +3,8 @@ import {
   buildStudioFacts, companyShares, marketByCategory, dataBasis, collectionStatus, whiteSpots,
 } from '../src/studio-data.js';
 import { loadKommunStats } from '../src/kommun-stats.js';
-import { renderKommun } from '../src/studio/pages/kommun.js';
+import { renderKommun, perElevByCategory, withOwnPoint } from '../src/studio/pages/kommun.js';
+import { priceDistribution } from '../src/studio-data.js';
 import { renderKategori, findCategory } from '../src/studio/pages/kategori.js';
 import { renderKommuner } from '../src/studio/pages/lists.js';
 
@@ -296,5 +297,76 @@ describe('P7. any DEAD_END means the collection is not complete evidence of abse
     const st = collectionStatus(peerConvs, { kodsWithAvtal: new Set(KODS) });
     const html = text(renderKommun({ kod: '0114', stats, facts, statusMap: st, today: TODAY }));
     expect(html).toContain('bara de 5 av 6 där insamlingen är klar');
+  });
+});
+
+// ------------------------------------------------------------------ P5
+describe('P5. spend per elev divides by the elever in the school forms the avtal cover', () => {
+  const kod = '0114';
+  const rows = () => {
+    const poly = C({ vendor_name: 'ILT Inläsningstjänst AB', annual_value_sek: 100000, products: ['Polylino'] });
+    const gy = C({ annual_value_sek: 40000, products: ['Binogi'] });
+    const noSeg = C({ vendor_name: 'Gleerups', annual_value_sek: 50000, products: ['Gleerups digitala läromedel'] });
+    return build([poly, gy, noSeg], {
+      coverage: [...covFor(poly.contract_id, 'Polylino', F9), ...covFor(gy.contract_id, 'Binogi', ['Gymnasiet'])],
+    });
+  };
+  it('F-9 avtal plus a gymnasium avtal: 140 000 kr over 1 000 + 800 elever, the avtal without school forms is left out', () => {
+    const m = perElevByCategory(rows(), { eleverIn: (segs) => stats.eleverIn(kod, segs) }).get('laromedel');
+    expect(m).toMatchObject({ value: 140000, elever: 1800, counted: 2, leftOut: 1 });
+    expect(m.perElev).toBeCloseTo(77.78, 2);
+  });
+  it('two avtal for the same pupils are not twice the pupils', () => {
+    const a = C({ vendor_name: 'ILT Inläsningstjänst AB', annual_value_sek: 60000, products: ['Polylino'] });
+    const b = C({ annual_value_sek: 40000, products: ['Binogi'] });
+    const facts = build([a, b], { coverage: [...covFor(a.contract_id, 'Polylino', F9), ...covFor(b.contract_id, 'Binogi', F9)] });
+    expect(perElevByCategory(facts, { eleverIn: (segs) => stats.eleverIn(kod, segs) }).get('laromedel').perElev).toBe(100);
+  });
+  it('for peers a category with any avtal left out is dropped', () => {
+    expect(perElevByCategory(rows(), { eleverIn: (segs) => stats.eleverIn(kod, segs), completeOnly: true }).has('laromedel')).toBe(false);
+  });
+  it('the page names the basis and how many avtal were left out', () => {
+    const html = text(renderKommun({ kod, stats, facts: rows(), statusMap: new Map([[kod, 'done']]), today: TODAY }));
+    expect(html).toContain('Känt årsvärde per elev i de skolformer avtalen gäller');
+    expect(html).toContain('1 utan känt värde eller skolformer räknas inte');
+    expect(html).toContain('78 kr/elev');
+    expect(html).not.toContain('gäller inte F-9');
+  });
+});
+
+// ------------------------------------------------------------------ P6
+describe('P6. the kommun\'s own price is not part of its peer benchmark', () => {
+  const priced = (kommun_kod, price) => C({ kommun_kod, vendor_name: 'ILT Inläsningstjänst AB', pricing_model: 'per_student', unit: 'elev', unit_price_sek: price, annual_value_sek: price * 1000 + Number(kommun_kod), products: ['Polylino'] });
+  it('peers 100 to 500 have median 300; a kommun paying 1 000 still sees 300', () => {
+    const facts = build([priced('0114', 1000), ...['0115', '0117', '0120', '0123', '0125'].map((k, i) => priced(k, 100 * (i + 1)))]);
+    const peers = priceDistribution(facts, { productSlug: 'polylino', kommunKods: ['0115', '0117', '0120', '0123', '0125'] });
+    const shown = withOwnPoint(peers, '0114', 1000);
+    expect(shown).toMatchObject({ n: 5, median: 300, p25: 200, p75: 400, max: 1000 });
+    expect(shown.values).toHaveLength(6);
+    const html = renderKommun({ kod: '0114', stats, facts, statusMap: new Map(), today: TODAY });
+    const card = html.slice(html.indexOf('class="card kp-row"'));
+    expect(card).toContain('median <b>300 kr/elev</b>');
+    expect(card).not.toContain('median <b>350 kr/elev</b>');
+    expect(card).toMatch(/is-highlight[^>]*><title>Testby 1: 1\s?000 kr\/elev/);
+  });
+});
+
+// ------------------------------------------------------------------ P9
+describe('P9. the kommun price list shows every priced owner row', () => {
+  it('ILT and Magma inside one Läromedia avtal both appear; the KPI counts one avtal', () => {
+    const c = C({ vendor_name: 'Läromedia Bokhandel Örebro AB', annual_value_sek: 100000 });
+    const facts = build([c], {
+      lineItems: [
+        LI(c.contract_id, 'Polylino', 60000, { unit: 'elev', unit_price_sek: 60, quantity: 1000, period_months: 12 }),
+        LI(c.contract_id, 'Magma', 20000, { unit: 'elev', unit_price_sek: 100, quantity: 200, period_months: 12 }),
+      ],
+    });
+    const html = text(renderKommun({ kod: '0114', stats, facts, statusMap: new Map([['0114', 'done']]), today: TODAY }));
+    expect(html).not.toContain('Inget av avtalen anger pris per elev');
+    expect(html).toContain('Polylino');
+    expect(html).toContain('Magma');
+    expect(html).toContain('via LäroMedia Bokhandel Örebro');
+    expect(html).toMatch(/Pris per elev känt 1 av 1 aktiva avtal, 2 priser i dem/);
+    expect(html).toContain('Går att jämföra okänt För få jämförbara kommuner');
   });
 });

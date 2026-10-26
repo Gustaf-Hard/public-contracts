@@ -4,7 +4,7 @@ import {
 } from '../src/studio-data.js';
 import { loadKommunStats } from '../src/kommun-stats.js';
 import { companyBySlug } from '../src/catalogue.js';
-import { renderKommun, perElevByCategory } from '../src/studio/pages/kommun.js';
+import { renderKommun } from '../src/studio/pages/kommun.js';
 import { renderLeverantor } from '../src/studio/pages/leverantor.js';
 import { renderKategori, findCategory } from '../src/studio/pages/kategori.js';
 import { consolidateByContract } from '../src/studio/pages/common.js';
@@ -100,7 +100,9 @@ describe('B. kr/elev only for prices comparable per elev', () => {
   it('Natur & Kultur "Lärarens guide" per_user is never divided by every pupil', () => {
     const c = C({ vendor_name: 'Natur & Kultur', pricing_model: 'per_user', annual_value_sek: 106, products: ['Lärarens guide till hem- och konsumentkunskap'] });
     const facts = build([c], { coverage: seg(c.contract_id, 'Lärarens guide till hem- och konsumentkunskap') });
-    expect(row(facts, c.contract_id)).toMatchObject({ kr_per_elev: null, kr_per_elev_basis: null, elever_in_scope: null });
+    // elever_in_scope is the pupils the avtal covers (r2 P5: spend per elev
+    // uses it for any model); the price per elev stays unknown.
+    expect(row(facts, c.contract_id)).toMatchObject({ kr_per_elev: null, kr_per_elev_basis: null, elever_in_scope: 600 });
   });
   it('Haldor staff licence: a personallicens line blocks value per elev even on a fixed avtal', () => {
     const c = C({ vendor_name: 'Haldor', pricing_model: 'fixed', annual_value_sek: 60000 });
@@ -258,30 +260,8 @@ describe('H. a reseller page counts the avtal it is the vendor of', () => {
   });
 });
 
-describe('K. peer spend per elev only from complete F-9 sums', () => {
-  it('a category with an unknown value is left out for a peer, a gymnasium-only avtal is left out of F-9', () => {
-    const gy = C({ kommun_kod: '0115', vendor_name: 'Haldor', annual_value_sek: 80000, products: ['Haldor Education'] });
-    const rows = build([
-      C({ kommun_kod: '0115', annual_value_sek: 30000, products: ['Polylino'] }),
-      C({ kommun_kod: '0115', vendor_name: 'Radish AB', annual_value_sek: null, products: ['Magma'] }),
-      C({ kommun_kod: '0115', vendor_name: 'IST', annual_value_sek: 50000, products: ['IST Administration'] }),
-      gy,
-    ], { coverage: [COV(gy.contract_id, 'Haldor Education', 'Gymnasiet')] });
-    const peer = perElevByCategory(rows, 1000, { completeOnly: true });
-    expect(peer.has('laromedel')).toBe(false); // 30 000 known + one unknown: partial
-    expect(peer.get('skoladministration')).toBe(50);
-    expect(peer.has('larplattform')).toBe(false); // Gymnasiet only, not F-9
-    const own = perElevByCategory(rows, 1000);
-    expect(own.get('laromedel')).toBe(30);
-  });
-  it('the chart names its denominator and the completeness rule', () => {
-    const facts = build([C({ kommun_kod: '0114', products: ['Polylino'] })]);
-    const html = text(renderKommun({ kod: '0114', stats, facts, statusMap: new Map(KODS.map((k) => [k, 'done'])), today: TODAY }));
-    expect(html).toContain('elever i förskoleklass till åk 9 (kommunal regi)');
-    expect(html).toContain('Avtal som bara gäller förskola, gymnasiet eller komvux räknas inte här');
-    expect(html).toContain('bara när alla deras aktiva avtal där har känt värde');
-  });
-});
+// K was reworked in round 2 (P5): spend per elev uses the avtal's own school
+// forms, not F-9; see tests/studio-final-fixes-r2.test.js.
 
 describe('F. segment matrices say multi-segment avtal count in each segment', () => {
   it('kategori matrix carries the note', () => {
