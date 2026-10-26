@@ -266,10 +266,6 @@ async function main() {
     };
   }
 
-  const stats = { fetched_at: new Date().toISOString(), sources, laar: LAAR, kommuner };
-  mkdirSync(path.dirname(OUT_STATS), { recursive: true });
-  writeFileSync(OUT_STATS, JSON.stringify(stats, null, 1) + '\n');
-
   // tiles
   let tileInfo = null;
   if (cent) {
@@ -284,8 +280,12 @@ async function main() {
       writeFileSync(OUT_TILES, JSON.stringify({ cols: t.cols, rows: t.rows, tiles: t.tiles }) + '\n');
       tileInfo = `${Object.keys(t.tiles).length} tiles on ${t.cols}x${t.rows}, mean displacement ${t.meanDisplacement.toFixed(2)} cells`;
     }
-    writeFileSync(OUT_STATS, JSON.stringify({ ...stats, sources }, null, 1) + '\n');
   }
+
+  // single write, after tiles so a tile failure is recorded in sources
+  const stats = { fetched_at: new Date().toISOString(), sources, laar: LAAR, kommuner };
+  mkdirSync(path.dirname(OUT_STATS), { recursive: true });
+  writeFileSync(OUT_STATS, JSON.stringify(stats, null, 1) + '\n');
 
   // summary
   const all = Object.values(kommuner);
