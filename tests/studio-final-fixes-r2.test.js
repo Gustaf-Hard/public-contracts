@@ -267,7 +267,8 @@ describe('P7. any DEAD_END means the collection is not complete evidence of abse
     const peerConvs = [...KODS.slice(1).map((k) => ({ kommun_kod: k, state: 'DONE' })), { kommun_kod: '0115', state: 'DEAD_END' }];
     const st = collectionStatus(peerConvs, { kodsWithAvtal: new Set(KODS) });
     const html = text(renderKommun({ kod: '0114', stats, facts, statusMap: st, today: TODAY }));
-    expect(html).toContain('bara de 5 av 6 där insamlingen är klar');
+    // r3 S2: with no category comparable the chart collapses to one sentence.
+    expect(html).toContain('5 av 6 liknande kommuner har klar insamling');
   });
 });
 
@@ -298,7 +299,8 @@ describe('P5. spend per elev divides by the elever in the school forms the avtal
   });
   it('the page names the basis and how many avtal were left out', () => {
     const html = text(renderKommun({ kod, stats, facts: rows(), statusMap: new Map([[kod, 'done']]), today: TODAY }));
-    expect(html).toContain('Känt årsvärde per elev i de skolformer avtalen gäller');
+    // r3 R5 / S2: the collapsed sentence names the basis.
+    expect(html).toContain('Ert kända årsvärde per elev i kommunen, i de skolformer avtalen gäller');
     expect(html).toContain('1 utan känt värde eller skolformer räknas inte');
     expect(html).toContain('78 kr/elev');
     expect(html).not.toContain('gäller inte F-9');

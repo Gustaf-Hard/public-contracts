@@ -292,7 +292,8 @@ describe('/studio/kommun/:kod', () => {
     }
     let html = (await body('/studio/kommun/1440')).text;
     const kop = () => html.slice(html.indexOf('id="kop"'), html.indexOf('id="pris"'));
-    expect(kop()).toContain('för få liknande med klar insamling');
+    // r3 S2: no category with MIN_N done peers collapses to one sentence.
+    expect(kop()).toContain('För få liknande kommuner att jämföra med');
     expect(kop()).not.toContain('liknande med klar insamling:');
     for (const kod of ['1401', '1402', '1407', '1415', '1441', '1482']) db.raw.prepare('UPDATE conversations SET state = ? WHERE kommun_kod = ?').run('DONE', kod);
     html = (await body('/studio/kommun/1440')).text;

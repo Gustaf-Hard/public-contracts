@@ -171,6 +171,20 @@ function spendSection({ kommun, profile, head, peers, stats, mine, statusMap }) 
     const m = ownMap.get(c) ?? null;
     return { c, s, m, own: m?.perElev ?? null, d };
   });
+  // S2: no category has MIN_N comparable peers, so a chart of "för få" rows
+  // compares nothing. Say it once with the counts, and give the kommun's own
+  // figures as text.
+  if (rows.every((r) => r.d.suppressed)) {
+    const most = rows.reduce((best, r) => (r.d.n > (best?.d.n ?? -1) ? r : best), null);
+    const ownBits = rows.filter((r) => isNum(r.own) || r.m?.leftOut).map((r) => {
+      const nLeft = (r.m?.leftOut ?? 0) - (r.m?.joint ?? 0);
+      const notes = [nLeft ? `${fmtInt(nLeft)} utan känt värde eller skolformer räknas inte` : '', r.m?.joint ? `${nOf(r.m.joint, 'samverkansavtal', 'samverkansavtal')} med okänd andel räknas inte` : ''].filter(Boolean);
+      return `${catName(r.c)} ${isNum(r.own) ? `${fmtPrice(r.own)} kr/elev` : 'okänt'}${notes.length ? ` (${notes.join(', ')})` : ''}`;
+    });
+    const text = `${fmtInt(donePeers.length)} av ${nOf(peers.length, 'liknande kommun', 'liknande kommuner')} har klar insamling, och i ingen kategori har minst ${MIN_N} av dem känt årsvärde och kända skolformer för alla sina aktiva avtal${most && most.d.n ? ` (flest i ${catName(most.c).toLowerCase()}: ${fmtInt(most.d.n)})` : ''}, så vi jämför inte årsvärde per elev här än.`;
+    const own = ownBits.length ? `Ert kända årsvärde per elev i kommunen, i de skolformer avtalen gäller: ${ownBits.join(', ')}.` : '';
+    return emptyPanel({ title: 'För få liknande kommuner att jämföra med', text, context: own });
+  }
   const plotted = rows.flatMap((r) => [r.own, r.d.suppressed ? null : r.d.p75].filter(isNum));
   const top = Math.max(1, ...plotted);
   const { hi, ticks } = niceDomain(0, top);
@@ -202,14 +216,14 @@ function spendSection({ kommun, profile, head, peers, stats, mine, statusMap }) 
     return `<li class="sc-row">${name}<div class="sc-track${few ? ' is-few hatch' : ''}">${band}${bar}${tick}</div><div class="sc-val">${ownText}${peerText}</div></li>`;
   }).join('');
 
-  const axis = `<div class="sc-axis-row"><span></span><div class="axis-x" aria-hidden="true">${ticks.map((t, i) => `<span class="axis-tick${i === 0 ? ' is-first' : i === ticks.length - 1 ? ' is-last' : ''}" style="left:${p(t)}">${esc(fmtPrice(t))}</span>`).join('')}<span class="axis-unit">kr per elev och år, i avtalens skolformer</span></div><span></span></div>`;
+  const axis = `<div class="sc-axis-row"><span></span><div class="axis-x" aria-hidden="true">${ticks.map((t, i) => `<span class="axis-tick${i === 0 ? ' is-first' : i === ticks.length - 1 ? ' is-last' : ''}" style="left:${p(t)}">${esc(fmtPrice(t))}</span>`).join('')}<span class="axis-unit">kr per elev i kommunen och år, i avtalens skolformer</span></div><span></span></div>`;
   const foot = `<figcaption class="viz-foot">
     ${hasOwn ? `<span class="lg"><i class="lg-dot is-highlight sq"></i>${esc(kommun.namn)}</span>` : ''}
     ${rows.some((r) => !r.d.suppressed) ? `<span class="lg"><i class="lg-band"></i>mittersta hälften bland liknande med klar insamling</span>
     <span class="lg"><i class="lg-tick"></i>median bland dem</span>` : ''}
     <span class="lg"><i class="lg-hatch"></i>för få (under ${MIN_N} kommuner)</span>
   </figcaption>`;
-  const lede = `Känt årsvärde per elev i de skolformer avtalen gäller: summan av avtal med känt värde och kända skolformer, delat med kommunens elever i de skolformerna (Skolverket, kommunal regi). Liknande kommuner räknas på samma sätt, men bara de ${fmtInt(donePeers.length)} av ${fmtInt(peers.length)} där insamlingen är klar, och i en kategori bara när alla deras aktiva avtal där har känt värde och kända skolformer.${hasOwn ? ' Era egna avtal utan känt värde eller utan kända skolformer räknas inte, raden säger hur många.' : ''}`;
+  const lede = `Känt årsvärde per elev i kommunen i de skolformer avtalen gäller: summan av avtal med känt värde och kända skolformer, delat med alla kommunens elever i de skolformerna (Skolverket, kommunal regi), också när ett avtal bara gäller en del av dem. Det är vad kommunen lägger per elev, inte avtalets pris per elev, som jämförs under Pris. Liknande kommuner räknas på samma sätt, men bara de ${fmtInt(donePeers.length)} av ${fmtInt(peers.length)} där insamlingen är klar, och i en kategori bara när alla deras aktiva avtal där har känt värde och kända skolformer.${hasOwn ? ' Era egna avtal utan känt värde eller utan kända skolformer räknas inte, raden säger hur många.' : ''}`;
   return `<figure class="viz sc card">
   <div class="viz-head"><span class="viz-label">${hasOwn ? 'Ert årsvärde per elev mot liknande kommuner' : 'Vad liknande kommuner lägger per elev'}</span><span class="viz-n">${esc(nOf(peers.length, 'liknande kommun', 'liknande kommuner'))}</span></div>
   <p class="meta card-lede">${esc(lede)}</p>

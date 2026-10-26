@@ -381,3 +381,34 @@ describe('R4. category and product counts are avtal, not copies or kommuner', ()
     expect(priceDistribution(facts, { productSlug: 'polylino' }).n).toBe(1);
   });
 });
+
+// ------------------------------------------------------------------ R5, S2
+describe('R5 and S2. spend per elev says it is per elev in the kommun; a chart of only "för få" collapses', () => {
+  const spendFacts = (kods) => {
+    const cs = kods.map((kod, i) => C({ kommun_kod: kod, vendor_name: 'Gleerups', annual_value_sek: 100000 + i * 10000, products: ['Gleerups digitala läromedel'] }));
+    return build(cs, { coverage: cs.flatMap((c) => covFor(c.contract_id, 'Gleerups digitala läromedel', F9)) });
+  };
+  it('with five done peers the chart shows, and the lede says per elev i kommunen i de skolformer avtalen gäller', () => {
+    const facts = spendFacts(KODS);
+    const st = new Map(KODS.map((k) => [k, 'done']));
+    const html = renderKommun({ kod: '0114', stats, facts, statusMap: st, today: TODAY });
+    const t = text(html);
+    expect(t).toContain('Känt årsvärde per elev i kommunen i de skolformer avtalen gäller');
+    expect(t).toContain('inte avtalets pris per elev');
+    expect(t).toContain('kr per elev i kommunen och år, i avtalens skolformer');
+    expect(html).toContain('class="sc-list"');
+    // 100 000 kr over 1 000 F-9 elever.
+    expect(t).toMatch(/100 kr\/elev/);
+  });
+  it('with fewer than five done peers in every category it is one sentence with the counts and the own figure', () => {
+    const facts = spendFacts(KODS);
+    const st = new Map(KODS.map((k, i) => [k, i < 4 ? 'done' : 'open']));
+    const html = renderKommun({ kod: '0114', stats, facts, statusMap: st, today: TODAY });
+    const t = text(html);
+    expect(html).not.toContain('class="sc-list"');
+    expect(t).toContain('För få liknande kommuner att jämföra med');
+    expect(t).toContain('3 av 6 liknande kommuner har klar insamling, och i ingen kategori har minst 5 av dem');
+    expect(t).toContain('(flest i läromedel: 3)');
+    expect(t).toContain('Ert kända årsvärde per elev i kommunen, i de skolformer avtalen gäller: Läromedel 100 kr/elev.');
+  });
+});
