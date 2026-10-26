@@ -281,6 +281,7 @@ function priceRows({ kommun, mine, facts, peers, today }) {
       f.joint ? jointValueText(f) ?? 'årsvärde okänt' : isNum(f.annual_value_sek) ? `${fmtKrCompact(f.annual_value_sek)}/år` : 'årsvärde okänt',
       via ? `via ${via}` : null,
       f.joint ? jointText(f) : null,
+      f.kr_per_elev_basis === 'i_huvudavtal' ? 'värdet ingår i huvudavtalets pris per elev' : f.kr_per_elev_basis === 'tillagg' ? 'ett av flera avtal för produkten, inget eget pris per elev' : null,
       modelLabel(f.pricing_model),
       isIso(f.next_renewal) && f.next_renewal.slice(0, 10) >= today ? `förnyas ${f.next_renewal.slice(0, 10)}` : null,
     ].filter(Boolean);
@@ -341,7 +342,7 @@ function priceRows({ kommun, mine, facts, peers, today }) {
     html = `${cards ? `<div class="kp-list">${cards}</div>` : ''}
     ${tiles ? `<div class="card kp-rest"><div class="viz-head"><span class="viz-label">Känt pris, för få att jämföra</span><span class="viz-n">${esc(nOf(small.length, 'pris', 'priser'))}</span></div>${tiles}</div>` : ''}
     ${!priced.length ? emptyPanel({ title: 'Inget av avtalen anger pris per elev', text: 'Vi räknar pris per elev när avtalet anger ett styckpris, eller ett årsvärde och vilka skolformer det gäller.' }) : ''}
-    ${rest ? `<div class="card kp-rest">${fold(`${nOf(unpriced.length, 'avtal', 'avtal')} utan känt pris per elev`, `<p class="meta card-lede">Avtalet anger inget styckpris, eller inte vilka skolformer det gäller. Där andra kommuner har känt pris för produkten visas deras median.</p><ul class="kp-rest-list">${rest}</ul>`, 'is-card-fold')}</div>` : ''}`;
+    ${rest ? `<div class="card kp-rest">${fold(`${nOf(unpriced.length, 'avtal', 'avtal')} utan känt pris per elev`, `<p class="meta card-lede">Avtalet anger inget styckpris, eller inte vilka skolformer det gäller. Ett tilläggsavtal får inget eget pris: när kommunen har flera avtal för en produkt räknas de ihop till ett pris på huvudavtalet. Där andra kommuner har känt pris för produkten visas deras median.</p><ul class="kp-rest-list">${rest}</ul>`, 'is-card-fold')}</div>` : ''}`;
   }
   return { html, priced: priced.length, pricedAvtal: pricedIds.size, comparable, total: avtal.length };
 }

@@ -259,6 +259,15 @@ export function buildStudioFacts({ contracts = [], lineItems = [], coverage = []
         _received_at: c.received_at ?? null,
         _vendor_key: ownerSlug ?? (blank(c.vendor_name) ? `contract:${c.contract_id}` : `name:${ownerName}`),
         _annual: annual,
+        _tillagg: TILLAGG_SUMMARY.test(c.summary ?? ''),
+        // Document identity for the samverkansavtal match (r4 W4). Internal:
+        // removed before the facts leave this function.
+        _doc: {
+          size: isFiniteNum(c.size_bytes) && c.size_bytes > 0 ? c.size_bytes : null,
+          name: blank(c.filename) ? null : String(c.filename).trim().toLowerCase(),
+          summary: blank(c.summary) ? null : String(c.summary).replace(/\s+/g, ' ').trim(),
+          kommun: blank(c.kommun_namn) ? null : normName(String(c.kommun_namn).replace(/\s+kommun$/i, '')),
+        },
       });
     }
     // An unsplit channel remainder with no category of its own takes the
@@ -279,7 +288,8 @@ export function buildStudioFacts({ contracts = [], lineItems = [], coverage = []
   markDuplicates(facts);
   markSuperseded(facts);
   allocateJoint(facts);
-  for (const f of facts) { delete f._received_at; delete f._vendor_key; delete f._annual; }
+  priceByKommunProduct(facts, stats);
+  for (const f of facts) { delete f._received_at; delete f._vendor_key; delete f._annual; delete f._tillagg; delete f._doc; }
   return facts;
 }
 
@@ -419,6 +429,8 @@ function avtalList(facts) {
     annual: rows[0]._annual,
     segments: sortGrades(new Set(union(rows, 'segments'))),
     products: union(rows, 'product_slugs'),
+    doc: rows[0]._doc ?? {},
+    live: rows.some((f) => f.active && !f.superseded),
   }));
 }
 
@@ -487,16 +499,30 @@ function markSuperseded(facts) {
 }
 
 // A samverkansavtal delivered by several kommuner: the same vendor, start,
-// end and annual value in different kommuner of one län is one avtal. We
+// end and annual value in different kommuner of one län, AND evidence that
+// the copies are one document (sameDocument: equal file size, the same file
+// name, or the same summary text) or that the avtal itself names the other
+// kommun (namesOther: one copy's summary names the other copy's kommun, as a
+// GGVV avtal "med Gnosjö, Vaggeryd och Värnamo" does), is one avtal. Equal
+// list prices alone are two avtal (r4 W4). We
 // rarely know every member or how the cost is shared (a copy may come from
 // two of four members), so nothing is allocated: every copy carries
 // joint.whole_value_sek (the whole avtal's value), the lowest-id copy keeps
 // it as annual_value_sek so market totals count it once, the other copies
-// have no value of their own (annual_value_sek null). No copy has a price
+// have no value of their own (annual_value_sek null). The value stays on an
+// active, non-superseded copy (the lowest such id); when no copy is one, no
+// copy carries the value and the market does not count it (r4 W5). No copy has a price
 // per elev: the whole value over one member's elever is not that member's
 // price. avtal_key is the same on every copy, so avtal counts count it once.
 // Kommun pages show it as "samverkansavtal (N kommuner), andel okänd" and
 // leave it out of the kommun's spend and of peer comparisons.
+export function sameDocument(a = {}, b = {}) {
+  return (a.size != null && a.size === b.size) || (a.name != null && a.name === b.name)
+    || (a.summary != null && a.summary === b.summary);
+}
+const names = (doc, kommun) => !!(doc.summary && kommun
+  && new RegExp(`(^| )${kommun.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}s?( |$)`).test(normName(doc.summary)));
+export const namesOther = (a = {}, b = {}) => names(a, b.kommun) || names(b, a.kommun);
 function allocateJoint(facts) {
   const live = avtalList(facts).filter((a) => !a.rows[0].duplicate_of && a.kod && a.start && a.end && isFiniteNum(a.annual) && a.annual > 0);
   // Members share a län (the first two digits of the kommun kod): kommunal
@@ -509,12 +535,14 @@ function allocateJoint(facts) {
       const members = [];
       for (const b of list) {
         if (used.has(b.id) || !sameKr(a.annual, b.annual) || members.some((m) => m.kod === b.kod)) continue;
+        if (members.length && !members.some((m) => sameDocument(m.doc, b.doc) || namesOther(m.doc, b.doc))) continue;
         members.push(b);
       }
       if (members.length < 2) continue;
       for (const m of members) used.add(m.id);
-      const primary = Math.min(...members.map((m) => m.id));
-      const key = `joint:${primary}`;
+      const carriers = members.filter((m) => m.live).map((m) => m.id);
+      const primary = carriers.length ? Math.min(...carriers) : null;
+      const key = `joint:${Math.min(...members.map((m) => m.id))}`;
       const kods = members.map((m) => m.kod).sort();
       for (const m of members) {
         for (const f of m.rows) {
@@ -526,6 +554,75 @@ function allocateJoint(facts) {
       }
     }
   }
+}
+
+// One price point per kommun x product (final review r4 W2). A kommun with a
+// main avtal and tilläggsavtal for one product (extra modules, another
+// school form) pays for the product with all of them, so a small tillägg's
+// value over the kommun's elever is never its price. Among the headline rows
+// (active, not superseded, not a samverkansavtal copy) that name the product,
+// the main row is the one with the largest known annual value (then the one
+// with a price, then the lowest id). Only the main row keeps a price: the
+// main row's price times its elever in scope (its value, for a value per
+// elev) plus the other rows' known values, over the main row's elever in
+// scope. When the other rows name school forms the main row does not (two
+// avtal for different grades), the denominator is Skolverket elever in the
+// union of their school forms. A styckpris main row whose elever are unknown
+// keeps its stated price.
+// When the main row has no price (no school forms, a staff licence), the
+// kommun has no price point for the product: a tillägg never stands in for
+// it. An avtal whose summary calls it a tilläggsavtal is main only when the
+// group has nothing else, and then keeps a price only when it states one
+// per elev (styckpris): its value over the kommun's elever is a module's
+// cost, not the product's price. kr_per_elev_basis marks the rows that lost
+// a price: 'i_huvudavtal' when their value is in the main row's price,
+// 'tillagg' when the product has no price point in the kommun.
+export const TILLAGG_SUMMARY = /^\s*(?:ett\s+|en\s+)?(?:samling av\s+)?till[äa]ggsavtal/i;
+export function priceByKommunProduct(facts, stats = null) {
+  const rows = facts.filter((f) => f.active && !f.superseded && !f.joint && f.kommun_kod);
+  const groups = new Map();
+  const drop = new Set();
+  for (const f of rows) {
+    // A lone tillägg priced by value per elev, whatever products it names.
+    if (f._tillagg && isFiniteNum(f.kr_per_elev) && f.kr_per_elev_basis !== 'styckpris') drop.add(f);
+    for (const p of new Set([...f.product_slugs, f.kr_per_elev_product_slug].filter(Boolean))) {
+      const k = `${f.kommun_kod}\u0000${p}`;
+      if (!groups.has(k)) groups.set(k, new Set());
+      groups.get(k).add(f);
+    }
+  }
+  const val = (f) => (isFiniteNum(f.annual_value_sek) ? f.annual_value_sek : -1);
+  const mains = new Map(); // row -> combined price
+  const included = new Map(); // row -> its value is in a main row's price
+  for (const set of groups.values()) {
+    if (set.size < 2) continue;
+    const list = [...set].sort((a, b) => (!!a._tillagg - !!b._tillagg) || val(b) - val(a)
+      || (isFiniteNum(b.kr_per_elev) - isFiniteNum(a.kr_per_elev)) || a.contract_id - b.contract_id);
+    const [main, ...rest] = list;
+    for (const r of rest) drop.add(r);
+    if (!isFiniteNum(main.kr_per_elev) || drop.has(main)) continue; // a lone-tillägg drop above covers main._tillagg
+    const others = rest.reduce((sum, r) => sum + (isFiniteNum(r.annual_value_sek) && r.annual_value_sek > 0 ? r.annual_value_sek : 0), 0);
+    const el = main.elever_in_scope;
+    let price = main.kr_per_elev;
+    if (others > 0 && isFiniteNum(el) && el > 0) {
+      let total = el;
+      const segs = new Set(list.flatMap((r) => r.segments));
+      if ([...segs].some((sg) => !main.segments.includes(sg))) {
+        const n = stats?.eleverIn?.(main.kommun_kod, sortGrades(segs));
+        total = isFiniteNum(n) && n > 0 ? Math.max(n, el) : null;
+      }
+      price = total == null ? null : (main.kr_per_elev * el + others) / total;
+    }
+    for (const r of rest) included.set(r, price != null);
+    if (price == null) { drop.add(main); continue; }
+    mains.set(main, Math.max(mains.get(main) ?? 0, round2(price)));
+  }
+  for (const r of drop) {
+    if (mains.has(r)) continue; // the main row of another product keeps its price
+    r.kr_per_elev = null; r.kr_per_elev_product_slug = null;
+    r.kr_per_elev_basis = included.get(r) && isFiniteNum(r.annual_value_sek) && r.annual_value_sek > 0 ? 'i_huvudavtal' : 'tillagg';
+  }
+  for (const [r, price] of mains) r.kr_per_elev = price;
 }
 
 // ---------------- helpers ----------------

@@ -134,6 +134,7 @@ export function renderOm({ facts, stats, statusMap = new Map(), basis = {}, toda
     <li><b>Skolverkets elevantal.</b> Avtalet anger vilka skolformer det gäller men inte hur många elever. Årsvärdet delas med antalet elever i kommunens egna skolor i de skolformerna${laar ? `, läsåret ${esc(laar)}` : ''}. <span class="muted">${esc(nOf(kb.skolverket, 'avtalsrad', 'avtalsrader'))}.</span></li>
   </ol>
   ${p(`Ett avtal för hela kommunen utan angivna skolformer räknas inte om till pris per elev, eftersom vi då skulle gissa. Inte heller licenser per användare, per lärare eller personal, avtal efter användning och engångsbelopp: de är inte ett pris för eleverna. Kostnadsfria avtal och avtal på 0 kr ingår inte i prisjämförelsen. Av ${fmtInt(kb.rows)} aktiva avtalsrader har ${fmtInt(kb.priced)} ett pris per elev.`)}
+  ${p('En kommun har en prispunkt per produkt. Har den ett huvudavtal och tilläggsavtal för samma produkt räknas de ihop: summan av deras kända årsvärden delat med eleverna i huvudavtalets skolformer, eller i alla avtalens skolformer när tilläggen gäller fler. Ett tilläggsavtal får aldrig ett eget pris per elev, och saknar huvudavtalet pris har kommunen inget pris för produkten.')}
   ${p('Årsvärdet är avtalets värde omräknat till ett år. Okänt värde räknas aldrig som noll, och varje summa visar hur många avtal värdet är känt för.')}
 </div>`;
 

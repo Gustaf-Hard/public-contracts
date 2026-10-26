@@ -1881,7 +1881,7 @@ export function openDb(path) {
              c.annual_value_sek, c.one_time_value_sek, c.pricing_model,
              c.unit_price_sek, c.unit, c.quantity, c.value_incl_moms,
              c.confidence, c.summary,
-             a.id AS attachment_id, a.filename,
+             a.id AS attachment_id, a.filename, a.size_bytes,
              m.received_at
       FROM contracts c
       JOIN attachments a ON a.id = c.attachment_id

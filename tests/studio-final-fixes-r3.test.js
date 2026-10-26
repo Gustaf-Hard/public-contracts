@@ -162,7 +162,10 @@ describe('R3. a samverkansavtal is shown whole, with andel okänd, and never as 
     products: ['IST Administration'], ...o,
   });
   const ggvv = () => {
-    const a = ist('0662'); const b = ist('0617', { annual_value_sek: 2000000.4 });
+    // r4 W4: the copies need document evidence; here each summary names the
+    // other member, as the GGVV avtal does.
+    const a = ist('0662', { kommun_namn: 'Gislaved', summary: 'Avtal mellan Gislaveds kommun (med Gnosjö) och IST.' });
+    const b = ist('0617', { kommun_namn: 'Gnosjö', annual_value_sek: 2000000.4, summary: 'Avtal för GGVV-kommunerna Gislaved och Gnosjö med IST.' });
     const facts = build([a, b], { coverage: [...covFor(a.contract_id, 'IST Administration', ALLSEG), ...covFor(b.contract_id, 'IST Administration', ALLSEG)] });
     return { a, b, facts };
   };
@@ -207,8 +210,8 @@ describe('R3. a samverkansavtal is shown whole, with andel okänd, and never as 
   it('partners are never each other\'s peers in a price strip: a joint styckpris is not a price', () => {
     // Tempus shape: two copies of one avtal with a per-elev line price.
     const line = (id) => ({ contract_id: id, product_name: 'Tempus Barn', amount_sek: null, unit_price_sek: 75, unit: 'elev', quantity: null, period_months: 12 });
-    const a = C({ vendor_name: 'Tempus', kommun_kod: '0662', annual_value_sek: 170000, pricing_model: 'per_student', products: ['Tempus Barn'] });
-    const b = C({ vendor_name: 'Tempus', kommun_kod: '0617', annual_value_sek: 170000, pricing_model: 'per_student', products: ['Tempus Barn'] });
+    const a = C({ vendor_name: 'Tempus', kommun_kod: '0662', annual_value_sek: 170000, pricing_model: 'per_student', products: ['Tempus Barn'], size_bytes: 123456 });
+    const b = C({ vendor_name: 'Tempus', kommun_kod: '0617', annual_value_sek: 170000, pricing_model: 'per_student', products: ['Tempus Barn'], size_bytes: 123456 });
     const facts = build([a, b], { lineItems: [line(a.contract_id), line(b.contract_id)] });
     expect(facts.every((f) => f.kr_per_elev == null)).toBe(true);
     expect(row(facts, a.contract_id).joint.n_kommuner).toBe(2);
@@ -358,7 +361,7 @@ describe('R2. no absence claim while underlag sits unread, or for a category we 
 // ------------------------------------------------------------------ R4
 describe('R4. category and product counts are avtal, not copies or kommuner', () => {
   it('a samverkansavtal from two kommuner is one active avtal on the category page, as on Marknad', () => {
-    const mk = (kod) => C({ vendor_name: 'IST', kommun_kod: kod, annual_value_sek: 1500000, period_start: '2023-01-01', period_end: '2029-12-31', products: ['IST Administration'] });
+    const mk = (kod) => C({ vendor_name: 'IST', kommun_kod: kod, annual_value_sek: 1500000, period_start: '2023-01-01', period_end: '2029-12-31', products: ['IST Administration'], size_bytes: 700000 }); // one document (r4 W4)
     const facts = build([mk('0662'), mk('0617')]);
     expect(marketByCategory(facts).find((m) => m.category === 'skoladministration').n_avtal).toBe(1);
     const t = text(renderKategori({ category: findCategory('skoladministration'), facts, stats, statusMap: new Map(), today: TODAY }));
@@ -366,7 +369,9 @@ describe('R4. category and product counts are avtal, not copies or kommuner', ()
     expect(t).toMatch(/känt för 1 av 1 avtal/);
   });
 
-  it('product price coverage counts priced avtal: two priced avtal in one kommun are 2 of 2', () => {
+  // r4 W2: two avtal for one product in one kommun are one price point on
+  // the larger (main) avtal, so only that avtal has a price of its own.
+  it('product price coverage counts priced avtal: two avtal for one product in one kommun are 1 of 2 (r4 W2)', () => {
     const line = (id, p) => ({ contract_id: id, product_name: 'Polylino', amount_sek: null, unit_price_sek: p, unit: 'elev', quantity: null, period_months: 12 });
     const a = C({ vendor_name: 'ILT Education AB', annual_value_sek: 50000, pricing_model: 'per_student', products: ['Polylino'] });
     const b = C({ vendor_name: 'ILT Education AB', annual_value_sek: 70000, period_start: '2025-01-01', period_end: '2028-07-31', pricing_model: 'per_student', products: ['Polylino'] });
@@ -374,7 +379,7 @@ describe('R4. category and product counts are avtal, not copies or kommuner', ()
     expect(head(facts)).toHaveLength(2);
     const hit = productBySlug('polylino');
     const t = text(renderProdukt({ product: hit.product, company: hit.company, facts, stats, statusMap: new Map(), today: TODAY }));
-    expect(t).toMatch(/Pris per elev känt 2 av 2 aktiva avtal/);
+    expect(t).toMatch(/Pris per elev känt 1 av 2 aktiva avtal/);
     expect(priceDistribution(facts, { productSlug: 'polylino' }).n).toBe(1);
   });
 });
