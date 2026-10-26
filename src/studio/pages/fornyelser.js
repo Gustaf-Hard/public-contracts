@@ -163,9 +163,16 @@ function csvCell(v) {
   return /[";\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
+// A samverkansavtal's whole value is on one row only, the first listed copy,
+// and the other copies say "samverkan, se <kommun>", so a SUM over the
+// value column counts it once (r5 V6).
 export function renewalsCsv(rows) {
   const lines = [CSV_HEAD.join(';')];
+  const carrier = new Map();
+  for (const r of rows) if (r.joint && r.value != null && !carrier.has(r.avtal_key)) carrier.set(r.avtal_key, r);
   for (const r of rows) {
+    const c = r.joint ? carrier.get(r.avtal_key) : null;
+    const elsewhere = c && c !== r;
     lines.push([
       r.kommun,
       ownersText(r),
@@ -174,8 +181,8 @@ export function renewalsCsv(rows) {
       r.lan ?? '',
       r.kommungrupp ?? '',
       r.channel ? companyLabel(r.channel) : 'Direkt',
-      r.value == null ? '' : Math.round(r.value),
-      r.joint ? 'samverkan' : r.value == null ? 'okänt' : r.valuePartial ? 'delvis känt' : 'känt',
+      r.value == null || elsewhere ? '' : Math.round(r.value),
+      elsewhere ? `samverkan, se ${c.kommun}` : r.joint ? 'samverkan' : r.value == null ? 'okänt' : r.valuePartial ? 'delvis känt' : 'känt',
       r.date,
       r.period_end ?? '',
       r.extension_option_until ?? '',

@@ -194,6 +194,27 @@ describe('V3. a shared generic file name alone is not one document', () => {
   });
 });
 
+// ------------------------------------------------------------------ V4, V6
+describe('V4 and V6. a samverkansavtal counts once on Utforska and sums once in the CSV', () => {
+  const mk = (kod, namn) => C({ kommun_kod: kod, kommun_namn: namn, size_bytes: 4242, period_start: '2025-08-01', period_end: '2027-07-31', next_review_date: null, products: ['Binogi'] });
+  const facts = build([mk('0114', 'Testby 1'), mk('0115', 'Testby 2')]);
+
+  it('Utforska: 1 avtal, known for 1 of 1', () => {
+    const t = text(renderUtforska({ facts, stats, today: TODAY, query: parseUtforskaQuery({}) }));
+    expect(t).toContain('känt för 1 av 1');
+    expect(t).not.toContain('känt för 1 av 2');
+    expect(t).toContain('1 aktivt avtal från 2 kommuner matchar');
+  });
+
+  it('CSV: the value column sums to the whole avtal once', () => {
+    const rows = renewalRows({ facts, stats, today: TODAY, query: undefined });
+    const lines = renewalsCsv(rows).trim().split('\r\n').slice(1).map((l) => l.split(';'));
+    const sum = lines.reduce((s, l) => s + (Number(l[7]) || 0), 0);
+    expect(sum).toBe(100000);
+    expect(lines.map((l) => l[8])).toEqual(['samverkan', 'samverkan, se Testby 1']);
+  });
+});
+
 // ------------------------------------------------------------------ V5
 describe('V5. a samverkansavtal\'s value carrier is chosen per owner company', () => {
   it('ILT and Binogi split 50/50; the carrier kommun replaces only its ILT avtal: the other copy carries ILT', () => {

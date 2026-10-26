@@ -201,8 +201,10 @@ describe('W3 and X1. a samverkansavtal on Förnyelser is the whole avtal, status
     for (const r of rows) expect(r).toMatchObject({ value: 177000, valuePartial: false, joint: { members: ['Testby 1', 'Testby 2'] } });
     const lines = renewalsCsv(rows).trim().split('\r\n');
     expect(lines[0].endsWith(';Samverkansavtal, kopior från')).toBe(true);
+    // r5 V6: the value is on the first copy only, so a SUM counts it once.
+    expect(lines[1]).toContain(';177000;samverkan;');
+    expect(lines[2]).toContain(';;samverkan, se Testby 1;');
     for (const l of lines.slice(1)) {
-      expect(l).toContain(';177000;samverkan;');
       expect(l).not.toContain(';känt;');
       expect(l.endsWith(';Testby 1, Testby 2')).toBe(true);
     }

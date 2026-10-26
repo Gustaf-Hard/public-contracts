@@ -8,7 +8,7 @@
 import { esc } from '../layout.js';
 import { fmtInt, fmtKrCompact, UNKNOWN } from '../format.js';
 import { CATEGORIES, companyBySlug } from '../../catalogue.js';
-import { UNKNOWN_CATEGORY, companyKey } from '../../studio-data.js';
+import { UNKNOWN_CATEGORY, avtalOf, companyKey } from '../../studio-data.js';
 import { contractLengthMonths } from '../../vendor-analytics.js';
 import { applyFilters, groupFacts, aggregateFacts, UNKNOWN as CORE_UNKNOWN } from '../../../public/explorer-core.js';
 import { filterBar, emptyPanel } from '../components.js';
@@ -130,7 +130,9 @@ export function groupRows(rows, dim, today) {
   return groupFacts(rows, dim, today);
 }
 
-const distinctAvtal = (fs) => new Set(fs.map((f) => f.contract_id)).size;
+// One avtal per avtal_key: a samverkansavtal's copies count once, as on
+// Marknad (r5 V4).
+const distinctAvtal = (fs) => new Set(fs.map(avtalOf)).size;
 
 function groupHref(dim, key, first) {
   if (key == null || key === CORE_UNKNOWN) return null;
@@ -249,8 +251,8 @@ export function renderUtforska({ facts, stats, today, query, page = 1 }) {
   // Avtal whose only party is a hidden utbildningsanordnare are left out of
   // the explorer; say so, or the totals here disagree with Marknad unexplained.
   const pool = q.urval === 'alla' ? facts : headline(facts);
-  const shown = new Set(base.map((f) => f.contract_id));
-  const nHidden = new Set(pool.filter((f) => !shown.has(f.contract_id)).map((f) => f.contract_id)).size;
+  const shown = new Set(base.map(avtalOf));
+  const nHidden = new Set(pool.filter((f) => !shown.has(avtalOf(f))).map(avtalOf)).size;
 
   const has = (get) => base.some((f) => get(f) == null);
   const opts = (get) => sortSv(new Set(base.map(get).filter((v) => v != null))).concat(has(get) ? [UNKNOWN] : []);
