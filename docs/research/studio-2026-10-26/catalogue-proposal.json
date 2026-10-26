@@ -1,0 +1,4831 @@
+[
+  {
+    "canonical": "ILT Education",
+    "slug": "ilt",
+    "category": "läromedel",
+    "role": "service",
+    "aliases": [
+      "ILT Education",
+      "ILT Inläsningstjänst",
+      "Inläsningstjänst",
+      "Aski Raski",
+      "ILT"
+    ],
+    "website": "https://ilteducation.se",
+    "avtal": 190,
+    "products": [
+      {
+        "name": "Studiestöd på modersmål",
+        "slug": "studiestod-pa-modersmal",
+        "category": "läromedel",
+        "what_it_is": "Inlästa läromedel och studiestöd på elevernas modersmål.",
+        "aliases": [
+          "Kommunabonnemang för Studiestöd på Modersmål",
+          "Kommunabonnemang Studiestöd på Modersmål",
+          "Kommunabonnemang för Studiestöd på Modersmål avseende Inlästa Läromedel",
+          "Studiestöd på Modersmål"
+        ]
+      },
+      {
+        "name": "Polyglutt Home Access",
+        "slug": "polyglutt-home-access",
+        "category": "läromedel",
+        "what_it_is": "Tillägg som ger barnens familjer tillgång till Polyglutt hemma.",
+        "aliases": [
+          "Home Access/Polyglutt förskola hemma",
+          "Polyglutt förskola Home Access"
+        ]
+      },
+      {
+        "name": "Polyglutt",
+        "slug": "polyglutt",
+        "category": "läromedel",
+        "what_it_is": "Digitalt bilderboksbibliotek för förskola och förskoleklass.",
+        "aliases": [
+          "Polyglutt skola",
+          "Polyglutt Förskola",
+          "Polyglutt förskola Huvudmannalicens",
+          "Polyglutt förskola",
+          "Polyglutt Skola",
+          "Polyglutt skola F-3"
+        ]
+      },
+      {
+        "name": "Polylino",
+        "slug": "polylino",
+        "category": "läromedel",
+        "what_it_is": "Digitalt bilderboksbibliotek för de yngre åren i grundskolan.",
+        "aliases": [
+          "Polylino skola",
+          "Abonnemang Polylino skola",
+          "Polylino F-6 Huvudmannalicens",
+          "Polylino Huvudmannalicens",
+          "Polylino anpassad gymnasieskola"
+        ]
+      },
+      {
+        "name": "Begreppa",
+        "slug": "begreppa",
+        "category": "läromedel",
+        "what_it_is": "Ämnesbegrepp förklarade med bild, ljud och text på flera språk.",
+        "aliases": [
+          "Begreppa Huvudmannalicens",
+          "Inlästa läromedel & Begreppa",
+          "Begreppa grundskola",
+          "Begreppa gymnasieskola, allmänna kurser"
+        ]
+      },
+      {
+        "name": "Aski Raski",
+        "slug": "aski-raski",
+        "category": "läromedel",
+        "what_it_is": "Lässpel för att lära sig läsa, F-3.",
+        "aliases": [
+          "AskiRaski",
+          "Aski Raski F-3"
+        ]
+      },
+      {
+        "name": "Fonologia",
+        "slug": "fonologia",
+        "category": "läromedel",
+        "what_it_is": "Digitalt läromedel för fonologisk medvetenhet och tidig läsinlärning.",
+        "aliases": []
+      },
+      {
+        "name": "Trovy",
+        "slug": "trovy",
+        "category": "läromedel",
+        "what_it_is": "Digitalt bibliotek med inlästa skönlitterära böcker.",
+        "aliases": []
+      },
+      {
+        "name": "Inlästa läromedel",
+        "slug": "inlasta-laromedel",
+        "category": "läromedel",
+        "what_it_is": "Inlästa versioner av tryckta läroböcker, som ljud i appen.",
+        "aliases": [
+          "Inlästa Läromedel",
+          "Kommunabonnemang Inlästa Läromedel",
+          "Kommunabonnemang",
+          "Inlästa Läromedel Kommunabonnemang",
+          "Kommunabonnemang inlästa läromedel",
+          "Inlästa Läromedel Huvudmannalicens",
+          "Inläsningstjänst",
+          "Kommunabonnemang Inlästa läromedel",
+          "Abonnemang för inlästa läromedel",
+          "ILT Digital",
+          "Inlästa läromedel & Begreppa",
+          "Kommunabonnemang Grundskola och Gymnasium avseende Inlästa Läromedel",
+          "Kommunabonnemang för Studiestöd på Modersmål avseende Inlästa Läromedel",
+          "ILT (Inläsningstjänst)"
+        ]
+      }
+    ],
+    "addOns": []
+  },
+  {
+    "canonical": "Radish",
+    "slug": "radish",
+    "category": "läromedel",
+    "role": "service",
+    "aliases": [
+      "Radish",
+      "Matteappen",
+      "Radish (Magma)"
+    ],
+    "website": null,
+    "avtal": 64,
+    "products": [
+      {
+        "name": "Magma Insight",
+        "slug": "magma-insight",
+        "category": "läromedel",
+        "what_it_is": "Huvudmannaplattform med uppföljning av elevernas resultat i Magma.",
+        "aliases": [
+          "Magma Pedagogik och Insight",
+          "Magma Huvudmannaplattform",
+          "Magma Insights/Kommunplattform",
+          "Magma Insights",
+          "Magma Pedagogik och Magma Insight"
+        ]
+      },
+      {
+        "name": "Magma",
+        "slug": "magma",
+        "category": "läromedel",
+        "what_it_is": "Digitalt matematikläromedel (tidigare Matteappen).",
+        "aliases": [
+          "Matteappen Magma",
+          "Matteappen",
+          "Magma Pedagogik",
+          "Matteappen Magma Kommunlicens",
+          "Magma Pedagogik och Insight",
+          "Magma Kommunlicens",
+          "Magma (Matteappen)",
+          "Magma Pedagogik och Magma Insight",
+          "Magma huvudmannalicens",
+          "Magma kommunlicens"
+        ]
+      }
+    ],
+    "addOns": [],
+    "probeLabel": "Magma"
+  },
+  {
+    "canonical": "Binogi",
+    "slug": "binogi",
+    "category": "läromedel",
+    "role": "service",
+    "aliases": [
+      "Binogi"
+    ],
+    "website": "https://binogi.se",
+    "avtal": 43,
+    "products": [
+      {
+        "name": "Binogi",
+        "slug": "binogi",
+        "category": "läromedel",
+        "what_it_is": "Digitalt läromedel med animerade ämnesfilmer och quiz på flera språk.",
+        "aliases": [
+          "Binogi.se",
+          "Binogi Språkprojektet",
+          "Binogi Arbetsblad",
+          "Binogi Bibliotek",
+          "Binogi Kit",
+          "Binogi.se digitalt flerspråkigt läromedel",
+          "Binogi (Språkprojektet)",
+          "Binogi.se digitala läromedel",
+          "Binogi.se (Språkprojektet)",
+          "Språkprojektet",
+          "Binogi.se - Årslicens",
+          "Binogi (Språkprojektet, digitalt läromedel)",
+          "Binogi 4-6",
+          "Binogi 7-9",
+          "Binogi F-3 pedagoger",
+          "Binogi IM inkl gymnasiet",
+          "Binogi Komvux inkl SFI",
+          "Binogi SFI och Komvux",
+          "Binogi Språkprojektet åk 7-9",
+          "Binogi för årskurs 4-6",
+          "Binogi för årskurs 7-9",
+          "Binogi för årskurs F-3",
+          "Binogi åk 4-6",
+          "Binogi åk 7-9",
+          "Binogi.se årskurs 4-6",
+          "Binogi.se årskurs 7-9",
+          "Digitalt läromedel",
+          "Språkprojektet Binogi",
+          "Språkprojektet med tillgång till Binogi"
+        ]
+      }
+    ],
+    "addOns": [],
+    "singleProduct": "Binogi"
+  },
+  {
+    "canonical": "Nationalencyklopedin",
+    "slug": "ne",
+    "category": "läromedel",
+    "role": "service",
+    "aliases": [
+      "Nationalencyklopedin",
+      "NE",
+      "NE Nationalencyklopedin",
+      "NE Sverige"
+    ],
+    "website": "https://ne.se",
+    "avtal": 59,
+    "products": [
+      {
+        "name": "NE 360",
+        "slug": "ne-360",
+        "category": "läromedel",
+        "what_it_is": "Samlad plattform med NE:s kunskapstjänster och digitala läromedel.",
+        "aliases": [
+          "NE 360 för grundskola 1-9",
+          "NE 360 Grundskola",
+          "NE 360 för gymnasiet",
+          "NE 360 GY inkl. anpassad GY",
+          "NE 360 för förskoleklass",
+          "NE 360 F-klass",
+          "NE 360 Förskoleklass",
+          "NE360 F-klass",
+          "NE360 Grund- och gymnasieskola",
+          "NE 360 Åk 1 - Åk 9",
+          "NE 360 Åk 1-9"
+        ]
+      },
+      {
+        "name": "AI-Martin",
+        "slug": "ai-martin",
+        "category": "läromedel",
+        "what_it_is": "AI-baserad studiehjälp från NE.",
+        "aliases": []
+      },
+      {
+        "name": "NE Digitala prov",
+        "slug": "ne-digitala-prov",
+        "category": "prov",
+        "what_it_is": "Färdiga digitala prov kopplade till NE:s läromedel.",
+        "aliases": [
+          "Digitala prov",
+          "NE digitala prov"
+        ]
+      },
+      {
+        "name": "Britannica School",
+        "slug": "britannica-school",
+        "category": "läromedel",
+        "what_it_is": "Engelskspråkigt uppslagsverk (Encyclopaedia Britannica) som NE säljer.",
+        "aliases": [
+          "Encyclopaedia Britannica",
+          "Encyclopædia Britannica",
+          "Encyklopedia Britannica School"
+        ]
+      },
+      {
+        "name": "E-språk",
+        "slug": "e-sprak",
+        "category": "läromedel",
+        "what_it_is": "Digital språkträning i moderna språk och engelska.",
+        "aliases": [
+          "E-Språk"
+        ]
+      },
+      {
+        "name": "NE Kunskapstjänster",
+        "slug": "ne-kunskapstjanster",
+        "category": "läromedel",
+        "what_it_is": "Uppslagsverket NE.se med Junior, Play, ordböcker och tematjänster.",
+        "aliases": [
+          "NE.se",
+          "Kunskapstjänster",
+          "Världens länder",
+          "NE Skola",
+          "NE Junior",
+          "NE Play",
+          "Junior",
+          "Ordböcker",
+          "Play",
+          "Temapaket",
+          "Uppslagsverk",
+          "Världens religioner",
+          "NE-play",
+          "Språklexikon",
+          "Världens Religioner",
+          "Spelling with NE",
+          "Kunskapstjänst",
+          "NE Fakta",
+          "Digitala kunskapstjänster",
+          "Kunskapstjänster för F-9",
+          "Kunskapstjänsterna",
+          "NE kunskapstjänster",
+          "NE.se abonnemang",
+          "Fria läromedel",
+          "Kunskapstjänster och digitala läromedel",
+          "NE Bibliotek",
+          "NE ordböcker",
+          "NE.se internettjänst",
+          "språklexikon",
+          "NE internettjänst",
+          "Kunskapstjänst förskola",
+          "Digitalt uppslagsverk",
+          "Filmtjänst med pedagogiska undervisningsfilmer",
+          "Fria läromedel (Kunskapstjänster)",
+          "Haja",
+          "Haja!",
+          "Kunskapstjänster 4-6",
+          "Kunskapstjänster 7-9",
+          "Kunskapstjänster F-3",
+          "Kunskapstjänster och digitala läromedel Åk 4-6",
+          "Kunskapstjänster och digitala läromedel Åk 7-9",
+          "Kunskapstjänster Åk 1-3",
+          "NE Skola, grundskolan",
+          "NE Skola, gymnasieskolan",
+          "Pedagogiska appar",
+          "Uppslagsverket",
+          "Världens klimat",
+          "17 språklexikon",
+          "Appar för de yngre",
+          "NE Ordböcker",
+          "NE SKOLA",
+          "NE play",
+          "Norstedts ordböcker",
+          "Ordbokstjänst"
+        ]
+      },
+      {
+        "name": "NE Läromedel",
+        "slug": "ne-laromedel",
+        "category": "läromedel",
+        "what_it_is": "NE:s digitala läromedel, även tryckta böcker med digitala delar.",
+        "aliases": [
+          "Läromedel",
+          "Tryckta läroböcker med digitala komponenter",
+          "Läromedel åk 4-9",
+          "NE digitala läromedel",
+          "Tryckta läroböcker med digitala komponenter Åk 4-6",
+          "Läromedel 7-9",
+          "Läromedelspaket SO åk 4-6",
+          "NE Digitala Läromedel",
+          "Digitala läromedel",
+          "Läromedel 4-6",
+          "Läromedel Gy",
+          "Läromedel åk 4-6",
+          "Läromedelspaket åk 4-6",
+          "Läromedelspaket åk 7-9",
+          "Tryckta läroböcker med digitala komponenter Åk 4 - Åk 6",
+          "NE Digitala läromedel",
+          "NE Digitala läromedel 4-6"
+        ]
+      }
+    ],
+    "addOns": [],
+    "probeLabel": "NE"
+  },
+  {
+    "canonical": "Skolplus",
+    "slug": "skolplus",
+    "category": "läromedel",
+    "role": "service",
+    "aliases": [
+      "Skolplus"
+    ],
+    "website": "https://skolplus.se",
+    "avtal": 42,
+    "products": [
+      {
+        "name": "Rörelseäventyret",
+        "slug": "rorelseaventyret",
+        "category": "läromedel",
+        "what_it_is": "Rörelsepass för de yngre eleverna från Skolplus.",
+        "aliases": [
+          "Skolplus Rörelseäventyret"
+        ]
+      },
+      {
+        "name": "Skolplus",
+        "slug": "skolplus",
+        "category": "läromedel",
+        "what_it_is": "Webbtjänst med övningar och spel i flera ämnen (Basutbud eller Komplett).",
+        "editions": [
+          "Basutbud",
+          "Komplett"
+        ],
+        "aliases": [
+          "Skolplus Basutbud",
+          "skolplus.se",
+          "Skolplus Komplett",
+          "Skolplus Basutbud komplett",
+          "Skolplus Basutbud (skolplus.se)",
+          "Skolplus Basutbud kommunlicens",
+          "skolplus.se Basutbud komplett",
+          "skolplus.se kommunlicens",
+          "skolplus.se kommunlicens Basutbud",
+          "Skolplus komplett",
+          "Skolplus.se",
+          "Skollicens 1 år för Skolplus Basutbud",
+          "Skollicens Basutbud",
+          "Huvudmanslicens 12 månader max Skolplus extern",
+          "Kommunlicens skolplus.se",
+          "Skollicens Basutbud ett år",
+          "Skolplus Basutbud (kommunlicens)",
+          "Skolplus komplett (skolplus.se)"
+        ]
+      }
+    ],
+    "addOns": []
+  },
+  {
+    "canonical": "SLI Education",
+    "slug": "sli",
+    "category": "läromedel",
+    "role": "service",
+    "aliases": [
+      "SLI Education",
+      "SLI"
+    ],
+    "website": "https://sli.se",
+    "avtal": 33,
+    "products": [
+      {
+        "name": "SLI Play",
+        "slug": "sli-play",
+        "category": "läromedel",
+        "what_it_is": "Strömmad utbildningsfilm och media för skolan.",
+        "aliases": [
+          "SLI strömmande media",
+          "SLI",
+          "FLOD EXT",
+          "SLI (strömmande media)",
+          "SLI strömmande media (SLI Play)",
+          "FLOD/SLI",
+          "SLI mediedistributionsplattform",
+          "SLI play",
+          "Strömmande media",
+          "SLI Education"
+        ]
+      }
+    ],
+    "addOns": [],
+    "singleProduct": "SLI Play"
+  },
+  {
+    "canonical": "Natur & Kultur",
+    "slug": "natur-kultur",
+    "category": "läromedel",
+    "role": "service",
+    "aliases": [
+      "Natur & Kultur",
+      "natur och kultur"
+    ],
+    "website": "https://www.nok.se",
+    "avtal": 20,
+    "products": [
+      {
+        "name": "PULS",
+        "slug": "puls",
+        "category": "läromedel",
+        "what_it_is": "Läromedelsserie i NO, SO och teknik för åk 4-6.",
+        "aliases": [
+          "PULS NO åk 4 Lärarwebb",
+          "PULS NO åk 5 Grundbok Digital",
+          "PULS NO åk 6 Grundbok Digital",
+          "Singellicens 365 dagar för PULS NO åk 6 Lärarwebb 12 mån, Natur & Kultur",
+          "PULS NO åk 5 Lärarwebb",
+          "PULS NO åk 6 Lärarwebb",
+          "PULS SO åk 4 Lärarwebb",
+          "PULS SO åk 6 Grundbok Digital",
+          "PULS SO åk 6 Lärarwebb",
+          "PULS Teknik 4-6 Grundbok Digital",
+          "Singellicens 365 dagar för PULS NO åk 5 Lärarwebb 12 mån, Natur & Kultur",
+          "Singellicens 365 dagar för PULS SO åk 4 Lärarwebb, Natur & Kultur",
+          "Singellicens 365 dagar för PULS SO åk 6 Grundbok Digital, Natur & Kultur",
+          "Singellicens 365 dagar för PULS SO åk 6 Lärarwebb 12 mån, Natur & Kultur",
+          "Singellicens 365 dagar för PULS Teknik 4-6 Grundbok Digital, fjärde upplagan, Natur & Kultur"
+        ]
+      },
+      {
+        "name": "Flex Matematik",
+        "slug": "flex-matematik",
+        "category": "läromedel",
+        "what_it_is": "Matematikläromedel för mellanstadiet.",
+        "aliases": [
+          "Flex Matematik åk 5 Webb 12 mån",
+          "Singellicens 365 dagar för Flex Matematik åk 4 Webb 12 mån",
+          "Flex Matematik åk 4 Webb",
+          "Flex Matematik åk 5 Webb",
+          "Flex Matematik åk 6 Webb",
+          "Flex Matematik åk 6 Webb 12 mån",
+          "Singellicens 365 dagar för Flex Matematik åk 6 Webb 12 mån"
+        ]
+      },
+      {
+        "name": "Skills",
+        "slug": "skills",
+        "category": "läromedel",
+        "what_it_is": "Engelskläromedel för mellanstadiet.",
+        "aliases": [
+          "Singellicens 365 dagar för Skills åk 5 Lärarwebb 12 mån, Natur & Kultur",
+          "Skills åk 4 Lärarwebb",
+          "Skills åk 4 Lärarwebb 12 mån",
+          "Skills åk 5 Lärarwebb"
+        ]
+      },
+      {
+        "name": "Fördel",
+        "slug": "fordel",
+        "category": "läromedel",
+        "what_it_is": "Läromedel i svenska som andraspråk för nyanlända.",
+        "aliases": [
+          "Fördel sva för nyanlända åk 4-6 Lärarhandledning Digital"
+        ]
+      },
+      {
+        "name": "Lärarens guide till hem- och konsumentkunskap",
+        "slug": "lararens-guide-till-hem-och-konsumentkunskap",
+        "category": "läromedel",
+        "what_it_is": "Lärarstöd i hem- och konsumentkunskap åk 4-6.",
+        "aliases": [
+          "Lärarens guide till hem- o konsumentkunskap åk 4-6 Lärarwebb",
+          "Singellicens 365 dagar för Lärarens guide till hem- o konsumentkunskap åk 4-6 Lärarwebb 12 mån"
+        ]
+      }
+    ],
+    "addOns": []
+  },
+  {
+    "canonical": "Gleerups",
+    "slug": "gleerups",
+    "category": "läromedel",
+    "role": "service",
+    "aliases": [
+      "Gleerups",
+      "gleerups utbildning"
+    ],
+    "website": "https://www.gleerups.se",
+    "avtal": 14,
+    "products": [
+      {
+        "name": "Utkik",
+        "slug": "utkik",
+        "category": "läromedel",
+        "what_it_is": "SO-läromedel (och NO-ämnen) för grundskolan.",
+        "aliases": [
+          "Gleerups Utkik SO + Titano NO 7-9",
+          "Gleerups Utkik SO- och NO-ämnen 4-6, digitalt lärare, 12 mån",
+          "Gleerups Utkik SO- och NO-ämnen 4-6, digitalt, elev, 12 mån",
+          "Gleerups Utkik SO + Titano NO 7-9, elev",
+          "Gleerups Utkik SO + Titano NO 7-9, lärare",
+          "Gleerups Utkik SO- och NO-ämnen 4-6"
+        ]
+      },
+      {
+        "name": "Titano",
+        "slug": "titano",
+        "category": "läromedel",
+        "what_it_is": "NO-läromedel för högstadiet.",
+        "aliases": [
+          "Gleerups Utkik SO + Titano NO 7-9",
+          "Gleerups Utkik SO + Titano NO 7-9, elev",
+          "Gleerups Utkik SO + Titano NO 7-9, lärare"
+        ]
+      },
+      {
+        "name": "MatteMax",
+        "slug": "mattemax",
+        "category": "läromedel",
+        "what_it_is": "Digitalt matematikläromedel.",
+        "aliases": [
+          "MatteMax digitalt läromedel",
+          "MatteMax digitalt läromedel, elev",
+          "MatteMax digitalt läromedel, lärare"
+        ]
+      },
+      {
+        "name": "Matematikportalen",
+        "slug": "matematikportalen",
+        "category": "läromedel",
+        "what_it_is": "Digitalt matematikläromedel F-9.",
+        "aliases": [
+          "Matematikportalen F-9",
+          "Matematikportalen F-9, Digitalt läromedel, elevlicens 12 mån",
+          "Matematikportalen F-9, Digitalt läromedel, lärarlicens 12 mån",
+          "Matematikportalen F-9, elevlicens 12 mån"
+        ]
+      },
+      {
+        "name": "Fokus",
+        "slug": "fokus",
+        "category": "läromedel",
+        "what_it_is": "Läromedelsserie i svenska, SO och NO för åk 1-3.",
+        "aliases": [
+          "Fokus NO, SO, svenska 1-3, lärarlicens",
+          "Fokus NO, SO, svenska 1-3, lärarlicens 12 mån",
+          "Fokus NO 1-3",
+          "Fokus NO 1-3, lärarlicens, 12 mån",
+          "Fokus SO 1-3",
+          "Fokus SO 1-3, lärarlicens, 12 mån",
+          "Fokus svenska 1-3",
+          "Fokus svenska 1-3, lärarlicens, 12 mån"
+        ]
+      },
+      {
+        "name": "Entré",
+        "slug": "entre",
+        "category": "läromedel",
+        "what_it_is": "Läromedel i svenska som andraspråk.",
+        "aliases": [
+          "Entré A komplement",
+          "Singellicens 12 mån Entré A komplement"
+        ]
+      },
+      {
+        "name": "Gleerups digitala läromedel",
+        "slug": "gleerups-digitala-laromedel",
+        "category": "läromedel",
+        "what_it_is": "Gleerups digitala läromedel per ämne eller i paket med alla ämnen.",
+        "editions": [
+          "alla ämnen",
+          "per ämne"
+        ],
+        "aliases": [
+          "Digitala läromedel",
+          "Gleerups digitala läromedel 4-6, alla ämnen",
+          "Gleerups digitala läromedel 7-9, alla ämnen",
+          "Gleerups digitala läromedel 7-9, alla ämnen, elev, 12 mån",
+          "Gleerups digitala läromedel 7-9, alla ämnen, lärare, 12 mån",
+          "Gleerups digitala läromedel 4-6, alla ämnen, elev, 12 mån",
+          "Gleerups digitala läromedel 4-6, alla ämnen, lärare, 12 mån",
+          "Gleerups digitala läromedel helhetslösning",
+          "Gleerups digitala läromedel åk 7-9",
+          "Gleerups franska 6-9, elev, 12 mån",
+          "Gleerups spanska 6-9, elev, 12 mån",
+          "Gleerups tyska 6-9, elev, 12 mån",
+          "Gleerups digitala läromedel 4-6 alla ämnen",
+          "Gleerups digitala läromedel 4-6, alla ämnen, elev",
+          "Gleerups digitala läromedel 4-6, alla ämnen, lärare",
+          "Gleerups digitala läromedel 7-9 alla ämnen",
+          "Gleerups franska 6-9",
+          "Gleerups franska 6-9, lärare, 12 mån",
+          "Gleerups idrott och hälsa 7-9",
+          "Gleerups idrott och hälsa 7-9, elev",
+          "Gleerups idrott och hälsa 7-9, lärare",
+          "Gleerups spanska 6-9",
+          "Gleerups spanska 6-9, lärare, 12 mån",
+          "Gleerups tyska 6-9",
+          "Gleerups tyska 6-9, digitalt läromedel",
+          "Gleerups tyska 6-9, digitalt läromedel, elev, 12 mån",
+          "Gleerups tyska 6-9, digitalt läromedel, lärare, 12 mån",
+          "Gleerups tyska 6-9, lärare, 12 mån"
+        ]
+      }
+    ],
+    "addOns": []
+  },
+  {
+    "canonical": "Liber",
+    "slug": "liber",
+    "category": "läromedel",
+    "role": "service",
+    "aliases": [
+      "Liber"
+    ],
+    "website": "https://www.liber.se",
+    "avtal": 1,
+    "products": [
+      {
+        "name": "Liber Svenska",
+        "slug": "liber-svenska",
+        "category": "läromedel",
+        "what_it_is": "Svenskläromedel för grundskolan, digitalt.",
+        "aliases": [
+          "Singellicens 12 mån för Liber Svenska 6 Digital (lärarlicens)"
+        ]
+      }
+    ],
+    "addOns": []
+  },
+  {
+    "canonical": "Sanoma Utbildning",
+    "slug": "sanoma",
+    "category": "läromedel",
+    "role": "service",
+    "aliases": [
+      "Sanoma Utbildning",
+      "Sanoma"
+    ],
+    "website": "https://www.sanomautbildning.se",
+    "avtal": 9,
+    "products": [
+      {
+        "name": "Bingel",
+        "slug": "bingel",
+        "category": "läromedel",
+        "what_it_is": "Övningsplattform i matematik och svenska för F-6.",
+        "aliases": [
+          "Skollicens 12 mån för Bingel licens Large >200 antal elever F-6",
+          "Bingel licens Large >200 elever F-6",
+          "Bingel licens Medium",
+          "Bingel licens Medium 75-200 elever F-6",
+          "Bingel kommunlicens"
+        ]
+      },
+      {
+        "name": "Lexia Provia",
+        "slug": "lexia-provia",
+        "category": "läromedel",
+        "what_it_is": "Kartläggning och träning av läs- och skrivförmåga.",
+        "aliases": [
+          "Lexia Provia kommunlicens SMALL"
+        ]
+      },
+      {
+        "name": "Champ",
+        "slug": "champ",
+        "category": "läromedel",
+        "what_it_is": "Engelskläromedel för grundskolan.",
+        "aliases": [
+          "Skollicens 12 mån för Champ 4 Lärarstöd+",
+          "Champ F-3 Lärarstöd Digital",
+          "Skollicens 12 mån för Champ F-3 Lärarstöd Digital"
+        ]
+      },
+      {
+        "name": "Milli Matematik",
+        "slug": "milli-matematik",
+        "category": "läromedel",
+        "what_it_is": "Matematikläromedel för lågstadiet.",
+        "aliases": [
+          "Milli Matematik 1 lärarstöd+"
+        ]
+      }
+    ],
+    "addOns": []
+  },
+  {
+    "canonical": "Studentlitteratur",
+    "slug": "studentlitteratur",
+    "category": "läromedel",
+    "role": "service",
+    "aliases": [
+      "Studentlitteratur"
+    ],
+    "website": "https://www.studentlitteratur.se",
+    "avtal": 6,
+    "products": [
+      {
+        "name": "Förskoleforum",
+        "slug": "forskoleforum",
+        "category": "läromedel",
+        "what_it_is": "Digital kompetensutvecklingstjänst för förskolans personal.",
+        "aliases": []
+      }
+    ],
+    "addOns": []
+  },
+  {
+    "canonical": "Clio",
+    "slug": "clio",
+    "category": "läromedel",
+    "role": "service",
+    "aliases": [
+      "Clio"
+    ],
+    "website": "https://www.clio.me",
+    "avtal": 1,
+    "products": [
+      {
+        "name": "Clio",
+        "slug": "clio",
+        "category": "läromedel",
+        "what_it_is": "Digitala läromedel i många ämnen (paketet Mixa och Maxa).",
+        "editions": [
+          "Mixa och Maxa"
+        ],
+        "aliases": [
+          "Clio Mixa och Maxa",
+          "Clio Mixa och Maxa HS",
+          "Clio Mixa och Maxa MS",
+          "Clio Mixa och Maxa MS/HS"
+        ]
+      }
+    ],
+    "addOns": [],
+    "singleProduct": "Clio"
+  },
+  {
+    "canonical": "Teachiq",
+    "slug": "teachiq",
+    "category": "prov",
+    "role": "service",
+    "aliases": [
+      "Teachiq",
+      "Exam.net",
+      "Kunskapsmatrisen"
+    ],
+    "website": "https://teachiq.com",
+    "avtal": 41,
+    "products": [
+      {
+        "name": "Kunskapsmatrisen",
+        "slug": "kunskapsmatrisen",
+        "category": "bedömning",
+        "what_it_is": "Verktyg för bedömning och återkoppling mot kunskapskraven.",
+        "aliases": [
+          "KM",
+          "Kunskapsmatrisen + Exam.net",
+          "KM (Kunskapsmatrisen)",
+          "Kunskapsmatrisen och Exam.net",
+          "KM (Kunskapsmatriser)"
+        ]
+      },
+      {
+        "name": "Exam.net",
+        "slug": "exam-net",
+        "category": "prov",
+        "what_it_is": "Plattform för säkra digitala prov.",
+        "aliases": [
+          "Kunskapsmatrisen + Exam.net",
+          "Digital provplattform",
+          "KM + Exam.net",
+          "IT-stöd för undervisning, prov och kunskapsutvärdering",
+          "Kunskapsmatrisen och Exam.net",
+          "Tjänst för digitala prov samt provbank"
+        ]
+      }
+    ],
+    "addOns": []
+  },
+  {
+    "canonical": "Musikoteket",
+    "slug": "musikoteket",
+    "category": "läromedel",
+    "role": "service",
+    "aliases": [
+      "Musikoteket"
+    ],
+    "website": "https://musikoteket.se",
+    "avtal": 5,
+    "products": [
+      {
+        "name": "Musikoteket",
+        "slug": "musikoteket",
+        "category": "läromedel",
+        "what_it_is": "Digitalt läromedel i musik.",
+        "aliases": []
+      }
+    ],
+    "addOns": [],
+    "singleProduct": "Musikoteket"
+  },
+  {
+    "canonical": "Nomp",
+    "slug": "nomp",
+    "category": "läromedel",
+    "role": "service",
+    "aliases": [
+      "Nomp"
+    ],
+    "website": "https://nomp.se",
+    "avtal": 2,
+    "products": [
+      {
+        "name": "Nomp Plus",
+        "slug": "nomp-plus",
+        "category": "läromedel",
+        "what_it_is": "Matematikträning med filmer och övningar.",
+        "aliases": [
+          "Nomp Plus Skola 12 månader",
+          "Nomp Plus Skola",
+          "Nomp Plus Skola 12 månader (elevplats, matematik)",
+          "NOMP Plus Skola"
+        ]
+      }
+    ],
+    "addOns": [],
+    "singleProduct": "Nomp Plus"
+  },
+  {
+    "canonical": "Swedish Film",
+    "slug": "swedish-film",
+    "category": "läromedel",
+    "role": "service",
+    "aliases": [
+      "Swedish Film"
+    ],
+    "website": "https://www.swedishfilm.se",
+    "avtal": 13,
+    "products": [
+      {
+        "name": "Film och Skola",
+        "slug": "film-och-skola",
+        "category": "läromedel",
+        "what_it_is": "Strömningstjänst med spelfilm och utbildningsfilm för skolan.",
+        "editions": [
+          "Spelfilm",
+          "Spelfilm Plus",
+          "Utbildningsfilm",
+          "Komplett"
+        ],
+        "aliases": [
+          "Film och Skola – Spelfilm Plus",
+          "Film och Skola - Spelfilm",
+          "Film och Skola - Utbildning",
+          "Film och Skola - spelfilm",
+          "Film och Skola - spelfilm plus",
+          "Film och Skola - utbildningsfilm",
+          "Film och Skola — Paket Komplett"
+        ]
+      },
+      {
+        "name": "Swedish Film-licens",
+        "slug": "swedish-film-licens",
+        "category": "läromedel",
+        "what_it_is": "Licens för att visa film offentligt i skolan.",
+        "aliases": [
+          "Swedish Film Licens",
+          "Swedish Film-licens (visningsrättigheter för filmvisningar i skola)",
+          "Swedish Film-licens gymnasieutbildning",
+          "Swedish Film-licens vuxenutbildning"
+        ]
+      }
+    ],
+    "addOns": []
+  },
+  {
+    "canonical": "Sveriges Utbildningsradio",
+    "slug": "ur",
+    "category": "läromedel",
+    "role": "service",
+    "aliases": [
+      "Sveriges Utbildningsradio"
+    ],
+    "website": "https://urplay.se",
+    "avtal": 1,
+    "products": [
+      {
+        "name": "UR-program",
+        "slug": "ur-program",
+        "category": "läromedel",
+        "what_it_is": "UR:s program och filmer för undervisning, enligt normalavtal.",
+        "aliases": [
+          "UR film och radioprogram",
+          "UR film- och radioprogram",
+          "Normalavtal för nyttjande av UR-program"
+        ]
+      }
+    ],
+    "addOns": [],
+    "singleProduct": "UR-program"
+  },
+  {
+    "canonical": "Kide Science",
+    "slug": "kide-science",
+    "category": "läromedel",
+    "role": "service",
+    "aliases": [
+      "kide science"
+    ],
+    "website": "https://www.kidescience.com",
+    "avtal": 0,
+    "products": [
+      {
+        "name": "Kide Science",
+        "slug": "kide-science",
+        "category": "läromedel",
+        "what_it_is": "Naturvetenskap och teknik genom lek för förskolan.",
+        "aliases": []
+      }
+    ],
+    "addOns": [],
+    "singleProduct": "Kide Science"
+  },
+  {
+    "canonical": "Creaza",
+    "slug": "creaza",
+    "category": "läromedel",
+    "role": "service",
+    "aliases": [
+      "Creaza"
+    ],
+    "website": "https://www.creaza.com",
+    "avtal": 1,
+    "products": [
+      {
+        "name": "Creaza",
+        "slug": "creaza",
+        "category": "läromedel",
+        "what_it_is": "Digitala skapandeverktyg för film, serier och tankekartor.",
+        "aliases": []
+      }
+    ],
+    "addOns": [],
+    "singleProduct": "Creaza"
+  },
+  {
+    "canonical": "iMAL",
+    "slug": "imal",
+    "category": "läromedel",
+    "role": "service",
+    "aliases": [
+      "iMAL"
+    ],
+    "website": null,
+    "avtal": 2,
+    "products": [
+      {
+        "name": "iMAL",
+        "slug": "imal",
+        "category": "läromedel",
+        "what_it_is": "Digitalt läromedel.",
+        "aliases": [
+          "iMAL digitala läromedel",
+          "iMAL licens år 1 (2024)",
+          "iMAL licens år 2 (2025)",
+          "iMAL licens år 3 (2026)"
+        ]
+      }
+    ],
+    "addOns": [],
+    "singleProduct": "iMAL"
+  },
+  {
+    "canonical": "LäraMera",
+    "slug": "laramera",
+    "category": "läromedel",
+    "role": "service",
+    "aliases": [
+      "LäraMera Program i Lund",
+      "LäraMera",
+      "Skoltavlan"
+    ],
+    "website": "https://www.laramera.se",
+    "avtal": 3,
+    "products": [
+      {
+        "name": "Skoltavlan",
+        "slug": "skoltavlan",
+        "category": "läromedel",
+        "what_it_is": "Pedagogiska program och övningar för interaktiv tavla och dator.",
+        "editions": [
+          "Plus"
+        ],
+        "aliases": [
+          "Skoltavlan Plus",
+          "Singellicens 12 månader - Skoltavlan",
+          "Singellicens 12 månader (Skoltavlan)"
+        ]
+      }
+    ],
+    "addOns": [],
+    "singleProduct": "Skoltavlan"
+  },
+  {
+    "canonical": "Slöjd.nu",
+    "slug": "slojd-nu",
+    "category": "läromedel",
+    "role": "service",
+    "aliases": [
+      "Textila Idéateljén - slojd",
+      "Textila Idéateljén",
+      "Slöjd.nu"
+    ],
+    "website": "https://slojd.nu",
+    "avtal": 7,
+    "products": [
+      {
+        "name": "Slöjdlexikon",
+        "slug": "slojdlexikon",
+        "category": "läromedel",
+        "what_it_is": "Digitalt uppslagsverk med instruktioner för slöjd.",
+        "aliases": [
+          "Slöjdlexikon och Slöjdportfolio",
+          "Skollicenser Slöjdlexikon"
+        ]
+      },
+      {
+        "name": "Slöjd- och bildportfolio",
+        "slug": "slojd-och-bildportfolio",
+        "category": "läromedel",
+        "what_it_is": "Digital portfolio för elevarbeten i slöjd och bild.",
+        "aliases": [
+          "Slöjd- Bildportfolio",
+          "Slöjd- och Bildportfolio",
+          "Slöjdportfolio",
+          "Slöjdlexikon och Slöjdportfolio",
+          "Bildportfolio",
+          "Skollicenser Slöjdportfolio"
+        ]
+      }
+    ],
+    "addOns": []
+  },
+  {
+    "canonical": "NTA Skolutveckling",
+    "slug": "nta",
+    "category": "läromedel",
+    "role": "service",
+    "aliases": [
+      "NTA Produktion och Service",
+      "NTA Skolutveckling"
+    ],
+    "website": "https://www.ntaskolutveckling.se",
+    "avtal": 2,
+    "products": [
+      {
+        "name": "NTA",
+        "slug": "nta",
+        "category": "läromedel",
+        "what_it_is": "Tema-lådor med material och lärarhandledning i naturvetenskap och teknik.",
+        "aliases": [
+          "NTA - Naturvetenskap och teknik för alla",
+          "NTA-lärarhandledningar",
+          "NTA-lådor"
+        ]
+      }
+    ],
+    "addOns": [
+      "Utbildning"
+    ],
+    "singleProduct": "NTA"
+  },
+  {
+    "canonical": "Hej Syv",
+    "slug": "hej-syv",
+    "category": "stödverktyg",
+    "role": "service",
+    "aliases": [
+      "Hej Syv"
+    ],
+    "website": "https://hejsyv.se",
+    "avtal": 3,
+    "products": [
+      {
+        "name": "Hej framtidsval",
+        "slug": "hej-framtidsval",
+        "category": "stödverktyg",
+        "what_it_is": "Elevtjänst för studie- och yrkesval.",
+        "aliases": [
+          "hejframtidsval.se"
+        ]
+      },
+      {
+        "name": "HejSyv",
+        "slug": "hejsyv",
+        "category": "stödverktyg",
+        "what_it_is": "Verktyg för studie- och yrkesvägledare.",
+        "aliases": [
+          "HejSyv.se"
+        ]
+      }
+    ],
+    "addOns": [
+      "Införande och uppstart"
+    ]
+  },
+  {
+    "canonical": "PictureMyLife",
+    "slug": "picturemylife",
+    "category": "stödverktyg",
+    "role": "service",
+    "aliases": [
+      "PictureMyLife"
+    ],
+    "website": "https://picturemylife.se",
+    "avtal": 4,
+    "products": [
+      {
+        "name": "PictureMyLife",
+        "slug": "picturemylife",
+        "category": "stödverktyg",
+        "what_it_is": "Digital bilddagbok som stöd för kommunikation.",
+        "aliases": [
+          "Dagboken",
+          "Licens PictureMyLife - Dagbok",
+          "PictureMyLife - Dagbok"
+        ]
+      }
+    ],
+    "addOns": [
+      "Kom igång-paket"
+    ],
+    "singleProduct": "PictureMyLife"
+  },
+  {
+    "canonical": "Everway",
+    "slug": "everway",
+    "category": "stödverktyg",
+    "role": "service",
+    "aliases": [
+      "Oribi Texthelp",
+      "Oribi",
+      "Everway",
+      "Everway Technology",
+      "ewerway"
+    ],
+    "website": "https://everway.com",
+    "note": "Oribi och Texthelp heter Everway sedan 2023.",
+    "avtal": 42,
+    "products": [
+      {
+        "name": "LexiFlow",
+        "slug": "lexiflow",
+        "category": "stödverktyg",
+        "what_it_is": "Läs- och skrivstöd med talsyntes och ordprediktion.",
+        "aliases": [
+          "Lexiflow",
+          "LexiFlow & SkrivaText",
+          "SkrivaText & LexiFlow",
+          "SkrivaText och LexiFlow",
+          "Lexiflow och Skriva Text",
+          "SkrivaText & LexiFlow (Kommunlicens Paketpris/Bundle)",
+          "LexiFlow Kommunlicens"
+        ]
+      },
+      {
+        "name": "SkrivaText",
+        "slug": "skrivatext",
+        "category": "stödverktyg",
+        "what_it_is": "Skrivstöd med rättstavning för svenska.",
+        "aliases": [
+          "LexiFlow & SkrivaText",
+          "Skriva Text",
+          "Skrivatext",
+          "SkrivaText & LexiFlow",
+          "SkrivaText och LexiFlow",
+          "Lexiflow och Skriva Text",
+          "SkrivaText & LexiFlow (Kommunlicens Paketpris/Bundle)",
+          "AppWriter & Skrivatext"
+        ]
+      },
+      {
+        "name": "Stava Rex",
+        "slug": "stava-rex",
+        "category": "stödverktyg",
+        "what_it_is": "Rättstavningsprogram för svenska.",
+        "aliases": []
+      },
+      {
+        "name": "SpellRight",
+        "slug": "spellright",
+        "category": "stödverktyg",
+        "what_it_is": "Rättstavningsprogram för engelska.",
+        "aliases": []
+      },
+      {
+        "name": "Oribi Speak",
+        "slug": "oribi-speak",
+        "category": "stödverktyg",
+        "what_it_is": "Talsyntes som läser upp text.",
+        "aliases": []
+      },
+      {
+        "name": "Oribi Habitat",
+        "slug": "oribi-habitat",
+        "category": "stödverktyg",
+        "what_it_is": "Samlat abonnemang på Oribis läs- och skrivverktyg.",
+        "aliases": []
+      }
+    ],
+    "addOns": [
+      "Synk och provisionering",
+      "Införande och uppstart"
+    ]
+  },
+  {
+    "canonical": "Wizkids",
+    "slug": "wizkids",
+    "category": "stödverktyg",
+    "role": "service",
+    "aliases": [
+      "Wizkids"
+    ],
+    "website": "https://wizkids.se",
+    "avtal": 10,
+    "products": [
+      {
+        "name": "AppWriter",
+        "slug": "appwriter",
+        "category": "stödverktyg",
+        "what_it_is": "Läs- och skrivstöd för Chromebook, iPad och webb.",
+        "aliases": [
+          "Appwriter",
+          "AppWriter Bundle",
+          "AppWriter & TxtAnalyser Cloud",
+          "AppWriter Cloud"
+        ]
+      },
+      {
+        "name": "TxtAnalyser",
+        "slug": "txtanalyser",
+        "category": "stödverktyg",
+        "what_it_is": "Grammatik- och stilkontroll för skrivande.",
+        "aliases": [
+          "AppWriter & TxtAnalyser Cloud"
+        ]
+      },
+      {
+        "name": "EduLife",
+        "slug": "edulife",
+        "category": "stödverktyg",
+        "what_it_is": "Administration och synk av Chromebooks och Google Workspace i skolan.",
+        "aliases": [
+          "EduLife+",
+          "EduLife Connect",
+          "Edulife",
+          "Edulife Unlimited",
+          "Fleet Management",
+          "EduLife +",
+          "Chromebook Mover & Editor",
+          "Chromebook Tracker",
+          "Edulife connect",
+          "Classroom Manager"
+        ]
+      }
+    ],
+    "addOns": [
+      "Införande och uppstart",
+      "Utbildning",
+      "Drift, förvaltning och underhåll",
+      "Integrationer"
+    ]
+  },
+  {
+    "canonical": "Claro Software",
+    "slug": "claro",
+    "category": "stödverktyg",
+    "role": "service",
+    "aliases": [
+      "claro software"
+    ],
+    "website": "https://www.clarosoftware.com",
+    "avtal": 0,
+    "products": [
+      {
+        "name": "Claro Valfrihet",
+        "slug": "claro-valfrihet",
+        "category": "stödverktyg",
+        "what_it_is": "Paketlicens med alla Claros läs- och skrivverktyg.",
+        "aliases": []
+      },
+      {
+        "name": "ClaroRead",
+        "slug": "claroread",
+        "category": "stödverktyg",
+        "what_it_is": "Uppläsning och skrivstöd för PC, Mac och Chrome.",
+        "aliases": [
+          "ClaroRead Plus PC",
+          "ClaroStudieverktyg PC",
+          "ClaroRead PRO",
+          "Claro (iOS)",
+          "ClaroRead Anywhere",
+          "ClaroRead Chrome Premium",
+          "ClaroRead Plus PRO PC"
+        ]
+      },
+      {
+        "name": "ClaroSpeak",
+        "slug": "clarospeak",
+        "category": "stödverktyg",
+        "what_it_is": "Uppläsningsapp för iOS och webb.",
+        "aliases": [
+          "ClaroSpeak för Webb",
+          "ClaroSpeak Plus iOS",
+          "ClaroSpeak Plus iOS-app"
+        ]
+      },
+      {
+        "name": "ClaroIdeas",
+        "slug": "claroideas",
+        "category": "stödverktyg",
+        "what_it_is": "Tankekartor med talstöd.",
+        "aliases": [
+          "ClaroIdeas PC"
+        ]
+      },
+      {
+        "name": "ClaroCapture",
+        "slug": "clarocapture",
+        "category": "stödverktyg",
+        "what_it_is": "Verktyg för att samla in och strukturera text.",
+        "aliases": [
+          "ClaroCapture PC"
+        ]
+      },
+      {
+        "name": "Claro BookReader",
+        "slug": "claro-bookreader",
+        "category": "stödverktyg",
+        "what_it_is": "Uppläsning av inskannade böcker och dokument.",
+        "aliases": [
+          "ClaroBookReader PC",
+          "Claro Bookreader PC"
+        ]
+      },
+      {
+        "name": "Claro AudioNote",
+        "slug": "claro-audionote",
+        "category": "stödverktyg",
+        "what_it_is": "Anteckningar med ljudinspelning.",
+        "aliases": [
+          "Claro Audionote PC"
+        ]
+      },
+      {
+        "name": "ScreenRuler",
+        "slug": "screenruler",
+        "category": "stödverktyg",
+        "what_it_is": "Läslinjal på skärmen.",
+        "aliases": [
+          "Screenruler PC"
+        ]
+      }
+    ],
+    "addOns": []
+  },
+  {
+    "canonical": "Svensk TalTeknologi",
+    "slug": "svensk-talteknologi",
+    "category": "stödverktyg",
+    "role": "service",
+    "aliases": [
+      "Svensk TalTeknologi"
+    ],
+    "website": "https://www.stt.se",
+    "note": "Svensk återförsäljare av Claro-verktygen.",
+    "avtal": 6,
+    "products": [
+      {
+        "name": "STT Valfrihet",
+        "slug": "stt-valfrihet",
+        "category": "stödverktyg",
+        "what_it_is": "Paketlicens med STT:s läs- och skrivverktyg.",
+        "aliases": [
+          "STT Valfrihet PRO"
+        ]
+      },
+      {
+        "name": "WordRead",
+        "slug": "wordread",
+        "category": "stödverktyg",
+        "what_it_is": "Uppläsning och skrivstöd för Mac.",
+        "aliases": [
+          "WordRead PLUS MAC",
+          "WordRead Plus MAC"
+        ]
+      },
+      {
+        "name": "SpeakIT",
+        "slug": "speakit",
+        "category": "stödverktyg",
+        "what_it_is": "Talsyntes som läser upp markerad text.",
+        "aliases": [
+          "SpeakIT PLUS"
+        ]
+      }
+    ],
+    "addOns": []
+  },
+  {
+    "canonical": "Vitec MV",
+    "slug": "vitec-mv",
+    "category": "stödverktyg",
+    "role": "service",
+    "aliases": [
+      "MV-Nordic",
+      "Vitec MV",
+      "vitec"
+    ],
+    "website": "https://www.vitecmv.com/se",
+    "note": "MV-Nordic heter Vitec MV.",
+    "avtal": 5,
+    "products": [
+      {
+        "name": "IntoWords",
+        "slug": "intowords",
+        "category": "stödverktyg",
+        "what_it_is": "Läs- och skrivstöd med uppläsning och ordprediktion på alla plattformar.",
+        "aliases": [
+          "IntoWords plus",
+          "Grammatik",
+          "IntoWords-Tränaren",
+          "IntoWords ordbok",
+          "IntoWords till Android",
+          "IntoWords till Google Chrome",
+          "IntoWords till Mac",
+          "IntoWords till Office 365",
+          "IntoWords till iPad",
+          "IntoWords till webb",
+          "Läs Här",
+          "Läs logg",
+          "Läs upp",
+          "IntoWords Android",
+          "IntoWords Cloud",
+          "IntoWords EPUB",
+          "IntoWords Mac",
+          "IntoWords OCR",
+          "IntoWords PDF",
+          "IntoWords Skriv",
+          "IntoWords Skrivmallar",
+          "IntoWords iPad"
+        ]
+      },
+      {
+        "name": "CD-ORD",
+        "slug": "cd-ord",
+        "category": "stödverktyg",
+        "what_it_is": "Äldre läs- och skrivstöd för Windows.",
+        "aliases": []
+      },
+      {
+        "name": "10Fingrar",
+        "slug": "10fingrar",
+        "category": "stödverktyg",
+        "what_it_is": "Träning i tangentbordsskrivning.",
+        "aliases": []
+      },
+      {
+        "name": "Skanread",
+        "slug": "skanread",
+        "category": "stödverktyg",
+        "what_it_is": "App som skannar text och läser upp den.",
+        "aliases": []
+      },
+      {
+        "name": "Ordboken",
+        "slug": "ordboken",
+        "category": "stödverktyg",
+        "what_it_is": "Digital ordbok med uppläsning.",
+        "aliases": []
+      },
+      {
+        "name": "Precodia",
+        "slug": "precodia",
+        "category": "stödverktyg",
+        "what_it_is": "Ordprediktion för PC.",
+        "aliases": []
+      },
+      {
+        "name": "Den talande boken",
+        "slug": "den-talande-boken",
+        "category": "stödverktyg",
+        "what_it_is": "Uppläsning av läromedel i DTB-format.",
+        "aliases": [
+          "DTB Media",
+          "Den Talande boken"
+        ]
+      }
+    ],
+    "addOns": [
+      "Extra röster"
+    ]
+  },
+  {
+    "canonical": "Symbolbruket",
+    "slug": "symbolbruket",
+    "category": "stödverktyg",
+    "role": "service",
+    "aliases": [
+      "Symbolbruket"
+    ],
+    "website": "https://www.symbolbruket.se",
+    "note": "Svensk leverantör av Widgits bildstödsprogram.",
+    "avtal": 26,
+    "products": [
+      {
+        "name": "Widgit Online",
+        "slug": "widgit-online",
+        "category": "stödverktyg",
+        "what_it_is": "Webbtjänst för att skapa material med bildstöd.",
+        "aliases": [
+          "Widgit Online & InPrint 3 - Sektor Omsorg",
+          "Widgit Online & InPrint 3 - Sektor Utbildning",
+          "Widgit Online - Större organisation",
+          "Widgit Online - Större organisation 12 mån"
+        ]
+      },
+      {
+        "name": "InPrint",
+        "slug": "inprint",
+        "category": "stödverktyg",
+        "what_it_is": "Program för att göra tryckt material med bildstöd.",
+        "aliases": [
+          "InPrint 4",
+          "InPrint 3",
+          "InPrint 4 & SymWriter 2",
+          "Widgit Online & InPrint 3 - Sektor Omsorg",
+          "Widgit Online & InPrint 3 - Sektor Utbildning"
+        ]
+      },
+      {
+        "name": "SymWriter",
+        "slug": "symwriter",
+        "category": "stödverktyg",
+        "what_it_is": "Ordbehandlare med bildstöd.",
+        "aliases": [
+          "SymWriter 2",
+          "InPrint 4 & SymWriter 2",
+          "Widgit Writer"
+        ]
+      }
+    ],
+    "addOns": [
+      "Mallar för två språk"
+    ]
+  },
+  {
+    "canonical": "ReadSpeaker",
+    "slug": "readspeaker",
+    "category": "stödverktyg",
+    "role": "service",
+    "aliases": [
+      "ReadSpeaker"
+    ],
+    "website": "https://www.readspeaker.com",
+    "avtal": 1,
+    "products": [
+      {
+        "name": "ReadSpeaker TextAid",
+        "slug": "readspeaker-textaid",
+        "category": "stödverktyg",
+        "what_it_is": "Uppläsning och läs- och skrivstöd i webbläsaren.",
+        "aliases": [
+          "ReadSpeaker Text-till-tal tillägg för Office 365"
+        ]
+      }
+    ],
+    "addOns": [
+      "Inloggning och identitet"
+    ],
+    "singleProduct": "ReadSpeaker TextAid"
+  },
+  {
+    "canonical": "Lexplore",
+    "slug": "lexplore",
+    "category": "bedömning",
+    "role": "service",
+    "aliases": [
+      "Lexplore"
+    ],
+    "website": "https://lexplore.com",
+    "avtal": 5,
+    "products": [
+      {
+        "name": "Lexplore Assessment",
+        "slug": "lexplore-assessment",
+        "category": "bedömning",
+        "what_it_is": "Screening av läsförmåga med ögonrörelsemätning.",
+        "aliases": [
+          "Lexplore Assessment åk 4-9"
+        ]
+      },
+      {
+        "name": "Lexplore Impact",
+        "slug": "lexplore-impact",
+        "category": "bedömning",
+        "what_it_is": "Lässcreening, insikter och läsflytsträning för hela skolan.",
+        "aliases": [
+          "Impact",
+          "Bibliotek",
+          "Kartläggning & Läsövningar & Läsdagbok",
+          "Impact – Screening & Insikter & Läsflytsträning & Bibliotek & Läsdagbok",
+          "Impact, 2-årsavtal - ÅK 1-9",
+          "Impact, 3-årsavtal - ÅK 6",
+          "Impact, 3-årsavtal - ÅK 7-9",
+          "Insikter",
+          "Läsdagbok",
+          "Läsflytsträning",
+          "Resultatportalen",
+          "Screening",
+          "Screening & Insikter",
+          "Screeningtjänsten"
+        ]
+      }
+    ],
+    "addOns": [
+      "Eye tracker",
+      "Utbildning",
+      "Införande och uppstart"
+    ]
+  },
+  {
+    "canonical": "DigiExam",
+    "slug": "digiexam",
+    "category": "prov",
+    "role": "service",
+    "aliases": [
+      "DigiExam"
+    ],
+    "website": "https://www.digiexam.com",
+    "avtal": 34,
+    "products": [
+      {
+        "name": "DigiExam",
+        "slug": "digiexam",
+        "category": "prov",
+        "what_it_is": "Plattform för digitala prov.",
+        "aliases": [
+          "Digiexam Plattformslicens",
+          "Digiexam användare (elever/studenter)",
+          "Digiexam",
+          "Digiexam elevlicenser Gr/Gy",
+          "DigiExam - digitala prov",
+          "DigiExam digitala prov",
+          "Digiexam Student Subscriptions - Grundskolan",
+          "Digiexam användare (personal)",
+          "Digiexam elevlicens VUX",
+          "Digiexam elevlicenser år 5-9",
+          "Digiexam Student Subscriptions",
+          "DigiExam Användare (Elever) åk 4-9",
+          "DigiExam Användare (Elever) åk F-3",
+          "DigiExam Student Subscription - K12",
+          "Digiexam Elevlicenser",
+          "Digiexam Platform License",
+          "Digiexam Platformlicens",
+          "Digiexam Student Subscriptions - Gymnasieskolan",
+          "Digiexam elevlicenser",
+          "DigiExam Användare",
+          "DigiExam Baslicens",
+          "DigiExam Elevlicenser",
+          "DigiExam Plattformslicens",
+          "Digiexam Student Subscriptions GY",
+          "Digiexam Student Subscriptions VUX",
+          "Digiexam användare",
+          "Digiexam användare (elever)",
+          "Digiexam användare (elever/studenter) Gymnasiet",
+          "Digiexam användare (elever/studenter) år 1-3",
+          "Digiexam användare (elever/studenter) år 4-9",
+          "Digiexam användare (elever/studenter) år 6-9",
+          "Digiexam användarlicenser",
+          "Digiexam elevlicenser Gr år 1-3",
+          "Digiexam elevlicenser Gr år 4-9",
+          "Digiexam elevlicenser Gy",
+          "Digiexam elevlicenser KomVux",
+          "Digiexam elevlicenser år 6-9"
+        ]
+      }
+    ],
+    "addOns": [
+      "Support",
+      "Införande och uppstart",
+      "Utbildning"
+    ],
+    "singleProduct": "DigiExam"
+  },
+  {
+    "canonical": "Dugga",
+    "slug": "dugga",
+    "category": "prov",
+    "role": "service",
+    "aliases": [
+      "Dugga"
+    ],
+    "website": "https://dugga.com",
+    "avtal": 10,
+    "products": [
+      {
+        "name": "Dugga AI Exam Engine",
+        "slug": "dugga-ai-exam-engine",
+        "category": "prov",
+        "what_it_is": "AI-assistent som hjälper läraren att skapa och rätta prov.",
+        "aliases": [
+          "AI Exam Engine - teacher assistant",
+          "AI Exam Engine"
+        ]
+      },
+      {
+        "name": "Dugga",
+        "slug": "dugga",
+        "category": "prov",
+        "what_it_is": "Plattform för digitala prov (Premium).",
+        "editions": [
+          "Premium"
+        ],
+        "aliases": [
+          "Dugga Premium",
+          "Tjänst för digitala prov",
+          "Dugga Premium Licenser",
+          "Plattform för digitala prov",
+          "Verktyg för digitala prov",
+          "Dugga digitalt verktyg för prov",
+          "Dugga Premium sitelicens/kommunlicens",
+          "Dugga Assessment",
+          "Dugga Premium (infasning)",
+          "Dugga Premium Kommunlicens",
+          "Dugga digitalt provsystem"
+        ]
+      }
+    ],
+    "addOns": [
+      "Support SLA",
+      "Utbildning",
+      "Införande och uppstart",
+      "Plagiatkontroll"
+    ]
+  },
+  {
+    "canonical": "Trelson",
+    "slug": "trelson",
+    "category": "prov",
+    "role": "service",
+    "aliases": [
+      "Trelson"
+    ],
+    "website": "https://trelson.com",
+    "avtal": 12,
+    "products": [
+      {
+        "name": "Trelson Mail Switch",
+        "slug": "trelson-mail-switch",
+        "category": "övrigt",
+        "what_it_is": "Tjänst för att flytta e-post mellan domäner i Google Workspace.",
+        "aliases": []
+      },
+      {
+        "name": "Trelson Assessment",
+        "slug": "trelson-assessment",
+        "category": "prov",
+        "what_it_is": "Plattform för digitala prov med låst provläge (fokusrum).",
+        "aliases": [
+          "Trelson",
+          "Trelson - digitala prov och fokusrum",
+          "Trelson grundlicens grundskola åk 4-9",
+          "Trelson adminverktyg - Läsår",
+          "Trelson app - Läsår",
+          "Trelson grundlicens VUX",
+          "Trelson grundlicens grundskola åk 2-3",
+          "Trelson grundlicens gymnasiet",
+          "Trelson terminlicens åk 4-9, gymnasiet och vux",
+          "Trelson årslicens åk 4-9, gymnasiet och vux",
+          "Trelson Assessment 2025",
+          "Trelson Assessment 2026",
+          "Trelson Assessment 2027",
+          "Trelson Fokusrum",
+          "Trelson kommunlicens"
+        ]
+      }
+    ],
+    "addOns": [
+      "Utbildning",
+      "Införande och uppstart"
+    ]
+  },
+  {
+    "canonical": "StudyBee",
+    "slug": "studybee",
+    "category": "bedömning",
+    "role": "service",
+    "aliases": [
+      "StudyBee"
+    ],
+    "website": "https://studybee.io",
+    "avtal": 4,
+    "products": [
+      {
+        "name": "StudyBee",
+        "slug": "studybee",
+        "category": "bedömning",
+        "what_it_is": "Bedömningsstöd och uppföljning av elevers kunskapsutveckling.",
+        "aliases": [
+          "StudyBee Assess",
+          "StudyBee Insights",
+          "StudyBee Mobile",
+          "Studybee Plus",
+          "StudyBee grundlicens",
+          "Licens StudyBee",
+          "StudyBee Licens",
+          "Early Warning System",
+          "Examensprognos",
+          "StudyBee grundlicens, per år"
+        ]
+      }
+    ],
+    "addOns": [
+      "Integrationer",
+      "Utbildning",
+      "Konsulttjänster"
+    ],
+    "singleProduct": "StudyBee"
+  },
+  {
+    "canonical": "Unikum",
+    "slug": "unikum",
+    "category": "lärplattform",
+    "role": "service",
+    "aliases": [
+      "Unikum",
+      "Chas Visual Management",
+      "chas"
+    ],
+    "website": "https://unikum.net",
+    "note": "Unikum ägs av Chas Visual Management AB.",
+    "avtal": 85,
+    "products": [
+      {
+        "name": "Unikum Stödinsatser",
+        "slug": "unikum-stodinsatser",
+        "category": "lärplattform",
+        "what_it_is": "Dokumentation av extra anpassningar och särskilt stöd.",
+        "aliases": [
+          "Unikum Stödinsatser Grundskola",
+          "Unikum Stödinsatser Förskola",
+          "Unikum Stödinsatser Förskola - Start Kommun",
+          "Unikum Stödinsatser Grundskola - Start Kommun",
+          "Unikum Stödinsatser Gymnasiet",
+          "Unikum Förskola stödinsatser start",
+          "Unikum Grundskola stödinsatser start",
+          "Unikum Gymnasium stödinsatser start",
+          "Unikum Stödinsatser Gymnasium",
+          "Unikum Stödinsatser - Grundskola",
+          "Unikum Stödinsatser Gymnasium - Start Kommun",
+          "Modul för Stödinsatser",
+          "Modul för Stödinsatser - Pilotabonnemang",
+          "Stödinsatser för Förskolan",
+          "Stödinsatser för Grundskolan",
+          "Unikum Förskola- Stödinsatser Start Kommun",
+          "Unikum Grundskola Stödinsatser Start Kommun",
+          "Unikum Grundskola- Stödinsatser Start Kommun",
+          "Unikum Stödinsatser Förskola - Start Kommun - Upp till 1500 barn",
+          "Unikum Stödinsatser Grundskola - Start Kommun - Upp till 2000 elever (2026)",
+          "Unikum Stödinsatser Grundskola - Start Kommun - Upp till 3000 elever"
+        ]
+      },
+      {
+        "name": "Unikum Närvaro och frånvaro",
+        "slug": "unikum-narvaro-och-franvaro",
+        "category": "lärplattform",
+        "what_it_is": "Närvaro i förskola och fritids och frånvaro i skolan.",
+        "aliases": [
+          "Unikum Närvaro Förskola",
+          "Unikum Frånvaro Grundskola",
+          "Unikum Närvaro Fritids",
+          "Strategisk frånvarohantering",
+          "Unikum Närvaro Förskola - Start Kommun",
+          "Närvaro/Schema i förskolan",
+          "Unikum Frånvaro Grundskola - Start Kommun",
+          "Söderhamn Frånvaro",
+          "Unikum Frånvaro",
+          "Unikum Frånvaro Grundskola - Start Kommun - Upp till 2000 elever (2026)",
+          "Unikum Frånvaro Grundskola - Start Kommun - Upp till 650 elever",
+          "Unikum Frånvaro Gymnasium",
+          "Unikum Närvaro Fritids - Start Kommun",
+          "Unikum Närvaro Förskola - Start Kommun - Upp till 1000 barn"
+        ]
+      },
+      {
+        "name": "Unikum Kvalitet",
+        "slug": "unikum-kvalitet",
+        "category": "lärplattform",
+        "what_it_is": "Stöd för systematiskt kvalitetsarbete.",
+        "aliases": [
+          "Unikum Kvalitet - Bas"
+        ]
+      },
+      {
+        "name": "Unikum Flow",
+        "slug": "unikum-flow",
+        "category": "lärplattform",
+        "what_it_is": "Modul i Unikum (Flow Mini).",
+        "aliases": [
+          "Unikum Flow Mini",
+          "Unikum Flow Mini - Kommun"
+        ]
+      },
+      {
+        "name": "Unikum",
+        "slug": "unikum",
+        "category": "lärplattform",
+        "what_it_is": "Lärplattform för förskola till gymnasium: planering, bedömning, IUP och vårdnadshavarkontakt.",
+        "aliases": [
+          "Unikum Grundskola",
+          "Unikum Förskola",
+          "Lärplattform",
+          "Unikum Förskola - Start Kommun",
+          "Unikum lärplattform",
+          "Unikum Gymnasium",
+          "Unikum Grundskola - Start Kommun",
+          "Unikum Bedömning",
+          "Unikum Gymnasiet",
+          "Unikum Ledighetsansökan",
+          "Unikum Förskola start",
+          "Unikum Grundskola start",
+          "Unikum Gymnasium start",
+          "Unikum schemavisning",
+          "Samlad lärresa inkl Fsk",
+          "Unikum Betyg Grundskola",
+          "Unikum Direktmeddelanden",
+          "Unikum Unikt lärande",
+          "Unikum betyg",
+          "Lärplattform (molntjänst/SaaS)",
+          "Unikum F-GY",
+          "Lärplattform - grundskola",
+          "Unikum IUP",
+          "Unikum IUP, Blogg och Bas",
+          "Unikum Pedagogisk plattform",
+          "Lärplattform grundskola",
+          "Unikum för Grundskolan",
+          "Unikum lärplattform Grundskola",
+          "Lärplattform gymnasium och vuxenutbildning",
+          "Unikum Lärplattform Förskola",
+          "Lärplattform gymnasiet",
+          "Lärplattform - förskola",
+          "Lärplattform gymnasium",
+          "Unikum för Förskolan",
+          "Unikum lärplattform Förskola",
+          "Verksamhetssystem Förskola",
+          "Learning Management System (LMS)",
+          "Lärplattform system Skara",
+          "Lärplattform system Vara",
+          "Modul för stöd av lärprocess och formativt arbetssätt",
+          "Unikum Gymnasium - Start Kommun",
+          "Unikum Schemavisning",
+          "Verksamhetssystem till skolan",
+          "Unikum Förskola - Start kommun",
+          "Unikum Grundskola - Start kommun",
+          "Unikum Gymnasium - Start kommun",
+          "Unikum 2021",
+          "Bas",
+          "Blogg",
+          "Blogg och Bas",
+          "Dialog med hemmet",
+          "Förtroende",
+          "Lärplattform Grundskola Förskola",
+          "Lärplattform för kommunikation, bedömning och uppföljning av elever",
+          "Pedagogisk dokumentation",
+          "Portfolio",
+          "Skolbanken",
+          "Unikum Bas",
+          "Unikum Betyg Grundskola - Start Kommun",
+          "Unikum Blogg",
+          "Unikum Blogg och Bas",
+          "Unikum Direktmeddelanden Bas",
+          "Unikum Familj - Start",
+          "Unikum Förskola (IUP, Blogg och Bas samt Portfolio inkl. 100Mb lagring/barn)",
+          "Unikum Förskola - Start Kommun - Upp till 1000 barn (2026)",
+          "Unikum Förskola - Start Kommun - Upp till 1500 barn",
+          "Unikum Förskola- Start Kommun",
+          "Unikum Grundskola - Start Kommun - Upp till 2000 elever (2026)",
+          "Unikum Grundskola - Start Kommun - Upp till 3000 elever",
+          "Unikum Grundskola - Start Kommun - Upp till 650 elever",
+          "Unikum Grundskola Start Kommun",
+          "Unikum Grundskola- Start Kommun",
+          "Unikum Lärplattform",
+          "Unikum Plattform",
+          "Unikum Portfolio",
+          "Unikum Start kommunabonnemang",
+          "Unikum Säker Elevmapp",
+          "Unikum abonnemang"
+        ]
+      }
+    ],
+    "addOns": [
+      "Unikum Connect",
+      "Unikum Arkiv och gallring",
+      "Införande och uppstart",
+      "Utbildning",
+      "Konsulttjänster",
+      "Migrering och dataöverföring",
+      "BankID-inloggning",
+      "Drift, förvaltning och underhåll"
+    ]
+  },
+  {
+    "canonical": "Haldor",
+    "slug": "haldor",
+    "category": "lärplattform",
+    "role": "service",
+    "aliases": [
+      "Haldor"
+    ],
+    "website": "https://haldor.se",
+    "avtal": 12,
+    "products": [
+      {
+        "name": "Haldor Education",
+        "slug": "haldor-education",
+        "category": "lärplattform",
+        "what_it_is": "Lärplattform byggd på Microsoft Teams, med moduler för planering, bedömning och närvaro.",
+        "aliases": [
+          "Haldor Dashboard",
+          "Haldor Uppgifter",
+          "Haldor Admin",
+          "Haldor Akademin",
+          "Haldor Analys och uppföljning",
+          "Haldor Elevdokumentation",
+          "Haldor Kunskapsbank",
+          "Haldor Planering och bedömning",
+          "Haldor Schema och närvaro",
+          "Haldor Schema plus",
+          "Haldor Utvecklingssamtal",
+          "Haldor Vårdnadshavare",
+          "Haldor",
+          "Haldor Ledighetsansökan",
+          "Haldor Planering & dokumentation för förskola",
+          "Haldor Planering och dokumentation för förskola",
+          "Haldor pedagogisk plattform",
+          "Kommunlicens Haldor",
+          "Lärplattform",
+          "Haldor Planering & bedömning",
+          "Lärplattform (Haldor för Teams)",
+          "Haldor Analys & uppföljning",
+          "Haldor Analys & uppföljning 3-10 skolor",
+          "Haldor Education Suite",
+          "Haldor Education elevlärplattform",
+          "Haldor Education kommunlicens",
+          "Haldor Licenser",
+          "Haldor Schema",
+          "Haldor för Teams",
+          "Licenser Haldor Education",
+          "PAKET - Haldor Elevdokumentation"
+        ]
+      }
+    ],
+    "addOns": [
+      "Schemaintegration",
+      "Analys via Power BI",
+      "Vårdnadshavarinloggning via IdP",
+      "API-tjänst",
+      "SMS-utskick",
+      "Införande och uppstart",
+      "EU-lagring",
+      "Konsulttjänster",
+      "Utbildning",
+      "Integrationer"
+    ],
+    "singleProduct": "Haldor Education"
+  },
+  {
+    "canonical": "Infomentor",
+    "slug": "infomentor",
+    "category": "lärplattform",
+    "role": "service",
+    "aliases": [
+      "Infomentor",
+      "informentor"
+    ],
+    "website": "https://www.infomentor.se",
+    "avtal": 30,
+    "products": [
+      {
+        "name": "InfoMentor",
+        "slug": "infomentor",
+        "category": "lärplattform",
+        "what_it_is": "Lärplattform för förskola och grundskola.",
+        "aliases": [
+          "InfoMentor P.O.D.B",
+          "InfoMentor Lärplattform",
+          "Lärplattform",
+          "InfoMentor P.O.D.B webbtjänst",
+          "InfoMentor lärplattform",
+          "InfoMentors Lärplattform",
+          "InfoMentor Grundskola",
+          "InfoMentor Grundskola och Förskola",
+          "InfoMentor Förskola",
+          "InfoMentor Operation Elementary and Sub",
+          "InfoMentor P.O.D.B (Tjänsten)",
+          "Lärplattform InfoMentor"
+        ]
+      }
+    ],
+    "addOns": [
+      "Support",
+      "Drift, förvaltning och underhåll",
+      "Integrationer",
+      "Införande och uppstart"
+    ],
+    "singleProduct": "InfoMentor"
+  },
+  {
+    "canonical": "Vklass",
+    "slug": "vklass",
+    "category": "lärplattform",
+    "role": "service",
+    "aliases": [
+      "Vklass"
+    ],
+    "website": "https://www.vklass.se",
+    "avtal": 24,
+    "products": [
+      {
+        "name": "Vklass Närvaro",
+        "slug": "vklass-narvaro",
+        "category": "lärplattform",
+        "what_it_is": "Närvaro och in- och utcheckning på fritids.",
+        "aliases": [
+          "Vklass Närvarofunktion",
+          "Närvarofunktion Fritids",
+          "Vklass Närvarofunktion Fritids",
+          "Vklass-närvaro licens inkl support",
+          "In och utcheckning fritidshem",
+          "Vklass Närvaro Fritids",
+          "Vklass närvarosystem",
+          "Vklass-närvaro licens inklusive support (Grundskoleförvaltningen)",
+          "Vklass-närvaro licens inklusive support (Utbildningsförvaltningen)"
+        ]
+      },
+      {
+        "name": "Vklass",
+        "slug": "vklass",
+        "category": "lärplattform",
+        "what_it_is": "Lärplattform med kommunikation, schema och dokumentation.",
+        "aliases": [
+          "Vklass lärplattform",
+          "Vklass Lärplattform",
+          "Lärplattform",
+          "Lärplattformen Vklass",
+          "Pedagogiskt IT-stöd (Vklass)",
+          "Vklass digital lärplattform",
+          "Vklass kommunikations- och lärplattform",
+          "Vklass prenumerationstjänst API",
+          "vklass",
+          "Skolplattform Grundskola",
+          "Utökad funktionalitet grundschema",
+          "Vklass Skola",
+          "Vklass Förskola",
+          "Vklass Grundskola/anpassad grundskola",
+          "Digital lärplattform (Vklass)",
+          "Elevadministrativt system",
+          "Lärplattform (IT-tjänst inkl. licenser, drift, service och support)",
+          "Lärportal Vklass",
+          "Systemkostnad",
+          "Vklass fritidshem",
+          "Vklass licens förskola",
+          "Vklass licens grundskola, gymnasium, vux"
+        ]
+      }
+    ],
+    "addOns": [
+      "Införande och uppstart",
+      "Konsulttjänster",
+      "Utbildning",
+      "Drift, förvaltning och underhåll"
+    ]
+  },
+  {
+    "canonical": "itslearning",
+    "slug": "itslearning",
+    "category": "lärplattform",
+    "role": "service",
+    "aliases": [
+      "itslearning"
+    ],
+    "website": "https://itslearning.com",
+    "avtal": 10,
+    "products": [
+      {
+        "name": "itslearning",
+        "slug": "itslearning",
+        "category": "lärplattform",
+        "what_it_is": "Lärplattform för grundskola och gymnasium.",
+        "aliases": [
+          "Lärplattform",
+          "Itslearning LMS Licences",
+          "itslearning LP",
+          "Itslearning LMS Licences (Per User)",
+          "License and hosting bundle, Annual, Per user, itslearning LP",
+          "Licens och hosting itslearning lärplattform",
+          "License and hosting bundle itslearning LP",
+          "License and hosting bundle, Annual, Per user, itslearning Parents",
+          "itslearning LMS",
+          "itslearning LP (License and hosting bundle)",
+          "itslearning Parents",
+          "itslearning lärplattform"
+        ]
+      }
+    ],
+    "addOns": [
+      "Integrationer",
+      "Plagiatkontroll",
+      "Advanced Reporting",
+      "Extra lagring",
+      "Införande och uppstart",
+      "Timbank"
+    ],
+    "singleProduct": "itslearning"
+  },
+  {
+    "canonical": "Meitner",
+    "slug": "meitner",
+    "category": "lärplattform",
+    "role": "service",
+    "aliases": [
+      "Meitner"
+    ],
+    "website": "https://meitner.se",
+    "avtal": 9,
+    "products": [
+      {
+        "name": "Meitner",
+        "slug": "meitner",
+        "category": "lärplattform",
+        "what_it_is": "Lärplattform och elevadministration för alla skolformer.",
+        "aliases": [
+          "Lärplattform",
+          "Meitner Lärplattform",
+          "Meitner lärplattform",
+          "Lärplattform (LMS)",
+          "Lärplattform för förskola",
+          "Administrativt system",
+          "Elevadministrativt system",
+          "LMS",
+          "LMS (lärplattform)"
+        ]
+      }
+    ],
+    "addOns": [
+      "Införande och uppstart"
+    ],
+    "singleProduct": "Meitner"
+  },
+  {
+    "canonical": "Showbie",
+    "slug": "showbie",
+    "category": "lärplattform",
+    "role": "service",
+    "aliases": [
+      "Showbie"
+    ],
+    "website": "https://www.showbie.com",
+    "avtal": 2,
+    "products": [
+      {
+        "name": "Showbie",
+        "slug": "showbie",
+        "category": "lärplattform",
+        "what_it_is": "App för uppgifter och återkoppling, främst på iPad.",
+        "editions": [
+          "Complete"
+        ],
+        "aliases": [
+          "Showbie Complete"
+        ]
+      }
+    ],
+    "addOns": [],
+    "singleProduct": "Showbie"
+  },
+  {
+    "canonical": "Aleido Learning",
+    "slug": "aleido",
+    "category": "lärplattform",
+    "role": "service",
+    "aliases": [
+      "Aleido Learning Sweden",
+      "Aleido Learning",
+      "aleido"
+    ],
+    "website": null,
+    "avtal": 1,
+    "products": [],
+    "addOns": []
+  },
+  {
+    "canonical": "Microsoft",
+    "slug": "microsoft",
+    "category": "lärplattform",
+    "role": "service",
+    "aliases": [
+      "Microsoft"
+    ],
+    "website": "https://www.microsoft.com/sv-se/education",
+    "avtal": 16,
+    "products": [
+      {
+        "name": "Microsoft Copilot",
+        "slug": "microsoft-copilot",
+        "category": "övrigt",
+        "what_it_is": "AI-assistent i Microsoft 365.",
+        "aliases": [
+          "Microsoft Copilot for Microsoft 365",
+          "Microsoft Copilot for Microsoft 365 A3 and A5 (Education Faculty Pricing)"
+        ]
+      },
+      {
+        "name": "Microsoft 365",
+        "slug": "microsoft-365",
+        "category": "lärplattform",
+        "what_it_is": "Office-program, Teams och e-post för skolan (A1, A3, A5).",
+        "editions": [
+          "A1",
+          "A3",
+          "A5"
+        ],
+        "aliases": [
+          "Microsoft 365 A3",
+          "Microsoft 365 A3 for faculty",
+          "Microsoft 365 A3 for students use benefit",
+          "Microsoft 365 A5 for faculty",
+          "Microsoft 365 A5 (Education Faculty Pricing)",
+          "M365 EDU A3",
+          "M365 EDU A3 Unified ShrdSvr ALNG SubsVL MVL PerUsr",
+          "Microsoft 365 A3 (Education Faculty Pricing)",
+          "Microsoft 365 A3 for Students use benefit (Education Student Pricing)",
+          "Microsoft 365 A5",
+          "Microsoft 365 A5 Compliance",
+          "Microsoft 365 A5 Compliance (Education Faculty Pricing)",
+          "Microsoft 365 A5 Security",
+          "Microsoft 365 A5 Security (Education Faculty Pricing)",
+          "O365 EDU A1",
+          "Microsoft Office 365",
+          "Samarbetsplattform (Microsoft Office 365 / Google G Suite)",
+          "M365 A3 Unified Edu Sub Per User",
+          "M365 A3 Unified Edu Sub Student Use Benefit Per User",
+          "M365 A5 Unified Edu Sub Per User",
+          "M365 A5 Unified Edu Sub Student Use Benefit Per User",
+          "Office 365 (Plan E3) Add On",
+          "Office Professional Plus",
+          "Microsoft 365 A3 for students",
+          "Microsoft 365 E3",
+          "Microsoft 365 F3"
+        ]
+      },
+      {
+        "name": "Power BI",
+        "slug": "power-bi",
+        "category": "övrigt",
+        "what_it_is": "Verktyg för rapporter och dataanalys.",
+        "aliases": [
+          "Power BI Pro",
+          "Power BI Pro (Education Faculty Pricing)"
+        ]
+      },
+      {
+        "name": "Power Automate",
+        "slug": "power-automate",
+        "category": "övrigt",
+        "what_it_is": "Automatisering av arbetsflöden.",
+        "aliases": [
+          "Power Automate Premium",
+          "Power Automate Premium (Education Faculty Pricing)"
+        ]
+      },
+      {
+        "name": "Visio",
+        "slug": "visio",
+        "category": "övrigt",
+        "what_it_is": "Program för diagram och flödesscheman.",
+        "aliases": [
+          "Visio Plan 2",
+          "Visio Plan 2 (Education Faculty Pricing)"
+        ]
+      },
+      {
+        "name": "Planner och Project",
+        "slug": "planner-och-project",
+        "category": "övrigt",
+        "what_it_is": "Planering och projektstyrning.",
+        "aliases": [
+          "Planner and Project Plan 3",
+          "Planner and Project Plan 3 for Faculty (Education Faculty Pricing)"
+        ]
+      },
+      {
+        "name": "Microsoft Entra ID",
+        "slug": "microsoft-entra-id",
+        "category": "övrigt",
+        "what_it_is": "Identitets- och behörighetshantering.",
+        "aliases": [
+          "Microsoft Entra ID P2",
+          "Microsoft Entra ID P2 for faculty (Education Faculty Pricing)"
+        ]
+      },
+      {
+        "name": "Microsoft Defender",
+        "slug": "microsoft-defender",
+        "category": "övrigt",
+        "what_it_is": "Skydd mot skadlig kod för datorer och e-post.",
+        "aliases": [
+          "Microsoft Defender for Endpoint P1",
+          "Defender O365 P1 Edu Sub Per User"
+        ]
+      },
+      {
+        "name": "Windows",
+        "slug": "windows",
+        "category": "övrigt",
+        "what_it_is": "Windows operativsystem och Windows Server med CAL-licenser.",
+        "aliases": [
+          "Core CAL",
+          "Windows Enterprise OS Upgrade",
+          "Windows Server"
+        ]
+      },
+      {
+        "name": "SQL Server",
+        "slug": "sql-server",
+        "category": "övrigt",
+        "what_it_is": "Databasserver.",
+        "aliases": [
+          "SQL Server Standard Core ALng LSA 2L"
+        ]
+      }
+    ],
+    "addOns": [
+      "Utbildning"
+    ]
+  },
+  {
+    "canonical": "Google",
+    "slug": "google",
+    "category": "lärplattform",
+    "role": "service",
+    "aliases": [
+      "Google"
+    ],
+    "website": "https://edu.google.com",
+    "avtal": 3,
+    "products": [
+      {
+        "name": "Chrome Education Upgrade",
+        "slug": "chrome-education-upgrade",
+        "category": "övrigt",
+        "what_it_is": "Licens för central hantering av Chromebooks.",
+        "aliases": [
+          "Chrome Education Upgrade (manageringslicens)",
+          "Licens: Chrome Education Upgrade"
+        ]
+      },
+      {
+        "name": "Google Workspace for Education",
+        "slug": "google-workspace-for-education",
+        "category": "lärplattform",
+        "what_it_is": "E-post, dokument och Classroom för skolan (Fundamentals, Standard, Plus).",
+        "editions": [
+          "Fundamentals",
+          "Standard",
+          "Plus"
+        ],
+        "aliases": [
+          "Google Workspace for Education Plus",
+          "Education Plus",
+          "Google Education Plus Edition",
+          "Google Education Plus 1Y Lic",
+          "Google Workspace for Education Standard",
+          "Google Workspace for Education Plus - STAFF",
+          "Google Workspace for Education Plus - STUDENTS",
+          "Google Workspace transition from old Workspace",
+          "Google Workspace for Education Plus (Elevlicenser)",
+          "Google Workspace for Education Plus (Lärarlicenser)",
+          "Google G Suite",
+          "Google Education Plus",
+          "Google Workspace for Education Plus, 1 010 elever och 100 lärare",
+          "Licens: Education Plus",
+          "Google Apps for Education",
+          "GAFE (G Suite)"
+        ]
+      }
+    ],
+    "addOns": [
+      "Support",
+      "Integrationer",
+      "Drift, förvaltning och underhåll",
+      "Migrering och dataöverföring"
+    ]
+  },
+  {
+    "canonical": "Adobe",
+    "slug": "adobe",
+    "category": "övrigt",
+    "role": "service",
+    "aliases": [
+      "adobe"
+    ],
+    "website": "https://www.adobe.com",
+    "avtal": 0,
+    "products": [],
+    "addOns": []
+  },
+  {
+    "canonical": "Tietoevry",
+    "slug": "tietoevry",
+    "category": "skoladministration",
+    "role": "service",
+    "aliases": [
+      "Tieto",
+      "Tietoevry",
+      "TietoEnator Healthcare & Welfare",
+      "TietoEnator",
+      "tieto evry"
+    ],
+    "website": "https://www.tietoevry.com",
+    "avtal": 105,
+    "products": [
+      {
+        "name": "Lifecare",
+        "slug": "lifecare",
+        "category": "övrigt",
+        "what_it_is": "Verksamhetssystem för vård och omsorg.",
+        "aliases": [
+          "Lifecare Cloud Solution"
+        ]
+      },
+      {
+        "name": "Edlevo",
+        "slug": "edlevo",
+        "category": "skoladministration",
+        "what_it_is": "Elevregister och skoladministration för alla skolformer (tidigare Tieto Education och Procapita).",
+        "aliases": [
+          "Tieto Education",
+          "Verksamhetssystem/barn & elevregister och tillhörande tjänster utbildning",
+          "Procapita Education",
+          "Skoladministrativt system",
+          "Procapita",
+          "Elevadministrativt system",
+          "Procapita/Edlevo",
+          "Verksamhetssystem/barn & elevregister",
+          "Edlevo Vuxenutbildning",
+          "App för VH",
+          "Barn- och elevregister",
+          "Procapita Förskola/Grundskola",
+          "Procapita Vuxenutbildning",
+          "Procapita Lärplattform",
+          "Edlevo Förskola/Grundskola",
+          "Aviseringar KIR",
+          "Elevhanteringssystem",
+          "Elevregister",
+          "Elevregistreringssystem",
+          "Grundmodul Förskola",
+          "Grundmodul Grundskolan",
+          "Grundmodul Gymnasieskola",
+          "Grundmodul Kulturskola",
+          "ProCapita",
+          "ProCapita/Education (elevregister)",
+          "Procapita Gymnasieskola",
+          "Procapita Kulturskola",
+          "Skoladministrativt system (Verksamhetssystem)",
+          "Verksamhetssystem till utbildningsförvaltningen",
+          "Verksamhetssystem/barn & elevregister och tillhörande tjänster utbildning (V6)",
+          "Verksamhetssystem/barn & elevregister och tillhörande tjänster utbildning V6",
+          "Vuxenutbildning",
+          "Edlevo Gymnasieskola",
+          "Elevdatasystem/Elevdatabas",
+          "Gymnasieantagning",
+          "Systemstöd för förskola och samtliga skolformer",
+          "Verksamhetssystem (Edlevo)",
+          "Paketpris Förskola/Grundskola",
+          "Elevadministrativt verksamhetssystem",
+          "Edlevo Skolval E-tjänst (Gr)",
+          "Procapita Förskola",
+          "Procapita/Tieto Education",
+          "Tieto Education / Edlevo",
+          "Edlevo DNP-stöd – Grundskola",
+          "Edlevo Fakturaadress Skattekontor (Fsk)",
+          "Procapita Lärplattform grundskola - gymnasieskola",
+          "Edlevo Betygsexport till gymnasieantagning (Gr)",
+          "Procapita Gymnasieskolan",
+          "Edlevo Ansökan barnomsorg m.fl.",
+          "Edlevo Effektiv klassuppflyttning",
+          "Paketpris Gymnasieskola",
+          "Paketpris Vuxenutbildning",
+          "Webmodul Nationella prov kursprov SFI",
+          "Webmodul Nationella prov kursprov gy-kurser",
+          "Edlevo DNP-stöd – Gymnasieskola",
+          "Edlevo DNP-stöd – Vuxenutbildning",
+          "Edlevo Samtycke FSK",
+          "Edlevo Samtycke GR",
+          "Edlevo Studieplan för elev (Vux/Sfi)",
+          "Edlevo Studieval förhandsgranskning",
+          "Edlevo elevregister förskola",
+          "Edlevo elevregister grundskola",
+          "Entreprenörsportal",
+          "Paketpris (9000)",
+          "Procapita Grundskola",
+          "Skolportal",
+          "Synpunkter",
+          "Taxibeställning",
+          "Vårdnadshavarportal",
+          "Edlevo Förnyelse av inkomstuppgift",
+          "Edlevo Ledighetsansökan (Gr)",
+          "Edlevo Login med id och lösenord (Fsk)",
+          "Edlevo Login med id och lösenord (Gr)",
+          "Edlevo Modersmålsansökan admin (Gr)",
+          "Edlevo Närvaro och frånvaro bas (Gr)",
+          "Edlevo Ämnesval - admin och E-tjänst",
+          "Paketpris Edlevo",
+          "Ansökan föräldrakonto",
+          "App för VH inkl. kontaktuppgifter",
+          "Betygsregistrering",
+          "Edlevo App för VH inkl. kontaktuppgifter",
+          "Edlevo App för Vårdnadshavare",
+          "Edlevo Boka utvecklingssamtal Fsk",
+          "Edlevo Boka utvecklingssamtal Gr",
+          "Edlevo Boka utvecklingssamtal Gy",
+          "Edlevo Ersättning egen regi Förskola",
+          "Edlevo Ersättning egen regi Grundskola",
+          "Edlevo Ersättning externa anordnare Förskola",
+          "Edlevo Ersättning externa anordnare Grundskola",
+          "Edlevo Ledighetsansökan, Grundskolan",
+          "Edlevo Ledighetsansökan, Gymnasiet",
+          "Edlevo Nyheter Fsk",
+          "Edlevo Nyheter Gr",
+          "Edlevo Nyheter Gy",
+          "Edlevo Nyheter Vux",
+          "Edlevo Skicka kursinformation/kursbesked",
+          "Edlevo Tvåvägsmeddelande Fsk",
+          "Edlevo Tvåvägsmeddelande Gr",
+          "Edlevo Tvåvägsmeddelande Gy",
+          "Edlevo Tvåvägsmeddelande Vux",
+          "Edlevo elevregister vuxenutbildning",
+          "Elevregister (IT-system som tjänst)",
+          "Frånvaro och närvaro",
+          "Förnyelse av inkomstuppgift",
+          "Förskola Elevregister",
+          "Förskola/Grundskola",
+          "Grundmodul",
+          "Grundskola Elevregister",
+          "Grundsystem - engångskostnad",
+          "Grundsystem - månadskostnad",
+          "Gymnasieskola",
+          "Kalenderschema elev och lärare",
+          "Kulturskola",
+          "Paketpris",
+          "Paketpris (Skolval-moduler)",
+          "Paketpris (moduler)",
+          "Paketpris Kulturskola",
+          "Paketpris Tieto Education Förskola, Grundskola",
+          "Paketpris transformering",
+          "Paketpris Övrigt (6598)",
+          "Planering Förskola bas",
+          "Planering Förskola uppföljning",
+          "Prisökning Edlevo",
+          "Procapita Education Förskola/Grundskola",
+          "Procapita Education Gymnasieskolan",
+          "Procapita Förskola/Grundskola moduler",
+          "Procapita Vuxenutbildning moduler",
+          "Rum",
+          "Skoladministration",
+          "Skolval Automatisk placering",
+          "System för skolskjuts/elevresor",
+          "Tieto EDU App",
+          "Tieto Edlevo",
+          "Tieto Education Förskola",
+          "Tieto Education Grundskola",
+          "Verksamhetssystem",
+          "Verksamhetssystem, barn- och elevadministration",
+          "Webmodul Vux anmälan",
+          "Webmodul Vårdnadshavarportal",
+          "Web-Betyg.net gr",
+          "Web-Betyg.net gy/vux",
+          "Web-Frånvaro.net gr",
+          "Web-Frånvaro.net gy/vux",
+          "Web-klass/grupplistor.net gr",
+          "Web-klass/grupplistor.net gy/vux",
+          "Web-Ämnesprov.net gr",
+          "Anmälan om specialkost och allergi",
+          "Ansökan barnomsorg (Fsk)",
+          "Barn och Elevregister",
+          "EDU BES",
+          "EDU MLO",
+          "Edlevo Ansökan barnomsorg",
+          "Edlevo Betyg",
+          "Edlevo Dagnärvaro (Sfi)",
+          "Edlevo Elevadministration",
+          "Edlevo Elevregister",
+          "Edlevo Familjeförhållanden",
+          "Edlevo Frånvaro",
+          "Edlevo Paketpris (barnomsorg)",
+          "Edlevo Registrera inkomst",
+          "Edlevo Svar på platserbjudande",
+          "Effektiv klassuppflyttning",
+          "Effektiv klassuppflyttning (Gy)",
+          "Familjeförhållanden (Fsk)",
+          "Nytt verksamhetssystem (Vuxenutbildning)",
+          "Registrera inkomst (Fsk)",
+          "Svar på platserbjudande (Fsk)",
+          "Uppdatering av gränssnittet till Edlevo"
+        ]
+      }
+    ],
+    "addOns": [
+      "Införande och uppstart",
+      "Integrationer",
+      "Drift, förvaltning och underhåll",
+      "Konsulttjänster",
+      "Inloggning och identitet",
+      "Utbildning",
+      "Testmiljö",
+      "Support",
+      "SMS",
+      "Migrering och dataöverföring",
+      "Driftsplattform",
+      "Dokumentation"
+    ]
+  },
+  {
+    "canonical": "IST",
+    "slug": "ist",
+    "category": "skoladministration",
+    "role": "service",
+    "aliases": [
+      "IST",
+      "ist education",
+      "ist sverige"
+    ],
+    "website": "https://www.ist.com/sv",
+    "avtal": 53,
+    "products": [
+      {
+        "name": "IST Analys",
+        "slug": "ist-analys",
+        "category": "skoladministration",
+        "what_it_is": "Statistik och analys av skolans data.",
+        "aliases": [
+          "Befolkningsanalys",
+          "IST Analys Gr",
+          "IST Analys Lärande Gr",
+          "IST Analys Lärande Gy",
+          "Analys Administration Förskola & Fritidshem",
+          "Ekonomianalys Föräldrafakturering",
+          "IST Analys Generellt",
+          "IST Analys Gymnasieskola",
+          "IST Analys Vux & SFI",
+          "IST Statistik"
+        ]
+      },
+      {
+        "name": "IST Schema",
+        "slug": "ist-schema",
+        "category": "skoladministration",
+        "what_it_is": "Schemaläggning.",
+        "aliases": [
+          "IST Schema Gr",
+          "IST Schema Grundskola",
+          "IST Schema Gr/Gy/Vux",
+          "IST Schema Gymnasieskola",
+          "IST Schema Vux",
+          "Schemaläggningsverktyg (option)"
+        ]
+      },
+      {
+        "name": "IST Lärande",
+        "slug": "ist-larande",
+        "category": "lärplattform",
+        "what_it_is": "Lärplattform kopplad till IST Administration.",
+        "aliases": [
+          "IST Lärande Grundskola",
+          "IST Lärande FSK",
+          "IST Lärande Gr",
+          "IST Lärande Gymnasieskola",
+          "IST Lärande Analys"
+        ]
+      },
+      {
+        "name": "Dexter",
+        "slug": "dexter",
+        "category": "skoladministration",
+        "what_it_is": "Webbportal för lärare och vårdnadshavare till Extens.",
+        "aliases": []
+      },
+      {
+        "name": "hypernet",
+        "slug": "hypernet",
+        "category": "skoladministration",
+        "what_it_is": "Skolportal och intranät.",
+        "aliases": []
+      },
+      {
+        "name": "PingPong",
+        "slug": "pingpong",
+        "category": "lärplattform",
+        "what_it_is": "Äldre lärplattform.",
+        "aliases": []
+      },
+      {
+        "name": "EduCloud",
+        "slug": "educloud",
+        "category": "integration",
+        "what_it_is": "Integrationsplattform för skolans system.",
+        "aliases": [
+          "EduCloud+"
+        ]
+      },
+      {
+        "name": "SkolID",
+        "slug": "skolid",
+        "category": "integration",
+        "what_it_is": "Inloggningstjänst för elever och personal.",
+        "aliases": []
+      },
+      {
+        "name": "TextLink",
+        "slug": "textlink",
+        "category": "övrigt",
+        "what_it_is": "Tjänst för SMS-utskick.",
+        "aliases": []
+      },
+      {
+        "name": "IST Home Skola",
+        "slug": "ist-home-skola",
+        "category": "skoladministration",
+        "what_it_is": "App för vårdnadshavare.",
+        "aliases": []
+      },
+      {
+        "name": "IST Administration",
+        "slug": "ist-administration",
+        "category": "skoladministration",
+        "what_it_is": "Elevregister och skoladministration för alla skolformer (tidigare Extens).",
+        "aliases": [
+          "IST Administration Grundskola",
+          "Extens",
+          "IST Administration Förskola",
+          "IST Administration Gymnasiet",
+          "IST Administration Vux",
+          "Elevadministrativt system",
+          "Elevregister",
+          "IST Administration Förskola & Fritidshem",
+          "IST Extens",
+          "IST Administration Gymnasieskola",
+          "Gymnasieantagning",
+          "IST Administration Musik & Kultur",
+          "IST Administration Vuxenutbildning & SFI",
+          "Barn- och elevadministrativt system",
+          "Barn- och elevregister",
+          "IT-stöd för skoladministration",
+          "Skoladministrationssystem (SaaS)",
+          "System för skoladministration",
+          "Verksamhetssystem elevadministration",
+          "Webbaserat IT-stöd för förskola & skola",
+          "Extens G2",
+          "Barn- och elevregister (IST Administration)",
+          "IST Administration Vux & SFI",
+          "IST",
+          "IST Administration (elevregister)",
+          "IT-stöd (IST-systemet)",
+          "Skol- och barnomsorgsadministrativt system",
+          "IST Administration för Grundskola",
+          "IST Administration grundskola",
+          "Ansökan och antag vux",
+          "Automatik (GR)",
+          "IST Administration Förskola & Fritidshem - Bas",
+          "IST Administration Grundskola - Bas",
+          "Extens Barnomsorg",
+          "Extens Elev Gr",
+          "IST Administration Förskola/Fritidshem",
+          "IST Administration för Förskola & Fritidshem",
+          "IST Administration gymnasium",
+          "IST Fakturering",
+          "IST Lämna & Hämta",
+          "KAA GY",
+          "Sambokontroll",
+          "IST Administration Förskola & Fritidshem - Extern Resursfördelning",
+          "IST Administration Förskola & Fritidshem - Intern Resursfördelning",
+          "IST Administration Förskola & Fritidshem - Retroaktiv avgiftskontroll",
+          "IST Administration Grundskola - Betyg",
+          "IST Administration Grundskola - Extern resursfördelning",
+          "IST Administration Grundskola - Intern resursfördelning",
+          "IST Administration Grundskola - Praktik",
+          "IST Administration Grundskola - Skolbyte",
+          "IST Administration Grundskola - Skolval",
+          "IST Administration Gymnasiet - Bas",
+          "IST Administration Gymnasiet - Betyg",
+          "IST Administration Gymnasiet - Extern resursfördelning",
+          "IST Administration Gymnasiet - Intern resursfördelning",
+          "IST Administration Gymnasiet - Valhantering",
+          "IST Administration Vux & SFI bas",
+          "IST IKE",
+          "IST Resursfördelning",
+          "Analys Administration Förskola & Fritidshem",
+          "Extens Betyg Gr",
+          "Extens DBV",
+          "Extens Musik & Kultur",
+          "Extens Personal Gr",
+          "Extens-gyantag",
+          "IST Administration (elevadministrativt register/elevregister)",
+          "IST Administration Generellt",
+          "IST Administration Gymnasieskola (avser IM med max 100 elever)",
+          "IST Administration Gymnasieskola - Bas",
+          "IST Administration för Förskola & Fritidshem - Bas",
+          "IST Administration för Grundskola - Bas",
+          "IST Formulär",
+          "IST Formulär för Gymnasiet",
+          "IST Förskola",
+          "IST IT-stöd för skoladministration",
+          "IST Medgivande",
+          "IST Närvaro/Frånvaro",
+          "IST Skola Gr",
+          "IST förskola/fritidshem",
+          "IST-stöd för skoladministration",
+          "Mitt Skolval",
+          "Skolpliktsbevakning",
+          "eFörvaltning för Barn, utbildning och kultur som Tjänst",
+          "eFörvaltning för Barn-, Utbildning- och Kulturförvaltningen"
+        ]
+      }
+    ],
+    "addOns": [
+      "ASP-drift",
+      "Integrationer",
+      "Migrering och dataöverföring",
+      "IST Navet",
+      "Historiklicens",
+      "Införande och uppstart",
+      "Konsulttjänster",
+      "Digitala nationella prov",
+      "Inloggning och identitet",
+      "Drift, förvaltning och underhåll",
+      "Utbildning",
+      "Databaslicens Sybase",
+      "SMS"
+    ]
+  },
+  {
+    "canonical": "SchoolSoft",
+    "slug": "schoolsoft",
+    "category": "skoladministration",
+    "role": "service",
+    "aliases": [
+      "SchoolSoft"
+    ],
+    "website": "https://www.schoolsoft.se",
+    "avtal": 72,
+    "products": [
+      {
+        "name": "SchoolSoft Schema",
+        "slug": "schoolsoft-schema",
+        "category": "skoladministration",
+        "what_it_is": "Schemaläggning med AI-stöd (AI Schema).",
+        "aliases": [
+          "Schemaläggningssystem",
+          "AI Schema",
+          "Schema Modul",
+          "Lärplattform, Schema Modul och Elevadministrativt System",
+          "Schema Modulen",
+          "SchoolSoft schemaläggning (SaaS)",
+          "Schema modul",
+          "Schema- och frånvaroprogram",
+          "Verksamhetssystem för skolväsendet - Elevregister och Skoladministration inklusive schema och fritidshem"
+        ]
+      },
+      {
+        "name": "SchoolSoft",
+        "slug": "schoolsoft",
+        "category": "skoladministration",
+        "what_it_is": "Skolplattform med lärplattform och elevadministration (EA).",
+        "aliases": [
+          "Lärplattform",
+          "SchoolSoft EA",
+          "SchoolSoft skoladministrativt system",
+          "Elevadministrativt system",
+          "SchoolSoft Lärplattform",
+          "Skoladministrativ plattform",
+          "Elevadministrativa Systemet EA",
+          "Barn- och elevregister",
+          "SchoolSoft lärplattform",
+          "Administrationssystem för skola",
+          "Barn- och elevadministrativt system",
+          "Elevadministrativt System",
+          "Elevadministrativt system och Skolplattform",
+          "SchoolSoft - Elevadministrativt system",
+          "SchoolSoft EA (ElevAdministration)",
+          "SchoolSoft Elevadministration",
+          "Skoladministrativt system",
+          "Verksamhetssystem för förskola och skola",
+          "Verksamhetssystem skola",
+          "Lärplattform och elevregister",
+          "Lärplattform samt elevadministrativt system",
+          "Lärplattform, Schema Modul och Elevadministrativt System",
+          "SchoolSoft - EA",
+          "Elevregister",
+          "SchoolSoft Lärplattform Anpassad grundskola",
+          "Modul, Barnadministration förskola",
+          "SchoolSoft Elevadministration (Elevregister)",
+          "Betyg och elevadministration",
+          "Betygsmodul",
+          "Betygsättning",
+          "Elevadministrativa systemet",
+          "Administration",
+          "Barnadministration förskola",
+          "Digital lärplattform/dokumentationssystem",
+          "Digitalt Stöd för lärande och utveckling",
+          "E-tjänst ansökan vuxenutbildning, ansökan, inkomständring",
+          "Elevadministration",
+          "Elevadministration och Betygsmodul",
+          "Elevadministration skola",
+          "Fakturering",
+          "Lärplattform (SchoolSoft)",
+          "Lärplattformen (option)",
+          "Lärplattformen - Support/licens Förskola",
+          "Lärplattformen - Support/licens Skola",
+          "Mitt skolval",
+          "Modul Barnadministration Förskola",
+          "Modul Barnadministration förskola",
+          "SchoolSoft - EA (Elevadministrativa systemet)",
+          "SchoolSoft - System för bedömning och kommunikation",
+          "SchoolSoft EA (Elevadministrativa systemet)",
+          "SchoolSoft Elev Administration",
+          "SchoolSoft Grundskolan",
+          "SchoolSoft licens",
+          "SchoolSoft programvara",
+          "SchoolSoft Årlig kostnad",
+          "Schoolsoft elevadmin",
+          "Schoolsoft lärplattform",
+          "Verksamhetssystem för skolväsendet - Elevregister och Skoladministration inklusive schema och fritidshem",
+          "Verksamhetssystem skola (skoladministrativt system och lärplattform)",
+          "Årligt pris för nyttjande av systemet"
+        ]
+      }
+    ],
+    "addOns": [
+      "Drift, förvaltning och underhåll",
+      "Införande och uppstart",
+      "Utbildning",
+      "Support",
+      "Läsårsarkivering",
+      "BankID-inloggning",
+      "Integrationer",
+      "Konsulttjänster",
+      "Migrering och dataöverföring",
+      "SMS-paket"
+    ]
+  },
+  {
+    "canonical": "Nova Software",
+    "slug": "nova-software",
+    "category": "skoladministration",
+    "role": "service",
+    "aliases": [
+      "Nova Software",
+      "Skola24",
+      "novasoftware",
+      "skola 24"
+    ],
+    "website": "https://www.skola24.se",
+    "avtal": 100,
+    "products": [
+      {
+        "name": "Skola24 Schema",
+        "slug": "skola24-schema",
+        "category": "skoladministration",
+        "what_it_is": "Schemaläggning med Novaschem och schemavisning i Skola24.",
+        "aliases": [
+          "Novaschem",
+          "Funktionspaket Schema",
+          "Närvaro- och schemaläggningssystem",
+          "Schemaläggningssystem",
+          "Skola24 Schemaläggningstjänst",
+          "Skola24 Schema - Analys och planering",
+          "Skola24 Funktionspaket Schema",
+          "Schemaläggning Arlandagymnasiet",
+          "Schemaläggningsprogram",
+          "NovaSchem",
+          "IT-stöd för schemaläggning samt närvaro/frånvarohantering",
+          "Schema- och frånvaroregistrering",
+          "Skola24 Plattform inkl Skola24 Schema",
+          "Skola24 plattform (Funktionspaket Schema inkl. Novaschem)",
+          "Skola24 plattform (Funktionspaket Schema och Frånvaro)",
+          "Skola24 plattform - Funktionspaket Schema",
+          "Skola24 plattform - Funktionspaket Schema inkl. Novaschem",
+          "Skola24 plattform inkl. Funktionspaket Schema (Novaschem)",
+          "Analys och planering",
+          "Analys och planering (enbart gy)",
+          "Skola24 Plattform (Skola24 Schema)",
+          "Skola24 Plattform inkl. Skola24 Schema",
+          "Skola24 schema"
+        ]
+      },
+      {
+        "name": "Skola24 Frånvaro",
+        "slug": "skola24-franvaro",
+        "category": "skoladministration",
+        "what_it_is": "Frånvarohantering och frånvarostatistik.",
+        "aliases": [
+          "Funktionspaket Frånvaro",
+          "Närvaro- och schemaläggningssystem",
+          "Skola24 Frånvarostatistik",
+          "IT-stöd för schemaläggning samt närvaro/frånvarohantering",
+          "Schema- och frånvaroregistrering",
+          "Frånvarostatistik",
+          "Skola24 Plattform (Skola24 Frånvaro)"
+        ]
+      },
+      {
+        "name": "Skola24 Fritidshem",
+        "slug": "skola24-fritidshem",
+        "category": "skoladministration",
+        "what_it_is": "Närvaro och schema för fritidshem.",
+        "aliases": [
+          "Fritidshem",
+          "Skola 24 Fritidshem",
+          "Skola24 Funktionspaket Fritidshem",
+          "Funktionspaket Fritidshem"
+        ]
+      },
+      {
+        "name": "Skola24",
+        "slug": "skola24",
+        "category": "skoladministration",
+        "what_it_is": "Plattform för schema, frånvaro och lokalbokning.",
+        "aliases": [
+          "Skola24 Plattform",
+          "Skola24 plattform",
+          "Skola24 Analys och planering",
+          "Skola24 Boka lokal",
+          "Skola 24",
+          "Schemaläggningssystem (Skola24)",
+          "Ledighetsansökan",
+          "Skola24 Dela lokal",
+          "Skola24 Plattform / Schema",
+          "Skola24 kommunlicens",
+          "Skola24 Plattform inkl Skola24 Schema",
+          "Skola24 plattform (Funktionspaket Schema inkl. Novaschem)",
+          "Skola24 plattform (Funktionspaket Schema och Frånvaro)",
+          "Skola24 plattform - Funktionspaket Schema inkl. Novaschem",
+          "Skola24 plattform inkl. Funktionspaket Schema (Novaschem)",
+          "Skola24 550",
+          "Skola24 App",
+          "Skola24 Boka Lokal",
+          "Skola24 Plattform (Frånvarostatistik)",
+          "Skola24 Plattform (tre års avtal)",
+          "Skola24 Plattform inkl. Skola24 Schema",
+          "Skola24 Plattform m.m.",
+          "Skola24 Plattform med tillval",
+          "Skola24 licens",
+          "Skola24 plattform (Alternativ 2)"
+        ]
+      }
+    ],
+    "addOns": [
+      "Integrationer",
+      "Frånvaroanmälan via telefon",
+      "SMS-avisering",
+      "Rapport pedagogisk personal (SCB)",
+      "Export lektion",
+      "Migrering och dataöverföring",
+      "Införande och uppstart",
+      "Konsulttjänster",
+      "Inloggning och identitet",
+      "Flerspråksval",
+      "SLA",
+      "Support",
+      "Utbildning"
+    ]
+  },
+  {
+    "canonical": "Tempus",
+    "slug": "tempus",
+    "category": "skoladministration",
+    "role": "service",
+    "aliases": [
+      "Tempus",
+      "Tempus Information Systems",
+      "tempus information system"
+    ],
+    "website": "https://tempus.se",
+    "avtal": 11,
+    "products": [
+      {
+        "name": "Tempus Personal",
+        "slug": "tempus-personal",
+        "category": "skoladministration",
+        "what_it_is": "Personalplanering i förskolan.",
+        "aliases": [
+          "System för personalplanering och närvaroregistrering",
+          "Tempus PERSONAL"
+        ]
+      },
+      {
+        "name": "Tempus Köksplanering",
+        "slug": "tempus-koksplanering",
+        "category": "skoladministration",
+        "what_it_is": "Planering av måltider och kök.",
+        "aliases": []
+      },
+      {
+        "name": "Tempus Barn",
+        "slug": "tempus-barn",
+        "category": "skoladministration",
+        "what_it_is": "Närvaroregistrering och barnadministration i förskola och fritids.",
+        "aliases": [
+          "Närvarosystem",
+          "Tempus förskolesystem",
+          "Tempus Barn Förskola",
+          "System för personalplanering och närvaroregistrering",
+          "Tempus",
+          "Tempus Admin",
+          "Tempus BARN",
+          "Tempus Dokumentation",
+          "Tempus Hemma",
+          "Tempus Nu",
+          "Tempus närvaroregistrering",
+          "Tempus system för närvaroregistrering",
+          "Tempus Barn och Personal"
+        ]
+      }
+    ],
+    "addOns": [
+      "Införande och uppstart",
+      "Konsulttjänster"
+    ]
+  },
+  {
+    "canonical": "Quiculum",
+    "slug": "quiculum",
+    "category": "skoladministration",
+    "role": "service",
+    "aliases": [
+      "Quiculum"
+    ],
+    "website": "https://quiculum.se",
+    "avtal": 9,
+    "products": [
+      {
+        "name": "Quiculum",
+        "slug": "quiculum",
+        "category": "skoladministration",
+        "what_it_is": "Skolplattform med elevadministration och schema.",
+        "aliases": [
+          "Elevadministrativt system",
+          "Quiculum skolplattform",
+          "Schemasystem",
+          "Quiculum förskola"
+        ]
+      }
+    ],
+    "addOns": [
+      "BankID- och SMS-tjänst",
+      "Integrationer"
+    ],
+    "singleProduct": "Quiculum"
+  },
+  {
+    "canonical": "Göteborgs IT Konsult Gotit",
+    "slug": "gotit",
+    "category": "skoladministration",
+    "role": "service",
+    "aliases": [
+      "Göteborgs IT Konsult Gotit",
+      "Gotit"
+    ],
+    "website": "https://gotit.se",
+    "avtal": 12,
+    "products": [
+      {
+        "name": "Skolplatsen",
+        "slug": "skolplatsen",
+        "category": "skoladministration",
+        "what_it_is": "Söktjänst och ansökan till vuxenutbildning.",
+        "aliases": [
+          "Skolplatsen och Alvis som tjänst",
+          "Skolplatsen som tjänst"
+        ]
+      },
+      {
+        "name": "Alvis",
+        "slug": "alvis",
+        "category": "skoladministration",
+        "what_it_is": "Elevadministration och antagning för vuxenutbildningen.",
+        "aliases": [
+          "Alvis som tjänst",
+          "Alvis Elevregister",
+          "Antagnings- och elevregister inom vuxenutbildning",
+          "Elevadministrativt system för kommunal vuxenutbildning",
+          "IT-system vuxenutbildningen (Alvis)",
+          "Skolplatsen och Alvis som tjänst",
+          "Administrativt IT-system för vuxenutbildning",
+          "IT-system vuxenutbildningen"
+        ]
+      }
+    ],
+    "addOns": []
+  },
+  {
+    "canonical": "SpeedAdmin",
+    "slug": "speedadmin",
+    "category": "skoladministration",
+    "role": "service",
+    "aliases": [
+      "SpeedAdmin",
+      "SpeedWARE"
+    ],
+    "website": "https://speedadmin.dk",
+    "avtal": 4,
+    "products": [
+      {
+        "name": "SpeedAdmin",
+        "slug": "speedadmin",
+        "category": "skoladministration",
+        "what_it_is": "Administrationssystem för kulturskolan.",
+        "editions": [
+          "Play!"
+        ],
+        "aliases": [
+          "SpeedAdmin Play! Abonnemang XS",
+          "Elevhanteringssystem Kulturskola",
+          "SpeedAdmin Play!",
+          "SpeedAdmin licens",
+          "Verksamhetssystem för Kulturskolan"
+        ]
+      }
+    ],
+    "addOns": [
+      "Integrationer",
+      "Införande och uppstart",
+      "Utbildning"
+    ],
+    "singleProduct": "SpeedAdmin"
+  },
+  {
+    "canonical": "StudyAlong",
+    "slug": "studyalong",
+    "category": "skoladministration",
+    "role": "service",
+    "aliases": [
+      "StudyAlong"
+    ],
+    "website": "https://studyalong.se",
+    "avtal": 3,
+    "products": [
+      {
+        "name": "Playalong",
+        "slug": "playalong",
+        "category": "läromedel",
+        "what_it_is": "Digitalt undervisningsmaterial för musik i kulturskolan.",
+        "aliases": [
+          "Modul 3:4 Digitalt undervisningsmaterial (PLAYALONG)"
+        ]
+      },
+      {
+        "name": "StudyAlong",
+        "slug": "studyalong",
+        "category": "skoladministration",
+        "what_it_is": "Administration och lärplattform för kulturskolan.",
+        "aliases": [
+          "Modul 1 Webbanmälan",
+          "Modul 2 Administration",
+          "Modul 2:2 Inventariehantering",
+          "Modul 2:3 Lokalbokning",
+          "Modul 3 Lärplattform",
+          "Modul 3:1 Min media",
+          "Modul 3:2 App",
+          "Modul 3:3 Video & audiochatt",
+          "Systemstöd Kulturskolan"
+        ]
+      }
+    ],
+    "addOns": [
+      "SMS"
+    ]
+  },
+  {
+    "canonical": "Tyra",
+    "slug": "tyra",
+    "category": "skoladministration",
+    "role": "service",
+    "aliases": [
+      "Tyra"
+    ],
+    "website": "https://tyra.io",
+    "avtal": 2,
+    "products": [
+      {
+        "name": "Tyra",
+        "slug": "tyra",
+        "category": "skoladministration",
+        "what_it_is": "App för förskolan: dokumentation, närvaro och kontakt med vårdnadshavare.",
+        "aliases": [
+          "Tyra förskola",
+          "App förskola (Tyra)",
+          "TYRA",
+          "TYRA Lärplattform för Förskola och Fritids",
+          "Licens och Support för TYRA på Förskolan och Fritids",
+          "TYRA Förskolan",
+          "Tyra licensavgift Förskolan"
+        ]
+      }
+    ],
+    "addOns": [],
+    "singleProduct": "Tyra"
+  },
+  {
+    "canonical": "Plan Digital",
+    "slug": "plan-digital",
+    "category": "skoladministration",
+    "role": "service",
+    "aliases": [
+      "Plan Digital"
+    ],
+    "website": null,
+    "avtal": 2,
+    "products": [
+      {
+        "name": "Plan Digital",
+        "slug": "plan-digital",
+        "category": "skoladministration",
+        "what_it_is": "System för tjänstefördelning i grundskolan.",
+        "aliases": [
+          "Tjänstefördelningssystem inom grundskola"
+        ]
+      }
+    ],
+    "addOns": [],
+    "singleProduct": "Plan Digital"
+  },
+  {
+    "canonical": "Royal Schedule",
+    "slug": "royal-schedule",
+    "category": "skoladministration",
+    "role": "service",
+    "aliases": [
+      "Royal Schedule"
+    ],
+    "website": "https://royalschedule.com",
+    "avtal": 2,
+    "products": [
+      {
+        "name": "Royal Schedule",
+        "slug": "royal-schedule",
+        "category": "skoladministration",
+        "what_it_is": "Schemaläggning med automatisk optimering.",
+        "aliases": [
+          "Schemaläggning per elev",
+          "Schemaläggningssystem (Royal Schedule)",
+          "Royal Schedule schemaläggningsverktyg",
+          "Schemaläggning"
+        ]
+      }
+    ],
+    "addOns": [
+      "Införande och uppstart"
+    ],
+    "singleProduct": "Royal Schedule"
+  },
+  {
+    "canonical": "Optiplan",
+    "slug": "optiplan",
+    "category": "skoladministration",
+    "role": "service",
+    "aliases": [
+      "Optiplan"
+    ],
+    "website": "https://optiplan.se",
+    "avtal": 1,
+    "products": [
+      {
+        "name": "Optiplan Skolskjuts",
+        "slug": "optiplan-skolskjuts",
+        "category": "skoladministration",
+        "what_it_is": "Planering av skolskjuts.",
+        "aliases": [
+          "Paketpris Optiplan Skolskjuts",
+          "Skolkarta",
+          "Skolskjutsskola"
+        ]
+      },
+      {
+        "name": "Optiplan Skolplacering",
+        "slug": "optiplan-skolplacering",
+        "category": "skoladministration",
+        "what_it_is": "Skolval och skolplacering med e-tjänst för vårdnadshavare.",
+        "aliases": [
+          "Optiplan Skolplacering (moduler)",
+          "Vårdnadshavarportal Ansökan & PDF beslut",
+          "Skolval Optiplan Skolplacering"
+        ]
+      }
+    ],
+    "addOns": [
+      "Integrationer"
+    ]
+  },
+  {
+    "canonical": "Svensk utbildningsteknologi",
+    "slug": "svensk-utbildningsteknologi",
+    "category": "skoladministration",
+    "role": "service",
+    "aliases": [
+      "Svensk utbildningsteknologi"
+    ],
+    "website": null,
+    "avtal": 2,
+    "products": [],
+    "addOns": []
+  },
+  {
+    "canonical": "Stratsys",
+    "slug": "stratsys",
+    "category": "övrigt",
+    "role": "service",
+    "aliases": [
+      "Stratsys"
+    ],
+    "website": "https://www.stratsys.com",
+    "avtal": 1,
+    "products": [
+      {
+        "name": "Stratsys SKA",
+        "slug": "stratsys-ska",
+        "category": "övrigt",
+        "what_it_is": "Stöd för systematiskt kvalitetsarbete i skolan.",
+        "aliases": [
+          "Stratsys - Systematiskt kvalitetsarbete",
+          "Kvalitetsarbete för skola (SKA)",
+          "SKA licenser (user)"
+        ]
+      }
+    ],
+    "addOns": [],
+    "singleProduct": "Stratsys SKA"
+  },
+  {
+    "canonical": "Prorenata",
+    "slug": "prorenata",
+    "category": "elevhälsa",
+    "role": "service",
+    "aliases": [
+      "Prorenata"
+    ],
+    "website": "https://prorenata.se",
+    "avtal": 27,
+    "products": [
+      {
+        "name": "ProReNata Journal",
+        "slug": "prorenata-journal",
+        "category": "elevhälsa",
+        "what_it_is": "Journalsystem för elevhälsan.",
+        "aliases": [
+          "Prorenata Journal",
+          "Systemstöd till Elevhälsan",
+          "Journalsystem elevhälsan",
+          "Journalsystem för elevhälsan (SaaS)",
+          "ProReNata - Systemstöd till Elevhälsan",
+          "Prorenata dokumentationssystem",
+          "Elevhälsovårdsjournal",
+          "Journalsystem för elevhälsan",
+          "Prorenata journalsystem för barn- och elevhälsan",
+          "Prorenata",
+          "ProRenata (GR)",
+          "Journal- och dokumentationssystem för elevhälsan",
+          "Prorenata Journal - EHT-licens",
+          "Prorenata Journal - Pedagoglicens",
+          "Prorenata Journal - Standardlicens",
+          "Dokumentationssystem för elevhälsan (ProReNata)",
+          "Dokumentationssystem för elevhälsa",
+          "Elevhälsosystem som molntjänst",
+          "Journalsystem",
+          "Journalsystem årskostnad Tierp",
+          "Personal för dokumentation av EHT",
+          "Personal med arbete i elevjournal",
+          "Prorenata (digitalt dokumentationsprogram)",
+          "Prorenata Journal - EHT-licens (ej HSL)",
+          "Prorenata Journal - Pedagoger",
+          "Prorenata Journal - Standardlicens (HSL)",
+          "Systemstöd till Elevhälsan (kommunlicens)"
+        ]
+      }
+    ],
+    "addOns": [
+      "Införande och uppstart",
+      "Integrationer",
+      "Överföring från PMO",
+      "Utbildning",
+      "NPÖ-koppling",
+      "Användarimport",
+      "Säker digital kommunikation (SDK)",
+      "Digital remiss (Inera)",
+      "Migrering och dataöverföring",
+      "Drift, förvaltning och underhåll",
+      "Support"
+    ],
+    "singleProduct": "ProReNata Journal"
+  },
+  {
+    "canonical": "CompuGroup Medical",
+    "slug": "cgm",
+    "category": "elevhälsa",
+    "role": "service",
+    "aliases": [
+      "CompuGroup Medical"
+    ],
+    "website": "https://www.cgm.com/swe_sv",
+    "avtal": 3,
+    "products": [
+      {
+        "name": "PMO",
+        "slug": "pmo",
+        "category": "elevhälsa",
+        "what_it_is": "Journalsystem för elevhälsan.",
+        "aliases": [
+          "PMO Elevhälsans ärenden",
+          "PMO Elevhälsans ärenden licens Modul med processtöd för EHT",
+          "PMO-SaaS"
+        ]
+      }
+    ],
+    "addOns": [
+      "Integrationer",
+      "Arkivexport",
+      "Drift, förvaltning och underhåll",
+      "Utbildning"
+    ],
+    "singleProduct": "PMO"
+  },
+  {
+    "canonical": "Digital Fox",
+    "slug": "digital-fox",
+    "category": "elevhälsa",
+    "role": "service",
+    "aliases": [
+      "Digital Fox"
+    ],
+    "website": "https://digitalfox.se",
+    "avtal": 3,
+    "products": [
+      {
+        "name": "DF Respons",
+        "slug": "df-respons",
+        "category": "elevhälsa",
+        "what_it_is": "Digital hantering av kränkande behandling, olyckor och elevärenden.",
+        "aliases": [
+          "Barnolycksfall",
+          "Kränkande behandling",
+          "Behov av särskilt stöd",
+          "DF RESPONS",
+          "DF RESPONS Skola FLEX",
+          "Digital elevakt/DF Respons",
+          "EHT-möte",
+          "Elevanteckning",
+          "Extra anpassningar",
+          "Pedagogisk utredning",
+          "Rapporttjänst",
+          "Rapporttjänst utan schemaläggning",
+          "Rektorsbeslut",
+          "Särskilt stöd förskola",
+          "Åtgärdsprogram"
+        ]
+      }
+    ],
+    "addOns": [
+      "Integrationer",
+      "Drift, förvaltning och underhåll",
+      "Support",
+      "Införande och uppstart"
+    ],
+    "singleProduct": "DF Respons"
+  },
+  {
+    "canonical": "Visma Draftit",
+    "slug": "draftit",
+    "category": "elevhälsa",
+    "role": "service",
+    "aliases": [
+      "Visma Draftit",
+      "Draftit"
+    ],
+    "website": "https://www.draftit.se",
+    "avtal": 3,
+    "products": [
+      {
+        "name": "Draftit Incident",
+        "slug": "draftit-incident",
+        "category": "elevhälsa",
+        "what_it_is": "Anmälan och hantering av kränkande behandling och incidenter.",
+        "aliases": [
+          "Kränkande Behandling Incident",
+          "Skolmiljö Incident"
+        ]
+      },
+      {
+        "name": "Draftit Skolledning",
+        "slug": "draftit-skolledning",
+        "category": "övrigt",
+        "what_it_is": "Regelverk och rutiner för skolledare.",
+        "aliases": [
+          "Draftit Publicering Skolledning",
+          "Skolledning"
+        ]
+      }
+    ],
+    "addOns": []
+  },
+  {
+    "canonical": "Eventful",
+    "slug": "eventful",
+    "category": "integration",
+    "role": "service",
+    "aliases": [
+      "Eventful"
+    ],
+    "website": "https://eventful.se",
+    "avtal": 10,
+    "products": [
+      {
+        "name": "TeamSynk",
+        "slug": "teamsynk",
+        "category": "integration",
+        "what_it_is": "Synk av elever, klasser och schema till Microsoft 365 och Teams.",
+        "editions": [
+          "Brons"
+        ],
+        "aliases": [
+          "Eventful Synktjänst för Microsoft 365/Teams for Edu – Brons",
+          "Eventful Skoltjänst för Office 365",
+          "TeamSynk Skola & Microsoft SDS",
+          "Eventful Synktjänst – Brons",
+          "Eventful Skoltjänst",
+          "Evenful Skoltjänst",
+          "Eventful SkolSynk",
+          "Eventful Skoltjänst för Microsoft 365",
+          "TeamSynk Organisation",
+          "TeamSynk Organisation - Gr, Gy & Vux",
+          "TeamSynk Skola & Microsoft SDS - Gr, Gy & Vux"
+        ]
+      },
+      {
+        "name": "KontoSynk",
+        "slug": "kontosynk",
+        "category": "integration",
+        "what_it_is": "Automatisk konto­hantering i Entra ID och Google.",
+        "aliases": [
+          "Entra KontoSynk & Lösenordshantering",
+          "Entra Kontosynk",
+          "Entra KontoSynk",
+          "Entra KontoSynk & Lösenordshantering - Gr-, Gy- & Vux-elever",
+          "GCDS",
+          "Google KontoSynk",
+          "Microsoft Entra Kontosynk"
+        ]
+      },
+      {
+        "name": "ClassroomSynk",
+        "slug": "classroomsynk",
+        "category": "integration",
+        "what_it_is": "Synk av klasser till Google Classroom.",
+        "aliases": [
+          "Google ClassroomSynk"
+        ]
+      },
+      {
+        "name": "GruppSynk",
+        "slug": "gruppsynk",
+        "category": "integration",
+        "what_it_is": "Synk av grupper mellan skolsystem och katalogtjänst.",
+        "aliases": [
+          "GruppSynk - Gr, Gy & Vux"
+        ]
+      },
+      {
+        "name": "AD-Synk",
+        "slug": "ad-synk",
+        "category": "integration",
+        "what_it_is": "Synk av konton till Active Directory.",
+        "aliases": [
+          "AD-Synk - Gr, Gy & Vux",
+          "Arbete i lokal kundmiljö vid implementering av AD-synk"
+        ]
+      },
+      {
+        "name": "FlowSync",
+        "slug": "flowsync",
+        "category": "integration",
+        "what_it_is": "API för dataflöden mellan skolans system.",
+        "aliases": [
+          "Eventful FlowSync",
+          "Licens Eventful FlowSync (API)"
+        ]
+      },
+      {
+        "name": "Lösenordshantering",
+        "slug": "losenordshantering",
+        "category": "integration",
+        "what_it_is": "Självservice för lösenord för elever och personal.",
+        "aliases": [
+          "Entra KontoSynk & Lösenordshantering",
+          "Entra KontoSynk & Lösenordshantering - Gr-, Gy- & Vux-elever",
+          "Lösenordshantering - Gr, Gy & Vux"
+        ]
+      },
+      {
+        "name": "Schemapublicering",
+        "slug": "schemapublicering",
+        "category": "integration",
+        "what_it_is": "Publicering av schema i Google Kalender.",
+        "aliases": []
+      },
+      {
+        "name": "DNP-provisionering",
+        "slug": "dnp-provisionering",
+        "category": "integration",
+        "what_it_is": "Konton och inloggning för digitala nationella prov.",
+        "aliases": []
+      },
+      {
+        "name": "Skolpass",
+        "slug": "skolpass",
+        "category": "integration",
+        "what_it_is": "Inloggningstjänst (IdP) via Google.",
+        "aliases": [
+          "Skolpass/IDP Google"
+        ]
+      }
+    ],
+    "addOns": [
+      "Drift, förvaltning och underhåll",
+      "Införande och uppstart",
+      "Inloggning och identitet",
+      "Support",
+      "Integrationer",
+      "Konsulttjänster"
+    ]
+  },
+  {
+    "canonical": "Skolfederation",
+    "slug": "skolfederation",
+    "category": "integration",
+    "role": "service",
+    "aliases": [
+      "Skolfederation"
+    ],
+    "website": "https://skolfederation.se",
+    "avtal": 4,
+    "products": [
+      {
+        "name": "Skolfederation",
+        "slug": "skolfederation",
+        "category": "integration",
+        "what_it_is": "Medlemskap i federationen för säker inloggning till skoltjänster.",
+        "aliases": [
+          "Skolfederation medlemskap"
+        ]
+      }
+    ],
+    "addOns": [],
+    "singleProduct": "Skolfederation"
+  },
+  {
+    "canonical": "Sambruk",
+    "slug": "sambruk",
+    "category": "övrigt",
+    "role": "service",
+    "aliases": [
+      "Sambruk"
+    ],
+    "website": "https://sambruk.se",
+    "avtal": 5,
+    "products": [
+      {
+        "name": "Tjänstekollen",
+        "slug": "tjanstekollen",
+        "category": "övrigt",
+        "what_it_is": "Gemensam e-tjänst för kommuner.",
+        "aliases": []
+      },
+      {
+        "name": "Tillarbetslivet",
+        "slug": "tillarbetslivet",
+        "category": "övrigt",
+        "what_it_is": "Tjänst för praktik och kontakt med arbetslivet.",
+        "aliases": []
+      },
+      {
+        "name": "EGIL",
+        "slug": "egil",
+        "category": "integration",
+        "what_it_is": "Öppen standard och tjänst för att föra över elevdata mellan system.",
+        "aliases": []
+      }
+    ],
+    "addOns": []
+  },
+  {
+    "canonical": "Learn-IT Umeå",
+    "slug": "samverka",
+    "category": "övrigt",
+    "role": "service",
+    "aliases": [
+      "Samverka.nu",
+      "Learn-IT Umeå"
+    ],
+    "website": "https://samverka.nu",
+    "avtal": 5,
+    "products": [
+      {
+        "name": "Samverka.nu",
+        "slug": "samverka-nu",
+        "category": "övrigt",
+        "what_it_is": "Tjänst för att hantera PRAO och praktikplatser.",
+        "aliases": [
+          "Samverka",
+          "Samverka.nu PRAO",
+          "www.samverka.nu",
+          "Årsavgift PRAO",
+          "Samverka.nu Praktik grundskola (PRAO)"
+        ]
+      }
+    ],
+    "addOns": [],
+    "singleProduct": "Samverka.nu"
+  },
+  {
+    "canonical": "Axiell",
+    "slug": "axiell",
+    "category": "övrigt",
+    "role": "service",
+    "aliases": [
+      "Axiell"
+    ],
+    "website": "https://www.axiell.com",
+    "avtal": 4,
+    "products": [
+      {
+        "name": "WeLib",
+        "slug": "welib",
+        "category": "övrigt",
+        "what_it_is": "Bibliotekssystem för skolbibliotek.",
+        "aliases": [
+          "WeLib licenser, drift och underhåll",
+          "WeLib Fristående",
+          "WeLib licenser, drift och underhåll för 3 000 elever"
+        ]
+      },
+      {
+        "name": "ElibU",
+        "slug": "elibu",
+        "category": "läromedel",
+        "what_it_is": "E-böcker och ljudböcker för skolan.",
+        "aliases": []
+      }
+    ],
+    "addOns": [
+      "Utbildning",
+      "Införande och uppstart",
+      "Migrering och dataöverföring",
+      "Inloggning och identitet"
+    ]
+  },
+  {
+    "canonical": "BTJ",
+    "slug": "btj",
+    "category": "övrigt",
+    "role": "service",
+    "aliases": [
+      "BTJ",
+      "bibliotekstjanst"
+    ],
+    "website": "https://www.btj.se",
+    "avtal": 2,
+    "products": [
+      {
+        "name": "ArtikelSök",
+        "slug": "artikelsok",
+        "category": "läromedel",
+        "what_it_is": "Databas med artiklar ur svensk press.",
+        "aliases": [
+          "ArtikelSök Gymnasieskola, yrkes- och folkhögskola > 3200"
+        ]
+      },
+      {
+        "name": "Updatum",
+        "slug": "updatum",
+        "category": "läromedel",
+        "what_it_is": "Faktadatabas om aktuella ämnen.",
+        "aliases": [
+          "Updatum Skolor > 3000 elever"
+        ]
+      }
+    ],
+    "addOns": []
+  },
+  {
+    "canonical": "Skillster",
+    "slug": "skillster",
+    "category": "övrigt",
+    "role": "service",
+    "aliases": [
+      "Skillster"
+    ],
+    "website": "https://skillster.com",
+    "avtal": 2,
+    "products": [
+      {
+        "name": "Skillster",
+        "slug": "skillster",
+        "category": "övrigt",
+        "what_it_is": "Körsimulatorer för fordonsutbildning.",
+        "aliases": [
+          "Molnbaserad simulatortjänst för körsimulatorer",
+          "Skillster simulatorprogramvara",
+          "Simulatortjänst",
+          "Tillkommande simulatortjänster"
+        ]
+      }
+    ],
+    "addOns": [],
+    "singleProduct": "Skillster"
+  },
+  {
+    "canonical": "P & L Nordic",
+    "slug": "pl-nordic",
+    "category": "läromedel",
+    "role": "service",
+    "aliases": [
+      "P & L Nordic"
+    ],
+    "website": null,
+    "avtal": 2,
+    "products": [
+      {
+        "name": "LearnWARE",
+        "slug": "learnware",
+        "category": "läromedel",
+        "what_it_is": "Interaktivt utbildningsmaterial för yrkesprogram.",
+        "aliases": [
+          "Interaktivt utbildningsmaterial för BA-programmet"
+        ]
+      }
+    ],
+    "addOns": [],
+    "singleProduct": "LearnWARE"
+  },
+  {
+    "canonical": "Lingio",
+    "slug": "lingio",
+    "category": "läromedel",
+    "role": "service",
+    "aliases": [
+      "Lingio"
+    ],
+    "website": "https://lingio.com",
+    "avtal": 2,
+    "products": [
+      {
+        "name": "Lingio",
+        "slug": "lingio",
+        "category": "läromedel",
+        "what_it_is": "App för yrkessvenska och språkinlärning.",
+        "aliases": [
+          "Lingio språkutbildning/utbildningslicenser"
+        ]
+      }
+    ],
+    "addOns": [
+      "Utbildning"
+    ],
+    "singleProduct": "Lingio"
+  },
+  {
+    "canonical": "EdAider",
+    "slug": "edaider",
+    "category": "övrigt",
+    "role": "service",
+    "aliases": [
+      "EdAi Technologies",
+      "EdAider"
+    ],
+    "website": "https://edaider.com",
+    "avtal": 3,
+    "products": [
+      {
+        "name": "EdAider",
+        "slug": "edaider",
+        "category": "övrigt",
+        "what_it_is": "AI-utbildning och AI-verktyg för skolledare och lärare.",
+        "aliases": [
+          "EdAiders AI-utbildning för skolor",
+          "Årslicens AI för skolledare och AI-utbildning",
+          "AI för skolledare",
+          "AI-utbildning",
+          "Årslicens AI för skolledare"
+        ]
+      }
+    ],
+    "addOns": [
+      "Utbildning"
+    ],
+    "singleProduct": "EdAider"
+  },
+  {
+    "canonical": "Stig",
+    "slug": "stig",
+    "category": "stödverktyg",
+    "role": "service",
+    "aliases": [
+      "Stig"
+    ],
+    "website": null,
+    "avtal": 2,
+    "products": [
+      {
+        "name": "Stig",
+        "slug": "stig",
+        "category": "stödverktyg",
+        "what_it_is": "Digitalt verktyg från Stig.",
+        "aliases": []
+      }
+    ],
+    "addOns": [],
+    "singleProduct": "Stig"
+  },
+  {
+    "canonical": "No Isolation",
+    "slug": "no-isolation",
+    "category": "stödverktyg",
+    "role": "service",
+    "aliases": [
+      "No Isolation"
+    ],
+    "website": "https://www.noisolation.com",
+    "avtal": 2,
+    "products": [
+      {
+        "name": "AV1",
+        "slug": "av1",
+        "category": "stödverktyg",
+        "what_it_is": "Robot som låter långtidssjuka elever delta i undervisningen hemifrån.",
+        "aliases": [
+          "AV1: Hårdvara"
+        ]
+      }
+    ],
+    "addOns": [
+      "Servicepaket"
+    ],
+    "singleProduct": "AV1"
+  },
+  {
+    "canonical": "CoSafe",
+    "slug": "cosafe",
+    "category": "övrigt",
+    "role": "service",
+    "aliases": [
+      "CoSafe"
+    ],
+    "website": "https://cosafe.com",
+    "avtal": 1,
+    "products": [
+      {
+        "name": "CoSafe",
+        "slug": "cosafe",
+        "category": "övrigt",
+        "what_it_is": "Digital larm- och krisplattform.",
+        "aliases": [
+          "CoSafe digital larmplattform"
+        ]
+      }
+    ],
+    "addOns": [
+      "Utbildning"
+    ],
+    "singleProduct": "CoSafe"
+  },
+  {
+    "canonical": "Entergate",
+    "slug": "entergate",
+    "category": "övrigt",
+    "role": "service",
+    "aliases": [
+      "Entergate"
+    ],
+    "website": "https://www.entergate.se",
+    "avtal": 3,
+    "products": [
+      {
+        "name": "esMaker",
+        "slug": "esmaker",
+        "category": "övrigt",
+        "what_it_is": "Verktyg för enkäter, nyhetsbrev och anmälningsformulär.",
+        "aliases": [
+          "Anmälningsformulär",
+          "Enkäter",
+          "Nyhetsbrev"
+        ]
+      }
+    ],
+    "addOns": []
+  },
+  {
+    "canonical": "Sirvoy",
+    "slug": "sirvoy",
+    "category": "övrigt",
+    "role": "service",
+    "aliases": [
+      "Sirvoy"
+    ],
+    "website": "https://sirvoy.com",
+    "avtal": 1,
+    "products": [
+      {
+        "name": "Sirvoy",
+        "slug": "sirvoy",
+        "category": "övrigt",
+        "what_it_is": "Bokningssystem för hotell och konferens.",
+        "editions": [
+          "Basic"
+        ],
+        "aliases": [
+          "Hotell- och konferensbokningssystem",
+          "Sirvoy Hotell- och konferensbokningssystem (Paket Basic)"
+        ]
+      }
+    ],
+    "addOns": [],
+    "singleProduct": "Sirvoy"
+  },
+  {
+    "canonical": "Göteborgsregionens kommunalförbund",
+    "slug": "gr",
+    "category": "återförsäljare",
+    "role": "channel",
+    "aliases": [
+      "Göteborgsregionens kommunalförbund"
+    ],
+    "website": "https://goteborgsregionen.se",
+    "avtal": 3,
+    "products": [
+      {
+        "name": "AV Media",
+        "slug": "av-media",
+        "category": "läromedel",
+        "what_it_is": "Strömmad film för skolor i Göteborgsregionen.",
+        "aliases": [
+          "AV Media (strömmande film)",
+          "AV Media (strömmad film)",
+          "AV Media (Strömmad film)"
+        ]
+      }
+    ],
+    "addOns": []
+  },
+  {
+    "canonical": "Mediapoolen Västra Götaland",
+    "slug": "mediapoolen",
+    "category": "återförsäljare",
+    "role": "channel",
+    "aliases": [
+      "Mediapoolen Västra Götaland",
+      "Mediapoolen"
+    ],
+    "website": "https://mediapoolen.se",
+    "avtal": 11,
+    "products": [
+      {
+        "name": "Mediapoolen Play",
+        "slug": "mediapoolen-play",
+        "category": "läromedel",
+        "what_it_is": "Filmkatalog och mediearkiv för skolan.",
+        "aliases": [
+          "Film för skolan",
+          "Filmkatalogen",
+          "Filmkatalogen (Mediapoolens play)",
+          "Mediearkivet",
+          "MediapoolenPlay"
+        ]
+      },
+      {
+        "name": "Språklabbet",
+        "slug": "spraklabbet",
+        "category": "läromedel",
+        "what_it_is": "Digitala resurser för språkundervisning.",
+        "aliases": []
+      },
+      {
+        "name": "Musikmattan",
+        "slug": "musikmattan",
+        "category": "läromedel",
+        "what_it_is": "Bakgrundsmusik som får användas fritt i skolan.",
+        "aliases": [
+          "Bakgrundsmusik (Musikmattan)"
+        ]
+      },
+      {
+        "name": "Begreppsdatabasen",
+        "slug": "begreppsdatabasen",
+        "category": "läromedel",
+        "what_it_is": "Databas med förklarade ämnesbegrepp.",
+        "aliases": []
+      },
+      {
+        "name": "Tema-biblioteket",
+        "slug": "tema-biblioteket",
+        "category": "läromedel",
+        "what_it_is": "Färdiga lektioner och teman om ämnen och omvärld.",
+        "aliases": [
+          "Lektioner",
+          "Omvärldsteman",
+          "Ämnesteman"
+        ]
+      },
+      {
+        "name": "Nutidsquiz",
+        "slug": "nutidsquiz",
+        "category": "läromedel",
+        "what_it_is": "Frågesport om aktuella händelser.",
+        "aliases": []
+      },
+      {
+        "name": "Paint Music",
+        "slug": "paint-music",
+        "category": "läromedel",
+        "what_it_is": "Verktyg för att skapa musik.",
+        "aliases": []
+      },
+      {
+        "name": "Seniorportalen",
+        "slug": "seniorportalen",
+        "category": "övrigt",
+        "what_it_is": "Digitala resurser för äldreomsorgen.",
+        "aliases": [
+          "Äldreportalen",
+          "Seniorwebben"
+        ]
+      }
+    ],
+    "addOns": [
+      "Kompetensutveckling",
+      "Boklåneservice"
+    ]
+  },
+  {
+    "canonical": "Skolon",
+    "slug": "skolon",
+    "category": "lärplattform",
+    "role": "channel",
+    "aliases": [
+      "Skolon"
+    ],
+    "website": "https://skolon.com",
+    "note": "Återförsäljare av andras läromedel, men säljer också en egen plattform.",
+    "avtal": 76,
+    "products": [
+      {
+        "name": "Skolup AI",
+        "slug": "skolup-ai",
+        "category": "stödverktyg",
+        "what_it_is": "AI-assistent för lärare och elever i Skolon.",
+        "editions": [
+          "Pro"
+        ],
+        "aliases": [
+          "Skolup AI - Pro Huvudmannalicens",
+          "Skolon Plus inklusive Skolup AI PRO",
+          "Skolon AI - PRO",
+          "Skolon AI",
+          "Skolon for AI - Skolup",
+          "Skolon AI - PRO ÅR 1",
+          "Skolon AI - PRO ÅR 2",
+          "Skolon AI - år 1",
+          "Skolup AI - Huvudmannalicens",
+          "Skolup AI - Pro Huvudmannalicens 1 år",
+          "Skolup AI Pro",
+          "Skolup AI Pro År 1"
+        ]
+      },
+      {
+        "name": "Skolon",
+        "slug": "skolon",
+        "category": "lärplattform",
+        "what_it_is": "Portal för att samla, dela ut och köpa digitala läromedel.",
+        "editions": [
+          "Basic",
+          "Standard",
+          "Plus",
+          "Pro",
+          "Total"
+        ],
+        "aliases": [
+          "Skolon Plus",
+          "Skolon Total",
+          "Användarlicens Skolon Total",
+          "Skolonplattformen",
+          "Skolon Plus inklusive Skolup AI PRO",
+          "Användarlicens Skolon Basic",
+          "Användarlicens Skolon Pro",
+          "Skolon Pro",
+          "Tillägg - Skolon Total",
+          "Användarlicens - Skolon Standard",
+          "Inköpsportal",
+          "Leveransplattform",
+          "Portallösning för åtkomst, hantering och inköp av digitala läromedel och andra digitala lärresurser",
+          "Skolon (e-läromedel)",
+          "Skolon Basic",
+          "Skolon Helhetsnivå",
+          "Skolon Leveransplattform",
+          "Skolon Platform",
+          "Skolon Standard",
+          "Skolon för vårdnadshavare"
+        ]
+      }
+    ],
+    "addOns": [
+      "Datasynk och provisionering",
+      "Införande och uppstart",
+      "Datavisualisering",
+      "Migrering och dataöverföring",
+      "Utbildning"
+    ]
+  },
+  {
+    "canonical": "Adda",
+    "slug": "adda",
+    "category": "återförsäljare",
+    "role": "channel",
+    "aliases": [
+      "adda",
+      "skl kommentus",
+      "sklkommentus",
+      "kommentus"
+    ],
+    "website": "https://www.adda.se",
+    "avtal": 0,
+    "products": [],
+    "addOns": []
+  },
+  {
+    "canonical": "Atea",
+    "slug": "atea",
+    "category": "återförsäljare",
+    "role": "channel",
+    "aliases": [
+      "Atea"
+    ],
+    "website": "https://www.atea.se",
+    "avtal": 36,
+    "products": [],
+    "addOns": [
+      "Konsulttjänster",
+      "Support"
+    ]
+  },
+  {
+    "canonical": "Dustin",
+    "slug": "dustin",
+    "category": "återförsäljare",
+    "role": "channel",
+    "aliases": [
+      "Dustin"
+    ],
+    "website": "https://www.dustin.se",
+    "avtal": 5,
+    "products": [],
+    "addOns": [
+      "Konsulttjänster",
+      "Integrationer",
+      "Inloggning och identitet",
+      "SMS",
+      "Utbildning"
+    ]
+  },
+  {
+    "canonical": "Insight",
+    "slug": "insight",
+    "category": "återförsäljare",
+    "role": "channel",
+    "aliases": [
+      "Insight Technology Solutions",
+      "Insight"
+    ],
+    "website": "https://se.insight.com",
+    "avtal": 16,
+    "products": [],
+    "addOns": [
+      "Konsulttjänster",
+      "Support",
+      "Drift, förvaltning och underhåll"
+    ]
+  },
+  {
+    "canonical": "Crayon",
+    "slug": "crayon",
+    "category": "återförsäljare",
+    "role": "channel",
+    "aliases": [
+      "Crayon"
+    ],
+    "website": "https://www.crayon.com",
+    "avtal": 2,
+    "products": [],
+    "addOns": []
+  },
+  {
+    "canonical": "SoftwareONE",
+    "slug": "softwareone",
+    "category": "återförsäljare",
+    "role": "channel",
+    "aliases": [
+      "SoftwareONE"
+    ],
+    "website": "https://www.softwareone.com",
+    "avtal": 1,
+    "products": [],
+    "addOns": []
+  },
+  {
+    "canonical": "Advania",
+    "slug": "advania",
+    "category": "återförsäljare",
+    "role": "channel",
+    "aliases": [
+      "Advania"
+    ],
+    "website": "https://www.advania.se",
+    "avtal": 1,
+    "products": [],
+    "addOns": [
+      "Konsulttjänster"
+    ]
+  },
+  {
+    "canonical": "Foxway",
+    "slug": "foxway",
+    "category": "återförsäljare",
+    "role": "channel",
+    "aliases": [
+      "Foxway Education",
+      "Foxway"
+    ],
+    "website": "https://www.foxway.com",
+    "avtal": 7,
+    "products": [],
+    "addOns": [
+      "Utbildning",
+      "Support"
+    ]
+  },
+  {
+    "canonical": "Online Partner",
+    "slug": "online-partner",
+    "category": "återförsäljare",
+    "role": "channel",
+    "aliases": [
+      "Online Partner",
+      "onlinepartner"
+    ],
+    "website": "https://onlinepartner.se",
+    "avtal": 8,
+    "products": [],
+    "addOns": []
+  },
+  {
+    "canonical": "Devoteam Cloud Services",
+    "slug": "devoteam",
+    "category": "återförsäljare",
+    "role": "channel",
+    "aliases": [
+      "Devoteam Cloud Services",
+      "Devoteam"
+    ],
+    "website": "https://www.devoteam.com",
+    "avtal": 3,
+    "products": [],
+    "addOns": []
+  },
+  {
+    "canonical": "LäroMedia Bokhandel Örebro",
+    "slug": "laromedia",
+    "category": "återförsäljare",
+    "role": "channel",
+    "aliases": [
+      "LäroMedia Bokhandel Örebro",
+      "LäroMedia",
+      "laromedia bokhandel"
+    ],
+    "website": "https://www.laromedia.se",
+    "avtal": 15,
+    "products": [],
+    "addOns": [
+      "Utbildning",
+      "Tjänst"
+    ]
+  },
+  {
+    "canonical": "Mediacenter Jönköpings län",
+    "slug": "mediacenter",
+    "category": "återförsäljare",
+    "role": "channel",
+    "aliases": [
+      "Mediacenter Jönköpings län",
+      "mediacenter jonkoping",
+      "mediacenter"
+    ],
+    "website": null,
+    "avtal": 2,
+    "products": [],
+    "addOns": []
+  },
+  {
+    "canonical": "Mediecenter Mälardalen",
+    "slug": "mediecenter-malardalen",
+    "category": "återförsäljare",
+    "role": "channel",
+    "aliases": [
+      "Mediecenter Mälardalen"
+    ],
+    "website": null,
+    "avtal": 3,
+    "products": [],
+    "addOns": []
+  },
+  {
+    "canonical": "Pulsen",
+    "slug": "pulsen",
+    "category": "återförsäljare",
+    "role": "channel",
+    "aliases": [
+      "Pulsen"
+    ],
+    "website": "https://www.pulsen.se",
+    "avtal": 5,
+    "products": [],
+    "addOns": []
+  },
+  {
+    "canonical": "Softronic",
+    "slug": "softronic",
+    "category": "återförsäljare",
+    "role": "channel",
+    "aliases": [
+      "Softronic"
+    ],
+    "website": "https://www.softronic.se",
+    "avtal": 5,
+    "products": [],
+    "addOns": [
+      "Konsulttjänster",
+      "Utbildning"
+    ]
+  },
+  {
+    "canonical": "Hermods",
+    "slug": "hermods",
+    "category": "utbildningsanordnare",
+    "role": "service",
+    "aliases": [
+      "Hermods"
+    ],
+    "website": null,
+    "avtal": 3,
+    "products": [],
+    "addOns": []
+  },
+  {
+    "canonical": "Bergstrands Vuxenutbildning",
+    "slug": "bergstrands",
+    "category": "utbildningsanordnare",
+    "role": "service",
+    "aliases": [
+      "Bergstrands Vuxenutbildning"
+    ],
+    "website": null,
+    "avtal": 2,
+    "products": [],
+    "addOns": []
+  },
+  {
+    "canonical": "Talenti",
+    "slug": "talenti",
+    "category": "utbildningsanordnare",
+    "role": "service",
+    "aliases": [
+      "Talenti",
+      "Talenti Sverige"
+    ],
+    "website": null,
+    "avtal": 2,
+    "products": [],
+    "addOns": []
+  },
+  {
+    "canonical": "Agila Institutet",
+    "slug": "agila",
+    "category": "utbildningsanordnare",
+    "role": "service",
+    "aliases": [
+      "Agila Institutet VUX",
+      "Agila Institutet"
+    ],
+    "website": null,
+    "avtal": 2,
+    "products": [],
+    "addOns": []
+  },
+  {
+    "canonical": "Upplands-Bro kommun",
+    "slug": "upplands-bro",
+    "category": "offentlig aktör",
+    "role": "service",
+    "aliases": [
+      "Upplands-Bro Kommun"
+    ],
+    "website": null,
+    "avtal": 2,
+    "products": [],
+    "addOns": []
+  },
+  {
+    "canonical": "Oard",
+    "slug": "oard",
+    "category": "skoladministration",
+    "role": "service",
+    "aliases": [
+      "AB Oard",
+      "Oard"
+    ],
+    "website": null,
+    "avtal": 2,
+    "products": [],
+    "addOns": []
+  }
+]
