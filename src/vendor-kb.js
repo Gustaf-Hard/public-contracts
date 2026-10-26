@@ -64,7 +64,7 @@ export const COMPANIES = [
 
   // ---- Services: skoladministration / lärplattform ----
   { canonical: 'Tietoevry', slug: 'tietoevry', role: 'service', category: 'skoladministration',
-    aliases: ['tietoevry', 'tieto', 'tieto evry'],
+    aliases: ['tietoevry', 'tieto', 'tieto evry', 'tietoenator'],
     products: ['Edlevo', 'Procapita', 'Tieto Education', 'Tieto EDU App',
       'TimeEdit School', 'Procapita Education'] },
   { canonical: 'IST', slug: 'ist', role: 'service', category: 'skoladministration',

@@ -178,6 +178,7 @@ describe('exports', () => {
       'Nationalencyklopedin', 'Microsoft', 'Google', 'Skola24', 'InfoMentor',
       'Everway', 'Teachiq', 'SchoolSoft', 'Oribi', 'Insight', 'Aleido Learning',
       'Tempus', 'Tietoevry', 'Inläsningstjänst (ILT)', 'LäroMedia Bokhandel Örebro',
+      'Oard', 'Talenti', 'Textila Idéateljén', 'EdAi Technologies',
     ]);
   });
 
@@ -188,5 +189,15 @@ describe('exports', () => {
     expect(KNOWN_CANONICALS.has('Haldor')).toBe(true);
     expect(KNOWN_CANONICALS.has('IST')).toBe(true);
     expect(KNOWN_CANONICALS.has('StudyBee')).toBe(true);
+  });
+});
+
+describe('canonicalVendorName — 2026-10-26 additions from live contracts', () => {
+  it.each([
+    ['AB Oard', 'Oard'], ['Talenti Sverige', 'Talenti'],
+    ['Textila Idéateljén - slojd', 'Textila Idéateljén'], ['EdAider', 'EdAi Technologies'],
+  ])('%s → %s', (raw, canonical) => {
+    expect(canonicalVendorName(raw)).toBe(canonical);
+    expect(canonicalVendorName(canonical)).toBe(canonical);
   });
 });

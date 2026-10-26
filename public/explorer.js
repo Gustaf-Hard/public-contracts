@@ -32,7 +32,7 @@ function fmtSekCompact(n) {
 // (explorerRow) — same columns, same okänt semantics.
 function rowHtml(f, todayIso) {
   var vendor = f.vendor_slug
-    ? '<a href="/leverantor/' + esc(f.vendor_slug) + '" data-pane-link>' + esc(f.vendor_name) + '</a>'
+    ? '<a href="/leverantor/' + esc(f.vendor_slug) + '" data-pane-link>' + esc(f.company_name || f.vendor_name) + '</a>'
     : '<span class="muted">okänd</span>';
   var value = f.annual_value_sek == null
     ? '<span class="muted"' + (f.avtalsvarde ? ' title="Ur avtalet: ' + esc(f.avtalsvarde) + '"' : '') + '>okänt</span>'

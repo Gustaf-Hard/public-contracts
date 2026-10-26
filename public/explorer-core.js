@@ -65,7 +65,7 @@ export function renewalWindow(f, todayIso) {
 function dimValue(f, dim, todayIso) {
   switch (dim) {
     case 'lan': return f.lan ?? UNKNOWN;
-    case 'vendor': return f.vendor_name ?? UNKNOWN;
+    case 'vendor': return f.company_name ?? f.vendor_name ?? UNKNOWN;
     case 'kommun': return f.kommun_namn ?? UNKNOWN;
     case 'pricing_model': return f.pricing_model ?? UNKNOWN;
     case 'value_band': return valueBand(f.annual_value_sek);
@@ -96,7 +96,7 @@ export function deriveOptions(facts) {
   };
   return {
     lan: collect((f) => f.lan),
-    vendor: collect((f) => f.vendor_name),
+    vendor: collect((f) => f.company_name ?? f.vendor_name),
     pricing_model: collect((f) => f.pricing_model),
     product: sortedSv(new Set(facts.flatMap((f) => f.products ?? []))),
   };
@@ -109,7 +109,7 @@ export function applyFilters(facts, filters, todayIso) {
   return facts.filter((f) => active.every(([key, value]) => {
     if (key === 'q') {
       const q = value.toLowerCase();
-      return [f.vendor_name, f.kommun_namn, ...(f.products ?? [])]
+      return [f.company_name, f.vendor_name, f.kommun_namn, ...(f.products ?? [])]
         .some((s) => s != null && s.toLowerCase().includes(q));
     }
     if (key === 'product') return (f.products ?? []).includes(value);

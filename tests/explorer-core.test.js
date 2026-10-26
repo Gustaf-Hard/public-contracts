@@ -190,3 +190,26 @@ describe('PRICING_MODEL_LABELS', () => {
     }
   });
 });
+
+// 2026-10-26: the explorer listed raw vendor rows (ILT, ILT Education, ILT
+// Inläsningstjänst) while the market table grouped them. company_name (from
+// buildContractFacts) is what the vendor filter, grouping and search use.
+describe('explorer vendor dimension uses the company', () => {
+  const ilt = [
+    fact({ contract_id: 10, vendor_name: 'ILT', company_name: 'ILT Education' }),
+    fact({ contract_id: 11, vendor_name: 'ILT Inläsningstjänst', company_name: 'ILT Education' }),
+  ];
+
+  it('offers one vendor option per company', () => {
+    expect(deriveOptions(ilt).vendor).toEqual(['ILT Education']);
+  });
+
+  it('filters and groups on the company', () => {
+    expect(applyFilters(ilt, { vendor: 'ILT Education' }, TODAY)).toHaveLength(2);
+    expect(groupFacts(ilt, 'vendor', TODAY).map((g) => g.key)).toEqual(['ILT Education']);
+  });
+
+  it('search still finds a contract by its raw vendor name', () => {
+    expect(applyFilters(ilt, { q: 'inläsningstjänst' }, TODAY).map((f) => f.contract_id)).toEqual([11]);
+  });
+});

@@ -49,6 +49,11 @@ export const VENDOR_CLUSTERS = Object.freeze([
   { canonical: 'Tietoevry', variants: ['Tietoevry', 'Tieto'] },
   { canonical: 'Inläsningstjänst (ILT)', variants: ['ILT', 'Inläsningstjänst', 'ILT Inläsningstjänst', 'ILT Education'] },
   { canonical: 'LäroMedia Bokhandel Örebro', variants: ['Läromedia Bokhandel Örebro', 'LäroMedia Bokhandel Örebro'] },
+  // 2026-10-26: near-dupes found in live contract vendor rows.
+  { canonical: 'Oard', variants: ['Oard', 'AB Oard'] },
+  { canonical: 'Talenti', variants: ['Talenti', 'Talenti Sverige'] },
+  { canonical: 'Textila Idéateljén', variants: ['Textila Idéateljén', 'Textila Idéateljén - slojd'] },
+  { canonical: 'EdAi Technologies', variants: ['EdAi Technologies', 'EdAider'] },
 ]);
 
 // variant lookup key → canonical.

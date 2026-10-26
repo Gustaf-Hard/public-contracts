@@ -2888,7 +2888,7 @@ function lengthCell(months) {
 // with the same columns after filtering/grouping — keep the two in sync.
 function explorerRow(f, todayIso) {
   const vendor = f.vendor_slug
-    ? `<a href="/leverantor/${escapeHtml(f.vendor_slug)}" data-pane-link>${escapeHtml(f.vendor_name)}</a>`
+    ? `<a href="/leverantor/${escapeHtml(f.vendor_slug)}" data-pane-link>${escapeHtml(f.company_name ?? f.vendor_name)}</a>`
     : '<span class="muted">okänd</span>';
   return `<tr>
     <td>${vendor}</td>

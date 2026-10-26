@@ -244,6 +244,10 @@ export function buildContractFacts(rows, { lanByKommunKod = new Map(), now }) {
     vendor_id: r.vendor_id ?? null,
     vendor_name: r.vendor_name ?? null,
     vendor_slug: r.vendor_slug ?? null,
+    // The company this vendor row groups under (KB, then alias map): what the
+    // explorer filters, groups and labels by, so "ILT" and "ILT Inläsningstjänst"
+    // are one choice, as in the market table (2026-10-26).
+    company_name: r.vendor_name ? groupingCompanyName(r.vendor_name) : null,
     kommun_kod: r.kommun_kod,
     kommun_namn: r.kommun_namn,
     lan: lanByKommunKod.get(r.kommun_kod) ?? null,

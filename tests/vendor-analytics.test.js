@@ -357,3 +357,16 @@ describe('buildMarketSummary + completeness', () => {
     expect(completeness([], 'annual_value_sek')).toEqual({ known: 0, total: 0 });
   });
 });
+
+describe('buildContractFacts — company_name (2026-10-26)', () => {
+  const row = (vendor_name) => ({ contract_id: 1, vendor_id: vendor_name ? 1 : null, vendor_name, vendor_slug: null, kommun_kod: '1489', kommun_namn: 'Alingsås' });
+  const now = new Date('2026-10-26T00:00:00Z');
+  it('carries the KB company for a product- or alias-named vendor row', () => {
+    const [ilt, tieto, unknown, none] = buildContractFacts(
+      [row('ILT Inläsningstjänst'), row('Tieto'), row('Natur & Kultur'), row(null)], { now });
+    expect(ilt.company_name).toBe('ILT Education');
+    expect(tieto.company_name).toBe('Tietoevry');
+    expect(unknown.company_name).toBe('Natur & Kultur');
+    expect(none.company_name).toBeNull();
+  });
+});

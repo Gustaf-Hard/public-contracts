@@ -81,3 +81,9 @@ describe('probeName', () => {
     expect(probeName(undefined)).toBe('');
   });
 });
+
+describe('resolveCompany — Tieto\'s old name', () => {
+  it('TietoEnator resolves to Tietoevry', () => {
+    expect(resolveCompany('TietoEnator Healthcare & Welfare')?.canonical).toBe('Tietoevry');
+  });
+});
