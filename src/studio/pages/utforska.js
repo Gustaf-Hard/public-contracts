@@ -178,7 +178,7 @@ function valueCell(f) {
   if (!isNum(f.annual_value_sek)) return `<span class="muted">${UNKNOWN}</span>`;
   const base = esc(fmtKrCompact(f.annual_value_sek));
   if (f.value_basis === 'split') return `${base}<small>egen del</small>`;
-  if (f.value_basis === 'unsplit_channel') return `${base}<small>hela avtalet</small>`;
+  if (f.value_basis === 'unsplit_channel') return `${base}<small>ej fördelat</small>`;
   return base;
 }
 

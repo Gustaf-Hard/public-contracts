@@ -9,13 +9,19 @@ const DEFAULT_PATH = path.resolve(
   '../data/kommun-stats/kommun-stats.json',
 );
 
+// Folkmängd bands, the peer fallback when a kommun has no kommungrupp.
+// `max` is exclusive; the last band has no upper bound.
+export const SIZE_BANDS = Object.freeze([
+  Object.freeze({ key: '<10k', min: 0, max: 10000 }),
+  Object.freeze({ key: '10-25k', min: 10000, max: 25000 }),
+  Object.freeze({ key: '25-50k', min: 25000, max: 50000 }),
+  Object.freeze({ key: '50-100k', min: 50000, max: 100000 }),
+  Object.freeze({ key: '>100k', min: 100000, max: null }),
+]);
+
 export function sizeBand(folkmangd) {
   if (!Number.isFinite(folkmangd)) return null;
-  if (folkmangd < 10000) return '<10k';
-  if (folkmangd < 25000) return '10-25k';
-  if (folkmangd < 50000) return '25-50k';
-  if (folkmangd < 100000) return '50-100k';
-  return '>100k';
+  return SIZE_BANDS.find((b) => b.max == null || folkmangd < b.max).key;
 }
 
 class KommunStats {

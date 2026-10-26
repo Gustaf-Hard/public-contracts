@@ -275,7 +275,7 @@ export function renderSearch({ q = '', stats, facts }) {
 <section class="section">${filterBar({ action: '/studio/sok', fields: [{ name: 'q', label: 'Kommun, leverantör eller produkt', type: 'text', value: q, placeholder: 't.ex. Ale eller Vklass', chip: false }] })}</section>
 <section class="section">${blocks ? `<div class="so-grid">${blocks}</div>` : emptyPanel({
     title: k ? 'Inga träffar' : 'Börja skriva',
-    text: k ? 'Prova en kortare del av namnet, eller bläddra bland alla leverantörer och kommuner.' : 'Sökningen letar bland alla 290 kommuner och alla leverantörer och produkter i katalogen.',
+    text: k ? 'Prova en kortare del av namnet, eller bläddra bland alla leverantörer och kommuner.' : `Sökningen letar bland alla ${fmtInt(KOMMUNER_TOTAL)} kommuner och alla leverantörer och produkter i katalogen.`,
   })}
   <p class="so-browse"><a href="/studio/leverantorer" data-pane-link>Alla leverantörer</a><a href="/studio/kommuner" data-pane-link>Alla kommuner</a><a href="/studio/kategorier" data-pane-link>Alla kategorier</a></p>
 </section>`;

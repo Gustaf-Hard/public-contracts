@@ -286,7 +286,7 @@ function periodText(f, today) {
 function valueText(f) {
   if (!isNum(f.annual_value_sek)) return null;
   const base = `${fmtKrCompact(f.annual_value_sek)}/år`;
-  if (f.value_basis === 'unsplit_channel') return `${base}, hela avtalet`;
+  if (f.value_basis === 'unsplit_channel') return `${base}, ej fördelat`;
   if (f.value_basis === 'split') return `${base}, egen del`;
   return base;
 }

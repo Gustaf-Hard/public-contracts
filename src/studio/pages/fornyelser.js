@@ -7,7 +7,7 @@
 import { esc } from '../layout.js';
 import { fmtInt, fmtKrCompact } from '../format.js';
 import { CATEGORIES, companyBySlug } from '../../catalogue.js';
-import { UNKNOWN_CATEGORY } from '../../studio-data.js';
+import { UNKNOWN_CATEGORY, KOMMUNER_TOTAL } from '../../studio-data.js';
 import { filterBar, emptyPanel, STRIP_SEGMENTS } from '../components.js';
 import {
   isNum, isIso, headline, categoryLabel, companyHref, productHref, kommunHref, kommunNamer,
@@ -82,7 +82,9 @@ export function renewalRows({ facts, stats, today, query }) {
     return true;
   };
   const by = new Map();
+  const rowsPer = new Map(); // all visible headline rows per avtal
   for (const f of headline(facts)) {
+    if (!(f.company_slug && companyBySlug(f.company_slug)?.hiddenInStudio)) rowsPer.set(f.contract_id, (rowsPer.get(f.contract_id) ?? 0) + 1);
     if (!match(f)) continue;
     if (!by.has(f.contract_id)) by.set(f.contract_id, []);
     by.get(f.contract_id).push(f);
@@ -106,7 +108,11 @@ export function renewalRows({ facts, stats, today, query }) {
       categories: cats,
       channel: f0.channel_slug,
       value: known.length ? known.reduce((sum, f) => sum + f.annual_value_sek, 0) : null,
-      valuePartial: known.length > 0 && known.length < fs.length,
+      // An unsplit channel row carries everything the split could not place
+      // (the whole avtal when the split was inconsistent), so with every
+      // row of the avtal present the known sum is the avtal's whole value.
+      valuePartial: known.length > 0 && known.length < fs.length
+        && !(fs.length === rowsPer.get(f0.contract_id) && known.some((f) => f.value_basis === 'unsplit_channel')),
       date: f0.next_renewal.slice(0, 10),
       period_end: isIso(f0.period_end) ? f0.period_end.slice(0, 10) : null,
       extension_option_until: f0.extension_option_until ?? null,
@@ -336,7 +342,11 @@ export function renderFornyelser({ facts, stats, today, query, page = 1 }) {
   const peak = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0];
   const peakText = peak ? (() => { const [y, m] = peak[0].split('-').map(Number); return `${MONTHS_LONG[m - 1]} ${y}`; })() : null;
   const filtered = ['kategori', 'segment', 'lan', 'kommungrupp', 'kanal'].some((k) => q[k]);
+  // Active avtal the calendar cannot place: no date at all, or a date that
+  // has already passed (e.g. renewed automatically after the last
+  // cancellation day). Counted, never silently dropped.
   const undated = new Set(head.filter((f) => !isIso(f.next_renewal)).map((f) => f.contract_id)).size;
+  const passed = new Set(head.filter((f) => isIso(f.next_renewal) && f.next_renewal.slice(0, 10) < today).map((f) => f.contract_id)).size;
 
   const answer = rows.length
     ? `${nOf(rows.length, 'avtal', 'avtal')} i ${nOf(kommuner, 'kommun', 'kommuner')} löper ut eller kan förnyas de närmaste ${q.man} månaderna${filtered ? ' med de valda filtren' : ''}. ${known.length ? `Känt årsvärde ${fmtKrCompact(value)}, känt för ${fmtInt(known.length)} av ${fmtInt(rows.length)}.` : 'Inget av dem har känt värde.'}${peak && peak[1] > 1 ? ` Flest i ${peakText}, ${fmtInt(peak[1])} avtal.` : ''}`
@@ -352,7 +362,7 @@ export function renderFornyelser({ facts, stats, today, query, page = 1 }) {
     <div class="eh-side">
       <dl class="eh-facts">
         <div class="eh-fact"><dt>Avtal</dt><dd class="eh-val">${esc(fmtInt(rows.length))}</dd><dd class="eh-sub">inom ${esc(String(q.man))} mån</dd></div>
-        <div class="eh-fact"><dt>Kommuner</dt><dd class="eh-val">${esc(fmtInt(kommuner))}</dd><dd class="eh-sub">av 290</dd></div>
+        <div class="eh-fact"><dt>Kommuner</dt><dd class="eh-val">${esc(fmtInt(kommuner))}</dd><dd class="eh-sub">av ${esc(fmtInt(KOMMUNER_TOTAL))}</dd></div>
         <div class="eh-fact${known.length ? '' : ' is-unknown'}"><dt>Känt årsvärde</dt><dd class="eh-val">${esc(known.length ? fmtKrCompact(value) : 'okänt')}</dd><dd class="eh-sub">${esc(rows.length ? `känt för ${fmtInt(known.length)} av ${fmtInt(rows.length)}` : 'inga avtal')}</dd></div>
       </dl>
     </div>
@@ -371,7 +381,13 @@ export function renderFornyelser({ facts, stats, today, query, page = 1 }) {
   const bar = `${filterBar({ action: '/studio/fornyelser', fields, resultLine: `${nOf(rows.length, 'avtal', 'avtal')}, ${nOf(kommuner, 'kommun', 'kommuner')}` })}
 <p class="fx-actions"><a class="fx-csv" href="${esc(csvHref)}" download><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v10M6 9l4 4 4-4M4 16h12"/></svg>Ladda ner listan som CSV</a><span class="meta">semikolonseparerad, öppnas i Excel</span></p>`;
 
-  const foot = `${fmtInt(undated)} aktiva avtal saknar slutdatum och syns inte här. Datumet är när avtalet löper ut, eller när en förlängning eller uppsägning avgörs om avtalet anger det.`;
+  const missing = undated + passed;
+  const foot = `${missing
+    ? `${nOf(missing, 'aktivt avtal', 'aktiva avtal')} saknar ett kommande datum och syns inte här: ${[
+      undated ? `${fmtInt(undated)} utan slutdatum` : '',
+      passed ? `${fmtInt(passed)} där datumet redan har passerat, till exempel avtal som har förlängts automatiskt efter sista uppsägningsdag` : '',
+    ].filter(Boolean).join(' och ')}. `
+    : ''}Datumet är när avtalet löper ut, eller när en förlängning eller uppsägning avgörs om avtalet anger det.`;
   const pageHref = (p) => `/studio/fornyelser${queryString(q, { sida: p > 1 ? p : null })}`;
   const body = rows.length
     ? `<div class="card">${renewalChart({ rows, today, months: q.man })}<p class="meta fx-foot">${esc(foot)}</p></div>`

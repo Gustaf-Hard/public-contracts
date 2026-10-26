@@ -6,6 +6,7 @@ import { openDb } from '../src/storage.js';
 import { createDashboardApp } from '../src/dashboard.js';
 import { loadKommunStats } from '../src/kommun-stats.js';
 import { renewalsCsv, termsText } from '../src/studio/pages/fornyelser.js';
+import { sizeBandsText } from '../src/studio/pages/om.js';
 
 // Hand-written fixture data only (the repo is public). Kommun names and kods
 // are open data, kommungrupper and län are assigned for the test; vendor and
@@ -18,6 +19,7 @@ const KOMMUNER = [
   ['0560', 'Boxholm', 'Landsbygdskommun, ej nära större stad', 'Östergötlands län'],
   ['0180', 'Stockholm', 'Storstäder', 'Stockholms län'],
   ['0380', 'Uppsala', 'Större stad', 'Uppsala län'],
+  ['0381', 'Enköping', 'Pendlingskommun nära större stad', 'Uppsala län'],
 ];
 const ELEVER = { 'Förskola': 900, 'Förskoleklass': 300, '1-3': 900, '4-6': 900, '7-9': 900, Gymnasiet: 800, Komvux: 300 };
 const STATS = loadKommunStats({
@@ -187,6 +189,50 @@ describe('/studio/fornyelser', () => {
     noLeaks(r.text);
   });
 
+  it('filters by segment, län, kommungrupp and kanal', async () => {
+    seedRenewals();
+    const cid = seedContract({ kod: '0381', vendor: 'Binogi AB', value: 40000, end: '2027-02-28', lines: [{ product_name: 'Binogi' }] });
+    db.replaceContractCoverage(cid, [{ product_name: 'Binogi', grade_level: '7-9', status: 'full', student_count: 0 }]);
+    const rowsOf = async (qs) => {
+      const list = listPart((await body(`/studio/fornyelser?${qs}`)).text);
+      return list.split('class="fx-row"').slice(1).map((r) => (/class="fx-kommun"[^>]*>([^<]+)</.exec(r) || [])[1]);
+    };
+    expect(await rowsOf('segment=7-9')).toEqual(['Enköping']);
+    expect(await rowsOf('lan=Uppsala%20l%C3%A4n')).toEqual(['Enköping']);
+    expect(await rowsOf('kommungrupp=Pendlingskommun%20n%C3%A4ra%20st%C3%B6rre%20stad')).toEqual(['Enköping']);
+    expect(await rowsOf('kanal=skolon')).toEqual(['Partille']);
+    const direkt = await rowsOf('kanal=direkt');
+    expect(direkt).toHaveLength(5);
+    expect(direkt).not.toContain(undefined);
+  });
+
+  it('counts active avtal whose date has passed instead of dropping them', async () => {
+    seedRenewals();
+    seedContract({ kod: '1440', vendor: 'Vklass AB', value: 50000, end: '2027-06-30', lines: [{ product_name: 'Vklass' }], extra: { auto_renews: 1, last_cancellation_date: '2026-09-30' } });
+    const r = await body('/studio/fornyelser');
+    expect(r.text).toContain('1 aktivt avtal saknar ett kommande datum och syns inte här: 1 där datumet redan har passerat');
+  });
+
+  it('an inconsistent channel split keeps the whole value on the channel, not "delvis känt"', async () => {
+    seedContract({
+      kod: '1402', vendor: 'Skolon AB', value: 50000, end: '2027-05-31',
+      lines: [
+        { product_name: 'Gleerups Digitala läromedel', amount_sek: 40000, period_months: 12 },
+        { product_name: 'NE Kunskapstjänster', amount_sek: 30000, period_months: 12 },
+      ],
+    });
+    const r = await body('/studio/fornyelser');
+    const row = listPart(r.text).split('class="fx-row"')[1];
+    expect(row).toContain('Skolon</a> <small class="muted">(ej fördelat)</small>');
+    expect(row).toContain('50 tkr');
+    expect(row).not.toContain('delvis känt');
+    const csv = (await get(app(), '/studio/fornyelser.csv')).text.trim().split('\r\n')[1];
+    expect(csv).toContain(';50000;känt;');
+    const ux = (await body('/studio/utforska')).text;
+    expect(ux).toContain('<small>ej fördelat</small>');
+    expect(ux).not.toContain('hela avtalet');
+  });
+
   it('serves a CSV with BOM, Swedish header and ; separated rows', async () => {
     seedRenewals();
     const r = await get(app(), '/studio/fornyelser.csv?kategori=laromedel&man=12');
@@ -226,7 +272,7 @@ describe('/studio/fornyelser', () => {
 });
 
 describe('/studio/utforska', () => {
-  it('page 1 has 50 rows and links to page 2', async () => {
+  it('page 1 has 50 rows and links to page 2, full HTML under 300 KB', async () => {
     const vendors = [['ILT Education AB', 'Polyglutt'], ['Vklass AB', 'Vklass'], ['Binogi AB', 'Binogi']];
     let k = 0;
     for (let i = 0; i < 20; i++) {
@@ -243,6 +289,9 @@ describe('/studio/utforska', () => {
     expect(rows.match(/<tr/g)).toHaveLength(50);
     expect(all.text).toMatch(/href="\/studio\/utforska\?urval=alla&amp;sida=2"/);
     expect(all.text).toContain('class="viz rank"');
+    const full = await get(app(), '/studio/utforska?urval=alla');
+    expect(full.text).toContain('<!doctype html>');
+    expect(full.raw.length).toBeLessThan(300 * 1024);
     const p2 = await body('/studio/utforska?urval=alla&sida=2');
     const rows2 = p2.text.slice(p2.text.indexOf('<tbody>'), p2.text.indexOf('</tbody>'));
     expect(rows2.match(/<tr/g)).toHaveLength(10);
@@ -339,6 +388,13 @@ describe('/studio/sok', () => {
     expect((await get(app(), '/studio/sok?q=polyglutt')).headers.get('location')).toBe('/studio/produkt/polyglutt');
   });
 
+  it('the exact name of a hiddenInStudio company never redirects to it', async () => {
+    const r = await get(app(), '/studio/sok?q=Hermods');
+    expect(r.status).toBe(200);
+    expect(r.headers.get('location')).toBeNull();
+    expect(r.text).not.toContain('/studio/leverantor/hermods');
+  });
+
   it('otherwise renders results grouped by kommuner, leverantörer and produkter', async () => {
     const r = await body('/studio/sok?q=poly');
     expect(r.status).toBe(200);
@@ -365,7 +421,12 @@ describe('/studio/om', () => {
     expect(r.text).toContain('kommungrupp');
     expect(r.text).toContain('ej fördelat');
     expect(r.text).toContain('hämtades 2026-10-20');
-    expect(r.text).toContain('insamlingen klar i 1 kommun, pågår i 4');
+    // size bands come from SIZE_BANDS, peer rules say which comparison uses what
+    expect(r.text).toContain(sizeBandsText());
+    expect(sizeBandsText().replace(/\u00a0/g, ' ')).toBe('under 10 000, 10 000 till 25 000, 25 000 till 50 000, 50 000 till 100 000 och över 100 000 invånare');
+    expect(r.text).toContain('bara med liknande kommuner där insamlingen är klar');
+    expect(r.text).toContain('alla liknande kommuner som har ett känt pris per elev för produkten');
+    expect(r.text).toContain('insamlingen klar i 1 kommun och pågår i 4. I 2 kommuner har vi inte begärt ut avtal än');
     noLeaks(r.text);
   });
 });

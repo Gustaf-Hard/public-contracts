@@ -14,7 +14,9 @@ export const UNKNOWN_COMPANY = 'Okänd leverantör';
 export const UNKNOWN_CATEGORY = 'okand';
 export const KOMMUNER_TOTAL = 290;
 
-const ACTIVE_YEARS = 4;
+// Headline rule: an avtal without period_end counts as active this many
+// years from its start.
+export const ACTIVE_YEARS = 4;
 const isFiniteNum = (v) => typeof v === 'number' && Number.isFinite(v);
 const isIso = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}/.test(s);
 const blank = (s) => typeof s !== 'string' || !s.trim();

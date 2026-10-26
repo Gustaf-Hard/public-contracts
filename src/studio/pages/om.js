@@ -4,10 +4,33 @@
 
 import { esc } from '../layout.js';
 import { fmtInt, fmtPct } from '../format.js';
-import { MIN_N, KOMMUNER_TOTAL, isCollectionFinished } from '../../studio-data.js';
-import { isIso, isNum, headline, section, nOf } from './common.js';
+import { MIN_N, KOMMUNER_TOTAL, ACTIVE_YEARS, isCollectionFinished } from '../../studio-data.js';
+import { SIZE_BANDS } from '../../kommun-stats.js';
+import { isIso, isNum, headline, section, nOf, safeAll } from './common.js';
+import { kommunStatus } from './lists.js';
 
-const ACTIVE_YEARS = 4;
+// A basis figure that could not be read is "okänt", never 0.
+const num = (n) => (isNum(n) ? fmtInt(n) : 'okänt');
+const nOfU = (n, one, many) => (isNum(n) ? nOf(n, one, many) : `okänt antal ${many}`);
+const YEARS_SV = ['noll', 'ett', 'två', 'tre', 'fyra', 'fem', 'sex', 'sju', 'åtta', 'nio', 'tio'];
+const yearsText = (n) => `${YEARS_SV[n] ?? fmtInt(n)} år`;
+
+// "under 10 000, 10 000 till 25 000, ... och över 100 000 invånare"
+export function sizeBandsText(bands = SIZE_BANDS) {
+  const parts = bands.map((b) => (b.min === 0 || b.min == null ? `under ${fmtInt(b.max)}`
+    : b.max == null ? `över ${fmtInt(b.min)}` : `${fmtInt(b.min)} till ${fmtInt(b.max)}`));
+  return `${parts.slice(0, -1).join(', ')} och ${parts[parts.length - 1]} invånare`;
+}
+
+// Collection status per kommun, by the same rules as the Kommuner directory.
+export function statusCounts({ facts, stats, statusMap }) {
+  const all = safeAll(stats).map((r) => r.kod);
+  const kods = all.length ? all : [...new Set([...statusMap.keys(), ...facts.map((f) => f.kommun_kod)])].filter(Boolean);
+  const collected = new Set(facts.map((f) => f.kommun_kod));
+  const out = { done: 0, open: 0, dead_end: 0, not_contacted: 0, unknown: 0 };
+  for (const kod of kods) out[kommunStatus(statusMap, kod, collected.has(kod))]++;
+  return out;
+}
 
 // Each collected avtal lands in exactly one bucket.
 export function avtalBreakdown(facts, today) {
@@ -52,10 +75,10 @@ export function renderOm({ facts, stats, statusMap = new Map(), basis = {}, toda
   const b = basis ?? {};
   const br = avtalBreakdown(facts, today);
   const kb = basisCounts(facts);
-  const statuses = [...statusMap.values()];
-  const open = statuses.filter((s) => s === 'open').length;
-  const notContacted = Math.max(0, KOMMUNER_TOTAL - statuses.filter((s) => s !== 'not_contacted').length);
-  const finished = statuses.filter(isCollectionFinished).length;
+  const sc = statusCounts({ facts, stats, statusMap });
+  const open = sc.open;
+  const notContacted = sc.not_contacted;
+  const finished = Object.entries(sc).filter(([k]) => isCollectionFinished(k)).reduce((x, [, n]) => x + n, 0);
   const fetched = fetchedDate(stats);
   const laar = stats?.data?.laar ?? null;
   const ttlMin = Math.max(1, Math.round(ttlMs / 60000));
@@ -65,12 +88,12 @@ export function renderOm({ facts, stats, statusMap = new Map(), basis = {}, toda
     <div class="eh-main">
       <span class="kicker">Om datan</span>
       <h1 class="page-title">Var siffrorna kommer ifrån</h1>
-      <p class="lede">${esc(`Allt i studion bygger på ${nOf(b.collected ?? 0, 'avtal', 'avtal')} som ${fmtInt(b.kommuner_collected ?? 0)} kommuner har lämnat ut till oss som allmänna handlingar. ${fmtInt(b.active ?? 0)} av dem är aktiva i dag, och det är de som räknas i marknadens siffror.`)}</p>
+      <p class="lede">${esc(`Allt i studion bygger på ${nOfU(b.collected, 'avtal', 'avtal')} som ${nOfU(b.kommuner_collected, 'kommun', 'kommuner')} har lämnat ut till oss som allmänna handlingar. ${num(b.active)} av dem är aktiva i dag, och det är de som räknas i marknadens siffror.`)}</p>
     </div>
     <div class="eh-side">
       <dl class="eh-facts">
-        <div class="eh-fact"><dt>Insamlade avtal</dt><dd class="eh-val">${esc(fmtInt(b.collected ?? 0))}</dd><dd class="eh-sub">från ${esc(nOf(b.kommuner_collected ?? 0, 'kommun', 'kommuner'))}</dd></div>
-        <div class="eh-fact"><dt>Aktiva avtal</dt><dd class="eh-val">${esc(fmtInt(b.active ?? 0))}</dd><dd class="eh-sub">i ${esc(nOf(b.kommuner_with_avtal ?? 0, 'kommun', 'kommuner'))}</dd></div>
+        <div class="eh-fact"><dt>Insamlade avtal</dt><dd class="eh-val">${esc(num(b.collected))}</dd><dd class="eh-sub">från ${esc(nOfU(b.kommuner_collected, 'kommun', 'kommuner'))}</dd></div>
+        <div class="eh-fact"><dt>Aktiva avtal</dt><dd class="eh-val">${esc(num(b.active))}</dd><dd class="eh-sub">i ${esc(nOfU(b.kommuner_with_avtal, 'kommun', 'kommuner'))}</dd></div>
         <div class="eh-fact"><dt>Insamling klar</dt><dd class="eh-val">${esc(fmtInt(finished))}</dd><dd class="eh-sub">av ${esc(fmtInt(KOMMUNER_TOTAL))} kommuner</dd></div>
       </dl>
     </div>
@@ -80,7 +103,7 @@ export function renderOm({ facts, stats, statusMap = new Map(), basis = {}, toda
   const insamling = `<div class="om-prose">
   ${p('Vi skickar en begäran om allmänna handlingar enligt offentlighetsprincipen till varje kommuns registrator och ber om kommunens gällande avtal för skolans digitala verktyg: läromedel, lärplattformar, skoladministration, prov, stödverktyg och elevhälsa. Avtalen som kommer tillbaka läses rad för rad: leverantör, produkter, period, årsvärde, prismodell och vilka skolformer avtalet gäller.')}
   ${p('Leverantörs- och produktnamn i avtalen skrivs på många sätt. En katalog läser varje namn som ett företag, en produkt, ett tillägg, en rabatt eller ett segment, så att samma produkt räknas som en.')}
-  ${p(`I dag är insamlingen klar i ${nOf(finished, 'kommun', 'kommuner')}${notContacted ? `, pågår i ${fmtInt(open)} och har inte börjat i ${fmtInt(notContacted)}` : ` och pågår i ${fmtInt(open)}`}. ${b.dead_end ? `${nOf(b.dead_end, 'kommun', 'kommuner')} har avslutat ärendet utan att lämna ut några avtal. De räknas som klara men utan underlag, och studion skriver aldrig att de saknar avtal.` : ''}`)}
+  ${p(`I dag är insamlingen klar i ${nOf(finished, 'kommun', 'kommuner')} och pågår i ${fmtInt(open)}${notContacted ? `. I ${nOf(notContacted, 'kommun', 'kommuner')} har vi inte begärt ut avtal än` : ''}${sc.unknown ? `. För ${nOf(sc.unknown, 'kommun', 'kommuner')} vet vi inte hur långt insamlingen har kommit` : ''}. ${sc.dead_end ? `${nOf(sc.dead_end, 'kommun', 'kommuner')} har avslutat ärendet utan att lämna ut några avtal. De räknas som klara men utan underlag, och studion skriver aldrig att de saknar avtal.` : ''}`)}
   ${p('Att en kommun saknar avtal i en kategori betyder bara något när insamlingen där är klar. Kartorna skiljer därför på tre saker: inget avtal och insamlingen klar, insamlingen pågår, och inte kontaktad än.')}
 </div>`;
 
@@ -90,13 +113,13 @@ export function renderOm({ facts, stats, statusMap = new Map(), basis = {}, toda
     ${bar([
     { cls: 'om-active', label: 'Aktiva', n: br.active },
     { cls: 'om-expired', label: 'Utgångna', n: br.expired },
-    { cls: 'om-undated hatch', label: 'Utan slutdatum och äldre än fyra år, eller helt utan datum', n: br.undated },
+    { cls: 'om-undated hatch', label: `Utan slutdatum och äldre än ${yearsText(ACTIVE_YEARS)}, eller helt utan datum`, n: br.undated },
     { cls: 'om-replaced', label: 'Ersatta av ett nyare avtal', n: br.superseded },
   ], br.total)}
   </div>
   <div class="span-5 om-prose">
     ${p(`Ett avtal är aktivt om slutdatumet är i dag eller senare. Saknar avtalet slutdatum räknas det som aktivt om det började för högst ${ACTIVE_YEARS} år sedan.`)}
-    ${p(`Därför är bara ${fmtInt(b.active ?? 0)} av ${fmtInt(b.collected ?? 0)} insamlade avtal aktiva: kommunerna lämnar ofta ut gamla avtal som har gått ut, och en del avtal anger inget slutdatum alls. ${fmtInt(b.active_unknown_end ?? 0)} av de aktiva avtalen saknar slutdatum.`)}
+    ${p(`Därför är bara ${num(b.active)} av ${num(b.collected)} insamlade avtal aktiva: kommunerna lämnar ofta ut gamla avtal som har gått ut, och en del avtal anger inget slutdatum alls. ${num(b.active_unknown_end)} av de aktiva avtalen saknar slutdatum.`)}
     ${p('Har en kommun flera avtal med samma leverantör om samma produkter räknas bara det nyaste. De äldre syns i underlaget men inte i siffrorna.')}
   </div>
 </div>`;
@@ -113,13 +136,15 @@ export function renderOm({ facts, stats, statusMap = new Map(), basis = {}, toda
 </div>`;
 
   const minN = `<div class="om-prose">
-  ${p(`Median, kvartiler och prisprickar visas bara när minst ${MIN_N} avtal finns att jämföra. Med färre visar vi en streckad ruta med texten "för få avtal" och antalet, och inga enskilda prickar. Det gäller överallt: prisdiagram, prismatriser och jämförelsen på kommunsidorna.`)}
-  ${p('Kommuners priser visas aldrig som en topplista. På en kommuns sida syns andra kommuner bara som en anonym fördelning.')}
+  ${p(`Median, kvartiler och prisprickar visas bara när minst ${MIN_N} avtal har känt pris per elev. Med färre visar vi en streckad ruta med texten "för få avtal" och antalet, och inga enskilda prickar. Det gäller prisdiagrammen, cellerna i prismatriserna och medianpriserna på kategori- och produktkorten.`)}
+  ${p(`På en kommuns sida räknas jämförelserna i kommuner. Kommunens pris för en produkt jämförs med liknande kommuner när minst ${MIN_N} av dem har känt pris för produkten. Är de färre jämför vi med alla kommuner med känt pris, och är också de färre än ${MIN_N} visas bara kommunens eget pris, utan jämförelse. Medianen för vad liknande kommuner lägger per elev och kategori visas från ${MIN_N} kommuner.`)}
+  ${p('Kommuners priser visas aldrig som en topplista. På en kommuns sida syns andra kommuner bara som en anonym fördelning. Enskilda avtal med värde finns i underlaget, eftersom avtalen är allmänna handlingar.')}
 </div>`;
 
   const peers = `<div class="om-prose">
-  ${p('Liknande kommuner är de som hör till samma kommungrupp enligt SKR:s indelning, till exempel storstäder, pendlingskommuner nära större stad eller landsbygdskommuner. Har en kommun ingen kommungrupp jämför vi med kommuner av samma storlek efter folkmängd: under 10 000, 10 000 till 25 000, 25 000 till 50 000, 50 000 till 100 000 och över 100 000 invånare.')}
-  ${p('När vi jämför vad en kommun betalar mot liknande kommuner räknas bara de kommuner där insamlingen är klar. En kommun som fortfarande skickar avtal skulle annars dra ned medianen med kostnader vi inte har sett än.')}
+  ${p(`Liknande kommuner är de som hör till samma kommungrupp enligt SKR:s indelning, till exempel storstäder, pendlingskommuner nära större stad eller landsbygdskommuner. Har en kommun ingen kommungrupp jämför vi med kommuner av samma storlek efter folkmängd: ${sizeBandsText()}.`)}
+  ${p('Hur mycket en kommun lägger per elev och år i varje kategori jämförs bara med liknande kommuner där insamlingen är klar. En kommun som fortfarande skickar avtal skulle annars dra ned medianen med kostnader vi inte har sett än.')}
+  ${p('Priset för en enskild produkt jämförs däremot med alla liknande kommuner som har ett känt pris per elev för produkten, även om insamlingen där pågår. Ett pris per elev påverkas inte av att kommunen ännu inte har skickat sina andra avtal.')}
 </div>`;
 
   const kanal = `<div class="om-prose">
