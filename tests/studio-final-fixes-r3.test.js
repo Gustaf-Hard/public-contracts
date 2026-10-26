@@ -412,3 +412,23 @@ describe('R5 and S2. spend per elev says it is per elev in the kommun; a chart o
     expect(t).toContain('Ert kända årsvärde per elev i kommunen, i de skolformer avtalen gäller: Läromedel 100 kr/elev.');
   });
 });
+
+// ------------------------------------------------------------------ S1
+describe('S1. a generic Lärplattform line on a Chas avtal', () => {
+  const LI = (contract_id, product_name, amount_sek) => ({ contract_id, product_name, amount_sek, unit_price_sek: null, unit: null, quantity: null, period_months: null });
+  it('is Unikum\'s when the avtal also names Unikum products', () => {
+    const c = C({ vendor_name: 'Chas Visual Management AB', annual_value_sek: 150000 });
+    const facts = build([c], { lineItems: [LI(c.contract_id, 'Unikum Grundskola - Start Kommun', 100000), LI(c.contract_id, 'Lärplattform system', 50000)] });
+    expect(row(facts, c.contract_id, 'unikum')).toMatchObject({ annual_value_sek: 150000, category: 'larplattform', channel_slug: 'chas' });
+    expect(row(facts, c.contract_id, 'chas')).toBeUndefined();
+  });
+  it('stays on Chas with no category when no Unikum product is named', () => {
+    const c = C({ vendor_name: 'Chas Visual Management AB', annual_value_sek: 150000 });
+    const facts = build([c], { lineItems: [LI(c.contract_id, 'Lärplattform system Testby', 100000), LI(c.contract_id, 'Lärplattform införande Testby', 50000)] });
+    expect(facts.map((f) => f.company_slug)).toEqual(['chas']);
+    expect(row(facts, c.contract_id, 'chas').category).toBeNull();
+  });
+  it('the Unikum catalogue note no longer says Chas owns Unikum', () => {
+    expect(productBySlug('unikum').company.note ?? '').not.toMatch(/ägs av Chas/);
+  });
+});

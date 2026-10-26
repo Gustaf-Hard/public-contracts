@@ -117,12 +117,21 @@ export function buildStudioFacts({ contracts = [], lineItems = [], coverage = []
     // stay on the avtal's vendor: "Integration ProReNata" on a Unikum avtal
     // is Unikum's fee, not a ProReNata avtal.
     const OWNER_KINDS = ['product', 'bundle', 'unresolved'];
-    const ownerOf = (r) => (OWNER_KINDS.includes(r.kind) && r.companySlug && r.companySlug !== ownerSlug ? r.companySlug : '');
+    const ownerOf0 = (r) => (OWNER_KINDS.includes(r.kind) && r.companySlug && r.companySlug !== ownerSlug ? r.companySlug : '');
     const productsOf = (r) => (r.kind === 'bundle' ? r.products ?? [] : ['product', 'segment'].includes(r.kind) && r.productSlug ? [r.productSlug] : []);
+    // Chas resells several lärplattformar (Unikum, Haldor, Meitner ...). A
+    // generic "Lärplattform" line on a Chas avtal is Unikum's only when the
+    // avtal also names Unikum products; otherwise it stays on Chas with no
+    // category (final review r3 S1).
+    const chasUnikum = ownerSlug === 'chas' && [
+      ...(linesBy.get(c.contract_id) ?? []).map((l) => l.product_name), ...(c.products ?? []),
+    ].some((n) => !blank(n) && ownerOf0(cls(n)) === 'unikum');
+    const GENERIC_LP = /^\s*l[äa]rplattform\b/i;
+    const ownerOf = (r, name) => (chasUnikum && GENERIC_LP.test(name ?? '') && ['noise', 'uncatalogued', 'unresolved'].includes(r.kind) ? 'unikum' : ownerOf0(r));
 
     for (const l of linesBy.get(c.contract_id) ?? []) {
       const r = cls(l.product_name);
-      const g = group(ownerOf(r));
+      const g = group(ownerOf(r, l.product_name));
       g.lines.push({ l, r });
       for (const p of productsOf(r)) if (p) g.products.add(p);
       if (['product', 'segment', 'bundle'].includes(r.kind)) for (const lv of mapUnitToGradeLevels(l.product_name)) g.grades.add(lv);
@@ -130,12 +139,12 @@ export function buildStudioFacts({ contracts = [], lineItems = [], coverage = []
     for (const name of c.products ?? []) {
       if (blank(name)) continue;
       const r = cls(name);
-      const g = group(ownerOf(r));
+      const g = group(ownerOf(r, name));
       for (const p of productsOf(r)) if (p) g.products.add(p);
     }
     for (const cv of covBy.get(c.contract_id) ?? []) {
       const r = cls(cv.product_name);
-      const g = group(ownerOf(r));
+      const g = group(ownerOf(r, cv.product_name));
       g.cov.push(cv);
       if (GRADE_LEVELS.includes(cv.grade_level)) g.grades.add(cv.grade_level);
     }

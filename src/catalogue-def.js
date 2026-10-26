@@ -298,7 +298,7 @@ export const COMPANIES = [
 
   // ---------------- Lärplattform ----------------
   { canonical: 'Unikum', slug: 'unikum', category: 'lärplattform', role: 'service', website: 'https://unikum.net',
-    note: 'Unikum ägs av Chas Visual Management AB.',
+    note: 'Säljs ofta via Chas Visual Management, som är en återförsäljare (kanal), inte ägare.',
     vendors: ['unikum'], brand: /unikum/, defaultProduct: 'Unikum',
     addOns: [
       A('Unikum Connect', /connect|ber api|\bsynk|provisionering|single sign on|\bsso\b|teams|\bapi\b/),
