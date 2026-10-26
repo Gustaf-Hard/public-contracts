@@ -159,6 +159,19 @@ describe('effectiveFollowUp', () => {
     expect(r).toEqual({ date: '2026-06-02', source: 'our_followup' });
   });
 
+  // 2026-10-26: a promise the case has since moved past is stale. Herrljunga
+  // showed "försenad 88d" from an out-of-office "tillbaka 27 juli" ingested in
+  // September, twelve days after we sent the close question (84 live cases).
+  it('ignores a promise date older than the latest state change and falls back to the rule', () => {
+    const r = effectiveFollowUp({ state: 'DELIVERING', state_changed_at: '2026-10-14 09:21:39', follow_up_at: '2026-07-30' });
+    expect(r).toEqual({ date: '2026-10-28', source: 'our_followup' }); // DELIVERING = 14 days
+  });
+
+  it('keeps a promise date set on or after the state change', () => {
+    const r = effectiveFollowUp({ state: 'ACK_RECEIVED', state_changed_at: '2026-10-14 09:21:39', follow_up_at: '2026-10-14' });
+    expect(r).toEqual({ date: '2026-10-14', source: 'kommun_promise' });
+  });
+
   it('returns nulls for terminal states', () => {
     expect(effectiveFollowUp({ state: 'DONE', state_changed_at: '2026-05-24T10:00:00Z' })).toEqual({ date: null, source: null });
     expect(effectiveFollowUp({ state: 'DEAD_END', state_changed_at: '2026-05-24T10:00:00Z' })).toEqual({ date: null, source: null });

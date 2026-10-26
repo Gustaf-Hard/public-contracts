@@ -154,7 +154,14 @@ export function effectiveFollowUp(conv, cfg = { enabled: false }) {
   // DEAD_END case must never show a live follow-up date, even if follow_up_at
   // was never cleared (legacy rows).
   if (TERMINAL.has(conv.state) || QUIESCENT_STATES.has(conv.state)) return none;
-  if (conv.follow_up_at) return { date: conv.follow_up_at, source: 'kommun_promise' };
+  // A promise older than the latest state change is stale: something has
+  // happened since (a delivery, our own reply) and the case is on the normal
+  // clock again. Without this an old out-of-office date showed "försenad 88d"
+  // on a case we had written to twelve days earlier (2026-10-26, 84 cases).
+  const changedDay = String(conv.state_changed_at ?? '').slice(0, 10);
+  if (conv.follow_up_at && !(changedDay && conv.follow_up_at < changedDay)) {
+    return { date: conv.follow_up_at, source: 'kommun_promise' };
+  }
   const rule = STALE_RULES[conv.state];
   if (!rule || !conv.state_changed_at) return none;
   const t = new Date(conv.state_changed_at).getTime();
