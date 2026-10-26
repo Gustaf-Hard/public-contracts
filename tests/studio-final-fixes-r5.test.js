@@ -57,6 +57,103 @@ const done = (kods) => new Map(kods.map((k) => [k, 'done']));
 const points = (facts, slug, kod = '0114') => facts.filter((f) => f.kommun_kod === kod && f.active && !f.superseded && f.kr_per_elev != null
   && (f.kr_per_elev_product_slug === slug || (!f.kr_per_elev_product_slug && f.product_slugs.length === 1 && f.product_slugs[0] === slug)));
 
+// ------------------------------------------------------------------ V1
+describe('V1. a kommun\'s price for a product is one avtal\'s own price, never a sum', () => {
+  const magma = (o) => C({ vendor_name: 'Radish AB', pricing_model: 'per_student', products: ['Magma'], ...o });
+
+  it('two analyses of one document at 120 kr give one point at 120 (the Haparanda shape)', () => {
+    const a = magma({ annual_value_sek: 106920, size_bytes: 777001, period_start: '2025-02-01', summary: 'Huvudavtal om Magma.' });
+    const b = magma({ annual_value_sek: 133920, size_bytes: 777001, period_start: '2025-03-01', summary: 'Huvudavtal om Magma, inläst igen.' });
+    const facts = build([a, b], {
+      lineItems: [perElev(a.contract_id, 'Magma', 120), perElev(b.contract_id, 'Magma', 120)],
+      coverage: [...covFor(a.contract_id, 'Magma', F9), ...covFor(b.contract_id, 'Magma', F9)],
+    });
+    expect(points(facts, 'magma').map((f) => [f.contract_id, f.kr_per_elev])).toEqual([[b.contract_id, 120]]);
+    expect(row(facts, a.contract_id).kr_per_elev_basis).toBe('annat_avtal');
+    const t = text(renderKommun({ kod: '0114', stats, facts, statusMap: done(['0114']), today: TODAY }));
+    expect(t).toContain('120 kr per elev och år, ert pris');
+    expect(t).not.toMatch(/21[0-9] kr per elev/);
+  });
+
+  it('a tillägg that changes the price terms never raises the price (the Lysekil shape)', () => {
+    const main = magma({ annual_value_sek: 34650, summary: 'Avtal om Magma.' });
+    const add = magma({ annual_value_sek: 50000, period_start: '2025-06-01', summary: 'Tilläggsavtal som justerar prisvillkoren för Magma.' });
+    const facts = build([main, add], { lineItems: [perElev(main.contract_id, 'Magma', 90)], coverage: covFor(main.contract_id, 'Magma', F9) });
+    expect(points(facts, 'magma').map((f) => f.kr_per_elev)).toEqual([90]);
+    expect(row(facts, add.contract_id).kr_per_elev).toBeNull();
+  });
+
+  it('two schools\' orders for the same school forms: the larger avtal\'s price, not a blend (the Ystad shape)', () => {
+    const sli = (o) => C({ vendor_name: 'SLI Education AB', pricing_model: 'per_student', products: ['SLI Play'], ...o });
+    const a = sli({ annual_value_sek: 19470, period_start: '2025-02-01', summary: 'Skola A beställer SLI Play.' });
+    const b = sli({ annual_value_sek: 20010, period_start: '2025-03-01', summary: 'Skola B beställer SLI Play.' });
+    const facts = build([a, b], {
+      lineItems: [perElev(a.contract_id, 'SLI Play', 59), perElev(b.contract_id, 'SLI Play', 69)],
+      coverage: [...covFor(a.contract_id, 'SLI Play', F9), ...covFor(b.contract_id, 'SLI Play', F9)],
+    });
+    expect(points(facts, 'sli-play').map((f) => [f.contract_id, f.kr_per_elev])).toEqual([[b.contract_id, 69]]);
+    expect(row(facts, a.contract_id).kr_per_elev_basis).toBe('annat_avtal');
+  });
+
+  it('a bundle\'s Polylino price is unchanged by Inlästa and Begreppa avtal, and they keep their own points (the Klippan shape)', () => {
+    const bundle = C({ vendor_name: 'ILT Education AB', pricing_model: 'per_student', annual_value_sek: 291330, products: ['Polylino', 'Inlästa läromedel', 'Begreppa'] });
+    const inl = C({ vendor_name: 'ILT Education AB', pricing_model: 'per_student', annual_value_sek: 56000, period_start: '2025-02-01', products: ['Inlästa läromedel'] });
+    const beg = C({ vendor_name: 'ILT Education AB', pricing_model: 'per_student', annual_value_sek: 12000, period_start: '2025-03-01', products: ['Begreppa'] });
+    const facts = build([bundle, inl, beg], {
+      lineItems: [perElev(bundle.contract_id, 'Polylino', 90), perElev(inl.contract_id, 'Inlästa läromedel', 65), perElev(beg.contract_id, 'Begreppa', 120)],
+      coverage: [...covFor(bundle.contract_id, 'Polylino', F9), ...covFor(inl.contract_id, 'Inlästa läromedel', ['Gymnasiet']), ...covFor(beg.contract_id, 'Begreppa', ['Komvux'])],
+    });
+    expect(row(facts, bundle.contract_id)).toMatchObject({ kr_per_elev: 90, kr_per_elev_product_slug: 'polylino' });
+    expect(points(facts, 'inlasta-laromedel').map((f) => f.kr_per_elev)).toEqual([65]);
+    expect(points(facts, 'begreppa').map((f) => f.kr_per_elev)).toEqual([120]);
+  });
+
+  it('a multi-product row prices only its own product: a Polyglutt avtal neither raises Polylino nor loses its point (Codex r5 new#1)', () => {
+    const both = C({ vendor_name: 'ILT Education AB', pricing_model: 'per_student', annual_value_sek: 30000, products: ['Polylino', 'Polyglutt'] });
+    const glutt = C({ vendor_name: 'ILT Education AB', annual_value_sek: 10000, period_start: '2025-02-01', products: ['Polyglutt'] });
+    const facts = build([both, glutt], {
+      lineItems: [perElev(both.contract_id, 'Polylino', 100)],
+      coverage: [...covFor(both.contract_id, 'Polylino', ['1-3']), ...covFor(glutt.contract_id, 'Polyglutt', ['1-3'])],
+    });
+    expect(points(facts, 'polylino').map((f) => f.kr_per_elev)).toEqual([100]);
+    expect(points(facts, 'polyglutt').map((f) => f.kr_per_elev)).toEqual([33.33]); // 10 000 over 300 elever in 1-3
+  });
+
+  it('the avtal\'s own elevantal basis is kept: no denominator switch (the Göteborg Alvis shape)', () => {
+    const alvis = (o) => C({ vendor_name: 'Göteborgs IT Konsult Gotit AB', products: ['Alvis'], ...o });
+    const big = alvis({ annual_value_sek: 401500, summary: 'Alvis för yrkeshögskolan.' });
+    const small = alvis({ annual_value_sek: 248400, period_start: '2025-02-01', summary: 'Alvis för prövning inom komvux.' });
+    const facts = build([big, small], { coverage: [...covFor(big.contract_id, 'Alvis', ['Gymnasiet'], 4500), ...covFor(small.contract_id, 'Alvis', ['Komvux'], 2000)] });
+    expect(points(facts, 'alvis').map((f) => [f.contract_id, f.kr_per_elev, f.kr_per_elev_basis])).toEqual([[big.contract_id, 89.22, 'avtalets_elevantal']]);
+    expect(row(facts, small.contract_id).kr_per_elev).toBeNull();
+  });
+
+  it('a Komvux avtal under the same product does not dilute the F-9 price (the Landskrona shape)', () => {
+    const main = C({ annual_value_sek: 120000, products: ['Binogi'], summary: 'Binogi för grundskolan.' });
+    const vux = C({ annual_value_sek: 5000, period_start: '2025-02-01', products: ['Binogi'], summary: 'Språkprojekt för komvux.' });
+    const facts = build([main, vux], { coverage: [...covFor(main.contract_id, 'Binogi', F9), ...covFor(vux.contract_id, 'Binogi', ['Komvux'])] });
+    expect(points(facts, 'binogi').map((f) => f.kr_per_elev)).toEqual([133.33]); // 120 000 over 900 elever
+  });
+
+  it('the same list price for grundskola and komvux stays the list price (the Hjo and Hörby shape)', () => {
+    const inl = (o) => C({ vendor_name: 'ILT Education AB', pricing_model: 'per_student', products: ['Inlästa läromedel'], ...o });
+    const a = inl({ annual_value_sek: 60660, summary: 'Inlästa läromedel för grundskolan.' });
+    const b = inl({ annual_value_sek: 4718, period_start: '2025-02-01', summary: 'Inlästa läromedel för komvux.' });
+    const facts = build([a, b], {
+      lineItems: [perElev(a.contract_id, 'Inlästa läromedel', 67.4), perElev(b.contract_id, 'Inlästa läromedel', 67.4)],
+      coverage: [...covFor(a.contract_id, 'Inlästa läromedel', F9), ...covFor(b.contract_id, 'Inlästa läromedel', ['Komvux'])],
+    });
+    expect(points(facts, 'inlasta-laromedel').map((f) => f.kr_per_elev)).toEqual([67.4]);
+    expect(priceDistribution(facts, { productSlug: 'inlasta-laromedel' }).n_avtal).toBe(1);
+  });
+
+  it('Y1: a lone tilläggsavtal with a styckpris has no price point', () => {
+    const add = C({ vendor_name: 'SchoolSoft AB', pricing_model: 'per_student', annual_value_sek: 4500, products: ['SchoolSoft'], summary: 'Tilläggsavtal om en modul, 10 kr per elev.' });
+    const facts = build([add], { lineItems: [perElev(add.contract_id, 'SchoolSoft', 10)], coverage: covFor(add.contract_id, 'SchoolSoft', F9) });
+    expect(row(facts, add.contract_id)).toMatchObject({ kr_per_elev: null, kr_per_elev_basis: 'tillagg' });
+  });
+});
+
 // ------------------------------------------------------------------ V3
 describe('V3. a shared generic file name alone is not one document', () => {
   it('two independent Binogi avtal both named "Avtal.pdf" stay two avtal with their own prices', () => {

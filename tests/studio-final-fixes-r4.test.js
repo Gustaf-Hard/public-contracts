@@ -125,18 +125,19 @@ describe('W1. the studio never claims a kommun has no avtal', () => {
 describe('W2. a tilläggsavtal never makes its own price point', () => {
   const tieto = (kod, o) => C({ vendor_name: 'Tieto', kommun_kod: kod, products: ['Edlevo'], ...o });
 
-  it('Emmaboda shape: main 456 000 and tillägg 8 700 are one point, the sum over the main avtal\'s elever', () => {
+  // r5 V1: the point is the main avtal's own price, never a sum.
+  it('Emmaboda shape: main 456 000 and tillägg 8 700 are one point, the main avtal\'s own price', () => {
     const main = tieto('0114', { annual_value_sek: 456000, summary: 'Avtal om Edlevo.' });
     const add = tieto('0114', { annual_value_sek: 8700, period_start: '2025-06-01', period_end: null, summary: 'Tilläggsavtal om Edlevo-moduler för gymnasiet och vux.' });
     const facts = build([main, add], { coverage: [...covFor(main.contract_id, 'Edlevo', ALL), ...covFor(add.contract_id, 'Edlevo', ['Gymnasiet', 'Komvux'])] });
-    expect(row(facts, main.contract_id).kr_per_elev).toBeCloseTo((456000 + 8700) / ELEVER_ALL, 2);
-    expect(row(facts, add.contract_id)).toMatchObject({ kr_per_elev: null, kr_per_elev_basis: 'i_huvudavtal' });
+    expect(row(facts, main.contract_id).kr_per_elev).toBeCloseTo(456000 / ELEVER_ALL, 2);
+    expect(row(facts, add.contract_id)).toMatchObject({ kr_per_elev: null, kr_per_elev_basis: 'tillagg' });
     const d = priceDistribution(facts, { productSlug: 'edlevo' });
     expect(d.n).toBe(1);
     const t = text(renderKommun({ kod: '0114', stats, facts, statusMap: done(['0114']), today: TODAY }));
-    expect(t).toContain('232 kr per elev och år, ert pris');
+    expect(t).toContain('228 kr per elev och år, ert pris');
     expect(t).not.toMatch(/\b4,4 kr per elev/); // 8 700 over the 2 000 elever is never shown as a price
-    expect(t).toContain('värdet ingår i huvudavtalets pris per elev');
+    expect(t).toContain('tilläggsavtal, inget eget pris per elev');
   });
 
   it('a main avtal with no school forms leaves the kommun without a price: the tillägg does not stand in', () => {
@@ -144,12 +145,12 @@ describe('W2. a tilläggsavtal never makes its own price point', () => {
     const add = tieto('0114', { annual_value_sek: 8700, period_start: '2025-06-01', period_end: null });
     const facts = build([main, add], { coverage: covFor(add.contract_id, 'Edlevo', ['Gymnasiet', 'Komvux']) });
     expect(facts.filter((f) => f.kr_per_elev != null)).toHaveLength(0);
-    expect(row(facts, add.contract_id).kr_per_elev_basis).toBe('tillagg');
+    expect(row(facts, add.contract_id).kr_per_elev_basis).toBe('annat_avtal');
     const t = text(renderKommun({ kod: '0114', stats, facts, statusMap: done(['0114']), today: TODAY }));
     expect(t).not.toContain('ert pris');
   });
 
-  it('a lone tilläggsavtal priced by value per elev has no price; one with a stated styckpris keeps it', () => {
+  it('a lone tilläggsavtal has no price, by value per elev or by a stated styckpris (r5 Y1)', () => {
     const lone = tieto('0115', { annual_value_sek: 30000, summary: 'Tilläggsavtal mellan kommunen och Tieto om modulen ersättningshantering.' });
     const sty = C({ vendor_name: 'SchoolSoft AB', kommun_kod: '0115', annual_value_sek: 48000, pricing_model: 'per_student', products: ['SchoolSoft'], summary: 'Tilläggsavtal om tjänsten, 48 kr per elev.' });
     const facts = build([lone, sty], {
@@ -157,7 +158,7 @@ describe('W2. a tilläggsavtal never makes its own price point', () => {
       lineItems: [{ contract_id: sty.contract_id, product_name: 'SchoolSoft', amount_sek: null, unit_price_sek: 48, unit: 'elev', quantity: null, period_months: 12 }],
     });
     expect(row(facts, lone.contract_id)).toMatchObject({ kr_per_elev: null, kr_per_elev_basis: 'tillagg' });
-    expect(row(facts, sty.contract_id)).toMatchObject({ kr_per_elev: 48, kr_per_elev_basis: 'styckpris' });
+    expect(row(facts, sty.contract_id)).toMatchObject({ kr_per_elev: null, kr_per_elev_basis: 'tillagg' });
   });
 
   it('the Edlevo median is not pulled down by module tillägg', () => {
@@ -180,12 +181,12 @@ describe('W2. a tilläggsavtal never makes its own price point', () => {
     expect(d.values.map((v) => v.kommun_kod)).not.toContain('0125');
   });
 
-  it('two avtal for different grades are priced over the elever of both', () => {
+  it('two avtal for different grades: the larger avtal\'s own price is the point (r5 V1)', () => {
     const a = C({ vendor_name: 'ILT Education AB', kommun_kod: '0117', annual_value_sek: 60000, products: ['Polylino'] });
     const b = C({ vendor_name: 'ILT Education AB', kommun_kod: '0117', annual_value_sek: 30000, period_start: '2025-02-01', products: ['Polylino'] });
     const facts = build([a, b], { coverage: [...covFor(a.contract_id, 'Polylino', ['1-3']), ...covFor(b.contract_id, 'Polylino', ['4-6'])] });
-    expect(row(facts, a.contract_id).kr_per_elev).toBe(150); // 90 000 over 600 elever in 1-3 and 4-6
-    expect(row(facts, b.contract_id).kr_per_elev).toBeNull();
+    expect(row(facts, a.contract_id).kr_per_elev).toBe(200); // 60 000 over the 300 elever in 1-3
+    expect(row(facts, b.contract_id)).toMatchObject({ kr_per_elev: null, kr_per_elev_basis: 'annat_avtal' });
   });
 });
 

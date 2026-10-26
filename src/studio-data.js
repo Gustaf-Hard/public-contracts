@@ -288,7 +288,7 @@ export function buildStudioFacts({ contracts = [], lineItems = [], coverage = []
   markDuplicates(facts);
   markSuperseded(facts);
   allocateJoint(facts);
-  priceByKommunProduct(facts, stats);
+  priceByKommunProduct(facts);
   for (const f of facts) { delete f._received_at; delete f._vendor_key; delete f._annual; delete f._tillagg; delete f._doc; }
   return facts;
 }
@@ -571,73 +571,54 @@ function allocateJoint(facts) {
   }
 }
 
-// One price point per kommun x product (final review r4 W2). A kommun with a
-// main avtal and tilläggsavtal for one product (extra modules, another
-// school form) pays for the product with all of them, so a small tillägg's
-// value over the kommun's elever is never its price. Among the headline rows
-// (active, not superseded, not a samverkansavtal copy) that name the product,
-// the main row is the one with the largest known annual value (then the one
-// with a price, then the lowest id). Only the main row keeps a price: the
-// main row's price times its elever in scope (its value, for a value per
-// elev) plus the other rows' known values, over the main row's elever in
-// scope. When the other rows name school forms the main row does not (two
-// avtal for different grades), the denominator is Skolverket elever in the
-// union of their school forms. A styckpris main row whose elever are unknown
-// keeps its stated price.
-// When the main row has no price (no school forms, a staff licence), the
-// kommun has no price point for the product: a tillägg never stands in for
-// it. An avtal whose summary calls it a tilläggsavtal is main only when the
-// group has nothing else, and then keeps a price only when it states one
-// per elev (styckpris): its value over the kommun's elever is a module's
-// cost, not the product's price. kr_per_elev_basis marks the rows that lost
-// a price: 'i_huvudavtal' when their value is in the main row's price,
-// 'tillagg' when the product has no price point in the kommun.
+// One price point per kommun x product (final review r5 V1). A kommun's
+// price for a product is the kr_per_elev of ONE avtal row, never a sum of
+// several. The rows for a product are the headline rows (active, not
+// superseded, not a samverkansavtal copy) whose price is for that product: a
+// single-product row, or a multi-product row whose kr_per_elev_product_slug
+// names it (a bundle's Polylino price is never Polyglutt's). Copies of one
+// document (sameDocument) collapse first. The main row is the one with the
+// largest known annual value (then known school forms, then the newest).
+// Only the main row keeps its price, and only when it has one:
+//   - a tilläggsavtal (the summary says so) never has a price point, even a
+//     stated styckpris and even alone: a module's price is not the product's;
+//   - a smaller row overlapping the main row's school forms is a tillägg,
+//     another school's order or a price change, and has no price point;
+//   - every other row of the product (another school form, an equal copy)
+//     has no price point either: one point per kommun x product.
+// When the main row has no price (no school forms, a staff licence), a
+// smaller overlapping row never stands in for it; a row for school forms the
+// main row does not cover may still be the kommun's point.
+// kr_per_elev_basis marks the rows that lost a price: 'tillagg' for a
+// tilläggsavtal, 'annat_avtal' for another avtal of the product.
 export const TILLAGG_SUMMARY = /^\s*(?:ett\s+|en\s+)?(?:samling av\s+)?till[äa]ggsavtal/i;
-export function priceByKommunProduct(facts, stats = null) {
+const priceProductOf = (f) => f.kr_per_elev_product_slug ?? (f.product_slugs.length === 1 ? f.product_slugs[0] : null);
+export function priceByKommunProduct(facts) {
   const rows = facts.filter((f) => f.active && !f.superseded && !f.joint && f.kommun_kod);
-  const groups = new Map();
-  const drop = new Set();
-  for (const f of rows) {
-    // A lone tillägg priced by value per elev, whatever products it names.
-    if (f._tillagg && isFiniteNum(f.kr_per_elev) && f.kr_per_elev_basis !== 'styckpris') drop.add(f);
-    for (const p of new Set([...f.product_slugs, f.kr_per_elev_product_slug].filter(Boolean))) {
-      const k = `${f.kommun_kod}\u0000${p}`;
-      if (!groups.has(k)) groups.set(k, new Set());
-      groups.get(k).add(f);
-    }
-  }
+  const noPrice = (f, basis) => {
+    if (!isFiniteNum(f.kr_per_elev)) return;
+    f.kr_per_elev = null; f.kr_per_elev_product_slug = null; f.kr_per_elev_basis = basis;
+  };
+  for (const f of rows) if (f._tillagg) noPrice(f, 'tillagg');
   const val = (f) => (isFiniteNum(f.annual_value_sek) ? f.annual_value_sek : -1);
-  const mains = new Map(); // row -> combined price
-  const included = new Map(); // row -> its value is in a main row's price
-  for (const set of groups.values()) {
-    if (set.size < 2) continue;
-    const list = [...set].sort((a, b) => (!!a._tillagg - !!b._tillagg) || val(b) - val(a)
-      || (isFiniteNum(b.kr_per_elev) - isFiniteNum(a.kr_per_elev)) || a.contract_id - b.contract_id);
-    const [main, ...rest] = list;
-    for (const r of rest) drop.add(r);
-    if (!isFiniteNum(main.kr_per_elev) || drop.has(main)) continue; // a lone-tillägg drop above covers main._tillagg
-    const others = rest.reduce((sum, r) => sum + (isFiniteNum(r.annual_value_sek) && r.annual_value_sek > 0 ? r.annual_value_sek : 0), 0);
-    const el = main.elever_in_scope;
-    let price = main.kr_per_elev;
-    if (others > 0 && isFiniteNum(el) && el > 0) {
-      let total = el;
-      const segs = new Set(list.flatMap((r) => r.segments));
-      if ([...segs].some((sg) => !main.segments.includes(sg))) {
-        const n = stats?.eleverIn?.(main.kommun_kod, sortGrades(segs));
-        total = isFiniteNum(n) && n > 0 ? Math.max(n, el) : null;
-      }
-      price = total == null ? null : (main.kr_per_elev * el + others) / total;
+  const order = (a, b) => val(b) - val(a) || ((b.segments.length > 0) - (a.segments.length > 0))
+    || String(dayOf(b.period_start) ?? '').localeCompare(String(dayOf(a.period_start) ?? ''))
+    || String(b._received_at ?? '').localeCompare(String(a._received_at ?? '')) || b.contract_id - a.contract_id;
+  const groups = groupBy(rows.filter((f) => !f._tillagg && priceProductOf(f)), (f) => `${f.kommun_kod}\u0000${priceProductOf(f)}`);
+  for (const group of groups.values()) {
+    if (group.length < 2) continue;
+    // Same-document copies collapse onto the fullest copy.
+    const docs = [];
+    for (const f of [...group].sort(order)) {
+      if (docs.some((d) => d.contract_id !== f.contract_id && sameDocument(d._doc ?? {}, f._doc ?? {}))) noPrice(f, 'annat_avtal');
+      else docs.push(f);
     }
-    for (const r of rest) included.set(r, price != null);
-    if (price == null) { drop.add(main); continue; }
-    mains.set(main, Math.max(mains.get(main) ?? 0, round2(price)));
+    const [main, ...rest] = docs;
+    const smallOverlap = (r) => val(r) < val(main) && segmentsOverlap(main.segments, r.segments);
+    for (const r of rest) if (smallOverlap(r)) noPrice(r, 'annat_avtal');
+    // The point is the main row's price, else the first remaining priced row.
+    for (const r of docs.filter((f) => isFiniteNum(f.kr_per_elev)).slice(1)) noPrice(r, 'annat_avtal');
   }
-  for (const r of drop) {
-    if (mains.has(r)) continue; // the main row of another product keeps its price
-    r.kr_per_elev = null; r.kr_per_elev_product_slug = null;
-    r.kr_per_elev_basis = included.get(r) && isFiniteNum(r.annual_value_sek) && r.annual_value_sek > 0 ? 'i_huvudavtal' : 'tillagg';
-  }
-  for (const [r, price] of mains) r.kr_per_elev = price;
 }
 
 // ---------------- helpers ----------------
