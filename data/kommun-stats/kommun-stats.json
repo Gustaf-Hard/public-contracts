@@ -1,0 +1,7294 @@
+{
+ "fetched_at": "2026-10-26T09:57:53.111Z",
+ "sources": {
+  "kolada_municipality_names": {
+   "url": "https://api.kolada.se/v3/municipality",
+   "status": "ok"
+  },
+  "siris_6_grundskola": {
+   "url": "https://siris.skolverket.se/siris/reports/export_api/runexport/?pExportID=6&pAr=2025",
+   "status": "ok"
+  },
+  "siris_57_gymnasieskola": {
+   "url": "https://siris.skolverket.se/siris/reports/export_api/runexport/?pExportID=57&pAr=2025",
+   "status": "ok"
+  },
+  "kolada_N11730_forskola": {
+   "url": "https://api.kolada.se/v3/data/kpi/N11730/year/2025",
+   "status": "ok"
+  },
+  "kolada_N11805_forskoleklass": {
+   "url": "https://api.kolada.se/v3/data/kpi/N11805/year/2025",
+   "status": "ok"
+  },
+  "pxweb_komvux": {
+   "url": "https://statistikdatabasen.skolverket.se/PxWeb/api/v1/sv/Skolverkets_statistikdatabas/Kommunala_jamforelsetal/Komvux/Elever_och_kursdeltagare/Komvux_grundlaggande_och_gymnasial/Komvux_grund_gymnasial_elever_kursdeltagare.px",
+   "status": "ok"
+  },
+  "kolada_kommungrupper": {
+   "url": "https://api.kolada.se/v3/municipality_groups/G92786..G92794",
+   "status": "ok"
+  },
+  "kolada_liknande_kommuner_grundskola": {
+   "url": "https://api.kolada.se/v3/municipality_groups?title=Liknande kommuner grundskola",
+   "status": "ok"
+  },
+  "wikidata_centroids": {
+   "url": "https://query.wikidata.org/sparql",
+   "status": "ok"
+  }
+ },
+ "laar": "2025/26",
+ "kommuner": {
+  "1060": {
+   "namn": "Olofström",
+   "lan": "Blekinge län",
+   "folkmangd": 12844,
+   "kommungrupp": "Pendlingskommun nära mindre tätort",
+   "peers": [
+    "1460",
+    "1785",
+    "1862",
+    "1882",
+    "2023",
+    "2104",
+    "2282"
+   ],
+   "elever": {
+    "Förskola": 463,
+    "Förskoleklass": 106,
+    "1-3": 384,
+    "4-6": 392,
+    "7-9": 459,
+    "Gymnasiet": 505,
+    "Komvux": 198
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1080": {
+   "namn": "Karlskrona",
+   "lan": "Blekinge län",
+   "folkmangd": 66021,
+   "kommungrupp": "Mindre stad/tätort",
+   "peers": [
+    "0188",
+    "0880",
+    "0980",
+    "1293",
+    "1383",
+    "2380",
+    "2482"
+   ],
+   "elever": {
+    "Förskola": 2355,
+    "Förskoleklass": 491,
+    "1-3": 1620,
+    "4-6": 1679,
+    "7-9": 1650,
+    "Gymnasiet": 2137,
+    "Komvux": 1920
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1081": {
+   "namn": "Ronneby",
+   "lan": "Blekinge län",
+   "folkmangd": 28708,
+   "kommungrupp": "Pendlingskommun nära mindre tätort",
+   "peers": [
+    "0192",
+    "0483",
+    "0586",
+    "0683",
+    "1499",
+    "2085",
+    "2283"
+   ],
+   "elever": {
+    "Förskola": 988,
+    "Förskoleklass": 289,
+    "1-3": 868,
+    "4-6": 868,
+    "7-9": 921,
+    "Gymnasiet": 1007,
+    "Komvux": 823
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1082": {
+   "namn": "Karlshamn",
+   "lan": "Blekinge län",
+   "folkmangd": 31642,
+   "kommungrupp": "Mindre stad/tätort",
+   "peers": [
+    "0781",
+    "0883",
+    "1493",
+    "2184",
+    "2280",
+    "2581",
+    "2584"
+   ],
+   "elever": {
+    "Förskola": 1186,
+    "Förskoleklass": 296,
+    "1-3": 936,
+    "4-6": 973,
+    "7-9": 872,
+    "Gymnasiet": 1034,
+    "Komvux": 1829
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1083": {
+   "namn": "Sölvesborg",
+   "lan": "Blekinge län",
+   "folkmangd": 17405,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "1421",
+    "1484",
+    "1781",
+    "1783",
+    "1882",
+    "2282",
+    "2514"
+   ],
+   "elever": {
+    "Förskola": 582,
+    "Förskoleklass": 159,
+    "1-3": 482,
+    "4-6": 579,
+    "7-9": 608,
+    "Gymnasiet": 597,
+    "Komvux": 314
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1214": {
+   "namn": "Svalöv",
+   "lan": "Skåne län",
+   "folkmangd": 14474,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0684",
+    "1260",
+    "1315",
+    "1763",
+    "2026",
+    "2321",
+    "2404"
+   ],
+   "elever": {
+    "Förskola": 641,
+    "Förskoleklass": 147,
+    "1-3": 499,
+    "4-6": 497,
+    "7-9": 364,
+    "Gymnasiet": 443,
+    "Komvux": 285
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1230": {
+   "namn": "Staffanstorp",
+   "lan": "Skåne län",
+   "folkmangd": 27482,
+   "kommungrupp": "Pendlingskommun nära storstad",
+   "peers": [
+    "0125",
+    "0139",
+    "0330",
+    "1262",
+    "1263",
+    "1761",
+    "2309"
+   ],
+   "elever": {
+    "Förskola": 770,
+    "Förskoleklass": 364,
+    "1-3": 1079,
+    "4-6": 1085,
+    "7-9": 1124,
+    "Gymnasiet": 18,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1231": {
+   "namn": "Burlöv",
+   "lan": "Skåne län",
+   "folkmangd": 20444,
+   "kommungrupp": "Pendlingskommun nära storstad",
+   "peers": [
+    "0187",
+    "0305",
+    "0684",
+    "1214",
+    "1442",
+    "1763",
+    "1881"
+   ],
+   "elever": {
+    "Förskola": 805,
+    "Förskoleklass": 265,
+    "1-3": 748,
+    "4-6": 700,
+    "7-9": 563,
+    "Gymnasiet": 54,
+    "Komvux": 698
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1233": {
+   "namn": "Vellinge",
+   "lan": "Skåne län",
+   "folkmangd": 37833,
+   "kommungrupp": "Pendlingskommun nära storstad",
+   "peers": [
+    "0114",
+    "0117",
+    "0120",
+    "0138",
+    "0162",
+    "1261",
+    "1402"
+   ],
+   "elever": {
+    "Förskola": 516,
+    "Förskoleklass": 354,
+    "1-3": 1096,
+    "4-6": 1157,
+    "7-9": 1038,
+    "Gymnasiet": 901,
+    "Komvux": 349
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1256": {
+   "namn": "Östra Göinge",
+   "lan": "Skåne län",
+   "folkmangd": 13718,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0461",
+    "0582",
+    "1260",
+    "1267",
+    "1443",
+    "1462",
+    "1715"
+   ],
+   "elever": {
+    "Förskola": 453,
+    "Förskoleklass": 149,
+    "1-3": 448,
+    "4-6": 435,
+    "7-9": 468,
+    "Gymnasiet": 65,
+    "Komvux": 607
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1257": {
+   "namn": "Örkelljunga",
+   "lan": "Skåne län",
+   "folkmangd": 10293,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0319",
+    "0428",
+    "0767",
+    "1466",
+    "1765",
+    "1884",
+    "2121"
+   ],
+   "elever": {
+    "Förskola": 378,
+    "Förskoleklass": 98,
+    "1-3": 310,
+    "4-6": 312,
+    "7-9": 291,
+    "Gymnasiet": 22,
+    "Komvux": 410
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1260": {
+   "namn": "Bjuv",
+   "lan": "Skåne län",
+   "folkmangd": 16052,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0461",
+    "0764",
+    "1214",
+    "1256",
+    "1267",
+    "1315",
+    "2026"
+   ],
+   "elever": {
+    "Förskola": 676,
+    "Förskoleklass": 173,
+    "1-3": 585,
+    "4-6": 550,
+    "7-9": 506,
+    "Gymnasiet": 45,
+    "Komvux": 389
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1261": {
+   "namn": "Kävlinge",
+   "lan": "Skåne län",
+   "folkmangd": 32655,
+   "kommungrupp": "Pendlingskommun nära storstad",
+   "peers": [
+    "0115",
+    "0162",
+    "0765",
+    "1233",
+    "1277",
+    "1440",
+    "2460"
+   ],
+   "elever": {
+    "Förskola": 1395,
+    "Förskoleklass": 371,
+    "1-3": 1264,
+    "4-6": 1196,
+    "7-9": 1036,
+    "Gymnasiet": 30,
+    "Komvux": 549
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1262": {
+   "namn": "Lomma",
+   "lan": "Skåne län",
+   "folkmangd": 24677,
+   "kommungrupp": "Pendlingskommun nära storstad",
+   "peers": [
+    "0125",
+    "0139",
+    "0330",
+    "1230",
+    "1263",
+    "1761",
+    "2309"
+   ],
+   "elever": {
+    "Förskola": 923,
+    "Förskoleklass": 290,
+    "1-3": 946,
+    "4-6": 1144,
+    "7-9": 1270,
+    "Gymnasiet": null,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1263": {
+   "namn": "Svedala",
+   "lan": "Skåne län",
+   "folkmangd": 23714,
+   "kommungrupp": "Pendlingskommun nära storstad",
+   "peers": [
+    "0125",
+    "0330",
+    "0643",
+    "1230",
+    "1262",
+    "1761",
+    "2309"
+   ],
+   "elever": {
+    "Förskola": 1222,
+    "Förskoleklass": 363,
+    "1-3": 1084,
+    "4-6": 1095,
+    "7-9": 1042,
+    "Gymnasiet": 240,
+    "Komvux": 568
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1264": {
+   "namn": "Skurup",
+   "lan": "Skåne län",
+   "folkmangd": 17139,
+   "kommungrupp": "Pendlingskommun nära storstad",
+   "peers": [
+    "0562",
+    "0686",
+    "0860",
+    "1273",
+    "1452",
+    "1961",
+    "2283"
+   ],
+   "elever": {
+    "Förskola": 720,
+    "Förskoleklass": 204,
+    "1-3": 637,
+    "4-6": 594,
+    "7-9": 612,
+    "Gymnasiet": 252,
+    "Komvux": 556
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1265": {
+   "namn": "Sjöbo",
+   "lan": "Skåne län",
+   "folkmangd": 19397,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0382",
+    "0687",
+    "0763",
+    "0884",
+    "1272",
+    "1276",
+    "1495"
+   ],
+   "elever": {
+    "Förskola": 556,
+    "Förskoleklass": 163,
+    "1-3": 492,
+    "4-6": 505,
+    "7-9": 437,
+    "Gymnasiet": 214,
+    "Komvux": 659
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1266": {
+   "namn": "Hörby",
+   "lan": "Skåne län",
+   "folkmangd": 15559,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0884",
+    "1276",
+    "1470",
+    "1471",
+    "1498",
+    "1766",
+    "2121"
+   ],
+   "elever": {
+    "Förskola": 433,
+    "Förskoleklass": 139,
+    "1-3": 453,
+    "4-6": 468,
+    "7-9": 457,
+    "Gymnasiet": 25,
+    "Komvux": 176
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1267": {
+   "namn": "Höör",
+   "lan": "Skåne län",
+   "folkmangd": 17680,
+   "kommungrupp": "Pendlingskommun nära mindre tätort",
+   "peers": [
+    "0461",
+    "0582",
+    "0764",
+    "1256",
+    "1260",
+    "1443",
+    "1462"
+   ],
+   "elever": {
+    "Förskola": 577,
+    "Förskoleklass": 153,
+    "1-3": 474,
+    "4-6": 498,
+    "7-9": 609,
+    "Gymnasiet": 27,
+    "Komvux": 272
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1270": {
+   "namn": "Tomelilla",
+   "lan": "Skåne län",
+   "folkmangd": 13669,
+   "kommungrupp": "Pendlingskommun nära mindre tätort",
+   "peers": [
+    "0481",
+    "0561",
+    "0861",
+    "1984",
+    "2029",
+    "2262",
+    "2523"
+   ],
+   "elever": {
+    "Förskola": 344,
+    "Förskoleklass": 106,
+    "1-3": 394,
+    "4-6": 361,
+    "7-9": 293,
+    "Gymnasiet": null,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1272": {
+   "namn": "Bromölla",
+   "lan": "Skåne län",
+   "folkmangd": 12497,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0763",
+    "0767",
+    "0884",
+    "1257",
+    "1276",
+    "1466",
+    "1471"
+   ],
+   "elever": {
+    "Förskola": 448,
+    "Förskoleklass": 113,
+    "1-3": 382,
+    "4-6": 418,
+    "7-9": 416,
+    "Gymnasiet": 51,
+    "Komvux": 301
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1273": {
+   "namn": "Osby",
+   "lan": "Skåne län",
+   "folkmangd": 12861,
+   "kommungrupp": "Pendlingskommun nära mindre tätort",
+   "peers": [
+    "0642",
+    "0860",
+    "1264",
+    "1430",
+    "1452",
+    "1465",
+    "1961"
+   ],
+   "elever": {
+    "Förskola": 429,
+    "Förskoleklass": 130,
+    "1-3": 404,
+    "4-6": 450,
+    "7-9": 503,
+    "Gymnasiet": 282,
+    "Komvux": 338
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1275": {
+   "namn": "Perstorp",
+   "lan": "Skåne län",
+   "folkmangd": 7115,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0331",
+    "0760",
+    "0821",
+    "2303",
+    "2326",
+    "2409",
+    "2421"
+   ],
+   "elever": {
+    "Förskola": 296,
+    "Förskoleklass": 65,
+    "1-3": 269,
+    "4-6": 253,
+    "7-9": 276,
+    "Gymnasiet": 30,
+    "Komvux": 162
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1276": {
+   "namn": "Klippan",
+   "lan": "Skåne län",
+   "folkmangd": 17713,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0687",
+    "0884",
+    "1265",
+    "1266",
+    "1272",
+    "1471",
+    "1495"
+   ],
+   "elever": {
+    "Förskola": 567,
+    "Förskoleklass": 193,
+    "1-3": 515,
+    "4-6": 502,
+    "7-9": 649,
+    "Gymnasiet": 785,
+    "Komvux": 659
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1277": {
+   "namn": "Åstorp",
+   "lan": "Skåne län",
+   "folkmangd": 16491,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0140",
+    "0162",
+    "0665",
+    "0765",
+    "1261",
+    "2422",
+    "2460"
+   ],
+   "elever": {
+    "Förskola": 775,
+    "Förskoleklass": 186,
+    "1-3": 652,
+    "4-6": 673,
+    "7-9": 635,
+    "Gymnasiet": 73,
+    "Komvux": 256
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1278": {
+   "namn": "Båstad",
+   "lan": "Skåne län",
+   "folkmangd": 16046,
+   "kommungrupp": "Landsbygdskommun med besöksnäring",
+   "peers": [
+    "0563",
+    "1083",
+    "1421",
+    "1447",
+    "1484",
+    "1783",
+    "2514"
+   ],
+   "elever": {
+    "Förskola": 506,
+    "Förskoleklass": 147,
+    "1-3": 381,
+    "4-6": 395,
+    "7-9": 536,
+    "Gymnasiet": 215,
+    "Komvux": 276
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1280": {
+   "namn": "Malmö",
+   "lan": "Skåne län",
+   "folkmangd": 367924,
+   "kommungrupp": "Storstäder",
+   "peers": [
+    "0380",
+    "0580",
+    "0581",
+    "0680",
+    "1283",
+    "1880",
+    "1980"
+   ],
+   "elever": {
+    "Förskola": 14752,
+    "Förskoleklass": 3366,
+    "1-3": 10348,
+    "4-6": 10519,
+    "7-9": 10053,
+    "Gymnasiet": 7947,
+    "Komvux": 10716
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1281": {
+   "namn": "Lund",
+   "lan": "Skåne län",
+   "folkmangd": 132333,
+   "kommungrupp": "Större stad",
+   "peers": [
+    "0580",
+    "0581",
+    "0680",
+    "1780",
+    "2180",
+    "2281",
+    "2480"
+   ],
+   "elever": {
+    "Förskola": 3569,
+    "Förskoleklass": 1058,
+    "1-3": 3419,
+    "4-6": 3698,
+    "7-9": 3987,
+    "Gymnasiet": 7819,
+    "Komvux": 4201
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1282": {
+   "namn": "Landskrona",
+   "lan": "Skåne län",
+   "folkmangd": 47571,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0483",
+    "0486",
+    "1485",
+    "1489",
+    "1499",
+    "2081",
+    "2284"
+   ],
+   "elever": {
+    "Förskola": 1528,
+    "Förskoleklass": 442,
+    "1-3": 1366,
+    "4-6": 1212,
+    "7-9": 1076,
+    "Gymnasiet": 537,
+    "Komvux": 1429
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1283": {
+   "namn": "Helsingborg",
+   "lan": "Skåne län",
+   "folkmangd": 152776,
+   "kommungrupp": "Större stad",
+   "peers": [
+    "0580",
+    "0581",
+    "0680",
+    "1380",
+    "1490",
+    "1880",
+    "1980"
+   ],
+   "elever": {
+    "Förskola": 4371,
+    "Förskoleklass": 1325,
+    "1-3": 4091,
+    "4-6": 4064,
+    "7-9": 3755,
+    "Gymnasiet": 3666,
+    "Komvux": 5748
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1284": {
+   "namn": "Höganäs",
+   "lan": "Skåne län",
+   "folkmangd": 28489,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0687",
+    "0781",
+    "0882",
+    "1265",
+    "1983",
+    "2181",
+    "2182"
+   ],
+   "elever": {
+    "Förskola": 683,
+    "Förskoleklass": 292,
+    "1-3": 887,
+    "4-6": 922,
+    "7-9": 1013,
+    "Gymnasiet": 445,
+    "Komvux": 792
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1285": {
+   "namn": "Eslöv",
+   "lan": "Skåne län",
+   "folkmangd": 35126,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0486",
+    "0662",
+    "0682",
+    "0685",
+    "1415",
+    "1489",
+    "1861"
+   ],
+   "elever": {
+    "Förskola": 1556,
+    "Förskoleklass": 409,
+    "1-3": 1263,
+    "4-6": 1260,
+    "7-9": 1192,
+    "Gymnasiet": 693,
+    "Komvux": 1053
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1286": {
+   "namn": "Ystad",
+   "lan": "Skåne län",
+   "folkmangd": 32188,
+   "kommungrupp": "Mindre stad/tätort",
+   "peers": [
+    "0883",
+    "1082",
+    "1083",
+    "1421",
+    "1781",
+    "1883",
+    "2582"
+   ],
+   "elever": {
+    "Förskola": 923,
+    "Förskoleklass": 256,
+    "1-3": 866,
+    "4-6": 913,
+    "7-9": 918,
+    "Gymnasiet": 1724,
+    "Komvux": 967
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1287": {
+   "namn": "Trelleborg",
+   "lan": "Skåne län",
+   "folkmangd": 47405,
+   "kommungrupp": "Pendlingskommun nära storstad",
+   "peers": [
+    "0583",
+    "1292",
+    "1382",
+    "1482",
+    "1487",
+    "1488",
+    "2081"
+   ],
+   "elever": {
+    "Förskola": 1768,
+    "Förskoleklass": 470,
+    "1-3": 1523,
+    "4-6": 1410,
+    "7-9": 1292,
+    "Gymnasiet": 1116,
+    "Komvux": 1161
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1290": {
+   "namn": "Kristianstad",
+   "lan": "Skåne län",
+   "folkmangd": 85908,
+   "kommungrupp": "Större stad",
+   "peers": [
+    "0780",
+    "0880",
+    "1380",
+    "1383",
+    "1481",
+    "1496",
+    "2482"
+   ],
+   "elever": {
+    "Förskola": 3026,
+    "Förskoleklass": 786,
+    "1-3": 2554,
+    "4-6": 2592,
+    "7-9": 2752,
+    "Gymnasiet": 2721,
+    "Komvux": 2297
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1291": {
+   "namn": "Simrishamn",
+   "lan": "Skåne län",
+   "folkmangd": 18779,
+   "kommungrupp": "Landsbygdskommun med besöksnäring",
+   "peers": [
+    "0584",
+    "0885",
+    "1278",
+    "1446",
+    "1864",
+    "2031",
+    "2034"
+   ],
+   "elever": {
+    "Förskola": 417,
+    "Förskoleklass": 98,
+    "1-3": 329,
+    "4-6": 331,
+    "7-9": 389,
+    "Gymnasiet": 193,
+    "Komvux": 347
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1292": {
+   "namn": "Ängelholm",
+   "lan": "Skåne län",
+   "folkmangd": 45159,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0583",
+    "1287",
+    "1293",
+    "1382",
+    "1482",
+    "1487",
+    "1496"
+   ],
+   "elever": {
+    "Förskola": 1542,
+    "Förskoleklass": 478,
+    "1-3": 1644,
+    "4-6": 1568,
+    "7-9": 1621,
+    "Gymnasiet": 1488,
+    "Komvux": 1182
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1293": {
+   "namn": "Hässleholm",
+   "lan": "Skåne län",
+   "folkmangd": 51915,
+   "kommungrupp": "Lågpendlingskommun nära större stad",
+   "peers": [
+    "0583",
+    "1287",
+    "1292",
+    "1482",
+    "1487",
+    "1496",
+    "2181"
+   ],
+   "elever": {
+    "Förskola": 1937,
+    "Förskoleklass": 514,
+    "1-3": 1550,
+    "4-6": 1528,
+    "7-9": 1588,
+    "Gymnasiet": 1365,
+    "Komvux": 1238
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1315": {
+   "namn": "Hylte",
+   "lan": "Hallands län",
+   "folkmangd": 10094,
+   "kommungrupp": "Lågpendlingskommun nära större stad",
+   "peers": [
+    "0461",
+    "1214",
+    "1443",
+    "1763",
+    "2026",
+    "2321",
+    "2404"
+   ],
+   "elever": {
+    "Förskola": 396,
+    "Förskoleklass": 120,
+    "1-3": 346,
+    "4-6": 351,
+    "7-9": 372,
+    "Gymnasiet": 27,
+    "Komvux": 271
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1380": {
+   "namn": "Halmstad",
+   "lan": "Hallands län",
+   "folkmangd": 106315,
+   "kommungrupp": "Större stad",
+   "peers": [
+    "0181",
+    "0484",
+    "0780",
+    "1290",
+    "1490",
+    "2180",
+    "2281"
+   ],
+   "elever": {
+    "Förskola": 3898,
+    "Förskoleklass": 1098,
+    "1-3": 3463,
+    "4-6": 3225,
+    "7-9": 3408,
+    "Gymnasiet": 3423,
+    "Komvux": 3340
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1381": {
+   "namn": "Laholm",
+   "lan": "Hallands län",
+   "folkmangd": 26565,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0586",
+    "0881",
+    "1491",
+    "1784",
+    "1885",
+    "1983",
+    "2183"
+   ],
+   "elever": {
+    "Förskola": 926,
+    "Förskoleklass": 274,
+    "1-3": 877,
+    "4-6": 862,
+    "7-9": 798,
+    "Gymnasiet": 303,
+    "Komvux": 739
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1382": {
+   "namn": "Falkenberg",
+   "lan": "Hallands län",
+   "folkmangd": 47321,
+   "kommungrupp": "Mindre stad/tätort",
+   "peers": [
+    "0583",
+    "1287",
+    "1292",
+    "1482",
+    "1487",
+    "2080",
+    "2081"
+   ],
+   "elever": {
+    "Förskola": 1760,
+    "Förskoleklass": 470,
+    "1-3": 1381,
+    "4-6": 1385,
+    "7-9": 1381,
+    "Gymnasiet": 1388,
+    "Komvux": 1245
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1383": {
+   "namn": "Varberg",
+   "lan": "Hallands län",
+   "folkmangd": 69460,
+   "kommungrupp": "Mindre stad/tätort",
+   "peers": [
+    "0880",
+    "1080",
+    "1293",
+    "1481",
+    "1496",
+    "2380",
+    "2482"
+   ],
+   "elever": {
+    "Förskola": 2549,
+    "Förskoleklass": 725,
+    "1-3": 2252,
+    "4-6": 2208,
+    "7-9": 2162,
+    "Gymnasiet": 2034,
+    "Komvux": 1604
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1384": {
+   "namn": "Kungsbacka",
+   "lan": "Hallands län",
+   "folkmangd": 86332,
+   "kommungrupp": "Pendlingskommun nära storstad",
+   "peers": [
+    "0123",
+    "0127",
+    "0136",
+    "0160",
+    "0163",
+    "0182",
+    "0186"
+   ],
+   "elever": {
+    "Förskola": 3319,
+    "Förskoleklass": 845,
+    "1-3": 2554,
+    "4-6": 2657,
+    "7-9": 3050,
+    "Gymnasiet": 2808,
+    "Komvux": 2143
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1401": {
+   "namn": "Härryda",
+   "lan": "Västra Götalands län",
+   "folkmangd": 40011,
+   "kommungrupp": "Pendlingskommun nära storstad",
+   "peers": [
+    "0115",
+    "0128",
+    "0139",
+    "0162",
+    "0191",
+    "1440",
+    "1441"
+   ],
+   "elever": {
+    "Förskola": 1681,
+    "Förskoleklass": 462,
+    "1-3": 1467,
+    "4-6": 1589,
+    "7-9": 1677,
+    "Gymnasiet": 1858,
+    "Komvux": 649
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1402": {
+   "namn": "Partille",
+   "lan": "Västra Götalands län",
+   "folkmangd": 41164,
+   "kommungrupp": "Pendlingskommun nära storstad",
+   "peers": [
+    "0114",
+    "0117",
+    "0120",
+    "0138",
+    "0186",
+    "1231",
+    "1233"
+   ],
+   "elever": {
+    "Förskola": 1947,
+    "Förskoleklass": 544,
+    "1-3": 1567,
+    "4-6": 1565,
+    "7-9": 1631,
+    "Gymnasiet": 533,
+    "Komvux": 293
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1407": {
+   "namn": "Öckerö",
+   "lan": "Västra Götalands län",
+   "folkmangd": 12863,
+   "kommungrupp": "Pendlingskommun nära storstad",
+   "peers": [
+    "1435",
+    "1492",
+    "1764",
+    "1984",
+    "2083",
+    "2260",
+    "2361"
+   ],
+   "elever": {
+    "Förskola": 290,
+    "Förskoleklass": 111,
+    "1-3": 321,
+    "4-6": 366,
+    "7-9": 391,
+    "Gymnasiet": 335,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1415": {
+   "namn": "Stenungsund",
+   "lan": "Västra Götalands län",
+   "folkmangd": 27854,
+   "kommungrupp": "Pendlingskommun nära storstad",
+   "peers": [
+    "0360",
+    "0486",
+    "0662",
+    "0685",
+    "0840",
+    "1981",
+    "2085"
+   ],
+   "elever": {
+    "Förskola": 1036,
+    "Förskoleklass": 279,
+    "1-3": 955,
+    "4-6": 999,
+    "7-9": 1031,
+    "Gymnasiet": 1443,
+    "Komvux": 821
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1419": {
+   "namn": "Tjörn",
+   "lan": "Västra Götalands län",
+   "folkmangd": 16003,
+   "kommungrupp": "Pendlingskommun nära mindre tätort",
+   "peers": [
+    "1407",
+    "1461",
+    "1473",
+    "1492",
+    "1984",
+    "2061",
+    "2083"
+   ],
+   "elever": {
+    "Förskola": 571,
+    "Förskoleklass": 176,
+    "1-3": 541,
+    "4-6": 517,
+    "7-9": 474,
+    "Gymnasiet": null,
+    "Komvux": 71
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1421": {
+   "namn": "Orust",
+   "lan": "Västra Götalands län",
+   "folkmangd": 15363,
+   "kommungrupp": "Pendlingskommun nära mindre tätort",
+   "peers": [
+    "1083",
+    "1484",
+    "1783",
+    "1882",
+    "2023",
+    "2104",
+    "2514"
+   ],
+   "elever": {
+    "Förskola": 477,
+    "Förskoleklass": 132,
+    "1-3": 355,
+    "4-6": 371,
+    "7-9": 405,
+    "Gymnasiet": 14,
+    "Komvux": 285
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1427": {
+   "namn": "Sotenäs",
+   "lan": "Västra Götalands län",
+   "folkmangd": 9036,
+   "kommungrupp": "Landsbygdskommun med besöksnäring",
+   "peers": [
+    "0584",
+    "0885",
+    "1291",
+    "1446",
+    "1864",
+    "2031",
+    "2034"
+   ],
+   "elever": {
+    "Förskola": 241,
+    "Förskoleklass": 81,
+    "1-3": 213,
+    "4-6": 226,
+    "7-9": 222,
+    "Gymnasiet": 22,
+    "Komvux": 70
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1430": {
+   "namn": "Munkedal",
+   "lan": "Västra Götalands län",
+   "folkmangd": 10272,
+   "kommungrupp": "Pendlingskommun nära mindre tätort",
+   "peers": [
+    "0642",
+    "0860",
+    "1273",
+    "1465",
+    "1960",
+    "2462",
+    "2521"
+   ],
+   "elever": {
+    "Förskola": 367,
+    "Förskoleklass": 103,
+    "1-3": 350,
+    "4-6": 357,
+    "7-9": 380,
+    "Gymnasiet": 76,
+    "Komvux": 383
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1435": {
+   "namn": "Tanum",
+   "lan": "Västra Götalands län",
+   "folkmangd": 12677,
+   "kommungrupp": "Landsbygdskommun med besöksnäring",
+   "peers": [
+    "0861",
+    "1407",
+    "1492",
+    "1764",
+    "1782",
+    "1984",
+    "2083"
+   ],
+   "elever": {
+    "Förskola": 393,
+    "Förskoleklass": 125,
+    "1-3": 386,
+    "4-6": 419,
+    "7-9": 392,
+    "Gymnasiet": 15,
+    "Komvux": 401
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1438": {
+   "namn": "Dals-Ed",
+   "lan": "Västra Götalands län",
+   "folkmangd": 4571,
+   "kommungrupp": "Pendlingskommun nära mindre tätort",
+   "peers": [
+    "0509",
+    "0513",
+    "1730",
+    "1960",
+    "2082",
+    "2462",
+    "2521"
+   ],
+   "elever": {
+    "Förskola": 147,
+    "Förskoleklass": 44,
+    "1-3": 135,
+    "4-6": 152,
+    "7-9": 157,
+    "Gymnasiet": 46,
+    "Komvux": 69
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1439": {
+   "namn": "Färgelanda",
+   "lan": "Västra Götalands län",
+   "folkmangd": 6288,
+   "kommungrupp": "Pendlingskommun nära mindre tätort",
+   "peers": [
+    "0319",
+    "0428",
+    "0509",
+    "0560",
+    "1466",
+    "1765",
+    "1904"
+   ],
+   "elever": {
+    "Förskola": 190,
+    "Förskoleklass": 53,
+    "1-3": 152,
+    "4-6": 172,
+    "7-9": 206,
+    "Gymnasiet": null,
+    "Komvux": 108
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1440": {
+   "namn": "Ale",
+   "lan": "Västra Götalands län",
+   "folkmangd": 32620,
+   "kommungrupp": "Pendlingskommun nära storstad",
+   "peers": [
+    "0115",
+    "0139",
+    "0162",
+    "0191",
+    "0765",
+    "1261",
+    "1401"
+   ],
+   "elever": {
+    "Förskola": 1581,
+    "Förskoleklass": 408,
+    "1-3": 1303,
+    "4-6": 1305,
+    "7-9": 1222,
+    "Gymnasiet": 135,
+    "Komvux": 596
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1441": {
+   "namn": "Lerum",
+   "lan": "Västra Götalands län",
+   "folkmangd": 43752,
+   "kommungrupp": "Pendlingskommun nära storstad",
+   "peers": [
+    "0115",
+    "0128",
+    "0139",
+    "0162",
+    "0191",
+    "1401",
+    "1440"
+   ],
+   "elever": {
+    "Förskola": 1970,
+    "Förskoleklass": 574,
+    "1-3": 1785,
+    "4-6": 1901,
+    "7-9": 1823,
+    "Gymnasiet": 1344,
+    "Komvux": 1159
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1442": {
+   "namn": "Vårgårda",
+   "lan": "Västra Götalands län",
+   "folkmangd": 12472,
+   "kommungrupp": "Pendlingskommun nära mindre tätort",
+   "peers": [
+    "0187",
+    "0604",
+    "0665",
+    "0684",
+    "0761",
+    "1763",
+    "2321"
+   ],
+   "elever": {
+    "Förskola": 510,
+    "Förskoleklass": 156,
+    "1-3": 524,
+    "4-6": 487,
+    "7-9": 405,
+    "Gymnasiet": 333,
+    "Komvux": 430
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1443": {
+   "namn": "Bollebygd",
+   "lan": "Västra Götalands län",
+   "folkmangd": 9784,
+   "kommungrupp": "Pendlingskommun nära storstad",
+   "peers": [
+    "0461",
+    "0617",
+    "1256",
+    "1315",
+    "1715",
+    "2026",
+    "2132"
+   ],
+   "elever": {
+    "Förskola": 450,
+    "Förskoleklass": 109,
+    "1-3": 275,
+    "4-6": 332,
+    "7-9": 380,
+    "Gymnasiet": 14,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1444": {
+   "namn": "Grästorp",
+   "lan": "Västra Götalands län",
+   "folkmangd": 5602,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "1460",
+    "1762",
+    "1862",
+    "1882",
+    "2023",
+    "2104",
+    "2518"
+   ],
+   "elever": {
+    "Förskola": 173,
+    "Förskoleklass": 54,
+    "1-3": 185,
+    "4-6": 165,
+    "7-9": 179,
+    "Gymnasiet": null,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1445": {
+   "namn": "Essunga",
+   "lan": "Västra Götalands län",
+   "folkmangd": 5559,
+   "kommungrupp": "Pendlingskommun nära mindre tätort",
+   "peers": [
+    "0512",
+    "0821",
+    "1275",
+    "2303",
+    "2326",
+    "2421",
+    "2425"
+   ],
+   "elever": {
+    "Förskola": 201,
+    "Förskoleklass": 59,
+    "1-3": 198,
+    "4-6": 214,
+    "7-9": 205,
+    "Gymnasiet": null,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1446": {
+   "namn": "Karlsborg",
+   "lan": "Västra Götalands län",
+   "folkmangd": 7047,
+   "kommungrupp": "Pendlingskommun nära mindre tätort",
+   "peers": [
+    "0563",
+    "0834",
+    "1278",
+    "1447",
+    "1760",
+    "1864",
+    "2034"
+   ],
+   "elever": {
+    "Förskola": 170,
+    "Förskoleklass": 50,
+    "1-3": 152,
+    "4-6": 181,
+    "7-9": 200,
+    "Gymnasiet": 12,
+    "Komvux": 121
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1447": {
+   "namn": "Gullspång",
+   "lan": "Västra Götalands län",
+   "folkmangd": 4949,
+   "kommungrupp": "Pendlingskommun nära mindre tätort",
+   "peers": [
+    "0563",
+    "0834",
+    "1278",
+    "1446",
+    "1484",
+    "1760",
+    "2034"
+   ],
+   "elever": {
+    "Förskola": 161,
+    "Förskoleklass": 52,
+    "1-3": 131,
+    "4-6": 132,
+    "7-9": 145,
+    "Gymnasiet": null,
+    "Komvux": 44
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1452": {
+   "namn": "Tranemo",
+   "lan": "Västra Götalands län",
+   "folkmangd": 11873,
+   "kommungrupp": "Lågpendlingskommun nära större stad",
+   "peers": [
+    "0642",
+    "1264",
+    "1273",
+    "1430",
+    "1445",
+    "1465",
+    "1961"
+   ],
+   "elever": {
+    "Förskola": 477,
+    "Förskoleklass": 139,
+    "1-3": 400,
+    "4-6": 419,
+    "7-9": 416,
+    "Gymnasiet": 293,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1460": {
+   "namn": "Bengtsfors",
+   "lan": "Västra Götalands län",
+   "folkmangd": 8955,
+   "kommungrupp": "Landsbygdskommun, ej nära större stad",
+   "peers": [
+    "1060",
+    "1444",
+    "1473",
+    "1785",
+    "1862",
+    "2023",
+    "2104"
+   ],
+   "elever": {
+    "Förskola": 206,
+    "Förskoleklass": 81,
+    "1-3": 249,
+    "4-6": 256,
+    "7-9": 278,
+    "Gymnasiet": 11,
+    "Komvux": 231
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1461": {
+   "namn": "Mellerud",
+   "lan": "Västra Götalands län",
+   "folkmangd": 9038,
+   "kommungrupp": "Pendlingskommun nära mindre tätort",
+   "peers": [
+    "1473",
+    "1492",
+    "1764",
+    "2061",
+    "2260",
+    "2361",
+    "2560"
+   ],
+   "elever": {
+    "Förskola": 358,
+    "Förskoleklass": 72,
+    "1-3": 275,
+    "4-6": 301,
+    "7-9": 281,
+    "Gymnasiet": 100,
+    "Komvux": 251
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1462": {
+   "namn": "Lilla Edet",
+   "lan": "Västra Götalands län",
+   "folkmangd": 14398,
+   "kommungrupp": "Pendlingskommun nära storstad",
+   "peers": [
+    "0488",
+    "0582",
+    "0617",
+    "1256",
+    "1715",
+    "2132",
+    "2481"
+   ],
+   "elever": {
+    "Förskola": 642,
+    "Förskoleklass": 144,
+    "1-3": 522,
+    "4-6": 460,
+    "7-9": 373,
+    "Gymnasiet": null,
+    "Komvux": 170
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1463": {
+   "namn": "Mark",
+   "lan": "Västra Götalands län",
+   "folkmangd": 35134,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0192",
+    "0483",
+    "0586",
+    "0683",
+    "1081",
+    "1491",
+    "1499"
+   ],
+   "elever": {
+    "Förskola": 1418,
+    "Förskoleklass": 357,
+    "1-3": 1153,
+    "4-6": 1165,
+    "7-9": 1185,
+    "Gymnasiet": 1004,
+    "Komvux": 672
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1465": {
+   "namn": "Svenljunga",
+   "lan": "Västra Götalands län",
+   "folkmangd": 10616,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0642",
+    "0860",
+    "1430",
+    "1960",
+    "2082",
+    "2462",
+    "2521"
+   ],
+   "elever": {
+    "Förskola": 431,
+    "Förskoleklass": 116,
+    "1-3": 336,
+    "4-6": 348,
+    "7-9": 326,
+    "Gymnasiet": 12,
+    "Komvux": 257
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1466": {
+   "namn": "Herrljunga",
+   "lan": "Västra Götalands län",
+   "folkmangd": 9509,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0319",
+    "0428",
+    "0767",
+    "1257",
+    "1439",
+    "1471",
+    "1765"
+   ],
+   "elever": {
+    "Förskola": 333,
+    "Förskoleklass": 98,
+    "1-3": 296,
+    "4-6": 333,
+    "7-9": 335,
+    "Gymnasiet": 194,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1470": {
+   "namn": "Vara",
+   "lan": "Västra Götalands län",
+   "folkmangd": 16011,
+   "kommungrupp": "Pendlingskommun nära mindre tätort",
+   "peers": [
+    "0482",
+    "0881",
+    "1266",
+    "1498",
+    "1766",
+    "1884",
+    "1885"
+   ],
+   "elever": {
+    "Förskola": 515,
+    "Förskoleklass": 143,
+    "1-3": 457,
+    "4-6": 477,
+    "7-9": 547,
+    "Gymnasiet": 478,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1471": {
+   "namn": "Götene",
+   "lan": "Västra Götalands län",
+   "folkmangd": 13223,
+   "kommungrupp": "Pendlingskommun nära mindre tätort",
+   "peers": [
+    "0767",
+    "1257",
+    "1266",
+    "1272",
+    "1466",
+    "1498",
+    "1766"
+   ],
+   "elever": {
+    "Förskola": 526,
+    "Förskoleklass": 147,
+    "1-3": 411,
+    "4-6": 467,
+    "7-9": 404,
+    "Gymnasiet": 2,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1472": {
+   "namn": "Tibro",
+   "lan": "Västra Götalands län",
+   "folkmangd": 11326,
+   "kommungrupp": "Pendlingskommun nära mindre tätort",
+   "peers": [
+    "0481",
+    "0561",
+    "0763",
+    "0861",
+    "0862",
+    "1270",
+    "1737"
+   ],
+   "elever": {
+    "Förskola": 483,
+    "Förskoleklass": 129,
+    "1-3": 389,
+    "4-6": 376,
+    "7-9": 334,
+    "Gymnasiet": 22,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1473": {
+   "namn": "Töreboda",
+   "lan": "Västra Götalands län",
+   "folkmangd": 9093,
+   "kommungrupp": "Pendlingskommun nära mindre tätort",
+   "peers": [
+    "1461",
+    "1860",
+    "2061",
+    "2101",
+    "2260",
+    "2361",
+    "2560"
+   ],
+   "elever": {
+    "Förskola": 346,
+    "Förskoleklass": 66,
+    "1-3": 242,
+    "4-6": 248,
+    "7-9": 275,
+    "Gymnasiet": 20,
+    "Komvux": 183
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1480": {
+   "namn": "Göteborg",
+   "lan": "Västra Götalands län",
+   "folkmangd": 613278,
+   "kommungrupp": "Storstäder",
+   "peers": [
+    "0180",
+    "0380",
+    "0580",
+    "1280",
+    "1281",
+    "1880",
+    "2480"
+   ],
+   "elever": {
+    "Förskola": 22182,
+    "Förskoleklass": 4933,
+    "1-3": 14847,
+    "4-6": 14398,
+    "7-9": 12642,
+    "Gymnasiet": 11360,
+    "Komvux": 19687
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1481": {
+   "namn": "Mölndal",
+   "lan": "Västra Götalands län",
+   "folkmangd": 72128,
+   "kommungrupp": "Pendlingskommun nära storstad",
+   "peers": [
+    "0880",
+    "1290",
+    "1383",
+    "1488",
+    "1496",
+    "2080",
+    "2482"
+   ],
+   "elever": {
+    "Förskola": 3039,
+    "Förskoleklass": 748,
+    "1-3": 2315,
+    "4-6": 2255,
+    "7-9": 2154,
+    "Gymnasiet": 948,
+    "Komvux": 2725
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1482": {
+   "namn": "Kungälv",
+   "lan": "Västra Götalands län",
+   "folkmangd": 50496,
+   "kommungrupp": "Pendlingskommun nära storstad",
+   "peers": [
+    "1287",
+    "1292",
+    "1382",
+    "1488",
+    "2080",
+    "2081",
+    "2284"
+   ],
+   "elever": {
+    "Förskola": 2030,
+    "Förskoleklass": 522,
+    "1-3": 1601,
+    "4-6": 1607,
+    "7-9": 1467,
+    "Gymnasiet": 1594,
+    "Komvux": 916
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1484": {
+   "namn": "Lysekil",
+   "lan": "Västra Götalands län",
+   "folkmangd": 13796,
+   "kommungrupp": "Landsbygdskommun, ej nära större stad",
+   "peers": [
+    "0834",
+    "1083",
+    "1278",
+    "1421",
+    "1760",
+    "1783",
+    "2514"
+   ],
+   "elever": {
+    "Förskola": 407,
+    "Förskoleklass": 128,
+    "1-3": 376,
+    "4-6": 399,
+    "7-9": 456,
+    "Gymnasiet": 596,
+    "Komvux": 329
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1485": {
+   "namn": "Uddevalla",
+   "lan": "Västra Götalands län",
+   "folkmangd": 56744,
+   "kommungrupp": "Lågpendlingskommun nära större stad",
+   "peers": [
+    "0480",
+    "1282",
+    "1482",
+    "1488",
+    "2080",
+    "2081",
+    "2284"
+   ],
+   "elever": {
+    "Förskola": 1500,
+    "Förskoleklass": 575,
+    "1-3": 1803,
+    "4-6": 1774,
+    "7-9": 1862,
+    "Gymnasiet": 3132,
+    "Komvux": 2187
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1486": {
+   "namn": "Strömstad",
+   "lan": "Västra Götalands län",
+   "folkmangd": 13557,
+   "kommungrupp": "Landsbygdskommun med besöksnäring",
+   "peers": [
+    "0331",
+    "0760",
+    "0840",
+    "1861",
+    "1982",
+    "2313",
+    "2481"
+   ],
+   "elever": {
+    "Förskola": 534,
+    "Förskoleklass": 128,
+    "1-3": 486,
+    "4-6": 488,
+    "7-9": 535,
+    "Gymnasiet": 407,
+    "Komvux": 481
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1487": {
+   "namn": "Vänersborg",
+   "lan": "Västra Götalands län",
+   "folkmangd": 40078,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0583",
+    "1287",
+    "1292",
+    "1382",
+    "1494",
+    "1983",
+    "2181"
+   ],
+   "elever": {
+    "Förskola": 1745,
+    "Förskoleklass": 396,
+    "1-3": 1186,
+    "4-6": 1220,
+    "7-9": 1174,
+    "Gymnasiet": 890,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1488": {
+   "namn": "Trollhättan",
+   "lan": "Västra Götalands län",
+   "folkmangd": 59265,
+   "kommungrupp": "Större stad",
+   "peers": [
+    "0480",
+    "1287",
+    "1382",
+    "1481",
+    "1482",
+    "1496",
+    "2080"
+   ],
+   "elever": {
+    "Förskola": 2295,
+    "Förskoleklass": 506,
+    "1-3": 1813,
+    "4-6": 1718,
+    "7-9": 1801,
+    "Gymnasiet": 1721,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1489": {
+   "namn": "Alingsås",
+   "lan": "Västra Götalands län",
+   "folkmangd": 42861,
+   "kommungrupp": "Pendlingskommun nära storstad",
+   "peers": [
+    "0483",
+    "0486",
+    "0662",
+    "1282",
+    "1285",
+    "1415",
+    "1499"
+   ],
+   "elever": {
+    "Förskola": 1483,
+    "Förskoleklass": 438,
+    "1-3": 1428,
+    "4-6": 1361,
+    "7-9": 1383,
+    "Gymnasiet": 1420,
+    "Komvux": 1048
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1490": {
+   "namn": "Borås",
+   "lan": "Västra Götalands län",
+   "folkmangd": 115238,
+   "kommungrupp": "Större stad",
+   "peers": [
+    "0181",
+    "0484",
+    "0581",
+    "0780",
+    "1290",
+    "1380",
+    "2180"
+   ],
+   "elever": {
+    "Förskola": 4756,
+    "Förskoleklass": 1172,
+    "1-3": 3586,
+    "4-6": 3589,
+    "7-9": 3504,
+    "Gymnasiet": 4707,
+    "Komvux": 5523
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1491": {
+   "namn": "Ulricehamn",
+   "lan": "Västra Götalands län",
+   "folkmangd": 24954,
+   "kommungrupp": "Lågpendlingskommun nära större stad",
+   "peers": [
+    "0586",
+    "0686",
+    "1081",
+    "1381",
+    "1463",
+    "1784",
+    "2183"
+   ],
+   "elever": {
+    "Förskola": 944,
+    "Förskoleklass": 256,
+    "1-3": 793,
+    "4-6": 792,
+    "7-9": 839,
+    "Gymnasiet": 529,
+    "Komvux": 693
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1492": {
+   "namn": "Åmål",
+   "lan": "Västra Götalands län",
+   "folkmangd": 11679,
+   "kommungrupp": "Pendlingskommun nära mindre tätort",
+   "peers": [
+    "1407",
+    "1461",
+    "1473",
+    "2061",
+    "2260",
+    "2361",
+    "2560"
+   ],
+   "elever": {
+    "Förskola": 302,
+    "Förskoleklass": 80,
+    "1-3": 284,
+    "4-6": 305,
+    "7-9": 411,
+    "Gymnasiet": 796,
+    "Komvux": 316
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1493": {
+   "namn": "Mariestad",
+   "lan": "Västra Götalands län",
+   "folkmangd": 24421,
+   "kommungrupp": "Mindre stad/tätort",
+   "peers": [
+    "0781",
+    "1082",
+    "1419",
+    "2062",
+    "2182",
+    "2280",
+    "2584"
+   ],
+   "elever": {
+    "Förskola": 907,
+    "Förskoleklass": 230,
+    "1-3": 699,
+    "4-6": 722,
+    "7-9": 628,
+    "Gymnasiet": 722,
+    "Komvux": 524
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1494": {
+   "namn": "Lidköping",
+   "lan": "Västra Götalands län",
+   "folkmangd": 40359,
+   "kommungrupp": "Mindre stad/tätort",
+   "peers": [
+    "0781",
+    "1082",
+    "1487",
+    "2181",
+    "2184",
+    "2280",
+    "2581"
+   ],
+   "elever": {
+    "Förskola": 1632,
+    "Förskoleklass": 393,
+    "1-3": 1212,
+    "4-6": 1269,
+    "7-9": 1075,
+    "Gymnasiet": 1750,
+    "Komvux": 1162
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1495": {
+   "namn": "Skara",
+   "lan": "Västra Götalands län",
+   "folkmangd": 18753,
+   "kommungrupp": "Pendlingskommun nära mindre tätort",
+   "peers": [
+    "0687",
+    "0884",
+    "1265",
+    "1266",
+    "1272",
+    "1276",
+    "1471"
+   ],
+   "elever": {
+    "Förskola": 754,
+    "Förskoleklass": 184,
+    "1-3": 567,
+    "4-6": 590,
+    "7-9": 556,
+    "Gymnasiet": 580,
+    "Komvux": 415
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1496": {
+   "namn": "Skövde",
+   "lan": "Västra Götalands län",
+   "folkmangd": 58272,
+   "kommungrupp": "Mindre stad/tätort",
+   "peers": [
+    "0480",
+    "1287",
+    "1292",
+    "1293",
+    "1482",
+    "1488",
+    "2080"
+   ],
+   "elever": {
+    "Förskola": 2344,
+    "Förskoleklass": 633,
+    "1-3": 1917,
+    "4-6": 1871,
+    "7-9": 1527,
+    "Gymnasiet": 2073,
+    "Komvux": 2334
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1497": {
+   "namn": "Hjo",
+   "lan": "Västra Götalands län",
+   "folkmangd": 9322,
+   "kommungrupp": "Pendlingskommun nära mindre tätort",
+   "peers": [
+    "1435",
+    "1764",
+    "1782",
+    "1863",
+    "1962",
+    "2260",
+    "2361"
+   ],
+   "elever": {
+    "Förskola": 367,
+    "Förskoleklass": 108,
+    "1-3": 301,
+    "4-6": 320,
+    "7-9": 310,
+    "Gymnasiet": 5,
+    "Komvux": 191
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1498": {
+   "namn": "Tidaholm",
+   "lan": "Västra Götalands län",
+   "folkmangd": 12736,
+   "kommungrupp": "Pendlingskommun nära mindre tätort",
+   "peers": [
+    "0428",
+    "1257",
+    "1266",
+    "1471",
+    "1766",
+    "1884",
+    "2121"
+   ],
+   "elever": {
+    "Förskola": 515,
+    "Förskoleklass": 123,
+    "1-3": 432,
+    "4-6": 469,
+    "7-9": 448,
+    "Gymnasiet": 265,
+    "Komvux": 273
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1499": {
+   "namn": "Falköping",
+   "lan": "Västra Götalands län",
+   "folkmangd": 32794,
+   "kommungrupp": "Mindre stad/tätort",
+   "peers": [
+    "0192",
+    "0483",
+    "0562",
+    "0683",
+    "1081",
+    "1463",
+    "2085"
+   ],
+   "elever": {
+    "Förskola": 1133,
+    "Förskoleklass": 386,
+    "1-3": 1149,
+    "4-6": 1147,
+    "7-9": 1166,
+    "Gymnasiet": 901,
+    "Komvux": 1244
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1715": {
+   "namn": "Kil",
+   "lan": "Värmlands län",
+   "folkmangd": 12024,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0582",
+    "0617",
+    "1256",
+    "1443",
+    "1462",
+    "2132",
+    "2481"
+   ],
+   "elever": {
+    "Förskola": 470,
+    "Förskoleklass": 139,
+    "1-3": 471,
+    "4-6": 451,
+    "7-9": 414,
+    "Gymnasiet": 18,
+    "Komvux": 229
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1730": {
+   "namn": "Eda",
+   "lan": "Värmlands län",
+   "folkmangd": 8289,
+   "kommungrupp": "Landsbygdskommun med besöksnäring",
+   "peers": [
+    "0482",
+    "0513",
+    "1438",
+    "1465",
+    "1960",
+    "2082",
+    "2462"
+   ],
+   "elever": {
+    "Förskola": 358,
+    "Förskoleklass": 86,
+    "1-3": 268,
+    "4-6": 288,
+    "7-9": 247,
+    "Gymnasiet": null,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1737": {
+   "namn": "Torsby",
+   "lan": "Värmlands län",
+   "folkmangd": 11278,
+   "kommungrupp": "Landsbygdskommun, ej nära större stad",
+   "peers": [
+    "0481",
+    "0561",
+    "0763",
+    "0862",
+    "1472",
+    "2401",
+    "2583"
+   ],
+   "elever": {
+    "Förskola": 385,
+    "Förskoleklass": 106,
+    "1-3": 340,
+    "4-6": 323,
+    "7-9": 384,
+    "Gymnasiet": 468,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1760": {
+   "namn": "Storfors",
+   "lan": "Värmlands län",
+   "folkmangd": 3777,
+   "kommungrupp": "Pendlingskommun nära mindre tätort",
+   "peers": [
+    "0834",
+    "1447",
+    "1484",
+    "1783",
+    "2513",
+    "2514",
+    "2518"
+   ],
+   "elever": {
+    "Förskola": 126,
+    "Förskoleklass": 36,
+    "1-3": 96,
+    "4-6": 116,
+    "7-9": 112,
+    "Gymnasiet": null,
+    "Komvux": 28
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1761": {
+   "namn": "Hammarö",
+   "lan": "Värmlands län",
+   "folkmangd": 16932,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0128",
+    "0330",
+    "1230",
+    "1262",
+    "1263",
+    "1814",
+    "2309"
+   ],
+   "elever": {
+    "Förskola": 800,
+    "Förskoleklass": 255,
+    "1-3": 803,
+    "4-6": 778,
+    "7-9": 754,
+    "Gymnasiet": null,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1762": {
+   "namn": "Munkfors",
+   "lan": "Värmlands län",
+   "folkmangd": 3637,
+   "kommungrupp": "Lågpendlingskommun nära större stad",
+   "peers": [
+    "0834",
+    "1444",
+    "1882",
+    "2023",
+    "2104",
+    "2513",
+    "2518"
+   ],
+   "elever": {
+    "Förskola": 146,
+    "Förskoleklass": 41,
+    "1-3": 119,
+    "4-6": 109,
+    "7-9": 116,
+    "Gymnasiet": null,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1763": {
+   "namn": "Forshaga",
+   "lan": "Värmlands län",
+   "folkmangd": 11439,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0187",
+    "0684",
+    "1214",
+    "1315",
+    "1442",
+    "2026",
+    "2321"
+   ],
+   "elever": {
+    "Förskola": 471,
+    "Förskoleklass": 145,
+    "1-3": 502,
+    "4-6": 434,
+    "7-9": 398,
+    "Gymnasiet": null,
+    "Komvux": 321
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1764": {
+   "namn": "Grums",
+   "lan": "Värmlands län",
+   "folkmangd": 8854,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "1435",
+    "1461",
+    "1497",
+    "1782",
+    "2021",
+    "2260",
+    "2361"
+   ],
+   "elever": {
+    "Förskola": 308,
+    "Förskoleklass": 71,
+    "1-3": 245,
+    "4-6": 253,
+    "7-9": 223,
+    "Gymnasiet": 17,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1765": {
+   "namn": "Årjäng",
+   "lan": "Värmlands län",
+   "folkmangd": 9734,
+   "kommungrupp": "Landsbygdskommun med besöksnäring",
+   "peers": [
+    "0319",
+    "0428",
+    "0767",
+    "1257",
+    "1439",
+    "1466",
+    "2121"
+   ],
+   "elever": {
+    "Förskola": 379,
+    "Förskoleklass": 114,
+    "1-3": 301,
+    "4-6": 269,
+    "7-9": 329,
+    "Gymnasiet": 72,
+    "Komvux": 145
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1766": {
+   "namn": "Sunne",
+   "lan": "Värmlands län",
+   "folkmangd": 13354,
+   "kommungrupp": "Landsbygdskommun, ej nära större stad",
+   "peers": [
+    "0428",
+    "1257",
+    "1266",
+    "1471",
+    "1498",
+    "1884",
+    "2121"
+   ],
+   "elever": {
+    "Förskola": 503,
+    "Förskoleklass": 141,
+    "1-3": 406,
+    "4-6": 371,
+    "7-9": 422,
+    "Gymnasiet": 391,
+    "Komvux": 377
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1780": {
+   "namn": "Karlstad",
+   "lan": "Värmlands län",
+   "folkmangd": 99007,
+   "kommungrupp": "Större stad",
+   "peers": [
+    "0183",
+    "0188",
+    "1281",
+    "2180",
+    "2281",
+    "2480",
+    "2580"
+   ],
+   "elever": {
+    "Förskola": 3568,
+    "Förskoleklass": 915,
+    "1-3": 2995,
+    "4-6": 2784,
+    "7-9": 2722,
+    "Gymnasiet": 3725,
+    "Komvux": 2733
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1781": {
+   "namn": "Kristinehamn",
+   "lan": "Värmlands län",
+   "folkmangd": 23590,
+   "kommungrupp": "Lågpendlingskommun nära större stad",
+   "peers": [
+    "1083",
+    "1286",
+    "1421",
+    "1882",
+    "1883",
+    "2282",
+    "2582"
+   ],
+   "elever": {
+    "Förskola": 686,
+    "Förskoleklass": 241,
+    "1-3": 672,
+    "4-6": 767,
+    "7-9": 768,
+    "Gymnasiet": 600,
+    "Komvux": 557
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1782": {
+   "namn": "Filipstad",
+   "lan": "Värmlands län",
+   "folkmangd": 9625,
+   "kommungrupp": "Landsbygdskommun, ej nära större stad",
+   "peers": [
+    "1435",
+    "1497",
+    "1764",
+    "1863",
+    "1962",
+    "2260",
+    "2361"
+   ],
+   "elever": {
+    "Förskola": 289,
+    "Förskoleklass": 68,
+    "1-3": 281,
+    "4-6": 266,
+    "7-9": 289,
+    "Gymnasiet": 278,
+    "Komvux": 192
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1783": {
+   "namn": "Hagfors",
+   "lan": "Värmlands län",
+   "folkmangd": 11324,
+   "kommungrupp": "Landsbygdskommun, ej nära större stad",
+   "peers": [
+    "0834",
+    "1083",
+    "1421",
+    "1484",
+    "1760",
+    "1882",
+    "2514"
+   ],
+   "elever": {
+    "Förskola": 323,
+    "Förskoleklass": 93,
+    "1-3": 262,
+    "4-6": 313,
+    "7-9": 342,
+    "Gymnasiet": 369,
+    "Komvux": 354
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1784": {
+   "namn": "Arvika",
+   "lan": "Värmlands län",
+   "folkmangd": 25408,
+   "kommungrupp": "Landsbygdskommun, ej nära större stad",
+   "peers": [
+    "0881",
+    "1381",
+    "1491",
+    "1885",
+    "1983",
+    "2084",
+    "2183"
+   ],
+   "elever": {
+    "Förskola": 926,
+    "Förskoleklass": 261,
+    "1-3": 858,
+    "4-6": 893,
+    "7-9": 717,
+    "Gymnasiet": 746,
+    "Komvux": 490
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1785": {
+   "namn": "Säffle",
+   "lan": "Värmlands län",
+   "folkmangd": 14756,
+   "kommungrupp": "Landsbygdskommun, ej nära större stad",
+   "peers": [
+    "1060",
+    "1419",
+    "1460",
+    "1862",
+    "2023",
+    "2062",
+    "2282"
+   ],
+   "elever": {
+    "Förskola": 437,
+    "Förskoleklass": 126,
+    "1-3": 387,
+    "4-6": 392,
+    "7-9": 441,
+    "Gymnasiet": 300,
+    "Komvux": 407
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1814": {
+   "namn": "Lekeberg",
+   "lan": "Örebro län",
+   "folkmangd": 8608,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0128",
+    "0139",
+    "0140",
+    "0765",
+    "2309",
+    "2422",
+    "2460"
+   ],
+   "elever": {
+    "Förskola": 377,
+    "Förskoleklass": 120,
+    "1-3": 391,
+    "4-6": 349,
+    "7-9": 317,
+    "Gymnasiet": 11,
+    "Komvux": 157
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1860": {
+   "namn": "Laxå",
+   "lan": "Örebro län",
+   "folkmangd": 5397,
+   "kommungrupp": "Lågpendlingskommun nära större stad",
+   "peers": [
+    "1461",
+    "1473",
+    "2021",
+    "2061",
+    "2101",
+    "2260",
+    "2560"
+   ],
+   "elever": {
+    "Förskola": 180,
+    "Förskoleklass": 69,
+    "1-3": 152,
+    "4-6": 166,
+    "7-9": 167,
+    "Gymnasiet": null,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1861": {
+   "namn": "Hallsberg",
+   "lan": "Örebro län",
+   "folkmangd": 16082,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0488",
+    "0760",
+    "0840",
+    "1486",
+    "1982",
+    "2313",
+    "2481"
+   ],
+   "elever": {
+    "Förskola": 736,
+    "Förskoleklass": 206,
+    "1-3": 591,
+    "4-6": 571,
+    "7-9": 578,
+    "Gymnasiet": 1212,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1862": {
+   "namn": "Degerfors",
+   "lan": "Örebro län",
+   "folkmangd": 9237,
+   "kommungrupp": "Pendlingskommun nära mindre tätort",
+   "peers": [
+    "1060",
+    "1444",
+    "1460",
+    "1785",
+    "1882",
+    "2023",
+    "2104"
+   ],
+   "elever": {
+    "Förskola": 362,
+    "Förskoleklass": 76,
+    "1-3": 269,
+    "4-6": 290,
+    "7-9": 302,
+    "Gymnasiet": 263,
+    "Komvux": 189
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1863": {
+   "namn": "Hällefors",
+   "lan": "Örebro län",
+   "folkmangd": 6269,
+   "kommungrupp": "Landsbygdskommun, ej nära större stad",
+   "peers": [
+    "1497",
+    "1764",
+    "1782",
+    "1962",
+    "2021",
+    "2505",
+    "2510"
+   ],
+   "elever": {
+    "Förskola": 169,
+    "Förskoleklass": 72,
+    "1-3": 190,
+    "4-6": 190,
+    "7-9": 186,
+    "Gymnasiet": 149,
+    "Komvux": 63
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1864": {
+   "namn": "Ljusnarsberg",
+   "lan": "Örebro län",
+   "folkmangd": 4290,
+   "kommungrupp": "Pendlingskommun nära mindre tätort",
+   "peers": [
+    "0563",
+    "0584",
+    "1446",
+    "1447",
+    "1760",
+    "2031",
+    "2034"
+   ],
+   "elever": {
+    "Förskola": 134,
+    "Förskoleklass": 32,
+    "1-3": 95,
+    "4-6": 102,
+    "7-9": 117,
+    "Gymnasiet": null,
+    "Komvux": 98
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1880": {
+   "namn": "Örebro",
+   "lan": "Örebro län",
+   "folkmangd": 160687,
+   "kommungrupp": "Större stad",
+   "peers": [
+    "0580",
+    "0581",
+    "0680",
+    "1283",
+    "1380",
+    "1980",
+    "2480"
+   ],
+   "elever": {
+    "Förskola": 6278,
+    "Förskoleklass": 1611,
+    "1-3": 4861,
+    "4-6": 4326,
+    "7-9": 4178,
+    "Gymnasiet": 5067,
+    "Komvux": 3923
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1881": {
+   "namn": "Kumla",
+   "lan": "Örebro län",
+   "folkmangd": 22665,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0305",
+    "0684",
+    "0764",
+    "1214",
+    "1231",
+    "1763",
+    "2321"
+   ],
+   "elever": {
+    "Förskola": 1103,
+    "Förskoleklass": 274,
+    "1-3": 904,
+    "4-6": 893,
+    "7-9": 874,
+    "Gymnasiet": 49,
+    "Komvux": 728
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1882": {
+   "namn": "Askersund",
+   "lan": "Örebro län",
+   "folkmangd": 11382,
+   "kommungrupp": "Lågpendlingskommun nära större stad",
+   "peers": [
+    "1060",
+    "1421",
+    "1444",
+    "1762",
+    "1862",
+    "2023",
+    "2104"
+   ],
+   "elever": {
+    "Förskola": 423,
+    "Förskoleklass": 130,
+    "1-3": 336,
+    "4-6": 329,
+    "7-9": 354,
+    "Gymnasiet": null,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1883": {
+   "namn": "Karlskoga",
+   "lan": "Örebro län",
+   "folkmangd": 30128,
+   "kommungrupp": "Mindre stad/tätort",
+   "peers": [
+    "0883",
+    "1083",
+    "1286",
+    "1421",
+    "1781",
+    "2514",
+    "2582"
+   ],
+   "elever": {
+    "Förskola": 1151,
+    "Förskoleklass": 268,
+    "1-3": 880,
+    "4-6": 925,
+    "7-9": 979,
+    "Gymnasiet": 866,
+    "Komvux": 704
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1884": {
+   "namn": "Nora",
+   "lan": "Örebro län",
+   "folkmangd": 10603,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0319",
+    "0428",
+    "1257",
+    "1498",
+    "1765",
+    "1766",
+    "2121"
+   ],
+   "elever": {
+    "Förskola": 367,
+    "Förskoleklass": 117,
+    "1-3": 337,
+    "4-6": 323,
+    "7-9": 377,
+    "Gymnasiet": 12,
+    "Komvux": 181
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1885": {
+   "namn": "Lindesberg",
+   "lan": "Örebro län",
+   "folkmangd": 23014,
+   "kommungrupp": "Lågpendlingskommun nära större stad",
+   "peers": [
+    "0382",
+    "0881",
+    "1470",
+    "1784",
+    "1983",
+    "2084",
+    "2183"
+   ],
+   "elever": {
+    "Förskola": 773,
+    "Förskoleklass": 212,
+    "1-3": 703,
+    "4-6": 700,
+    "7-9": 765,
+    "Gymnasiet": 790,
+    "Komvux": 362
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1904": {
+   "namn": "Skinnskatteberg",
+   "lan": "Västmanlands län",
+   "folkmangd": 4234,
+   "kommungrupp": "Pendlingskommun nära mindre tätort",
+   "peers": [
+    "0319",
+    "0428",
+    "0509",
+    "0560",
+    "1439",
+    "1466",
+    "1765"
+   ],
+   "elever": {
+    "Förskola": 134,
+    "Förskoleklass": 38,
+    "1-3": 91,
+    "4-6": 133,
+    "7-9": 106,
+    "Gymnasiet": null,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1907": {
+   "namn": "Surahammar",
+   "lan": "Västmanlands län",
+   "folkmangd": 9733,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0617",
+    "0760",
+    "1982",
+    "2132",
+    "2313",
+    "2409",
+    "2481"
+   ],
+   "elever": {
+    "Förskola": 356,
+    "Förskoleklass": 107,
+    "1-3": 371,
+    "4-6": 364,
+    "7-9": 371,
+    "Gymnasiet": 8,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1960": {
+   "namn": "Kungsör",
+   "lan": "Västmanlands län",
+   "folkmangd": 8550,
+   "kommungrupp": "Pendlingskommun nära mindre tätort",
+   "peers": [
+    "0513",
+    "1430",
+    "1465",
+    "1730",
+    "2082",
+    "2462",
+    "2521"
+   ],
+   "elever": {
+    "Förskola": 356,
+    "Förskoleklass": 105,
+    "1-3": 295,
+    "4-6": 285,
+    "7-9": 269,
+    "Gymnasiet": 26,
+    "Komvux": 287
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1961": {
+   "namn": "Hallstahammar",
+   "lan": "Västmanlands län",
+   "folkmangd": 16600,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0331",
+    "0360",
+    "0562",
+    "0840",
+    "1264",
+    "1273",
+    "1452"
+   ],
+   "elever": {
+    "Förskola": 713,
+    "Förskoleklass": 205,
+    "1-3": 601,
+    "4-6": 580,
+    "7-9": 624,
+    "Gymnasiet": 36,
+    "Komvux": 475
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1962": {
+   "namn": "Norberg",
+   "lan": "Västmanlands län",
+   "folkmangd": 5351,
+   "kommungrupp": "Pendlingskommun nära mindre tätort",
+   "peers": [
+    "1497",
+    "1764",
+    "1782",
+    "1863",
+    "2021",
+    "2505",
+    "2510"
+   ],
+   "elever": {
+    "Förskola": 197,
+    "Förskoleklass": 54,
+    "1-3": 169,
+    "4-6": 153,
+    "7-9": 179,
+    "Gymnasiet": null,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1980": {
+   "namn": "Västerås",
+   "lan": "Västmanlands län",
+   "folkmangd": 161240,
+   "kommungrupp": "Större stad",
+   "peers": [
+    "0580",
+    "0581",
+    "0680",
+    "1283",
+    "1380",
+    "1490",
+    "1880"
+   ],
+   "elever": {
+    "Förskola": 4809,
+    "Förskoleklass": 1579,
+    "1-3": 4766,
+    "4-6": 4096,
+    "7-9": 3317,
+    "Gymnasiet": 4004,
+    "Komvux": 6081
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1981": {
+   "namn": "Sala",
+   "lan": "Västmanlands län",
+   "folkmangd": 22600,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0360",
+    "0562",
+    "0662",
+    "0685",
+    "0840",
+    "1415",
+    "1961"
+   ],
+   "elever": {
+    "Förskola": 677,
+    "Förskoleklass": 241,
+    "1-3": 796,
+    "4-6": 820,
+    "7-9": 880,
+    "Gymnasiet": 723,
+    "Komvux": 345
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1982": {
+   "namn": "Fagersta",
+   "lan": "Västmanlands län",
+   "folkmangd": 12915,
+   "kommungrupp": "Pendlingskommun nära mindre tätort",
+   "peers": [
+    "0331",
+    "0760",
+    "1486",
+    "1861",
+    "1907",
+    "2313",
+    "2481"
+   ],
+   "elever": {
+    "Förskola": 483,
+    "Förskoleklass": 105,
+    "1-3": 330,
+    "4-6": 420,
+    "7-9": 503,
+    "Gymnasiet": 447,
+    "Komvux": 738
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1983": {
+   "namn": "Köping",
+   "lan": "Västmanlands län",
+   "folkmangd": 25610,
+   "kommungrupp": "Lågpendlingskommun nära större stad",
+   "peers": [
+    "0382",
+    "0882",
+    "1284",
+    "1784",
+    "1885",
+    "2084",
+    "2183"
+   ],
+   "elever": {
+    "Förskola": 1036,
+    "Förskoleklass": 280,
+    "1-3": 857,
+    "4-6": 882,
+    "7-9": 935,
+    "Gymnasiet": 917,
+    "Komvux": 840
+   },
+   "grundskola_masked_cells": 0
+  },
+  "1984": {
+   "namn": "Arboga",
+   "lan": "Västmanlands län",
+   "folkmangd": 13929,
+   "kommungrupp": "Pendlingskommun nära mindre tätort",
+   "peers": [
+    "0861",
+    "1270",
+    "1407",
+    "1435",
+    "1492",
+    "1764",
+    "2083"
+   ],
+   "elever": {
+    "Förskola": 527,
+    "Förskoleklass": 146,
+    "1-3": 470,
+    "4-6": 437,
+    "7-9": 479,
+    "Gymnasiet": 339,
+    "Komvux": 405
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2021": {
+   "namn": "Vansbro",
+   "lan": "Dalarnas län",
+   "folkmangd": 6741,
+   "kommungrupp": "Landsbygdskommun, ej nära större stad",
+   "peers": [
+    "1461",
+    "1764",
+    "1863",
+    "1962",
+    "2260",
+    "2361",
+    "2560"
+   ],
+   "elever": {
+    "Förskola": 189,
+    "Förskoleklass": 61,
+    "1-3": 161,
+    "4-6": 183,
+    "7-9": 216,
+    "Gymnasiet": 154,
+    "Komvux": 149
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2023": {
+   "namn": "Malung-Sälen",
+   "lan": "Dalarnas län",
+   "folkmangd": 10192,
+   "kommungrupp": "Landsbygdskommun med besöksnäring",
+   "peers": [
+    "1060",
+    "1444",
+    "1460",
+    "1762",
+    "1862",
+    "1882",
+    "2104"
+   ],
+   "elever": {
+    "Förskola": 363,
+    "Förskoleklass": 84,
+    "1-3": 293,
+    "4-6": 271,
+    "7-9": 323,
+    "Gymnasiet": 312,
+    "Komvux": 149
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2026": {
+   "namn": "Gagnef",
+   "lan": "Dalarnas län",
+   "folkmangd": 10307,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0461",
+    "1214",
+    "1315",
+    "1443",
+    "1763",
+    "2321",
+    "2404"
+   ],
+   "elever": {
+    "Förskola": 458,
+    "Förskoleklass": 133,
+    "1-3": 411,
+    "4-6": 386,
+    "7-9": 397,
+    "Gymnasiet": 12,
+    "Komvux": 192
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2029": {
+   "namn": "Leksand",
+   "lan": "Dalarnas län",
+   "folkmangd": 16167,
+   "kommungrupp": "Landsbygdskommun med besöksnäring",
+   "peers": [
+    "0481",
+    "0561",
+    "0861",
+    "1270",
+    "2161",
+    "2262",
+    "2523"
+   ],
+   "elever": {
+    "Förskola": 410,
+    "Förskoleklass": 131,
+    "1-3": 452,
+    "4-6": 460,
+    "7-9": 457,
+    "Gymnasiet": 534,
+    "Komvux": 483
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2031": {
+   "namn": "Rättvik",
+   "lan": "Dalarnas län",
+   "folkmangd": 10978,
+   "kommungrupp": "Landsbygdskommun med besöksnäring",
+   "peers": [
+    "0563",
+    "0584",
+    "0885",
+    "1291",
+    "1446",
+    "1864",
+    "2034"
+   ],
+   "elever": {
+    "Förskola": 369,
+    "Förskoleklass": 82,
+    "1-3": 296,
+    "4-6": 283,
+    "7-9": 300,
+    "Gymnasiet": 447,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2034": {
+   "namn": "Orsa",
+   "lan": "Dalarnas län",
+   "folkmangd": 6902,
+   "kommungrupp": "Landsbygdskommun med besöksnäring",
+   "peers": [
+    "0563",
+    "0584",
+    "1446",
+    "1447",
+    "1760",
+    "1864",
+    "2031"
+   ],
+   "elever": {
+    "Förskola": 226,
+    "Förskoleklass": 67,
+    "1-3": 172,
+    "4-6": 183,
+    "7-9": 203,
+    "Gymnasiet": null,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2039": {
+   "namn": "Älvdalen",
+   "lan": "Dalarnas län",
+   "folkmangd": 6831,
+   "kommungrupp": "Landsbygdskommun med besöksnäring",
+   "peers": [
+    "0560",
+    "0763",
+    "0862",
+    "2401",
+    "2463",
+    "2505",
+    "2583"
+   ],
+   "elever": {
+    "Förskola": 223,
+    "Förskoleklass": 52,
+    "1-3": 186,
+    "4-6": 186,
+    "7-9": 242,
+    "Gymnasiet": null,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2061": {
+   "namn": "Smedjebacken",
+   "lan": "Dalarnas län",
+   "folkmangd": 10758,
+   "kommungrupp": "Pendlingskommun nära mindre tätort",
+   "peers": [
+    "1461",
+    "1473",
+    "1492",
+    "2101",
+    "2260",
+    "2361",
+    "2560"
+   ],
+   "elever": {
+    "Förskola": 393,
+    "Förskoleklass": 104,
+    "1-3": 333,
+    "4-6": 349,
+    "7-9": 350,
+    "Gymnasiet": 69,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2062": {
+   "namn": "Mora",
+   "lan": "Dalarnas län",
+   "folkmangd": 20419,
+   "kommungrupp": "Landsbygdskommun med besöksnäring",
+   "peers": [
+    "1060",
+    "1419",
+    "1493",
+    "1781",
+    "1785",
+    "2282",
+    "2584"
+   ],
+   "elever": {
+    "Förskola": 519,
+    "Förskoleklass": 207,
+    "1-3": 622,
+    "4-6": 589,
+    "7-9": 679,
+    "Gymnasiet": 1070,
+    "Komvux": 565
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2080": {
+   "namn": "Falun",
+   "lan": "Dalarnas län",
+   "folkmangd": 59974,
+   "kommungrupp": "Mindre stad/tätort",
+   "peers": [
+    "0480",
+    "1382",
+    "1482",
+    "1485",
+    "1488",
+    "1496",
+    "2081"
+   ],
+   "elever": {
+    "Förskola": 2210,
+    "Förskoleklass": 609,
+    "1-3": 1899,
+    "4-6": 1786,
+    "7-9": 1782,
+    "Gymnasiet": 1845,
+    "Komvux": 1838
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2081": {
+   "namn": "Borlänge",
+   "lan": "Dalarnas län",
+   "folkmangd": 51354,
+   "kommungrupp": "Större stad",
+   "peers": [
+    "0480",
+    "1287",
+    "1382",
+    "1482",
+    "1485",
+    "2080",
+    "2284"
+   ],
+   "elever": {
+    "Förskola": 1976,
+    "Förskoleklass": 591,
+    "1-3": 1736,
+    "4-6": 1675,
+    "7-9": 1569,
+    "Gymnasiet": 1932,
+    "Komvux": 1664
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2082": {
+   "namn": "Säter",
+   "lan": "Dalarnas län",
+   "folkmangd": 11222,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0482",
+    "0513",
+    "0860",
+    "1430",
+    "1465",
+    "1730",
+    "1960"
+   ],
+   "elever": {
+    "Förskola": 493,
+    "Förskoleklass": 112,
+    "1-3": 423,
+    "4-6": 392,
+    "7-9": 334,
+    "Gymnasiet": 30,
+    "Komvux": 293
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2083": {
+   "namn": "Hedemora",
+   "lan": "Dalarnas län",
+   "folkmangd": 15025,
+   "kommungrupp": "Pendlingskommun nära mindre tätort",
+   "peers": [
+    "1407",
+    "1419",
+    "1435",
+    "1492",
+    "1984",
+    "2161",
+    "2361"
+   ],
+   "elever": {
+    "Förskola": 442,
+    "Förskoleklass": 124,
+    "1-3": 382,
+    "4-6": 374,
+    "7-9": 452,
+    "Gymnasiet": 346,
+    "Komvux": 554
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2084": {
+   "namn": "Avesta",
+   "lan": "Dalarnas län",
+   "folkmangd": 22366,
+   "kommungrupp": "Mindre stad/tätort",
+   "peers": [
+    "0382",
+    "0881",
+    "0882",
+    "1266",
+    "1885",
+    "1983",
+    "2183"
+   ],
+   "elever": {
+    "Förskola": 850,
+    "Förskoleklass": 210,
+    "1-3": 726,
+    "4-6": 695,
+    "7-9": 793,
+    "Gymnasiet": 865,
+    "Komvux": 797
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2085": {
+   "namn": "Ludvika",
+   "lan": "Dalarnas län",
+   "folkmangd": 26812,
+   "kommungrupp": "Mindre stad/tätort",
+   "peers": [
+    "0192",
+    "0483",
+    "0562",
+    "1081",
+    "1264",
+    "1415",
+    "1499"
+   ],
+   "elever": {
+    "Förskola": 1084,
+    "Förskoleklass": 293,
+    "1-3": 893,
+    "4-6": 899,
+    "7-9": 972,
+    "Gymnasiet": 802,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2101": {
+   "namn": "Ockelbo",
+   "lan": "Gävleborgs län",
+   "folkmangd": 5715,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "1461",
+    "1473",
+    "1860",
+    "2021",
+    "2061",
+    "2260",
+    "2560"
+   ],
+   "elever": {
+    "Förskola": 193,
+    "Förskoleklass": 51,
+    "1-3": 147,
+    "4-6": 178,
+    "7-9": 181,
+    "Gymnasiet": null,
+    "Komvux": 184
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2104": {
+   "namn": "Hofors",
+   "lan": "Gävleborgs län",
+   "folkmangd": 9138,
+   "kommungrupp": "Pendlingskommun nära mindre tätort",
+   "peers": [
+    "1060",
+    "1444",
+    "1460",
+    "1762",
+    "1862",
+    "1882",
+    "2023"
+   ],
+   "elever": {
+    "Förskola": 350,
+    "Förskoleklass": 101,
+    "1-3": 270,
+    "4-6": 299,
+    "7-9": 258,
+    "Gymnasiet": 8,
+    "Komvux": 261
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2121": {
+   "namn": "Ovanåker",
+   "lan": "Gävleborgs län",
+   "folkmangd": 11272,
+   "kommungrupp": "Landsbygdskommun, ej nära större stad",
+   "peers": [
+    "0319",
+    "0428",
+    "1257",
+    "1498",
+    "1765",
+    "1766",
+    "1884"
+   ],
+   "elever": {
+    "Förskola": 403,
+    "Förskoleklass": 129,
+    "1-3": 381,
+    "4-6": 374,
+    "7-9": 385,
+    "Gymnasiet": 271,
+    "Komvux": 412
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2132": {
+   "namn": "Nordanstig",
+   "lan": "Gävleborgs län",
+   "folkmangd": 9284,
+   "kommungrupp": "Pendlingskommun nära mindre tätort",
+   "peers": [
+    "0582",
+    "0617",
+    "1443",
+    "1462",
+    "1715",
+    "1907",
+    "2305"
+   ],
+   "elever": {
+    "Förskola": 337,
+    "Förskoleklass": 76,
+    "1-3": 265,
+    "4-6": 250,
+    "7-9": 254,
+    "Gymnasiet": 19,
+    "Komvux": 353
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2161": {
+   "namn": "Ljusdal",
+   "lan": "Gävleborgs län",
+   "folkmangd": 18377,
+   "kommungrupp": "Landsbygdskommun, ej nära större stad",
+   "peers": [
+    "1435",
+    "1984",
+    "2029",
+    "2083",
+    "2262",
+    "2280",
+    "2523"
+   ],
+   "elever": {
+    "Förskola": 414,
+    "Förskoleklass": 122,
+    "1-3": 432,
+    "4-6": 443,
+    "7-9": 505,
+    "Gymnasiet": 460,
+    "Komvux": 405
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2180": {
+   "namn": "Gävle",
+   "lan": "Gävleborgs län",
+   "folkmangd": 104108,
+   "kommungrupp": "Större stad",
+   "peers": [
+    "0780",
+    "1080",
+    "1290",
+    "1380",
+    "1780",
+    "2281",
+    "2482"
+   ],
+   "elever": {
+    "Förskola": 4077,
+    "Förskoleklass": 1047,
+    "1-3": 3161,
+    "4-6": 2764,
+    "7-9": 2575,
+    "Gymnasiet": 3157,
+    "Komvux": 3296
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2181": {
+   "namn": "Sandviken",
+   "lan": "Gävleborgs län",
+   "folkmangd": 38033,
+   "kommungrupp": "Lågpendlingskommun nära större stad",
+   "peers": [
+    "0583",
+    "0882",
+    "1284",
+    "1293",
+    "1487",
+    "1494",
+    "2184"
+   ],
+   "elever": {
+    "Förskola": 1368,
+    "Förskoleklass": 370,
+    "1-3": 1190,
+    "4-6": 1203,
+    "7-9": 1186,
+    "Gymnasiet": 918,
+    "Komvux": 1372
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2182": {
+   "namn": "Söderhamn",
+   "lan": "Gävleborgs län",
+   "folkmangd": 24163,
+   "kommungrupp": "Landsbygdskommun, ej nära större stad",
+   "peers": [
+    "0781",
+    "2029",
+    "2161",
+    "2262",
+    "2280",
+    "2523",
+    "2584"
+   ],
+   "elever": {
+    "Förskola": 621,
+    "Förskoleklass": 227,
+    "1-3": 697,
+    "4-6": 776,
+    "7-9": 784,
+    "Gymnasiet": 680,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2183": {
+   "namn": "Bollnäs",
+   "lan": "Gävleborgs län",
+   "folkmangd": 26018,
+   "kommungrupp": "Landsbygdskommun, ej nära större stad",
+   "peers": [
+    "0881",
+    "0882",
+    "1381",
+    "1784",
+    "1885",
+    "1983",
+    "2084"
+   ],
+   "elever": {
+    "Förskola": 769,
+    "Förskoleklass": 242,
+    "1-3": 758,
+    "4-6": 746,
+    "7-9": 514,
+    "Gymnasiet": 631,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2184": {
+   "namn": "Hudiksvall",
+   "lan": "Gävleborgs län",
+   "folkmangd": 37341,
+   "kommungrupp": "Mindre stad/tätort",
+   "peers": [
+    "0781",
+    "0883",
+    "1082",
+    "1493",
+    "1494",
+    "2181",
+    "2581"
+   ],
+   "elever": {
+    "Förskola": 1350,
+    "Förskoleklass": 329,
+    "1-3": 1106,
+    "4-6": 1122,
+    "7-9": 1196,
+    "Gymnasiet": 1364,
+    "Komvux": 1164
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2260": {
+   "namn": "Ånge",
+   "lan": "Västernorrlands län",
+   "folkmangd": 9000,
+   "kommungrupp": "Landsbygdskommun, ej nära större stad",
+   "peers": [
+    "1461",
+    "1473",
+    "1492",
+    "1764",
+    "2021",
+    "2361",
+    "2560"
+   ],
+   "elever": {
+    "Förskola": 309,
+    "Förskoleklass": 88,
+    "1-3": 218,
+    "4-6": 226,
+    "7-9": 221,
+    "Gymnasiet": 210,
+    "Komvux": 134
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2262": {
+   "namn": "Timrå",
+   "lan": "Västernorrlands län",
+   "folkmangd": 17465,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0481",
+    "0561",
+    "0861",
+    "1270",
+    "2029",
+    "2161",
+    "2523"
+   ],
+   "elever": {
+    "Förskola": 632,
+    "Förskoleklass": 187,
+    "1-3": 548,
+    "4-6": 544,
+    "7-9": 572,
+    "Gymnasiet": 448,
+    "Komvux": 423
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2280": {
+   "namn": "Härnösand",
+   "lan": "Västernorrlands län",
+   "folkmangd": 24348,
+   "kommungrupp": "Mindre stad/tätort",
+   "peers": [
+    "0781",
+    "1493",
+    "2161",
+    "2182",
+    "2262",
+    "2523",
+    "2584"
+   ],
+   "elever": {
+    "Förskola": 774,
+    "Förskoleklass": 235,
+    "1-3": 704,
+    "4-6": 727,
+    "7-9": 788,
+    "Gymnasiet": 840,
+    "Komvux": 684
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2281": {
+   "namn": "Sundsvall",
+   "lan": "Västernorrlands län",
+   "folkmangd": 98962,
+   "kommungrupp": "Större stad",
+   "peers": [
+    "0780",
+    "0980",
+    "1080",
+    "1290",
+    "1380",
+    "1780",
+    "2180"
+   ],
+   "elever": {
+    "Förskola": 3681,
+    "Förskoleklass": 843,
+    "1-3": 2585,
+    "4-6": 1995,
+    "7-9": 2168,
+    "Gymnasiet": 2085,
+    "Komvux": 3039
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2282": {
+   "namn": "Kramfors",
+   "lan": "Västernorrlands län",
+   "folkmangd": 17390,
+   "kommungrupp": "Landsbygdskommun, ej nära större stad",
+   "peers": [
+    "1060",
+    "1083",
+    "1460",
+    "1785",
+    "1862",
+    "2023",
+    "2062"
+   ],
+   "elever": {
+    "Förskola": 555,
+    "Förskoleklass": 148,
+    "1-3": 469,
+    "4-6": 500,
+    "7-9": 500,
+    "Gymnasiet": 537,
+    "Komvux": 431
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2283": {
+   "namn": "Sollefteå",
+   "lan": "Västernorrlands län",
+   "folkmangd": 18138,
+   "kommungrupp": "Landsbygdskommun, ej nära större stad",
+   "peers": [
+    "0562",
+    "0686",
+    "0860",
+    "1264",
+    "1273",
+    "1430",
+    "1465"
+   ],
+   "elever": {
+    "Förskola": 580,
+    "Förskoleklass": 189,
+    "1-3": 594,
+    "4-6": 622,
+    "7-9": 592,
+    "Gymnasiet": 585,
+    "Komvux": 544
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2284": {
+   "namn": "Örnsköldsvik",
+   "lan": "Västernorrlands län",
+   "folkmangd": 55338,
+   "kommungrupp": "Mindre stad/tätort",
+   "peers": [
+    "0480",
+    "1282",
+    "1482",
+    "1485",
+    "1488",
+    "2080",
+    "2081"
+   ],
+   "elever": {
+    "Förskola": 2002,
+    "Förskoleklass": 577,
+    "1-3": 1842,
+    "4-6": 1913,
+    "7-9": 1939,
+    "Gymnasiet": 1750,
+    "Komvux": 1298
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2303": {
+   "namn": "Ragunda",
+   "lan": "Jämtlands län",
+   "folkmangd": 5152,
+   "kommungrupp": "Landsbygdskommun, ej nära större stad",
+   "peers": [
+    "0760",
+    "0821",
+    "1275",
+    "1445",
+    "2326",
+    "2409",
+    "2421"
+   ],
+   "elever": {
+    "Förskola": 175,
+    "Förskoleklass": 60,
+    "1-3": 138,
+    "4-6": 154,
+    "7-9": 170,
+    "Gymnasiet": 80,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2305": {
+   "namn": "Bräcke",
+   "lan": "Jämtlands län",
+   "folkmangd": 5950,
+   "kommungrupp": "Lågpendlingskommun nära större stad",
+   "peers": [
+    "0617",
+    "0760",
+    "1715",
+    "1907",
+    "2132",
+    "2403",
+    "2409"
+   ],
+   "elever": {
+    "Förskola": 167,
+    "Förskoleklass": 64,
+    "1-3": 197,
+    "4-6": 180,
+    "7-9": 181,
+    "Gymnasiet": 90,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2309": {
+   "namn": "Krokom",
+   "lan": "Jämtlands län",
+   "folkmangd": 15795,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0128",
+    "0140",
+    "0330",
+    "1230",
+    "1262",
+    "1761",
+    "1814"
+   ],
+   "elever": {
+    "Förskola": 691,
+    "Förskoleklass": 193,
+    "1-3": 654,
+    "4-6": 642,
+    "7-9": 621,
+    "Gymnasiet": 200,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2313": {
+   "namn": "Strömsund",
+   "lan": "Jämtlands län",
+   "folkmangd": 10904,
+   "kommungrupp": "Landsbygdskommun, ej nära större stad",
+   "peers": [
+    "0488",
+    "0760",
+    "1861",
+    "1907",
+    "1982",
+    "2409",
+    "2481"
+   ],
+   "elever": {
+    "Förskola": 328,
+    "Förskoleklass": 125,
+    "1-3": 362,
+    "4-6": 360,
+    "7-9": 373,
+    "Gymnasiet": 232,
+    "Komvux": 121
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2321": {
+   "namn": "Åre",
+   "lan": "Jämtlands län",
+   "folkmangd": 12770,
+   "kommungrupp": "Landsbygdskommun med besöksnäring",
+   "peers": [
+    "0187",
+    "0684",
+    "1214",
+    "1315",
+    "1763",
+    "2026",
+    "2404"
+   ],
+   "elever": {
+    "Förskola": 562,
+    "Förskoleklass": 158,
+    "1-3": 467,
+    "4-6": 444,
+    "7-9": 428,
+    "Gymnasiet": 265,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2326": {
+   "namn": "Berg",
+   "lan": "Jämtlands län",
+   "folkmangd": 7085,
+   "kommungrupp": "Lågpendlingskommun nära större stad",
+   "peers": [
+    "0331",
+    "0760",
+    "0821",
+    "1275",
+    "1445",
+    "2303",
+    "2421"
+   ],
+   "elever": {
+    "Förskola": 296,
+    "Förskoleklass": 75,
+    "1-3": 228,
+    "4-6": 206,
+    "7-9": 204,
+    "Gymnasiet": 78,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2361": {
+   "namn": "Härjedalen",
+   "lan": "Jämtlands län",
+   "folkmangd": 10117,
+   "kommungrupp": "Landsbygdskommun med besöksnäring",
+   "peers": [
+    "1407",
+    "1461",
+    "1492",
+    "1764",
+    "2061",
+    "2260",
+    "2560"
+   ],
+   "elever": {
+    "Förskola": 337,
+    "Förskoleklass": 99,
+    "1-3": 275,
+    "4-6": 285,
+    "7-9": 308,
+    "Gymnasiet": 194,
+    "Komvux": 213
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2380": {
+   "namn": "Östersund",
+   "lan": "Jämtlands län",
+   "folkmangd": 64963,
+   "kommungrupp": "Större stad",
+   "peers": [
+    "0188",
+    "0880",
+    "0980",
+    "1080",
+    "1293",
+    "1383",
+    "2482"
+   ],
+   "elever": {
+    "Förskola": 2312,
+    "Förskoleklass": 521,
+    "1-3": 1728,
+    "4-6": 1728,
+    "7-9": 1715,
+    "Gymnasiet": 3078,
+    "Komvux": 2814
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2401": {
+   "namn": "Nordmaling",
+   "lan": "Västerbottens län",
+   "folkmangd": 6905,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0560",
+    "0862",
+    "1737",
+    "2039",
+    "2463",
+    "2505",
+    "2583"
+   ],
+   "elever": {
+    "Förskola": 246,
+    "Förskoleklass": 79,
+    "1-3": 232,
+    "4-6": 195,
+    "7-9": 196,
+    "Gymnasiet": null,
+    "Komvux": 123
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2403": {
+   "namn": "Bjurholm",
+   "lan": "Västerbottens län",
+   "folkmangd": 2327,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0617",
+    "0760",
+    "1907",
+    "2305",
+    "2313",
+    "2409",
+    "2481"
+   ],
+   "elever": {
+    "Förskola": 76,
+    "Förskoleklass": 31,
+    "1-3": 89,
+    "4-6": 63,
+    "7-9": 80,
+    "Gymnasiet": null,
+    "Komvux": 41
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2404": {
+   "namn": "Vindeln",
+   "lan": "Västerbottens län",
+   "folkmangd": 5421,
+   "kommungrupp": "Lågpendlingskommun nära större stad",
+   "peers": [
+    "0684",
+    "1214",
+    "1315",
+    "1763",
+    "2026",
+    "2321",
+    "2417"
+   ],
+   "elever": {
+    "Förskola": 198,
+    "Förskoleklass": 62,
+    "1-3": 169,
+    "4-6": 173,
+    "7-9": 186,
+    "Gymnasiet": null,
+    "Komvux": 138
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2409": {
+   "namn": "Robertsfors",
+   "lan": "Västerbottens län",
+   "folkmangd": 6595,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0617",
+    "0760",
+    "1907",
+    "2305",
+    "2313",
+    "2403",
+    "2481"
+   ],
+   "elever": {
+    "Förskola": 248,
+    "Förskoleklass": 76,
+    "1-3": 201,
+    "4-6": 247,
+    "7-9": 207,
+    "Gymnasiet": null,
+    "Komvux": 98
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2417": {
+   "namn": "Norsjö",
+   "lan": "Västerbottens län",
+   "folkmangd": 3811,
+   "kommungrupp": "Landsbygdskommun, ej nära större stad",
+   "peers": [
+    "0684",
+    "1214",
+    "1315",
+    "1763",
+    "2026",
+    "2321",
+    "2404"
+   ],
+   "elever": {
+    "Förskola": 149,
+    "Förskoleklass": 40,
+    "1-3": 121,
+    "4-6": 128,
+    "7-9": 134,
+    "Gymnasiet": 1,
+    "Komvux": 63
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2418": {
+   "namn": "Malå",
+   "lan": "Västerbottens län",
+   "folkmangd": 2902,
+   "kommungrupp": "Landsbygdskommun, ej nära större stad",
+   "peers": [
+    "0187",
+    "0604",
+    "0665",
+    "0761",
+    "1442",
+    "2417",
+    "2422"
+   ],
+   "elever": {
+    "Förskola": 129,
+    "Förskoleklass": 31,
+    "1-3": 97,
+    "4-6": 108,
+    "7-9": 122,
+    "Gymnasiet": 4,
+    "Komvux": 27
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2421": {
+   "namn": "Storuman",
+   "lan": "Västerbottens län",
+   "folkmangd": 5543,
+   "kommungrupp": "Landsbygdskommun med besöksnäring",
+   "peers": [
+    "0512",
+    "0821",
+    "1275",
+    "1445",
+    "2303",
+    "2326",
+    "2425"
+   ],
+   "elever": {
+    "Förskola": 194,
+    "Förskoleklass": 39,
+    "1-3": 172,
+    "4-6": 162,
+    "7-9": 183,
+    "Gymnasiet": 122,
+    "Komvux": 108
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2422": {
+   "namn": "Sorsele",
+   "lan": "Västerbottens län",
+   "folkmangd": 2362,
+   "kommungrupp": "Landsbygdskommun med besöksnäring",
+   "peers": [
+    "0604",
+    "0665",
+    "0761",
+    "0765",
+    "1277",
+    "2418",
+    "2460"
+   ],
+   "elever": {
+    "Förskola": 69,
+    "Förskoleklass": 24,
+    "1-3": 84,
+    "4-6": 73,
+    "7-9": 72,
+    "Gymnasiet": null,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2425": {
+   "namn": "Dorotea",
+   "lan": "Västerbottens län",
+   "folkmangd": 2241,
+   "kommungrupp": "Landsbygdskommun, ej nära större stad",
+   "peers": [
+    "0512",
+    "0642",
+    "0821",
+    "1445",
+    "2421",
+    "2506",
+    "2521"
+   ],
+   "elever": {
+    "Förskola": 61,
+    "Förskoleklass": 28,
+    "1-3": 54,
+    "4-6": 60,
+    "7-9": 79,
+    "Gymnasiet": null,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2460": {
+   "namn": "Vännäs",
+   "lan": "Västerbottens län",
+   "folkmangd": 9225,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0604",
+    "0665",
+    "0761",
+    "1277",
+    "1442",
+    "2418",
+    "2422"
+   ],
+   "elever": {
+    "Förskola": 456,
+    "Förskoleklass": 102,
+    "1-3": 364,
+    "4-6": 341,
+    "7-9": 333,
+    "Gymnasiet": 524,
+    "Komvux": 377
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2462": {
+   "namn": "Vilhelmina",
+   "lan": "Västerbottens län",
+   "folkmangd": 6172,
+   "kommungrupp": "Landsbygdskommun, ej nära större stad",
+   "peers": [
+    "0642",
+    "0860",
+    "1430",
+    "1465",
+    "1960",
+    "2506",
+    "2521"
+   ],
+   "elever": {
+    "Förskola": 224,
+    "Förskoleklass": 58,
+    "1-3": 155,
+    "4-6": 171,
+    "7-9": 173,
+    "Gymnasiet": 246,
+    "Komvux": 249
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2463": {
+   "namn": "Åsele",
+   "lan": "Västerbottens län",
+   "folkmangd": 2683,
+   "kommungrupp": "Landsbygdskommun, ej nära större stad",
+   "peers": [
+    "0560",
+    "0862",
+    "1904",
+    "2039",
+    "2401",
+    "2505",
+    "2510"
+   ],
+   "elever": {
+    "Förskola": 105,
+    "Förskoleklass": 27,
+    "1-3": 82,
+    "4-6": 80,
+    "7-9": 67,
+    "Gymnasiet": null,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2480": {
+   "namn": "Umeå",
+   "lan": "Västerbottens län",
+   "folkmangd": 135273,
+   "kommungrupp": "Större stad",
+   "peers": [
+    "0580",
+    "0581",
+    "0680",
+    "1281",
+    "1780",
+    "2180",
+    "2281"
+   ],
+   "elever": {
+    "Förskola": 5121,
+    "Förskoleklass": 1344,
+    "1-3": 3978,
+    "4-6": 3799,
+    "7-9": 3603,
+    "Gymnasiet": 3876,
+    "Komvux": 3497
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2481": {
+   "namn": "Lycksele",
+   "lan": "Västerbottens län",
+   "folkmangd": 12159,
+   "kommungrupp": "Landsbygdskommun, ej nära större stad",
+   "peers": [
+    "0488",
+    "0760",
+    "1715",
+    "1907",
+    "1982",
+    "2313",
+    "2409"
+   ],
+   "elever": {
+    "Förskola": 543,
+    "Förskoleklass": 132,
+    "1-3": 449,
+    "4-6": 431,
+    "7-9": 400,
+    "Gymnasiet": 622,
+    "Komvux": 316
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2482": {
+   "namn": "Skellefteå",
+   "lan": "Västerbottens län",
+   "folkmangd": 75405,
+   "kommungrupp": "Mindre stad/tätort",
+   "peers": [
+    "0880",
+    "1080",
+    "1290",
+    "1293",
+    "1383",
+    "1481",
+    "2380"
+   ],
+   "elever": {
+    "Förskola": 3078,
+    "Förskoleklass": 751,
+    "1-3": 2319,
+    "4-6": 2328,
+    "7-9": 2374,
+    "Gymnasiet": 2278,
+    "Komvux": 2071
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2505": {
+   "namn": "Arvidsjaur",
+   "lan": "Norrbottens län",
+   "folkmangd": 6026,
+   "kommungrupp": "Landsbygdskommun, ej nära större stad",
+   "peers": [
+    "0561",
+    "0862",
+    "1863",
+    "1962",
+    "2039",
+    "2401",
+    "2510"
+   ],
+   "elever": {
+    "Förskola": 241,
+    "Förskoleklass": 58,
+    "1-3": 179,
+    "4-6": 212,
+    "7-9": 183,
+    "Gymnasiet": 253,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2506": {
+   "namn": "Arjeplog",
+   "lan": "Norrbottens län",
+   "folkmangd": 2570,
+   "kommungrupp": "Landsbygdskommun med besöksnäring",
+   "peers": [
+    "0512",
+    "0642",
+    "1430",
+    "1465",
+    "2425",
+    "2462",
+    "2521"
+   ],
+   "elever": {
+    "Förskola": 57,
+    "Förskoleklass": 29,
+    "1-3": 74,
+    "4-6": 66,
+    "7-9": 87,
+    "Gymnasiet": null,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2510": {
+   "namn": "Jokkmokk",
+   "lan": "Norrbottens län",
+   "folkmangd": 4695,
+   "kommungrupp": "Landsbygdskommun med besöksnäring",
+   "peers": [
+    "0561",
+    "1863",
+    "1962",
+    "2039",
+    "2401",
+    "2463",
+    "2505"
+   ],
+   "elever": {
+    "Förskola": 179,
+    "Förskoleklass": 32,
+    "1-3": 98,
+    "4-6": 101,
+    "7-9": 120,
+    "Gymnasiet": 83,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2513": {
+   "namn": "Överkalix",
+   "lan": "Norrbottens län",
+   "folkmangd": 3183,
+   "kommungrupp": "Landsbygdskommun, ej nära större stad",
+   "peers": [
+    "0834",
+    "1444",
+    "1760",
+    "1762",
+    "1783",
+    "2104",
+    "2518"
+   ],
+   "elever": {
+    "Förskola": 98,
+    "Förskoleklass": 17,
+    "1-3": 70,
+    "4-6": 55,
+    "7-9": 55,
+    "Gymnasiet": 3,
+    "Komvux": 81
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2514": {
+   "namn": "Kalix",
+   "lan": "Norrbottens län",
+   "folkmangd": 15252,
+   "kommungrupp": "Landsbygdskommun, ej nära större stad",
+   "peers": [
+    "0834",
+    "1083",
+    "1278",
+    "1421",
+    "1484",
+    "1760",
+    "1783"
+   ],
+   "elever": {
+    "Förskola": 486,
+    "Förskoleklass": 129,
+    "1-3": 366,
+    "4-6": 391,
+    "7-9": 403,
+    "Gymnasiet": 483,
+    "Komvux": 309
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2518": {
+   "namn": "Övertorneå",
+   "lan": "Norrbottens län",
+   "folkmangd": 3995,
+   "kommungrupp": "Landsbygdskommun, ej nära större stad",
+   "peers": [
+    "0834",
+    "1444",
+    "1760",
+    "1762",
+    "1882",
+    "2104",
+    "2513"
+   ],
+   "elever": {
+    "Förskola": 106,
+    "Förskoleklass": 32,
+    "1-3": 91,
+    "4-6": 77,
+    "7-9": 101,
+    "Gymnasiet": 93,
+    "Komvux": 68
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2521": {
+   "namn": "Pajala",
+   "lan": "Norrbottens län",
+   "folkmangd": 5706,
+   "kommungrupp": "Landsbygdskommun, ej nära större stad",
+   "peers": [
+    "0642",
+    "0860",
+    "1430",
+    "1465",
+    "1960",
+    "2462",
+    "2506"
+   ],
+   "elever": {
+    "Förskola": 147,
+    "Förskoleklass": 59,
+    "1-3": 149,
+    "4-6": 164,
+    "7-9": 158,
+    "Gymnasiet": 106,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2523": {
+   "namn": "Gällivare",
+   "lan": "Norrbottens län",
+   "folkmangd": 17135,
+   "kommungrupp": "Landsbygdskommun med besöksnäring",
+   "peers": [
+    "0481",
+    "0561",
+    "0861",
+    "1270",
+    "2029",
+    "2161",
+    "2262"
+   ],
+   "elever": {
+    "Förskola": 667,
+    "Förskoleklass": 161,
+    "1-3": 541,
+    "4-6": 470,
+    "7-9": 452,
+    "Gymnasiet": 550,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2560": {
+   "namn": "Älvsbyn",
+   "lan": "Norrbottens län",
+   "folkmangd": 7815,
+   "kommungrupp": "Lågpendlingskommun nära större stad",
+   "peers": [
+    "1461",
+    "1473",
+    "1492",
+    "2021",
+    "2101",
+    "2260",
+    "2361"
+   ],
+   "elever": {
+    "Förskola": 330,
+    "Förskoleklass": 94,
+    "1-3": 239,
+    "4-6": 227,
+    "7-9": 262,
+    "Gymnasiet": 145,
+    "Komvux": 115
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2580": {
+   "namn": "Luleå",
+   "lan": "Norrbottens län",
+   "folkmangd": 80304,
+   "kommungrupp": "Större stad",
+   "peers": [
+    "0183",
+    "0188",
+    "0980",
+    "1080",
+    "1780",
+    "2281",
+    "2482"
+   ],
+   "elever": {
+    "Förskola": 2929,
+    "Förskoleklass": 668,
+    "1-3": 2069,
+    "4-6": 2175,
+    "7-9": 2159,
+    "Gymnasiet": 2384,
+    "Komvux": 1744
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2581": {
+   "namn": "Piteå",
+   "lan": "Norrbottens län",
+   "folkmangd": 42184,
+   "kommungrupp": "Mindre stad/tätort",
+   "peers": [
+    "0781",
+    "0883",
+    "1082",
+    "1493",
+    "1494",
+    "2181",
+    "2184"
+   ],
+   "elever": {
+    "Förskola": 1751,
+    "Förskoleklass": 448,
+    "1-3": 1233,
+    "4-6": 1380,
+    "7-9": 1377,
+    "Gymnasiet": 1427,
+    "Komvux": 877
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2582": {
+   "namn": "Boden",
+   "lan": "Norrbottens län",
+   "folkmangd": 28624,
+   "kommungrupp": "Lågpendlingskommun nära större stad",
+   "peers": [
+    "0883",
+    "1083",
+    "1286",
+    "1421",
+    "1781",
+    "1883",
+    "2282"
+   ],
+   "elever": {
+    "Förskola": 867,
+    "Förskoleklass": 227,
+    "1-3": 691,
+    "4-6": 688,
+    "7-9": 559,
+    "Gymnasiet": 782,
+    "Komvux": 693
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2583": {
+   "namn": "Haparanda",
+   "lan": "Norrbottens län",
+   "folkmangd": 9027,
+   "kommungrupp": "Landsbygdskommun, ej nära större stad",
+   "peers": [
+    "0763",
+    "0767",
+    "0862",
+    "1466",
+    "1737",
+    "2039",
+    "2401"
+   ],
+   "elever": {
+    "Förskola": 236,
+    "Förskoleklass": 77,
+    "1-3": 214,
+    "4-6": 275,
+    "7-9": 320,
+    "Gymnasiet": 230,
+    "Komvux": 182
+   },
+   "grundskola_masked_cells": 0
+  },
+  "2584": {
+   "namn": "Kiruna",
+   "lan": "Norrbottens län",
+   "folkmangd": 22402,
+   "kommungrupp": "Mindre stad/tätort",
+   "peers": [
+    "0781",
+    "1407",
+    "1493",
+    "2083",
+    "2161",
+    "2182",
+    "2280"
+   ],
+   "elever": {
+    "Förskola": 727,
+    "Förskoleklass": 191,
+    "1-3": 574,
+    "4-6": 606,
+    "7-9": 629,
+    "Gymnasiet": 692,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0114": {
+   "namn": "Upplands Väsby",
+   "lan": "Stockholms län",
+   "folkmangd": 50495,
+   "kommungrupp": "Pendlingskommun nära storstad",
+   "peers": [
+    "0117",
+    "0120",
+    "0138",
+    "0186",
+    "0381",
+    "1233",
+    "1402"
+   ],
+   "elever": {
+    "Förskola": 733,
+    "Förskoleklass": 289,
+    "1-3": 954,
+    "4-6": 901,
+    "7-9": 802,
+    "Gymnasiet": 563,
+    "Komvux": 2022
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0115": {
+   "namn": "Vallentuna",
+   "lan": "Stockholms län",
+   "folkmangd": 35361,
+   "kommungrupp": "Pendlingskommun nära storstad",
+   "peers": [
+    "0139",
+    "0162",
+    "0191",
+    "0765",
+    "1261",
+    "1401",
+    "1440"
+   ],
+   "elever": {
+    "Förskola": 492,
+    "Förskoleklass": 369,
+    "1-3": 1160,
+    "4-6": 1196,
+    "7-9": 1050,
+    "Gymnasiet": 502,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0117": {
+   "namn": "Österåker",
+   "lan": "Stockholms län",
+   "folkmangd": 49943,
+   "kommungrupp": "Pendlingskommun nära storstad",
+   "peers": [
+    "0114",
+    "0120",
+    "0138",
+    "0186",
+    "0191",
+    "1233",
+    "1402"
+   ],
+   "elever": {
+    "Förskola": 1409,
+    "Förskoleklass": 405,
+    "1-3": 1314,
+    "4-6": 1179,
+    "7-9": 1023,
+    "Gymnasiet": 608,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0120": {
+   "namn": "Värmdö",
+   "lan": "Stockholms län",
+   "folkmangd": 46601,
+   "kommungrupp": "Pendlingskommun nära storstad",
+   "peers": [
+    "0114",
+    "0117",
+    "0138",
+    "0186",
+    "0381",
+    "1233",
+    "1402"
+   ],
+   "elever": {
+    "Förskola": 1461,
+    "Förskoleklass": 370,
+    "1-3": 1269,
+    "4-6": 1201,
+    "7-9": 1120,
+    "Gymnasiet": 1490,
+    "Komvux": 1329
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0123": {
+   "namn": "Järfälla",
+   "lan": "Stockholms län",
+   "folkmangd": 90180,
+   "kommungrupp": "Pendlingskommun nära storstad",
+   "peers": [
+    "0136",
+    "0160",
+    "0181",
+    "0484",
+    "0780",
+    "1290",
+    "1384"
+   ],
+   "elever": {
+    "Förskola": 3019,
+    "Förskoleklass": 987,
+    "1-3": 2882,
+    "4-6": 2590,
+    "7-9": 2204,
+    "Gymnasiet": 1039,
+    "Komvux": 4269
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0125": {
+   "namn": "Ekerö",
+   "lan": "Stockholms län",
+   "folkmangd": 29062,
+   "kommungrupp": "Pendlingskommun nära storstad",
+   "peers": [
+    "0330",
+    "0643",
+    "1230",
+    "1262",
+    "1263",
+    "1761",
+    "2309"
+   ],
+   "elever": {
+    "Förskola": 820,
+    "Förskoleklass": 324,
+    "1-3": 1127,
+    "4-6": 1072,
+    "7-9": 1081,
+    "Gymnasiet": 41,
+    "Komvux": 396
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0126": {
+   "namn": "Huddinge",
+   "lan": "Stockholms län",
+   "folkmangd": 114686,
+   "kommungrupp": "Pendlingskommun nära storstad",
+   "peers": [
+    "0127",
+    "0136",
+    "0160",
+    "0163",
+    "0182",
+    "0484",
+    "1384"
+   ],
+   "elever": {
+    "Förskola": 3794,
+    "Förskoleklass": 1270,
+    "1-3": 3785,
+    "4-6": 3720,
+    "7-9": 3320,
+    "Gymnasiet": 2520,
+    "Komvux": 4363
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0127": {
+   "namn": "Botkyrka",
+   "lan": "Stockholms län",
+   "folkmangd": 96750,
+   "kommungrupp": "Pendlingskommun nära storstad",
+   "peers": [
+    "0123",
+    "0126",
+    "0136",
+    "0160",
+    "0163",
+    "0182",
+    "1384"
+   ],
+   "elever": {
+    "Förskola": 3646,
+    "Förskoleklass": 874,
+    "1-3": 2808,
+    "4-6": 2901,
+    "7-9": 2872,
+    "Gymnasiet": 2822,
+    "Komvux": 4808
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0128": {
+   "namn": "Salem",
+   "lan": "Stockholms län",
+   "folkmangd": 17370,
+   "kommungrupp": "Pendlingskommun nära storstad",
+   "peers": [
+    "0139",
+    "0140",
+    "0765",
+    "1277",
+    "1401",
+    "1814",
+    "2309"
+   ],
+   "elever": {
+    "Förskola": 449,
+    "Förskoleklass": 152,
+    "1-3": 417,
+    "4-6": 475,
+    "7-9": 574,
+    "Gymnasiet": 244,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0136": {
+   "namn": "Haninge",
+   "lan": "Stockholms län",
+   "folkmangd": 101408,
+   "kommungrupp": "Pendlingskommun nära storstad",
+   "peers": [
+    "0123",
+    "0127",
+    "0160",
+    "0163",
+    "0181",
+    "0182",
+    "1384"
+   ],
+   "elever": {
+    "Förskola": 3367,
+    "Förskoleklass": 943,
+    "1-3": 2802,
+    "4-6": 2638,
+    "7-9": 2343,
+    "Gymnasiet": 2539,
+    "Komvux": 3780
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0138": {
+   "namn": "Tyresö",
+   "lan": "Stockholms län",
+   "folkmangd": 49645,
+   "kommungrupp": "Pendlingskommun nära storstad",
+   "peers": [
+    "0114",
+    "0117",
+    "0120",
+    "0186",
+    "0381",
+    "1233",
+    "1402"
+   ],
+   "elever": {
+    "Förskola": 1449,
+    "Förskoleklass": 520,
+    "1-3": 1648,
+    "4-6": 1615,
+    "7-9": 1604,
+    "Gymnasiet": 516,
+    "Komvux": 1526
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0139": {
+   "namn": "Upplands-Bro",
+   "lan": "Stockholms län",
+   "folkmangd": 33333,
+   "kommungrupp": "Pendlingskommun nära storstad",
+   "peers": [
+    "0115",
+    "0128",
+    "0162",
+    "1401",
+    "1440",
+    "1441",
+    "1814"
+   ],
+   "elever": {
+    "Förskola": 1274,
+    "Förskoleklass": 357,
+    "1-3": 1057,
+    "4-6": 1103,
+    "7-9": 993,
+    "Gymnasiet": 879,
+    "Komvux": 1233
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0140": {
+   "namn": "Nykvarn",
+   "lan": "Stockholms län",
+   "folkmangd": 12384,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0128",
+    "0765",
+    "1277",
+    "1440",
+    "1814",
+    "2422",
+    "2460"
+   ],
+   "elever": {
+    "Förskola": 610,
+    "Förskoleklass": 152,
+    "1-3": 531,
+    "4-6": 519,
+    "7-9": 492,
+    "Gymnasiet": null,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0160": {
+   "namn": "Täby",
+   "lan": "Stockholms län",
+   "folkmangd": 78514,
+   "kommungrupp": "Pendlingskommun nära storstad",
+   "peers": [
+    "0114",
+    "0120",
+    "0127",
+    "0136",
+    "0163",
+    "0186",
+    "1384"
+   ],
+   "elever": {
+    "Förskola": 291,
+    "Förskoleklass": 677,
+    "1-3": 2018,
+    "4-6": 1790,
+    "7-9": 1665,
+    "Gymnasiet": 1433,
+    "Komvux": 4373
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0162": {
+   "namn": "Danderyd",
+   "lan": "Stockholms län",
+   "folkmangd": 32500,
+   "kommungrupp": "Pendlingskommun nära storstad",
+   "peers": [
+    "0115",
+    "0139",
+    "0765",
+    "1233",
+    "1261",
+    "1277",
+    "1440"
+   ],
+   "elever": {
+    "Förskola": 772,
+    "Förskoleklass": 313,
+    "1-3": 954,
+    "4-6": 1090,
+    "7-9": 978,
+    "Gymnasiet": 1367,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0163": {
+   "namn": "Sollentuna",
+   "lan": "Stockholms län",
+   "folkmangd": 78033,
+   "kommungrupp": "Pendlingskommun nära storstad",
+   "peers": [
+    "0114",
+    "0117",
+    "0127",
+    "0136",
+    "0138",
+    "0160",
+    "1384"
+   ],
+   "elever": {
+    "Förskola": 1452,
+    "Förskoleklass": 709,
+    "1-3": 2144,
+    "4-6": 2347,
+    "7-9": 2353,
+    "Gymnasiet": 2273,
+    "Komvux": 2571
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0180": {
+   "namn": "Stockholm",
+   "lan": "Stockholms län",
+   "folkmangd": 999239,
+   "kommungrupp": "Storstäder",
+   "peers": [
+    "0380",
+    "0580",
+    "1280",
+    "1281",
+    "1480",
+    "1880",
+    "2480"
+   ],
+   "elever": {
+    "Förskola": 27555,
+    "Förskoleklass": 7809,
+    "1-3": 23623,
+    "4-6": 23028,
+    "7-9": 20978,
+    "Gymnasiet": 18585,
+    "Komvux": 29110
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0181": {
+   "namn": "Södertälje",
+   "lan": "Stockholms län",
+   "folkmangd": 102772,
+   "kommungrupp": "Större stad",
+   "peers": [
+    "0123",
+    "0136",
+    "0484",
+    "0780",
+    "1380",
+    "1384",
+    "1490"
+   ],
+   "elever": {
+    "Förskola": 4205,
+    "Förskoleklass": 826,
+    "1-3": 2552,
+    "4-6": 2500,
+    "7-9": 2708,
+    "Gymnasiet": 1164,
+    "Komvux": 3779
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0182": {
+   "namn": "Nacka",
+   "lan": "Stockholms län",
+   "folkmangd": 113730,
+   "kommungrupp": "Pendlingskommun nära storstad",
+   "peers": [
+    "0126",
+    "0127",
+    "0136",
+    "0160",
+    "0163",
+    "0484",
+    "1384"
+   ],
+   "elever": {
+    "Förskola": 2699,
+    "Förskoleklass": 1035,
+    "1-3": 3167,
+    "4-6": 2980,
+    "7-9": 2811,
+    "Gymnasiet": 3174,
+    "Komvux": 3220
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0183": {
+   "namn": "Sundbyberg",
+   "lan": "Stockholms län",
+   "folkmangd": 57000,
+   "kommungrupp": "Pendlingskommun nära storstad",
+   "peers": [
+    "0188",
+    "0883",
+    "0980",
+    "1286",
+    "1883",
+    "2580",
+    "2582"
+   ],
+   "elever": {
+    "Förskola": 1949,
+    "Förskoleklass": 454,
+    "1-3": 1341,
+    "4-6": 1162,
+    "7-9": 532,
+    "Gymnasiet": 280,
+    "Komvux": 2505
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0184": {
+   "namn": "Solna",
+   "lan": "Stockholms län",
+   "folkmangd": 86435,
+   "kommungrupp": "Pendlingskommun nära storstad",
+   "peers": [
+    "0183",
+    "0885",
+    "1291",
+    "1427",
+    "1780",
+    "2031",
+    "2580"
+   ],
+   "elever": {
+    "Förskola": 2078,
+    "Förskoleklass": 508,
+    "1-3": 1425,
+    "4-6": 975,
+    "7-9": 747,
+    "Gymnasiet": 684,
+    "Komvux": 2499
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0186": {
+   "namn": "Lidingö",
+   "lan": "Stockholms län",
+   "folkmangd": 48369,
+   "kommungrupp": "Pendlingskommun nära storstad",
+   "peers": [
+    "0114",
+    "0117",
+    "0120",
+    "0138",
+    "0381",
+    "1233",
+    "1402"
+   ],
+   "elever": {
+    "Förskola": 1370,
+    "Förskoleklass": 441,
+    "1-3": 1341,
+    "4-6": 1358,
+    "7-9": 1263,
+    "Gymnasiet": 960,
+    "Komvux": 996
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0187": {
+   "namn": "Vaxholm",
+   "lan": "Stockholms län",
+   "folkmangd": 11636,
+   "kommungrupp": "Pendlingskommun nära storstad",
+   "peers": [
+    "0665",
+    "0684",
+    "0761",
+    "1214",
+    "1442",
+    "1763",
+    "2321"
+   ],
+   "elever": {
+    "Förskola": 232,
+    "Förskoleklass": 109,
+    "1-3": 400,
+    "4-6": 451,
+    "7-9": 463,
+    "Gymnasiet": null,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0188": {
+   "namn": "Norrtälje",
+   "lan": "Stockholms län",
+   "folkmangd": 66832,
+   "kommungrupp": "Mindre stad/tätort",
+   "peers": [
+    "0183",
+    "0880",
+    "0980",
+    "1080",
+    "1383",
+    "2380",
+    "2581"
+   ],
+   "elever": {
+    "Förskola": 1184,
+    "Förskoleklass": 446,
+    "1-3": 1388,
+    "4-6": 1382,
+    "7-9": 1305,
+    "Gymnasiet": 1259,
+    "Komvux": 1475
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0191": {
+   "namn": "Sigtuna",
+   "lan": "Stockholms län",
+   "folkmangd": 53365,
+   "kommungrupp": "Pendlingskommun nära storstad",
+   "peers": [
+    "0114",
+    "0115",
+    "0117",
+    "0138",
+    "0162",
+    "1261",
+    "1440"
+   ],
+   "elever": {
+    "Förskola": 1914,
+    "Förskoleklass": 524,
+    "1-3": 1752,
+    "4-6": 1648,
+    "7-9": 1448,
+    "Gymnasiet": 1256,
+    "Komvux": 1853
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0192": {
+   "namn": "Nynäshamn",
+   "lan": "Stockholms län",
+   "folkmangd": 30610,
+   "kommungrupp": "Pendlingskommun nära storstad",
+   "peers": [
+    "0483",
+    "0586",
+    "0683",
+    "1081",
+    "1463",
+    "1499",
+    "2085"
+   ],
+   "elever": {
+    "Förskola": 974,
+    "Förskoleklass": 262,
+    "1-3": 944,
+    "4-6": 844,
+    "7-9": 849,
+    "Gymnasiet": 375,
+    "Komvux": 1071
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0305": {
+   "namn": "Håbo",
+   "lan": "Uppsala län",
+   "folkmangd": 23252,
+   "kommungrupp": "Pendlingskommun nära storstad",
+   "peers": [
+    "0684",
+    "0764",
+    "1214",
+    "1231",
+    "1763",
+    "1881",
+    "2321"
+   ],
+   "elever": {
+    "Förskola": 808,
+    "Förskoleklass": 270,
+    "1-3": 850,
+    "4-6": 754,
+    "7-9": 726,
+    "Gymnasiet": 507,
+    "Komvux": 503
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0319": {
+   "namn": "Älvkarleby",
+   "lan": "Uppsala län",
+   "folkmangd": 9573,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0428",
+    "0767",
+    "1257",
+    "1466",
+    "1765",
+    "1884",
+    "2121"
+   ],
+   "elever": {
+    "Förskola": 400,
+    "Förskoleklass": 59,
+    "1-3": 232,
+    "4-6": 204,
+    "7-9": 195,
+    "Gymnasiet": 26,
+    "Komvux": 296
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0330": {
+   "namn": "Knivsta",
+   "lan": "Uppsala län",
+   "folkmangd": 21733,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0125",
+    "0128",
+    "1230",
+    "1262",
+    "1263",
+    "1761",
+    "2309"
+   ],
+   "elever": {
+    "Förskola": 607,
+    "Förskoleklass": 274,
+    "1-3": 859,
+    "4-6": 849,
+    "7-9": 854,
+    "Gymnasiet": 111,
+    "Komvux": 527
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0331": {
+   "namn": "Heby",
+   "lan": "Uppsala län",
+   "folkmangd": 14275,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0840",
+    "1275",
+    "1486",
+    "1861",
+    "1961",
+    "1982",
+    "2326"
+   ],
+   "elever": {
+    "Förskola": 419,
+    "Förskoleklass": 155,
+    "1-3": 463,
+    "4-6": 473,
+    "7-9": 491,
+    "Gymnasiet": null,
+    "Komvux": 322
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0360": {
+   "namn": "Tierp",
+   "lan": "Uppsala län",
+   "folkmangd": 21028,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0331",
+    "0562",
+    "0662",
+    "0840",
+    "1415",
+    "1961",
+    "1981"
+   ],
+   "elever": {
+    "Förskola": 865,
+    "Förskoleklass": 225,
+    "1-3": 718,
+    "4-6": 744,
+    "7-9": 710,
+    "Gymnasiet": 421,
+    "Komvux": 696
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0380": {
+   "namn": "Uppsala",
+   "lan": "Uppsala län",
+   "folkmangd": 249726,
+   "kommungrupp": "Större stad",
+   "peers": [
+    "0580",
+    "0680",
+    "1280",
+    "1281",
+    "1880",
+    "1980",
+    "2480"
+   ],
+   "elever": {
+    "Förskola": 6462,
+    "Förskoleklass": 2260,
+    "1-3": 7057,
+    "4-6": 6570,
+    "7-9": 5937,
+    "Gymnasiet": 6629,
+    "Komvux": 7657
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0381": {
+   "namn": "Enköping",
+   "lan": "Uppsala län",
+   "folkmangd": 48804,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0114",
+    "0120",
+    "0138",
+    "0186",
+    "0682",
+    "1285",
+    "1489"
+   ],
+   "elever": {
+    "Förskola": 1420,
+    "Förskoleklass": 601,
+    "1-3": 1771,
+    "4-6": 1478,
+    "7-9": 1320,
+    "Gymnasiet": 1504,
+    "Komvux": 1308
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0382": {
+   "namn": "Östhammar",
+   "lan": "Uppsala län",
+   "folkmangd": 22181,
+   "kommungrupp": "Lågpendlingskommun nära större stad",
+   "peers": [
+    "0881",
+    "0882",
+    "1266",
+    "1495",
+    "1885",
+    "1983",
+    "2084"
+   ],
+   "elever": {
+    "Förskola": 808,
+    "Förskoleklass": 241,
+    "1-3": 739,
+    "4-6": 766,
+    "7-9": 741,
+    "Gymnasiet": 344,
+    "Komvux": 379
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0428": {
+   "namn": "Vingåker",
+   "lan": "Södermanlands län",
+   "folkmangd": 8666,
+   "kommungrupp": "Pendlingskommun nära mindre tätort",
+   "peers": [
+    "0319",
+    "1257",
+    "1439",
+    "1466",
+    "1765",
+    "1884",
+    "2121"
+   ],
+   "elever": {
+    "Förskola": 333,
+    "Förskoleklass": 71,
+    "1-3": 284,
+    "4-6": 276,
+    "7-9": 211,
+    "Gymnasiet": null,
+    "Komvux": 134
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0461": {
+   "namn": "Gnesta",
+   "lan": "Södermanlands län",
+   "folkmangd": 11343,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "1256",
+    "1260",
+    "1267",
+    "1315",
+    "1443",
+    "1715",
+    "2026"
+   ],
+   "elever": {
+    "Förskola": 409,
+    "Förskoleklass": 118,
+    "1-3": 370,
+    "4-6": 375,
+    "7-9": 397,
+    "Gymnasiet": null,
+    "Komvux": 308
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0480": {
+   "namn": "Nyköping",
+   "lan": "Södermanlands län",
+   "folkmangd": 58310,
+   "kommungrupp": "Mindre stad/tätort",
+   "peers": [
+    "1482",
+    "1485",
+    "1488",
+    "1496",
+    "2080",
+    "2081",
+    "2284"
+   ],
+   "elever": {
+    "Förskola": 1951,
+    "Förskoleklass": 534,
+    "1-3": 1708,
+    "4-6": 1579,
+    "7-9": 978,
+    "Gymnasiet": 1546,
+    "Komvux": 2275
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0481": {
+   "namn": "Oxelösund",
+   "lan": "Södermanlands län",
+   "folkmangd": 11962,
+   "kommungrupp": "Pendlingskommun nära mindre tätort",
+   "peers": [
+    "0561",
+    "0861",
+    "1270",
+    "1472",
+    "1737",
+    "2029",
+    "2523"
+   ],
+   "elever": {
+    "Förskola": 469,
+    "Förskoleklass": 128,
+    "1-3": 417,
+    "4-6": 364,
+    "7-9": 337,
+    "Gymnasiet": null,
+    "Komvux": 385
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0482": {
+   "namn": "Flen",
+   "lan": "Södermanlands län",
+   "folkmangd": 15095,
+   "kommungrupp": "Pendlingskommun nära mindre tätort",
+   "peers": [
+    "0513",
+    "0686",
+    "0860",
+    "1470",
+    "1730",
+    "1960",
+    "2082"
+   ],
+   "elever": {
+    "Förskola": 372,
+    "Förskoleklass": 120,
+    "1-3": 418,
+    "4-6": 424,
+    "7-9": 407,
+    "Gymnasiet": 73,
+    "Komvux": 441
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0483": {
+   "namn": "Katrineholm",
+   "lan": "Södermanlands län",
+   "folkmangd": 33984,
+   "kommungrupp": "Mindre stad/tätort",
+   "peers": [
+    "0192",
+    "0586",
+    "0683",
+    "1081",
+    "1463",
+    "1499",
+    "2085"
+   ],
+   "elever": {
+    "Förskola": 1401,
+    "Förskoleklass": 404,
+    "1-3": 1261,
+    "4-6": 1132,
+    "7-9": 1048,
+    "Gymnasiet": 1272,
+    "Komvux": 1478
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0484": {
+   "namn": "Eskilstuna",
+   "lan": "Södermanlands län",
+   "folkmangd": 106789,
+   "kommungrupp": "Större stad",
+   "peers": [
+    "0123",
+    "0136",
+    "0181",
+    "0182",
+    "0780",
+    "1380",
+    "1490"
+   ],
+   "elever": {
+    "Förskola": 3892,
+    "Förskoleklass": 1023,
+    "1-3": 3407,
+    "4-6": 3351,
+    "7-9": 3285,
+    "Gymnasiet": 3264,
+    "Komvux": 4931
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0486": {
+   "namn": "Strängnäs",
+   "lan": "Södermanlands län",
+   "folkmangd": 39387,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0662",
+    "0685",
+    "1282",
+    "1285",
+    "1415",
+    "1489",
+    "1499"
+   ],
+   "elever": {
+    "Förskola": 1263,
+    "Förskoleklass": 302,
+    "1-3": 1012,
+    "4-6": 768,
+    "7-9": 734,
+    "Gymnasiet": 438,
+    "Komvux": 818
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0488": {
+   "namn": "Trosa",
+   "lan": "Södermanlands län",
+   "folkmangd": 14900,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0582",
+    "1462",
+    "1715",
+    "1861",
+    "1907",
+    "2313",
+    "2481"
+   ],
+   "elever": {
+    "Förskola": 485,
+    "Förskoleklass": 173,
+    "1-3": 589,
+    "4-6": 580,
+    "7-9": 552,
+    "Gymnasiet": 7,
+    "Komvux": 51
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0509": {
+   "namn": "Ödeshög",
+   "lan": "Östergötlands län",
+   "folkmangd": 5221,
+   "kommungrupp": "Pendlingskommun nära mindre tätort",
+   "peers": [
+    "0319",
+    "0428",
+    "0560",
+    "1439",
+    "1765",
+    "1884",
+    "1904"
+   ],
+   "elever": {
+    "Förskola": 144,
+    "Förskoleklass": 54,
+    "1-3": 179,
+    "4-6": 160,
+    "7-9": 152,
+    "Gymnasiet": null,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0512": {
+   "namn": "Ydre",
+   "lan": "Östergötlands län",
+   "folkmangd": 3619,
+   "kommungrupp": "Pendlingskommun nära mindre tätort",
+   "peers": [
+    "0642",
+    "0821",
+    "1445",
+    "1452",
+    "2421",
+    "2425",
+    "2506"
+   ],
+   "elever": {
+    "Förskola": 144,
+    "Förskoleklass": 46,
+    "1-3": 107,
+    "4-6": 126,
+    "7-9": 105,
+    "Gymnasiet": null,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0513": {
+   "namn": "Kinda",
+   "lan": "Östergötlands län",
+   "folkmangd": 9924,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0482",
+    "1438",
+    "1465",
+    "1730",
+    "1884",
+    "1960",
+    "2082"
+   ],
+   "elever": {
+    "Förskola": 331,
+    "Förskoleklass": 126,
+    "1-3": 359,
+    "4-6": 317,
+    "7-9": 319,
+    "Gymnasiet": null,
+    "Komvux": 153
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0560": {
+   "namn": "Boxholm",
+   "lan": "Östergötlands län",
+   "folkmangd": 5451,
+   "kommungrupp": "Pendlingskommun nära mindre tätort",
+   "peers": [
+    "0509",
+    "0767",
+    "1439",
+    "1904",
+    "2039",
+    "2401",
+    "2583"
+   ],
+   "elever": {
+    "Förskola": 231,
+    "Förskoleklass": 50,
+    "1-3": 183,
+    "4-6": 190,
+    "7-9": 178,
+    "Gymnasiet": null,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0561": {
+   "namn": "Åtvidaberg",
+   "lan": "Östergötlands län",
+   "folkmangd": 11490,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0481",
+    "0861",
+    "1270",
+    "1472",
+    "1737",
+    "1782",
+    "2029"
+   ],
+   "elever": {
+    "Förskola": 386,
+    "Förskoleklass": 103,
+    "1-3": 394,
+    "4-6": 384,
+    "7-9": 340,
+    "Gymnasiet": 241,
+    "Komvux": 174
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0562": {
+   "namn": "Finspång",
+   "lan": "Östergötlands län",
+   "folkmangd": 21502,
+   "kommungrupp": "Lågpendlingskommun nära större stad",
+   "peers": [
+    "0360",
+    "1264",
+    "1273",
+    "1961",
+    "1981",
+    "2085",
+    "2283"
+   ],
+   "elever": {
+    "Förskola": 762,
+    "Förskoleklass": 219,
+    "1-3": 689,
+    "4-6": 703,
+    "7-9": 743,
+    "Gymnasiet": 132,
+    "Komvux": 176
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0563": {
+   "namn": "Valdemarsvik",
+   "lan": "Östergötlands län",
+   "folkmangd": 7526,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0834",
+    "1278",
+    "1446",
+    "1447",
+    "1484",
+    "1760",
+    "2034"
+   ],
+   "elever": {
+    "Förskola": 242,
+    "Förskoleklass": 59,
+    "1-3": 201,
+    "4-6": 174,
+    "7-9": 186,
+    "Gymnasiet": null,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0580": {
+   "namn": "Linköping",
+   "lan": "Östergötlands län",
+   "folkmangd": 168714,
+   "kommungrupp": "Större stad",
+   "peers": [
+    "0581",
+    "0680",
+    "1281",
+    "1283",
+    "1880",
+    "1980",
+    "2480"
+   ],
+   "elever": {
+    "Förskola": 5554,
+    "Förskoleklass": 1652,
+    "1-3": 4913,
+    "4-6": 5059,
+    "7-9": 4293,
+    "Gymnasiet": 4855,
+    "Komvux": 4207
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0581": {
+   "namn": "Norrköping",
+   "lan": "Östergötlands län",
+   "folkmangd": 144904,
+   "kommungrupp": "Större stad",
+   "peers": [
+    "0680",
+    "1283",
+    "1380",
+    "1490",
+    "1880",
+    "1980",
+    "2480"
+   ],
+   "elever": {
+    "Förskola": 5974,
+    "Förskoleklass": 1384,
+    "1-3": 4307,
+    "4-6": 3928,
+    "7-9": 3311,
+    "Gymnasiet": 3621,
+    "Komvux": 5065
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0582": {
+   "namn": "Söderköping",
+   "lan": "Östergötlands län",
+   "folkmangd": 14741,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0488",
+    "0617",
+    "1256",
+    "1462",
+    "1715",
+    "2132",
+    "2481"
+   ],
+   "elever": {
+    "Förskola": 501,
+    "Förskoleklass": 174,
+    "1-3": 535,
+    "4-6": 513,
+    "7-9": 497,
+    "Gymnasiet": 140,
+    "Komvux": 113
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0583": {
+   "namn": "Motala",
+   "lan": "Östergötlands län",
+   "folkmangd": 43131,
+   "kommungrupp": "Lågpendlingskommun nära större stad",
+   "peers": [
+    "1287",
+    "1292",
+    "1382",
+    "1482",
+    "1487",
+    "1496",
+    "2181"
+   ],
+   "elever": {
+    "Förskola": 1680,
+    "Förskoleklass": 446,
+    "1-3": 1428,
+    "4-6": 1320,
+    "7-9": 1113,
+    "Gymnasiet": 1181,
+    "Komvux": 1328
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0584": {
+   "namn": "Vadstena",
+   "lan": "Östergötlands län",
+   "folkmangd": 7484,
+   "kommungrupp": "Pendlingskommun nära mindre tätort",
+   "peers": [
+    "0563",
+    "0885",
+    "1291",
+    "1446",
+    "1864",
+    "2031",
+    "2034"
+   ],
+   "elever": {
+    "Förskola": 227,
+    "Förskoleklass": 63,
+    "1-3": 225,
+    "4-6": 228,
+    "7-9": 220,
+    "Gymnasiet": null,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0586": {
+   "namn": "Mjölby",
+   "lan": "Östergötlands län",
+   "folkmangd": 28823,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0192",
+    "0683",
+    "1081",
+    "1381",
+    "1463",
+    "1491",
+    "1784"
+   ],
+   "elever": {
+    "Förskola": 1381,
+    "Förskoleklass": 334,
+    "1-3": 1040,
+    "4-6": 1071,
+    "7-9": 982,
+    "Gymnasiet": 678,
+    "Komvux": 520
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0604": {
+   "namn": "Aneby",
+   "lan": "Jönköpings län",
+   "folkmangd": 6851,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0187",
+    "0665",
+    "0761",
+    "1442",
+    "2418",
+    "2422",
+    "2460"
+   ],
+   "elever": {
+    "Förskola": 300,
+    "Förskoleklass": 101,
+    "1-3": 273,
+    "4-6": 259,
+    "7-9": 255,
+    "Gymnasiet": null,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0617": {
+   "namn": "Gnosjö",
+   "lan": "Jönköpings län",
+   "folkmangd": 9010,
+   "kommungrupp": "Pendlingskommun nära mindre tätort",
+   "peers": [
+    "0582",
+    "1443",
+    "1462",
+    "1715",
+    "1907",
+    "2132",
+    "2305"
+   ],
+   "elever": {
+    "Förskola": 310,
+    "Förskoleklass": 106,
+    "1-3": 325,
+    "4-6": 351,
+    "7-9": 319,
+    "Gymnasiet": 269,
+    "Komvux": 285
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0642": {
+   "namn": "Mullsjö",
+   "lan": "Jönköpings län",
+   "folkmangd": 7546,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "1273",
+    "1430",
+    "1465",
+    "1960",
+    "2462",
+    "2506",
+    "2521"
+   ],
+   "elever": {
+    "Förskola": 396,
+    "Förskoleklass": 89,
+    "1-3": 271,
+    "4-6": 264,
+    "7-9": 298,
+    "Gymnasiet": null,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0643": {
+   "namn": "Habo",
+   "lan": "Jönköpings län",
+   "folkmangd": 13511,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0125",
+    "0330",
+    "1230",
+    "1262",
+    "1263",
+    "1761",
+    "2309"
+   ],
+   "elever": {
+    "Förskola": 572,
+    "Förskoleklass": 216,
+    "1-3": 616,
+    "4-6": 666,
+    "7-9": 595,
+    "Gymnasiet": null,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0662": {
+   "namn": "Gislaved",
+   "lan": "Jönköpings län",
+   "folkmangd": 28641,
+   "kommungrupp": "Landsbygdskommun, ej nära större stad",
+   "peers": [
+    "0360",
+    "0486",
+    "0685",
+    "1081",
+    "1415",
+    "1981",
+    "2085"
+   ],
+   "elever": {
+    "Förskola": 1111,
+    "Förskoleklass": 329,
+    "1-3": 932,
+    "4-6": 1042,
+    "7-9": 1022,
+    "Gymnasiet": 907,
+    "Komvux": 665
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0665": {
+   "namn": "Vaggeryd",
+   "lan": "Jönköpings län",
+   "folkmangd": 14943,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0187",
+    "0604",
+    "0684",
+    "0761",
+    "1231",
+    "1442",
+    "2418"
+   ],
+   "elever": {
+    "Förskola": 659,
+    "Förskoleklass": 182,
+    "1-3": 592,
+    "4-6": 513,
+    "7-9": 582,
+    "Gymnasiet": 326,
+    "Komvux": 369
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0680": {
+   "namn": "Jönköping",
+   "lan": "Jönköpings län",
+   "folkmangd": 148152,
+   "kommungrupp": "Större stad",
+   "peers": [
+    "0580",
+    "0581",
+    "1283",
+    "1380",
+    "1880",
+    "1980",
+    "2480"
+   ],
+   "elever": {
+    "Förskola": 5673,
+    "Förskoleklass": 1534,
+    "1-3": 4541,
+    "4-6": 4600,
+    "7-9": 4627,
+    "Gymnasiet": 5482,
+    "Komvux": 3986
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0682": {
+   "namn": "Nässjö",
+   "lan": "Jönköpings län",
+   "folkmangd": 31474,
+   "kommungrupp": "Lågpendlingskommun nära större stad",
+   "peers": [
+    "0486",
+    "0488",
+    "0662",
+    "0685",
+    "1285",
+    "1415",
+    "1861"
+   ],
+   "elever": {
+    "Förskola": 1339,
+    "Förskoleklass": 384,
+    "1-3": 1182,
+    "4-6": 1178,
+    "7-9": 1066,
+    "Gymnasiet": 1056,
+    "Komvux": 878
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0683": {
+   "namn": "Värnamo",
+   "lan": "Jönköpings län",
+   "folkmangd": 34534,
+   "kommungrupp": "Mindre stad/tätort",
+   "peers": [
+    "0192",
+    "0483",
+    "0586",
+    "1081",
+    "1463",
+    "1499",
+    "2085"
+   ],
+   "elever": {
+    "Förskola": 1366,
+    "Förskoleklass": 364,
+    "1-3": 1220,
+    "4-6": 1221,
+    "7-9": 1267,
+    "Gymnasiet": 1169,
+    "Komvux": 717
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0684": {
+   "namn": "Sävsjö",
+   "lan": "Jönköpings län",
+   "folkmangd": 11531,
+   "kommungrupp": "Pendlingskommun nära mindre tätort",
+   "peers": [
+    "0187",
+    "0761",
+    "1214",
+    "1442",
+    "1763",
+    "2026",
+    "2321"
+   ],
+   "elever": {
+    "Förskola": 475,
+    "Förskoleklass": 132,
+    "1-3": 429,
+    "4-6": 409,
+    "7-9": 378,
+    "Gymnasiet": 244,
+    "Komvux": 319
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0685": {
+   "namn": "Vetlanda",
+   "lan": "Jönköpings län",
+   "folkmangd": 27313,
+   "kommungrupp": "Landsbygdskommun, ej nära större stad",
+   "peers": [
+    "0360",
+    "0662",
+    "0682",
+    "1285",
+    "1415",
+    "1981",
+    "2085"
+   ],
+   "elever": {
+    "Förskola": 1091,
+    "Förskoleklass": 283,
+    "1-3": 926,
+    "4-6": 984,
+    "7-9": 991,
+    "Gymnasiet": 1111,
+    "Komvux": 822
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0686": {
+   "namn": "Eksjö",
+   "lan": "Jönköpings län",
+   "folkmangd": 17660,
+   "kommungrupp": "Pendlingskommun nära mindre tätort",
+   "peers": [
+    "0482",
+    "0860",
+    "1264",
+    "1491",
+    "1960",
+    "2082",
+    "2283"
+   ],
+   "elever": {
+    "Förskola": 703,
+    "Förskoleklass": 186,
+    "1-3": 605,
+    "4-6": 648,
+    "7-9": 627,
+    "Gymnasiet": 798,
+    "Komvux": 758
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0687": {
+   "namn": "Tranås",
+   "lan": "Jönköpings län",
+   "folkmangd": 18555,
+   "kommungrupp": "Landsbygdskommun, ej nära större stad",
+   "peers": [
+    "0763",
+    "0884",
+    "1265",
+    "1272",
+    "1276",
+    "1495",
+    "2523"
+   ],
+   "elever": {
+    "Förskola": 649,
+    "Förskoleklass": 206,
+    "1-3": 603,
+    "4-6": 593,
+    "7-9": 672,
+    "Gymnasiet": 732,
+    "Komvux": 662
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0760": {
+   "namn": "Uppvidinge",
+   "lan": "Kronobergs län",
+   "folkmangd": 8911,
+   "kommungrupp": "Lågpendlingskommun nära större stad",
+   "peers": [
+    "1486",
+    "1861",
+    "1907",
+    "1982",
+    "2313",
+    "2409",
+    "2481"
+   ],
+   "elever": {
+    "Förskola": 326,
+    "Förskoleklass": 96,
+    "1-3": 283,
+    "4-6": 274,
+    "7-9": 277,
+    "Gymnasiet": 14,
+    "Komvux": 221
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0761": {
+   "namn": "Lessebo",
+   "lan": "Kronobergs län",
+   "folkmangd": 8115,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0187",
+    "0604",
+    "0665",
+    "0684",
+    "1442",
+    "1763",
+    "2418"
+   ],
+   "elever": {
+    "Förskola": 300,
+    "Förskoleklass": 96,
+    "1-3": 312,
+    "4-6": 267,
+    "7-9": 264,
+    "Gymnasiet": 22,
+    "Komvux": 320
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0763": {
+   "namn": "Tingsryd",
+   "lan": "Kronobergs län",
+   "folkmangd": 11896,
+   "kommungrupp": "Lågpendlingskommun nära större stad",
+   "peers": [
+    "0862",
+    "0884",
+    "1272",
+    "1471",
+    "1472",
+    "1737",
+    "2583"
+   ],
+   "elever": {
+    "Förskola": 442,
+    "Förskoleklass": 110,
+    "1-3": 339,
+    "4-6": 345,
+    "7-9": 383,
+    "Gymnasiet": 152,
+    "Komvux": 390
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0764": {
+   "namn": "Alvesta",
+   "lan": "Kronobergs län",
+   "folkmangd": 19687,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0461",
+    "1214",
+    "1256",
+    "1260",
+    "1267",
+    "1443",
+    "1881"
+   ],
+   "elever": {
+    "Förskola": 800,
+    "Förskoleklass": 233,
+    "1-3": 723,
+    "4-6": 710,
+    "7-9": 694,
+    "Gymnasiet": 47,
+    "Komvux": 548
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0765": {
+   "namn": "Älmhult",
+   "lan": "Kronobergs län",
+   "folkmangd": 17579,
+   "kommungrupp": "Pendlingskommun nära mindre tätort",
+   "peers": [
+    "0128",
+    "0140",
+    "0162",
+    "0665",
+    "1277",
+    "1440",
+    "2460"
+   ],
+   "elever": {
+    "Förskola": 755,
+    "Förskoleklass": 187,
+    "1-3": 668,
+    "4-6": 734,
+    "7-9": 675,
+    "Gymnasiet": 492,
+    "Komvux": 564
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0767": {
+   "namn": "Markaryd",
+   "lan": "Kronobergs län",
+   "folkmangd": 9862,
+   "kommungrupp": "Pendlingskommun nära mindre tätort",
+   "peers": [
+    "0319",
+    "0428",
+    "1257",
+    "1272",
+    "1466",
+    "1471",
+    "1765"
+   ],
+   "elever": {
+    "Förskola": 361,
+    "Förskoleklass": 119,
+    "1-3": 313,
+    "4-6": 321,
+    "7-9": 329,
+    "Gymnasiet": 319,
+    "Komvux": 216
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0780": {
+   "namn": "Växjö",
+   "lan": "Kronobergs län",
+   "folkmangd": 98940,
+   "kommungrupp": "Större stad",
+   "peers": [
+    "0181",
+    "0484",
+    "1290",
+    "1380",
+    "1481",
+    "1490",
+    "2281"
+   ],
+   "elever": {
+    "Förskola": 3852,
+    "Förskoleklass": 1080,
+    "1-3": 3183,
+    "4-6": 3230,
+    "7-9": 2634,
+    "Gymnasiet": 3428,
+    "Komvux": 3134
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0781": {
+   "namn": "Ljungby",
+   "lan": "Kronobergs län",
+   "folkmangd": 28132,
+   "kommungrupp": "Mindre stad/tätort",
+   "peers": [
+    "1082",
+    "1284",
+    "1494",
+    "2161",
+    "2182",
+    "2280",
+    "2584"
+   ],
+   "elever": {
+    "Förskola": 1004,
+    "Förskoleklass": 294,
+    "1-3": 845,
+    "4-6": 835,
+    "7-9": 865,
+    "Gymnasiet": 899,
+    "Komvux": 547
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0821": {
+   "namn": "Högsby",
+   "lan": "Kalmar län",
+   "folkmangd": 5134,
+   "kommungrupp": "Pendlingskommun nära mindre tätort",
+   "peers": [
+    "0512",
+    "1275",
+    "1445",
+    "2303",
+    "2326",
+    "2421",
+    "2425"
+   ],
+   "elever": {
+    "Förskola": 131,
+    "Förskoleklass": 40,
+    "1-3": 141,
+    "4-6": 137,
+    "7-9": 174,
+    "Gymnasiet": 11,
+    "Komvux": 119
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0834": {
+   "namn": "Torsås",
+   "lan": "Kalmar län",
+   "folkmangd": 6919,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "1444",
+    "1760",
+    "1762",
+    "1783",
+    "2104",
+    "2513",
+    "2518"
+   ],
+   "elever": {
+    "Förskola": 172,
+    "Förskoleklass": 55,
+    "1-3": 200,
+    "4-6": 199,
+    "7-9": 175,
+    "Gymnasiet": 540,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0840": {
+   "namn": "Mörbylånga",
+   "lan": "Kalmar län",
+   "folkmangd": 16306,
+   "kommungrupp": "Pendlingskommun nära större stad",
+   "peers": [
+    "0331",
+    "0360",
+    "1486",
+    "1861",
+    "1961",
+    "1981",
+    "1982"
+   ],
+   "elever": {
+    "Förskola": 597,
+    "Förskoleklass": 174,
+    "1-3": 550,
+    "4-6": 556,
+    "7-9": 503,
+    "Gymnasiet": null,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0860": {
+   "namn": "Hultsfred",
+   "lan": "Kalmar län",
+   "folkmangd": 13484,
+   "kommungrupp": "Pendlingskommun nära mindre tätort",
+   "peers": [
+    "0686",
+    "1273",
+    "1430",
+    "1465",
+    "2082",
+    "2283",
+    "2462"
+   ],
+   "elever": {
+    "Förskola": 533,
+    "Förskoleklass": 115,
+    "1-3": 379,
+    "4-6": 414,
+    "7-9": 347,
+    "Gymnasiet": 400,
+    "Komvux": 515
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0861": {
+   "namn": "Mönsterås",
+   "lan": "Kalmar län",
+   "folkmangd": 12978,
+   "kommungrupp": "Pendlingskommun nära mindre tätort",
+   "peers": [
+    "0481",
+    "0561",
+    "1270",
+    "1435",
+    "2029",
+    "2262",
+    "2523"
+   ],
+   "elever": {
+    "Förskola": 518,
+    "Förskoleklass": 109,
+    "1-3": 413,
+    "4-6": 451,
+    "7-9": 411,
+    "Gymnasiet": null,
+    "Komvux": 290
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0862": {
+   "namn": "Emmaboda",
+   "lan": "Kalmar län",
+   "folkmangd": 8807,
+   "kommungrupp": "Pendlingskommun nära mindre tätort",
+   "peers": [
+    "0763",
+    "1472",
+    "1737",
+    "2039",
+    "2401",
+    "2505",
+    "2583"
+   ],
+   "elever": {
+    "Förskola": 256,
+    "Förskoleklass": 77,
+    "1-3": 266,
+    "4-6": 327,
+    "7-9": 277,
+    "Gymnasiet": 166,
+    "Komvux": 198
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0880": {
+   "namn": "Kalmar",
+   "lan": "Kalmar län",
+   "folkmangd": 73068,
+   "kommungrupp": "Större stad",
+   "peers": [
+    "1080",
+    "1290",
+    "1293",
+    "1383",
+    "1481",
+    "2380",
+    "2482"
+   ],
+   "elever": {
+    "Förskola": 3104,
+    "Förskoleklass": 762,
+    "1-3": 2282,
+    "4-6": 2332,
+    "7-9": 2077,
+    "Gymnasiet": 3377,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0881": {
+   "namn": "Nybro",
+   "lan": "Kalmar län",
+   "folkmangd": 19803,
+   "kommungrupp": "Lågpendlingskommun nära större stad",
+   "peers": [
+    "0382",
+    "1266",
+    "1470",
+    "1784",
+    "1885",
+    "2084",
+    "2183"
+   ],
+   "elever": {
+    "Förskola": 691,
+    "Förskoleklass": 208,
+    "1-3": 658,
+    "4-6": 593,
+    "7-9": 698,
+    "Gymnasiet": 481,
+    "Komvux": 577
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0882": {
+   "namn": "Oskarshamn",
+   "lan": "Kalmar län",
+   "folkmangd": 26762,
+   "kommungrupp": "Mindre stad/tätort",
+   "peers": [
+    "0382",
+    "1284",
+    "1495",
+    "1885",
+    "1983",
+    "2084",
+    "2183"
+   ],
+   "elever": {
+    "Förskola": 1086,
+    "Förskoleklass": 294,
+    "1-3": 874,
+    "4-6": 901,
+    "7-9": 949,
+    "Gymnasiet": 952,
+    "Komvux": 706
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0883": {
+   "namn": "Västervik",
+   "lan": "Kalmar län",
+   "folkmangd": 36269,
+   "kommungrupp": "Mindre stad/tätort",
+   "peers": [
+    "1082",
+    "1286",
+    "1493",
+    "2062",
+    "2184",
+    "2581",
+    "2582"
+   ],
+   "elever": {
+    "Förskola": 1267,
+    "Förskoleklass": 338,
+    "1-3": 1103,
+    "4-6": 1167,
+    "7-9": 1005,
+    "Gymnasiet": 992,
+    "Komvux": 740
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0884": {
+   "namn": "Vimmerby",
+   "lan": "Kalmar län",
+   "folkmangd": 15327,
+   "kommungrupp": "Landsbygdskommun, ej nära större stad",
+   "peers": [
+    "0687",
+    "0763",
+    "1266",
+    "1272",
+    "1276",
+    "1471",
+    "1495"
+   ],
+   "elever": {
+    "Förskola": 572,
+    "Förskoleklass": 153,
+    "1-3": 502,
+    "4-6": 514,
+    "7-9": 513,
+    "Gymnasiet": 454,
+    "Komvux": 377
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0885": {
+   "namn": "Borgholm",
+   "lan": "Kalmar län",
+   "folkmangd": 10626,
+   "kommungrupp": "Landsbygdskommun med besöksnäring",
+   "peers": [
+    "0584",
+    "1291",
+    "1427",
+    "1446",
+    "1864",
+    "2031",
+    "2034"
+   ],
+   "elever": {
+    "Förskola": 256,
+    "Förskoleklass": 73,
+    "1-3": 240,
+    "4-6": 233,
+    "7-9": 228,
+    "Gymnasiet": null,
+    "Komvux": null
+   },
+   "grundskola_masked_cells": 0
+  },
+  "0980": {
+   "namn": "Gotland",
+   "lan": "Gotlands län",
+   "folkmangd": 60852,
+   "kommungrupp": "Mindre stad/tätort",
+   "peers": [
+    "0188",
+    "1080",
+    "1293",
+    "1383",
+    "1494",
+    "2380",
+    "2581"
+   ],
+   "elever": {
+    "Förskola": 1719,
+    "Förskoleklass": 496,
+    "1-3": 1650,
+    "4-6": 1603,
+    "7-9": 1743,
+    "Gymnasiet": 1653,
+    "Komvux": 1804
+   },
+   "grundskola_masked_cells": 0
+  }
+ }
+}
