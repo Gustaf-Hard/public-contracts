@@ -262,7 +262,7 @@ describe('P7. any DEAD_END means the collection is not complete evidence of abse
     expect(k).toContain('Delvis utlämnat');
     expect(k).not.toContain('Insamling klar');
     const list = text(renderKommuner({ facts, stats, statusMap: status, tiles: { cols: 1, rows: 1, tiles: {} } }));
-    expect(list).toMatch(/Insamling klar 1 och 1 delvis utlämnade/);
+    expect(list).toMatch(/Insamling klar 1 och 1 delvis utlämnad\b/); // singular since r5 V7
     expect(list).toContain('1 har lämnat ut en del men inte alla');
   });
   it('a partial peer is not a peer with finished collection', () => {

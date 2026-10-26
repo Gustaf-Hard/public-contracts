@@ -20,7 +20,7 @@ export const isIso = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}/.test(s
 
 // "och 5 utan utlämnade avtal, 3 delvis utlämnade": what "klar" leaves out.
 export function notDone(deadEnd, partial) {
-  const bits = [deadEnd ? `${fmtInt(deadEnd)} utan utlämnade avtal` : '', partial ? `${fmtInt(partial)} delvis utlämnade` : ''].filter(Boolean);
+  const bits = [deadEnd ? `${fmtInt(deadEnd)} utan utlämnade avtal` : '', partial ? `${fmtInt(partial)} ${partial === 1 ? 'delvis utlämnad' : 'delvis utlämnade'}` : ''].filter(Boolean);
   return bits.length ? `och ${bits.join(', ')}` : '';
 }
 
@@ -239,7 +239,7 @@ export function noneStatusText(ws) {
   const bits = [
     n.done + n.unreviewed ? `${fmtInt(n.done + n.unreviewed)} med klar insamling${n.unreviewed ? ` (${fmtInt(n.unreviewed)} med underlag ej genomgånget)` : ''}` : '',
     n.open ? `${fmtInt(n.open)} där insamlingen pågår` : '',
-    n.partial ? `${fmtInt(n.partial)} delvis utlämnade` : '',
+    n.partial ? `${fmtInt(n.partial)} ${n.partial === 1 ? 'delvis utlämnad' : 'delvis utlämnade'}` : '',
     n.dead_end ? `${fmtInt(n.dead_end)} utan utlämnade avtal` : '',
     n.not_contacted ? `${fmtInt(n.not_contacted)} där insamlingen inte har börjat` : '',
     n.unknown ? `${fmtInt(n.unknown)} med okänd status` : '',

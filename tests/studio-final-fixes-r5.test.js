@@ -240,3 +240,20 @@ describe('V5. a samverkansavtal\'s value carrier is chosen per owner company', (
   });
 });
 
+// ------------------------------------------------------------------ V7
+describe('V7. copy', () => {
+  it('"1 delvis utlämnad" is singular', () => {
+    expect(notDone(0, 1)).toBe('och 1 delvis utlämnad');
+    expect(notDone(0, 2)).toBe('och 2 delvis utlämnade');
+  });
+
+  it('the spend panel says "inga aktiva avtal i underlaget", never "här"', () => {
+    const own = C({ products: ['Binogi'] });
+    // Five peers buy Edlevo with a known value, so the row is shown for 0114.
+    const peers = ['0115', '0117', '0120', '0123', '0125'].map((kod, i) => C({ vendor_name: 'Tieto', kommun_kod: kod, kommun_namn: `Testby ${i + 2}`, products: ['Edlevo'], summary: `Edlevo för ${kod}.` }));
+    const facts = build([own, ...peers], { coverage: [own, ...peers].flatMap((c) => covFor(c.contract_id, c === own ? 'Binogi' : 'Edlevo', F9)) });
+    const t = text(renderKommun({ kod: '0114', stats, facts, statusMap: done(KODS), today: TODAY }));
+    expect(t).not.toContain('inga aktiva avtal här');
+    expect(t).toContain('inga aktiva avtal i underlaget');
+  });
+});

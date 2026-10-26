@@ -201,7 +201,7 @@ function spendSection({ kommun, profile, head, peers, stats, mine, statusMap }) 
     const left = `${nLeft ? `, ${fmtInt(nLeft)} utan känt värde eller skolformer räknas inte` : ''}${m?.joint ? `, ${nOf(m.joint, 'samverkansavtal', 'samverkansavtal')} med okänd andel räknas inte` : ''}`;
     const name = `<div class="sc-name"><b>${esc(catName(c))}</b><small>${esc(s
       ? `${nOf(s.n_avtal, 'avtal', 'avtal')}${!s.n_known ? ', värde okänt' : s.n_known < s.n_avtal ? `, värde känt för ${fmtInt(s.n_known)}` : ''}${left}`
-      : hasOwn ? 'inga aktiva avtal här' : `${fmtInt(nPeers)} liknande köper här`)}</small></div>`;
+      : hasOwn ? 'inga aktiva avtal i underlaget' : `${fmtInt(nPeers)} liknande köper här`)}</small></div>`;
     let bar = '';
     if (ownKnown) bar = `<span class="sc-bar grow-x" style="width:${p(o)};--i:${i}"></span>`;
     else if (s) bar = '<span class="sc-bar is-unknown hatch"></span>';
