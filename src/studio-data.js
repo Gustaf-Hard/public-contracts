@@ -5,7 +5,7 @@
 // percentiles are suppressed below MIN_N.
 
 import { classifyVendor, classifyLine, companyBySlug, productBySlug } from './catalogue.js';
-import { GRADE_LEVELS, mapUnitToGradeLevels, normalizeAnnualValue } from './vendor-analytics.js';
+import { GRADE_LEVELS, contractLengthMonths, mapUnitToGradeLevels, normalizeAnnualValue } from './vendor-analytics.js';
 import { computeNextReviewDate } from './contract-lifecycle.js';
 
 export const MIN_N = 5;
@@ -43,25 +43,35 @@ const productCategory = (slug) => productBySlug(slug)?.product.category ?? null;
 const sortGrades = (set) => GRADE_LEVELS.filter((g) => set.has(g));
 const round2 = (x) => Math.round(x * 100) / 100;
 
-// Student count stated in the avtal's coverage rows. analyse-contract copies
-// one entry's count onto every grade it lists, so per product the distinct
-// counts are summed; products of one row cover the same pupils, so the max
-// across products is taken. Returns { count, invalid }.
-function coverageStudents(covRows) {
-  const byProduct = new Map();
+// Student count stated in the avtal's coverage rows, or null when the rows do
+// not pin it down. analyse-contract writes one row per (product, grade) and
+// copies an entry's count onto every grade it lists, so "1-3 300 + 4-6 300"
+// may be one entry of 300 or two of 300 each: a count repeated on two grades
+// of one product is ambiguous and gives null. Products agreeing on a grade
+// cover the same pupils (counted once); disagreeing is ambiguous. Every
+// product's rows need a count, and the counted grades must be exactly the
+// row's segments. Returns { count, invalid } (invalid: a stated count <= 0).
+function coverageStudents(covRows, segments) {
   let invalid = false;
-  for (const r of covRows) {
-    if (r.student_count != null && !(isFiniteNum(r.student_count) && r.student_count > 0)) invalid = true;
-    if (!byProduct.has(r.product_name)) byProduct.set(r.product_name, []);
-    byProduct.get(r.product_name).push(r.student_count);
+  let complete = true;
+  const gradeCount = new Map();
+  const byProduct = groupBy(covRows.filter((r) => GRADE_LEVELS.includes(r.grade_level)), (r) => r.product_name);
+  if (byProduct.size === 0) complete = false;
+  for (const rows of byProduct.values()) {
+    const seen = new Set();
+    for (const r of rows) {
+      const n = r.student_count;
+      if (n == null) { complete = false; continue; }
+      if (!(isFiniteNum(n) && n > 0)) { invalid = true; continue; }
+      if (seen.has(n)) complete = false;
+      seen.add(n);
+      const prev = gradeCount.get(r.grade_level);
+      if (prev != null && prev !== n) complete = false;
+      gradeCount.set(r.grade_level, n);
+    }
   }
-  let best = null;
-  for (const counts of byProduct.values()) {
-    if (!counts.every((n) => isFiniteNum(n) && n > 0)) continue;
-    const sum = [...new Set(counts)].reduce((s, n) => s + n, 0);
-    if (best == null || sum > best) best = sum;
-  }
-  return { count: best, invalid };
+  if (!complete || sortGrades(new Set(gradeCount.keys())).join() !== segments.join()) return { count: null, invalid };
+  return { count: [...gradeCount.values()].reduce((sum, n) => sum + n, 0), invalid };
 }
 
 function newerKey(f) {
@@ -114,7 +124,7 @@ export function buildStudioFacts({ contracts = [], lineItems = [], coverage = []
     for (const l of linesBy.get(c.contract_id) ?? []) {
       const r = cls(l.product_name);
       const g = group(ownerOf(r));
-      g.lines.push(l);
+      g.lines.push({ l, r });
       for (const p of productsOf(r)) if (p) g.products.add(p);
       if (['product', 'segment', 'bundle'].includes(r.kind)) for (const lv of mapUnitToGradeLevels(l.product_name)) g.grades.add(lv);
     }
@@ -148,12 +158,33 @@ export function buildStudioFacts({ contracts = [], lineItems = [], coverage = []
     const values = new Map();
     let remainderBasis = annual == null ? null : 'stated';
     if (foreign.length) {
+      // amount_sek is the line's share of the avtal's TOTAL price
+      // (analyse-contract). A line with period_months is annualised by it.
+      // Lines without one are taken as annual unless the lines add up to more
+      // than a year of the avtal's value; then they are totals over the avtal
+      // length, and with no known length nothing is split.
+      const allLines = [...groups.values()].flatMap((g) => g.lines);
+      const hasAmt = ({ l }) => isFiniteNum(l.amount_sek) && l.amount_sek >= 0;
+      const hasPm = ({ l }) => isFiniteNum(l.period_months) && l.period_months > 0;
+      const withPm = allLines.filter((x) => hasAmt(x) && hasPm(x)).reduce((sum, { l }) => sum + (l.amount_sek * 12) / l.period_months, 0);
+      const noPm = allLines.filter((x) => hasAmt(x) && !hasPm(x)).reduce((sum, { l }) => sum + l.amount_sek, 0);
+      const avtalMonths = contractLengthMonths(c.period_start, c.period_end);
+      let noPmFactor = 1;
+      if (annual != null && withPm + noPm > annual + 1) noPmFactor = avtalMonths ? 12 / avtalMonths : null;
+      let determinable = true;
       const amounts = new Map(foreign.map((k) => {
-        const known = groups.get(k).lines.map((l) => l.amount_sek).filter((a) => isFiniteNum(a) && a >= 0);
-        return [k, known.length ? known.reduce((s, a) => s + a, 0) : null];
+        const known = groups.get(k).lines.filter(hasAmt);
+        if (!known.length) return [k, null];
+        let sum = 0;
+        for (const x of known) {
+          if (hasPm(x)) sum += (x.l.amount_sek * 12) / x.l.period_months;
+          else if (noPmFactor == null) determinable = false;
+          else sum += x.l.amount_sek * noPmFactor;
+        }
+        return [k, Math.round(sum)];
       }));
-      const splitSum = [...amounts.values()].reduce((s, a) => s + (a ?? 0), 0);
-      const consistent = annual != null && splitSum <= annual + 1;
+      const splitSum = [...amounts.values()].reduce((sum, a) => sum + (a ?? 0), 0);
+      const consistent = annual != null && determinable && splitSum <= annual + 1;
       for (const k of foreign) values.set(k, consistent ? amounts.get(k) : null);
       const own = groups.get('');
       const ownHasProducts = own.products.size > 0 && vendor?.role !== 'channel';
@@ -200,6 +231,7 @@ export function buildStudioFacts({ contracts = [], lineItems = [], coverage = []
         elever_in_scope: null,
         kr_per_elev: null,
         kr_per_elev_basis: null,
+        kr_per_elev_product_slug: null,
         attachment_id: c.attachment_id ?? null,
         _g: g,
         _owner: isOwner,
@@ -228,19 +260,26 @@ export function buildStudioFacts({ contracts = [], lineItems = [], coverage = []
 
 function pricePerElev(r, { contract, singleRow, stats }) {
   const g = r._g;
-  const unitLine = g.lines.find((l) => ELEV_UNIT.test(l.unit ?? '') && isFiniteNum(l.unit_price_sek) && l.unit_price_sek > 0);
+  // Styckpris: a product line of this row priced per elev for a period of at
+  // least 12 months (or no stated period); an explicit >= 12 months wins.
+  const unitLines = g.lines.filter(({ l, r: c }) => ['product', 'segment', 'bundle'].includes(c.kind)
+    && ELEV_UNIT.test(l.unit ?? '') && isFiniteNum(l.unit_price_sek) && l.unit_price_sek > 0
+    && (l.period_months == null || (isFiniteNum(l.period_months) && l.period_months >= 12)));
+  const unitLine = unitLines.find(({ l }) => l.period_months != null) ?? unitLines[0];
   if (unitLine) {
-    r.kr_per_elev = round2(unitLine.unit_price_sek);
+    r.kr_per_elev = round2(unitLine.l.unit_price_sek);
     r.kr_per_elev_basis = 'styckpris';
+    r.kr_per_elev_product_slug = unitLine.r.kind === 'bundle' ? null : unitLine.r.productSlug ?? null;
     return;
   }
   if (singleRow && ELEV_UNIT.test(contract.unit ?? '') && isFiniteNum(contract.unit_price_sek) && contract.unit_price_sek > 0) {
     r.kr_per_elev = round2(contract.unit_price_sek);
     r.kr_per_elev_basis = 'styckpris';
+    r.kr_per_elev_product_slug = r.product_slugs.length === 1 ? r.product_slugs[0] : null;
     return;
   }
   if (r.segments.length === 0) return; // a kommun-wide licence without segments is not normalised
-  const { count, invalid } = coverageStudents(g.cov);
+  const { count, invalid } = coverageStudents(g.cov, r.segments);
   if (invalid) return; // a stated 0 or negative count is bad data, not a fallback
   let elever = null; let basis = null;
   if (count != null) {
@@ -370,7 +409,7 @@ export function marketByCategory(facts) {
 export function priceDistribution(facts, { productSlug, category, segment, kommunKods } = {}) {
   const kods = kommunKods ? new Set(kommunKods) : null;
   const rows = headline(facts).filter((f) => isFiniteNum(f.kr_per_elev)
-    && (!productSlug || f.product_slugs.includes(productSlug))
+    && (!productSlug || (f.product_slugs.length === 1 && f.product_slugs[0] === productSlug) || f.kr_per_elev_product_slug === productSlug)
     && (!category || catOf(f) === category)
     && (!segment || f.segments.includes(segment))
     && (!kods || kods.has(f.kommun_kod)));
@@ -446,7 +485,7 @@ function spendRows(rows) {
 
 // peerMedianByCategory: { category: distribution } over peers' known spend in
 // that category. A peer with no known value there is unknown, not 0.
-export function kommunProfile(facts, stats, kod) {
+export function kommunProfile(facts, stats, kod, { today = new Date().toISOString().slice(0, 10) } = {}) {
   const rows = headline(facts);
   const mine = rows.filter((f) => f.kommun_kod === kod);
   const spendByCategory = spendRows(mine);
@@ -472,7 +511,7 @@ export function kommunProfile(facts, stats, kod) {
   }
   overlaps.sort((a, b) => a.category.localeCompare(b.category));
 
-  const renewals = mine.filter((f) => isIso(f.next_renewal))
+  const renewals = mine.filter((f) => isIso(f.next_renewal) && f.next_renewal.slice(0, 10) >= today)
     .map((f) => ({
       contract_id: f.contract_id, company_slug: f.company_slug, company_name: f.company_name,
       category: f.category, next_renewal: f.next_renewal, annual_value_sek: f.annual_value_sek,
@@ -491,8 +530,33 @@ export function dataBasis(facts, statusMap = new Map()) {
     active: activeIds.size,
     active_unknown_end: unknownEnd.size,
     collected: distinct(facts, (f) => f.contract_id),
-    kommuner_with_avtal: distinct(facts.filter((f) => f.kommun_kod), (f) => f.kommun_kod),
+    kommuner_with_avtal: distinct(head.filter((f) => f.kommun_kod), (f) => f.kommun_kod),
+    kommuner_collected: distinct(facts.filter((f) => f.kommun_kod), (f) => f.kommun_kod),
     kommuner_total: KOMMUNER_TOTAL,
     done: [...statusMap.values()].filter((s) => s === 'done').length,
   };
+}
+
+function filterRows(facts, { category, companySlug } = {}) {
+  return headline(facts).filter((f) => (!category || catOf(f) === category) && (!companySlug || f.company_slug === companySlug));
+}
+
+// Pricing-model mix over headline rows; n counts avtal, null model -> 'okand'.
+export function pricingModelMix(facts, opts = {}) {
+  const rows = filterRows(facts, opts);
+  const total = distinct(rows, (f) => f.contract_id);
+  return [...groupBy(rows, (f) => f.pricing_model ?? UNKNOWN_CATEGORY)]
+    .map(([model, group]) => {
+      const n = distinct(group, (f) => f.contract_id);
+      return { model, n, share: total > 0 ? n / total : null };
+    })
+    .sort((a, b) => b.n - a.n || a.model.localeCompare(b.model));
+}
+
+// Channel mix over headline rows; a row bought directly is 'direkt'.
+export function channelMix(facts, opts = {}) {
+  const rows = filterRows(facts, opts);
+  return [...groupBy(rows, (f) => f.channel_slug ?? 'direkt')]
+    .map(([channel_slug, group]) => ({ channel_slug, n: distinct(group, (f) => f.contract_id), value_known_sek: sumKnown(group) }))
+    .sort((a, b) => b.value_known_sek - a.value_known_sek || b.n - a.n || a.channel_slug.localeCompare(b.channel_slug));
 }

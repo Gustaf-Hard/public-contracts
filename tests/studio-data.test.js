@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   MIN_N, buildStudioFacts, collectionStatus, distribution, marketByCategory,
   companyShares, priceDistribution, renewalBuckets, whiteSpots, coOccurrence,
-  kommunProfile, dataBasis,
+  kommunProfile, dataBasis, pricingModelMix, channelMix,
 } from '../src/studio-data.js';
 import { loadKommunStats } from '../src/kommun-stats.js';
 
@@ -95,6 +95,25 @@ describe('buildStudioFacts: channel split', () => {
   it('blank line names never carry value or products', () => {
     expect(facts.reduce((s, f) => s + f.annual_value_sek, 0)).toBe(100000);
   });
+  it('annualises a multi-year line by its period_months', () => {
+    const c3 = C({ vendor_name: 'Läromedia Bokhandel Örebro AB', annual_value_sek: 100000, period_start: '2025-01-01', period_end: '2027-12-31', products: [] });
+    const f3 = build([c3], { lineItems: [LI(c3.contract_id, 'Polylino', 90000, { period_months: 36 })] });
+    expect(f3.find((f) => f.company_slug === 'ilt')).toMatchObject({ annual_value_sek: 30000, value_basis: 'split' });
+    expect(f3.find((f) => f.company_slug === 'laromedia')).toMatchObject({ annual_value_sek: 70000, value_basis: 'unsplit_channel' });
+  });
+  it('annualises lines without a period by the avtal length when they exceed a year of value', () => {
+    const c4 = C({ vendor_name: 'Läromedia Bokhandel Örebro AB', annual_value_sek: 100000, period_start: '2025-01-01', period_end: '2027-12-31', products: [] });
+    const f4 = build([c4], { lineItems: [LI(c4.contract_id, 'Polylino', 90000), LI(c4.contract_id, 'Magma', 150000)] });
+    expect(f4.find((f) => f.company_slug === 'ilt').annual_value_sek).toBe(30000);
+    expect(f4.find((f) => f.company_slug === 'radish').annual_value_sek).toBe(50000);
+    expect(f4.find((f) => f.company_slug === 'laromedia').annual_value_sek).toBe(20000);
+  });
+  it('does not split multi-year lines when the avtal length is unknown', () => {
+    const c5 = C({ vendor_name: 'Läromedia Bokhandel Örebro AB', annual_value_sek: 100000, period_start: '2025-01-01', period_end: null, products: [] });
+    const f5 = build([c5], { lineItems: [LI(c5.contract_id, 'Polylino', 90000), LI(c5.contract_id, 'Magma', 150000)] });
+    expect(f5.find((f) => f.company_slug === 'ilt')).toMatchObject({ annual_value_sek: null, value_basis: null });
+    expect(f5.find((f) => f.company_slug === 'laromedia')).toMatchObject({ annual_value_sek: 100000, value_basis: 'unsplit_channel' });
+  });
   it('does not split when line amounts exceed the avtal value', () => {
     const c2 = C({ vendor_name: 'Läromedia Bokhandel Örebro AB', annual_value_sek: 10000, products: [] });
     const f2 = build([c2], { lineItems: [LI(c2.contract_id, 'Polylino', 30000)] });
@@ -154,12 +173,35 @@ describe('buildStudioFacts: kr_per_elev', () => {
     const [f] = build([c], { coverage: [COV(c.contract_id, 'Polylino', '4-6', 500)] });
     expect(f).toMatchObject({ segments: ['4-6'], elever_in_scope: 500, kr_per_elev: 200, kr_per_elev_basis: 'avtalets_elevantal' });
   });
-  it('a student count copied to every grade of one entry is counted once', () => {
-    const c = C({ annual_value_sek: 100000 });
-    const [f] = build([c], {
-      coverage: ['1-3', '4-6', '7-9'].map((g) => COV(c.contract_id, 'Polylino', g, 2000)),
-    });
-    expect(f).toMatchObject({ elever_in_scope: 2000, kr_per_elev: 50 });
+  it('one count on several grades of a product is ambiguous: Skolverket, not the count', () => {
+    // "1-3 300 + 4-6 300" may be one entry of 300 or two of 300 each.
+    const c = C({ annual_value_sek: 95000 });
+    const [f] = build([c], { coverage: [COV(c.contract_id, 'Polylino', '1-3', 300), COV(c.contract_id, 'Polylino', '4-6', 300)] });
+    expect(f).toMatchObject({ segments: ['1-3', '4-6'], elever_in_scope: 1900, kr_per_elev: 50, kr_per_elev_basis: 'skolverket' });
+  });
+  it('different counts per grade and per product are summed', () => {
+    const c = C({ annual_value_sek: 70000, vendor_name: 'Gleerups Utbildning AB', products: [] });
+    const [f] = build([c], { coverage: [COV(c.contract_id, 'Gleerupsportal', '4-6', 300), COV(c.contract_id, 'Gleerups digitala läromedel', '7-9', 400)] });
+    expect(f).toMatchObject({ segments: ['4-6', '7-9'], elever_in_scope: 700, kr_per_elev: 100, kr_per_elev_basis: 'avtalets_elevantal' });
+  });
+  it('products agreeing on a grade count the same pupils once', () => {
+    const c = C({ annual_value_sek: 50000, vendor_name: 'Gleerups Utbildning AB', products: [] });
+    const [f] = build([c], { coverage: [COV(c.contract_id, 'Gleerupsportal', '4-6', 500), COV(c.contract_id, 'Gleerups digitala läromedel', '4-6', 500)] });
+    expect(f).toMatchObject({ elever_in_scope: 500, kr_per_elev: 100, kr_per_elev_basis: 'avtalets_elevantal' });
+  });
+  it('a partly known count is not used as the whole', () => {
+    const c = C({ annual_value_sek: 210000, vendor_name: 'Gleerups Utbildning AB', products: [] });
+    const [f] = build([c], { coverage: [COV(c.contract_id, 'Gleerupsportal', '4-6', 300), COV(c.contract_id, 'Gleerups digitala läromedel', '7-9', null)] });
+    expect(f).toMatchObject({ elever_in_scope: 2100, kr_per_elev: 100, kr_per_elev_basis: 'skolverket' });
+  });
+  it('styckpris uses a product line of at least 12 months', () => {
+    const c = C({ annual_value_sek: null, pricing_model: 'per_student', products: [] });
+    const [f] = build([c], { lineItems: [
+      LI(c.contract_id, 'Utbildning', 5000, { unit: 'elev', unit_price_sek: 9 }),
+      LI(c.contract_id, 'Polylino', 6540, { unit: 'elev', unit_price_sek: 65.4, period_months: 7 }),
+      LI(c.contract_id, 'Polylino', 11000, { unit: 'elev', unit_price_sek: 110, period_months: 12 }),
+    ] });
+    expect(f).toMatchObject({ kr_per_elev: 110, kr_per_elev_basis: 'styckpris' });
   });
   it('falls back to Skolverket elever for the segments', () => {
     const c = C({ annual_value_sek: 100000 });
@@ -249,6 +291,18 @@ describe('priceDistribution', () => {
     expect(d.values).toHaveLength(5);
     expect(d.values[0]).toEqual({ kommun_kod: '9001', kr_per_elev: 100 });
   });
+  it('a bundle row is not part of one product\'s distribution', () => {
+    const facts = [...priced(5), ...build([C({ kommun_kod: '9006', unit: 'elev', unit_price_sek: 999, pricing_model: 'per_student', products: ['Polylino', 'Inlästa läromedel'] })])];
+    expect(facts.at(-1).product_slugs).toHaveLength(2);
+    const d = priceDistribution(facts, { productSlug: 'polylino' });
+    expect(d.n).toBe(5);
+    expect(d.max).toBe(140);
+  });
+  it('a bundle row counts for a product when its styckpris came from that product\'s own line', () => {
+    const c = C({ kommun_kod: '9006', annual_value_sek: null, products: ['Polylino', 'Inlästa läromedel'] });
+    const facts = [...priced(4), ...build([c], { lineItems: [LI(c.contract_id, 'Polylino', 10000, { unit: 'elev', unit_price_sek: 150, period_months: 12 })] })];
+    expect(priceDistribution(facts, { productSlug: 'polylino' })).toMatchObject({ n: 5, max: 150 });
+  });
   it('filters by kommunKods and category', () => {
     expect(priceDistribution(priced(5), { kommunKods: ['9001', '9002'] }).n).toBe(2);
     expect(priceDistribution(priced(5), { category: 'skoladministration' }).n).toBe(0);
@@ -279,19 +333,41 @@ describe('renewals, co-occurrence, profile, basis', () => {
     ]);
   });
   it('kommunProfile', () => {
-    const p = kommunProfile(facts, stats, '9001');
+    const p = kommunProfile(facts, stats, '9001', { today: TODAY });
     expect(p.spendByCategory.find((s) => s.category === 'laromedel')).toMatchObject({ value_known_sek: 12000, n_avtal: 2 });
     expect(p.overlaps).toEqual([{ category: 'laromedel', companies: [{ slug: 'gleerups', name: 'Gleerups' }, { slug: 'ilt', name: 'ILT Education' }] }]);
     expect(p.peerMedianByCategory.laromedel).toMatchObject({ n: 1, suppressed: true, median: null });
     expect(p.renewals.map((r) => r.next_renewal)).toEqual(['2027-01-15', '2027-01-31', '2029-01-01']);
   });
   it('kommunProfile for a kommun with no avtal is empty, not a crash', () => {
-    const p = kommunProfile(facts, stats, '9006');
+    const p = kommunProfile(facts, stats, '9006', { today: TODAY });
     expect(p).toEqual({ spendByCategory: [], peerMedianByCategory: expect.any(Object), overlaps: [], renewals: [] });
-    expect(kommunProfile([], null, '0000').spendByCategory).toEqual([]);
+    expect(kommunProfile([], null, '0000', { today: TODAY }).spendByCategory).toEqual([]);
+  });
+  it('kommunProfile renewals only lists dates from today on', () => {
+    const f2 = build([C({ kommun_kod: '9001', auto_renews: 1, last_cancellation_date: '2026-06-30', period_end: '2027-06-30' })]);
+    expect(f2[0]).toMatchObject({ active: true, next_renewal: '2026-07-01' });
+    expect(kommunProfile(f2, stats, '9001', { today: TODAY }).renewals).toEqual([]);
   });
   it('dataBasis', () => {
     const st = collectionStatus([{ kommun_kod: '9001', state: 'DONE' }, { kommun_kod: '9002', state: 'SENT' }]);
-    expect(dataBasis(facts, st)).toMatchObject({ active: 4, collected: 5, kommuner_with_avtal: 3, kommuner_total: 290, done: 1 });
+    expect(dataBasis(facts, st)).toMatchObject({ active: 4, collected: 5, kommuner_with_avtal: 2, kommuner_collected: 3, kommuner_total: 290, done: 1 });
+  });
+  it('pricingModelMix counts headline avtal per model, null as okand', () => {
+    const f2 = build([C(), C({ kommun_kod: '9002', pricing_model: null }), C({ kommun_kod: '9003', pricing_model: 'per_student' }), C({ kommun_kod: '9004', vendor_name: 'IST', products: [] })]);
+    expect(pricingModelMix(f2, { category: 'laromedel' })).toEqual([
+      { model: 'fixed', n: 1, share: 1 / 3 }, { model: 'okand', n: 1, share: 1 / 3 }, { model: 'per_student', n: 1, share: 1 / 3 },
+    ]);
+    expect(pricingModelMix(f2, { companySlug: 'ist' })).toEqual([{ model: 'fixed', n: 1, share: 1 }]);
+  });
+  it('channelMix splits direct and channel avtal', () => {
+    const ch = C({ kommun_kod: '9002', vendor_name: 'Läromedia Bokhandel Örebro AB', annual_value_sek: 100000, period_end: '2026-12-31', products: [] });
+    const f2 = build([C({ annual_value_sek: 40000 }), ch], { lineItems: [LI(ch.contract_id, 'Polylino', 30000)] });
+    expect(channelMix(f2, { companySlug: 'ilt' })).toEqual([
+      { channel_slug: 'direkt', n: 1, value_known_sek: 40000 }, { channel_slug: 'laromedia', n: 1, value_known_sek: 30000 },
+    ]);
+    expect(channelMix(f2)).toEqual([
+      { channel_slug: 'laromedia', n: 1, value_known_sek: 100000 }, { channel_slug: 'direkt', n: 1, value_known_sek: 40000 },
+    ]);
   });
 });
