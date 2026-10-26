@@ -299,6 +299,16 @@ describe('/studio/utforska', () => {
     noLeaks(all.text);
   });
 
+  it('says how many avtal with hidden utbildningsanordnare it leaves out, only when unfiltered', async () => {
+    seedContract({ kod: '1440', vendor: 'Hermods', lines: [] });
+    seedContract({ kod: '1401', vendor: 'Vklass AB', lines: [{ product_name: 'Vklass' }] });
+    const r = await body('/studio/utforska');
+    expect(r.text).toContain('1 avtal med utbildningsanordnare utan produkter visas inte här.');
+    expect(r.text).toContain('1 aktivt avtal från 1 kommun matchar');
+    const f = await body('/studio/utforska?kategori=larplattform');
+    expect(f.text).not.toContain('utbildningsanordnare');
+  });
+
   it('filters and groups through explorer-core, with dash-free band labels', async () => {
     seedRenewals();
     const r = await body('/studio/utforska?grupp=kategori&value_band=100%20till%20500%20tkr');

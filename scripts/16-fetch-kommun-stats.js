@@ -1,5 +1,6 @@
 // Fetch kommun open data and build the tile grid.
 //   node scripts/16-fetch-kommun-stats.js
+//   node scripts/16-fetch-kommun-stats.js --tiles-only   (offline, from cached centroids)
 // Writes data/kommun-stats/kommun-stats.json and public/geo/kommun-tiles.json.
 // Sources (all open): Skolverket SIRIS exports 6 and 57, Skolverket PxWeb
 // (komvux), Kolada v3 (förskola, förskoleklass, kommungrupp, peers), Wikidata
@@ -13,6 +14,7 @@ import { politeFetch } from '../src/http.js';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OUT_STATS = path.join(ROOT, 'data/kommun-stats/kommun-stats.json');
 const OUT_TILES = path.join(ROOT, 'public/geo/kommun-tiles.json');
+const OUT_CENTROIDS = path.join(ROOT, 'data/kommun-stats/centroids.json');
 
 const START_YEAR = 2025; // läsår 2025/26, mätt 15 oktober 2025
 const LAAR = '2025/26';
@@ -38,14 +40,25 @@ export function parseCell(v) {
 
 // Project centroids onto a cols x rows grid, big kommuner keep their cell,
 // the rest take the nearest free cell. Deterministic.
-export function buildTiles(points, { cols = 18, rows = 32 } = {}) {
-  const lons = points.map((p) => p.lon);
-  const lats = points.map((p) => p.lat);
-  const lonMin = Math.min(...lons), lonMax = Math.max(...lons);
-  const latMin = Math.min(...lats), latMax = Math.max(...lats);
+// Sinusoidal x (longitude shrinks with cos(lat)) keeps Norrland narrow, and
+// latWarp blends latitude with its rank so the dense south gets more rows
+// than its area would give it: without it the 230 southern kommuner pile into
+// a square blob and the map stops reading as Sweden.
+export function buildTiles(points, { cols = 18, rows = 40, latWarp = 0.4 } = {}) {
+  const X = (p) => (p.lon - 16) * Math.cos((p.lat * Math.PI) / 180);
+  const xs = points.map(X);
+  const xMin = Math.min(...xs), xMax = Math.max(...xs);
+  const lats = points.map((p) => p.lat).sort((a, b) => a - b);
+  const latMin = lats[0], latMax = lats[lats.length - 1];
+  const rank = (lat) => {
+    let lo = 0; while (lo < lats.length && lats[lo] < lat) lo++;
+    let hi = lo; while (hi < lats.length && lats[hi] === lat) hi++;
+    return lats.length > 1 ? ((lo + hi - 1) / 2) / (lats.length - 1) : 0;
+  };
+  const span = (v, lo, hi) => (hi > lo ? (v - lo) / (hi - lo) : 0);
   const ideal = (p) => ({
-    x: ((p.lon - lonMin) / (lonMax - lonMin)) * (cols - 1),
-    y: ((latMax - p.lat) / (latMax - latMin)) * (rows - 1),
+    x: span(X(p), xMin, xMax) * (cols - 1),
+    y: ((1 - latWarp) * span(latMax - p.lat, 0, latMax - latMin) + latWarp * (1 - rank(p.lat))) * (rows - 1),
   });
   const order = [...points].sort((a, b) => (b.weight ?? 0) - (a.weight ?? 0) || a.kod.localeCompare(b.kod));
   const taken = new Map();
@@ -210,7 +223,7 @@ async function fetchPeers(nameToKod) {
   return out;
 }
 
-async function fetchCentroids(codes) {
+export async function fetchCentroids(codes) {
   const q = 'SELECT ?kod ?c WHERE { ?i wdt:P31 wd:Q127448; wdt:P525 ?kod; wdt:P625 ?c . }';
   const url = `${WDQS}?query=${encodeURIComponent(q)}`;
   const j = await getJson(url, { headers: { Accept: 'application/sparql-results+json' } });
@@ -224,6 +237,23 @@ async function fetchCentroids(codes) {
 }
 
 // ---------- main ----------
+
+function writeTiles(muni, cent) {
+  const pts = muni.map((m) => ({ kod: m.kommun_kod, ...cent[m.kommun_kod], weight: m.folkmangd ?? 0 }));
+  const t = buildTiles(pts);
+  mkdirSync(path.dirname(OUT_TILES), { recursive: true });
+  writeFileSync(OUT_TILES, JSON.stringify({ cols: t.cols, rows: t.rows, tiles: t.tiles }) + '\n');
+  return `${Object.keys(t.tiles).length} tiles on ${t.cols}x${t.rows}, mean displacement ${t.meanDisplacement.toFixed(2)} cells`;
+}
+
+// --tiles-only: rebuild the tile grid offline from the cached centroids.
+function tilesOnly() {
+  const muni = JSON.parse(readFileSync(path.join(ROOT, 'data/municipalities.json'), 'utf8'));
+  const cent = JSON.parse(readFileSync(OUT_CENTROIDS, 'utf8'));
+  const missing = muni.filter((m) => !cent[m.kommun_kod]).map((m) => m.kommun_kod);
+  if (missing.length) throw new Error(`no cached centroid for ${missing.join(',')}`);
+  console.log(`tiles: ${writeTiles(muni, cent)}`);
+}
 
 async function main() {
   const muni = JSON.parse(readFileSync(path.join(ROOT, 'data/municipalities.json'), 'utf8'));
@@ -274,11 +304,9 @@ async function main() {
       mark('wikidata_centroids', WDQS, 'failed', { error: `no centroid for ${missing.join(',')}` });
       console.error(`FAILED tiles: no centroid for ${missing.join(',')}`);
     } else {
-      const pts = muni.map((m) => ({ kod: m.kommun_kod, ...cent[m.kommun_kod], weight: m.folkmangd ?? 0 }));
-      const t = buildTiles(pts);
-      mkdirSync(path.dirname(OUT_TILES), { recursive: true });
-      writeFileSync(OUT_TILES, JSON.stringify({ cols: t.cols, rows: t.rows, tiles: t.tiles }) + '\n');
-      tileInfo = `${Object.keys(t.tiles).length} tiles on ${t.cols}x${t.rows}, mean displacement ${t.meanDisplacement.toFixed(2)} cells`;
+      mkdirSync(path.dirname(OUT_CENTROIDS), { recursive: true });
+      writeFileSync(OUT_CENTROIDS, JSON.stringify(cent) + '\n');
+      tileInfo = writeTiles(muni, cent);
     }
   }
 
@@ -298,5 +326,6 @@ async function main() {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  main().catch((e) => { console.error(e); process.exit(1); });
+  if (process.argv.includes('--tiles-only')) tilesOnly();
+  else main().catch((e) => { console.error(e); process.exit(1); });
 }

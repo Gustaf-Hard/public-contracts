@@ -167,7 +167,7 @@ describe('/studio/kommun/:kod', () => {
     expect(html).toContain('strip-dot fade-in is-highlight');
     expect(html).toContain('140 kr/elev');
     // Begreppa: three priced peers -> own number only
-    expect(html).toContain('för få jämförbara kommuner');
+    expect(html).toContain('För få jämförbara kommuner');
     expect(html).toMatch(/kp-own-num">80</);
     // Two lärplattformar -> overlap warning
     expect(html).toContain('id="overlapp"');
@@ -246,7 +246,7 @@ describe('/studio/kommun/:kod', () => {
     }
     const html = (await body('/studio/kommun/1440')).text;
     expect(html).toMatch(/kp-own-num">140</);
-    expect(html).toContain('4 liknande och 4 kommuner totalt med känt pris');
+    expect(html).toContain('4 liknande kommuner och 4 kommuner totalt har känt pris');
     expect(html).not.toContain('strip-dot');
     expect(html).not.toContain('class="viz strip"');
   });
@@ -308,6 +308,22 @@ describe('/studio/kommun/:kod', () => {
     expect(html).toContain('Polyglutt');
     expect(html).not.toContain('vi har inte begärt ut avtal här än');
     expect(html).toContain('Status okänd');
+  });
+
+  it('long lists fold: unpriced avtal sit behind a closed fold, the price tiles cap at six', async () => {
+    // eight priced single-product avtal no other kommun prices -> eight compact tiles
+    const prods = [['ILT Education AB', 'Polylino'], ['ILT Education AB', 'Studiestöd på modersmål'], ['Binogi AB', 'Binogi'],
+      ['Radish', 'Magma'], ['SLI Education', 'SLI Play'], ['Gleerups', 'Utkik'], ['Gleerups', 'Titano'], ['Skolplus', 'Rörelseäventyret']];
+    for (const [vendor, product_name] of prods) {
+      seedContract({ kod: '1440', vendor, lines: [{ product_name, unit: 'elev', unit_price_sek: 50, period_months: 12 }] });
+    }
+    seedContract({ kod: '1440', vendor: 'Vklass AB', value: null, model: 'fixed', lines: [] });
+    const html = (await body('/studio/kommun/1440')).text;
+    expect(html).toMatch(/<details class="kn-fold is-card-fold"><summary>1 avtal utan känt pris per elev<\/summary>/);
+    const tiles = html.slice(html.indexOf('Känt pris, för få att jämföra'));
+    const visible = tiles.slice(0, tiles.indexOf('<details class="kn-fold">'));
+    expect((visible.match(/class="kp-tile"/g) || []).length).toBe(6);
+    expect(tiles).toMatch(/<summary>Visa 2 avtal till<\/summary>/);
   });
 
   it('hostile vendor names are escaped', async () => {

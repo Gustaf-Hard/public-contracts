@@ -155,7 +155,16 @@ describe('/studio (Marknad)', () => {
     // 11 avtal active, 12 collected, 6 kommuner with an active avtal
     expect(r.text).toContain('11 aktiva avtal (12 insamlade)');
     expect(r.text).toMatch(/6 av 290 kommuner/);
+    // the vendor KPI says how many of them are in the catalogue (the Leverantörer page count)
+    expect(r.text).toContain('4 i katalogen, 3 med känt värde');
     noLeaks(r.text);
+  });
+
+  it('"Insamling klar" says how many of the finished kommuner released no avtal', async () => {
+    seedMarket();
+    conversation('0180', 'DEAD_END'); // Stockholm: closed without avtal
+    const html = (await body('/studio')).text;
+    expect(html).toMatch(/Insamling klar<\/dt><dd><b>1<\/b> kommun, varav 1 utan utlämnade avtal/);
   });
 
   it('known market value never counts the unknown Unikum value as 0', async () => {
@@ -254,12 +263,19 @@ describe('/studio/kategori/:slug', () => {
     expect(html.indexOf('ILT Education')).toBeLessThan(html.indexOf('Binogi'));
     expect(html).toContain('class="viz tilemap"');
     const legend = html.slice(html.indexOf('tm-legend'));
-    for (const l of ['Har avtal i kategorin', 'Inget avtal, insamling klar', 'Insamling pågår', 'Inte kontaktad']) {
+    for (const l of ['Har aktivt avtal i kategorin', 'Inget aktivt avtal, insamling klar', 'Insamling pågår', 'Inte kontaktad']) {
       expect(legend).toContain(l);
     }
     expect(html).toContain('t-none-done');
     expect(html).toContain('t-none-open');
     noLeaks(html);
+  });
+
+  it('the white-spot KPI basis says inget aktivt avtal', async () => {
+    seedMarket();
+    const html = (await body('/studio/kategori/laromedel')).text;
+    expect(html).toContain('insamlingen klar, inget aktivt avtal i kategorin');
+    expect(html).toMatch(/\d+ i katalogen, \d+ med känt värde/);
   });
 
   it('white-spot legend counts add up to the tiles, and an expired avtal is not "has"', async () => {

@@ -17,7 +17,7 @@ import { ADDA_MONTH, ADDA_NOTE } from './marknad.js';
 
 export const MONTH_CHOICES = Object.freeze([6, 12, 18, 24, 36]);
 export const DEFAULT_MONTHS = 18;
-export const FORNYELSER_PAGE_SIZE = 100;
+export const FORNYELSER_PAGE_SIZE = 40;
 // Fixed hue per category (colour follows the category, never its rank). Only
 // three hues pass the validator for every pair, and a stacked bar can put
 // any two next to each other; the rest share the neutral, unknown is hatched.

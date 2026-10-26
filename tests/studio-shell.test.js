@@ -157,6 +157,9 @@ describe('studioLayout', () => {
     expect(html).not.toContain('<html');
     expect(html).not.toContain('<nav');
     expect(html).toContain('<p>kropp</p>');
+    // the basis line is part of the swapped pane, never left stale outside it
+    expect(html).toContain('data-basis');
+    expect(html).toContain('data-page-title="X · Mediagraf Studio"');
   });
 
   it('escapes the title', () => {

@@ -175,6 +175,7 @@ export function segmentMatrix({ rows = [], cols = [], cell, id = null, unit = 'k
   };
 
   const pops = [];
+  let anyUnknown = false;
   const head = `<div class="sm-corner">${esc(rowHead)}</div>${cols.map((c) => `<div class="sm-colhead">${esc(c.label)}</div>`).join('')}`;
   const body = rows.map((r, i) => `<div class="sm-rowhead">${esc(r.label)}</div>${cols.map((c, j) => {
     const d = grid[i][j];
@@ -187,6 +188,7 @@ export function segmentMatrix({ rows = [], cols = [], cell, id = null, unit = 'k
     // Unknown: no dist, no count, or a count that should have a median but
     // does not. Distinct from n = 0 (a known empty group) and from too few.
     if (n == null || (n >= MIN_N && !isNum(d.median))) {
+      anyUnknown = true;
       cls = 'sm-cell is-unknown hatch';
       inner = `<span class="sm-few">${UNKNOWN}</span>`;
       pop = '<p>Underlaget för den här gruppen kunde inte räknas fram. Det betyder inte att det saknas avtal.</p>';
@@ -215,6 +217,7 @@ export function segmentMatrix({ rows = [], cols = [], cell, id = null, unit = 'k
     <span class="sm-ramp">${Array.from({ length: SEQ_STEPS }, (_, k) => `<i class="seq-${k}"></i>`).join('')}</span>
     <span>högre${medians.length ? ` <b>${esc(fmtInt(medians[medians.length - 1]))}</b>` : ''} median ${esc(unit)}</span>
     <span class="lg"><i class="lg-hatch"></i>för få avtal (under ${MIN_N})</span>
+    ${anyUnknown ? `<span class="lg"><i class="lg-hatch lg-unknown"></i>${UNKNOWN}, underlaget kunde inte räknas fram</span>` : ''}
   </div>`;
 
   return `<figure class="viz sm">

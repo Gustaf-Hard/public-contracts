@@ -27,7 +27,16 @@ export const TENDER_LEAD_MONTHS = 9;
 // is worth a look; two läromedel vendors is ordinary (one per subject).
 export const SINGLE_SYSTEM = Object.freeze(['larplattform', 'skoladministration', 'prov', 'elevhalsa']);
 const RENEWAL_MONTHS = 24;
-const MAX_ALT = 6;
+const MAX_ALT = 4;
+// The page leads with the answer; long lists fold behind these caps so a
+// kommun with 40 avtal is not an 8 000 px scroll. Everything stays reachable.
+export const MAX_PRICE_ROWS = 3;
+export const MAX_PRICE_TILES = 6;
+export const MAX_ALT_CARDS = 4;
+export const MAX_OWN_LANES = 8;
+
+// A closed fold: summary line plus the rest of the list.
+const fold = (summary, body, cls = '') => `<details class="kn-fold${cls ? ` ${cls}` : ''}"><summary>${esc(summary)}</summary>${body}</details>`;
 
 const STATUS = Object.freeze({
   not_contacted: { chip: 'Inte kontaktad', cls: 'is-none', text: 'Vi har inte begärt ut kommunens avtal än. Nedan ser du vad liknande kommuner köper och betalar.' },
@@ -148,7 +157,7 @@ function spendSection({ kommun, profile, head, peers, stats, mine, statusMap }) 
     const few = d.suppressed;
     const nPeers = peerAny.get(c)?.size ?? 0;
     const name = `<div class="sc-name"><b>${esc(catName(c))}</b><small>${esc(s
-      ? `${nOf(s.n_avtal, 'avtal', 'avtal')}${s.n_known < s.n_avtal ? `, värde känt för ${fmtInt(s.n_known)}` : ''}`
+      ? `${nOf(s.n_avtal, 'avtal', 'avtal')}${!s.n_known ? ', värde okänt' : s.n_known < s.n_avtal ? `, värde känt för ${fmtInt(s.n_known)}` : ''}`
       : hasOwn ? 'inga aktiva avtal här' : `${fmtInt(nPeers)} liknande köper här`)}</small></div>`;
     let bar = '';
     if (ownKnown) bar = `<span class="sc-bar grow-x" style="width:${p(o)};--i:${i}"></span>`;
@@ -167,8 +176,8 @@ function spendSection({ kommun, profile, head, peers, stats, mine, statusMap }) 
   const axis = `<div class="sc-axis-row"><span></span><div class="axis-x" aria-hidden="true">${ticks.map((t, i) => `<span class="axis-tick${i === 0 ? ' is-first' : i === ticks.length - 1 ? ' is-last' : ''}" style="left:${p(t)}">${esc(fmtPrice(t))}</span>`).join('')}<span class="axis-unit">kr per elev och år</span></div><span></span></div>`;
   const foot = `<figcaption class="viz-foot">
     ${hasOwn ? `<span class="lg"><i class="lg-dot is-highlight sq"></i>${esc(kommun.namn)}</span>` : ''}
-    <span class="lg"><i class="lg-band"></i>mittersta hälften bland liknande med klar insamling</span>
-    <span class="lg"><i class="lg-tick"></i>median bland dem</span>
+    ${rows.some((r) => !r.d.suppressed) ? `<span class="lg"><i class="lg-band"></i>mittersta hälften bland liknande med klar insamling</span>
+    <span class="lg"><i class="lg-tick"></i>median bland dem</span>` : ''}
     <span class="lg"><i class="lg-hatch"></i>för få (under ${MIN_N} kommuner)</span>
   </figcaption>`;
   const lede = elever
@@ -240,17 +249,24 @@ function priceRows({ kommun, mine, facts, peers, today }) {
       small.push({
         it,
         why: !slug ? 'Avtalet gäller flera produkter till ett pris, så vi jämför inte per produkt.'
-          : `Det finns för få jämförbara kommuner: ${fmtInt(peerK.size)} liknande och ${fmtInt(otherK.size)} kommuner totalt med känt pris, vi jämför från ${MIN_N}.`,
+          : `För få jämförbara kommuner: ${peerK.size ? nOf(peerK.size, 'liknande kommun', 'liknande kommuner') : 'ingen liknande kommun'} och ${otherK.size ? nOf(otherK.size, 'kommun', 'kommuner') : 'ingen kommun'} totalt har känt pris, vi jämför från ${MIN_N}.`,
       });
     }
   }
   comparable = big.length;
   const own = (f) => `<div class="kp-own"><span class="kp-own-num">${esc(fmtPrice(f.kr_per_elev))}</span><span class="kp-own-unit">kr per elev och år, ert pris</span></div>`;
-  const cards = big.map(({ it, viz }, i) => `<article class="card kp-row" style="--i:${i}">
+  const card = ({ it, viz }, i) => `<article class="card kp-row" style="--i:${i}">
       <div class="kp-left">${head(it.f, it.pname, it.slug)}${own(it.f)}</div>
       <div class="kp-viz">${viz}</div>
-    </article>`).join('');
-  const tiles = small.map(({ it, why }) => `<li class="kp-tile">${head(it.f, it.pname, it.slug)}${own(it.f)}<p class="kp-why">${esc(why)}</p></li>`).join('');
+    </article>`;
+  const bigRest = big.slice(MAX_PRICE_ROWS);
+  const cards = big.slice(0, MAX_PRICE_ROWS).map(card).join('')
+    + (bigRest.length ? fold(`Visa ${nOf(bigRest.length, 'jämförelse', 'jämförelser')} till`, `<div class="kp-list">${bigRest.map((b, i) => card(b, i)).join('')}</div>`) : '');
+  const tile = ({ it, why }) => `<li class="kp-tile">${head(it.f, it.pname, it.slug)}${own(it.f)}<p class="kp-why">${esc(why)}</p></li>`;
+  const smallRest = small.slice(MAX_PRICE_TILES);
+  const tiles = small.length
+    ? `<ul class="kp-tiles">${small.slice(0, MAX_PRICE_TILES).map(tile).join('')}</ul>${smallRest.length ? fold(`Visa ${nOf(smallRest.length, 'avtal', 'avtal')} till`, `<ul class="kp-tiles">${smallRest.map(tile).join('')}</ul>`) : ''}`
+    : '';
 
   const rest = unpriced.map(({ f, slug, pname, peerK, otherK }) => {
     const med = (kods) => priceDistribution(facts, { productSlug: slug, kommunKods: [...kods] }).median;
@@ -263,9 +279,9 @@ function priceRows({ kommun, mine, facts, peers, today }) {
   let html = '';
   if (avtal.length) {
     html = `${cards ? `<div class="kp-list">${cards}</div>` : ''}
-    ${tiles ? `<div class="card kp-rest"><div class="viz-head"><span class="viz-label">Känt pris, för få att jämföra</span><span class="viz-n">${esc(nOf(small.length, 'avtal', 'avtal'))}</span></div><ul class="kp-tiles">${tiles}</ul></div>` : ''}
+    ${tiles ? `<div class="card kp-rest"><div class="viz-head"><span class="viz-label">Känt pris, för få att jämföra</span><span class="viz-n">${esc(nOf(small.length, 'avtal', 'avtal'))}</span></div>${tiles}</div>` : ''}
     ${!priced.length ? emptyPanel({ title: 'Inget av avtalen anger pris per elev', text: 'Vi räknar pris per elev när avtalet anger ett styckpris, eller ett årsvärde och vilka skolformer det gäller.' }) : ''}
-    ${rest ? `<div class="card kp-rest"><div class="viz-head"><span class="viz-label">Utan känt pris per elev</span><span class="viz-n">${esc(nOf(unpriced.length, 'avtal', 'avtal'))}</span></div><ul class="kp-rest-list">${rest}</ul></div>` : ''}`;
+    ${rest ? `<div class="card kp-rest">${fold(`${nOf(unpriced.length, 'avtal', 'avtal')} utan känt pris per elev`, `<p class="meta card-lede">Avtalet anger inget styckpris, eller inte vilka skolformer det gäller. Där andra kommuner har känt pris för produkten visas deras median.</p><ul class="kp-rest-list">${rest}</ul>`, 'is-card-fold')}</div>` : ''}`;
   }
   return { html, priced: priced.length, comparable, total: avtal.length };
 }
@@ -337,7 +353,7 @@ function alternatives({ kommun, head, peers, mine }) {
   if (!cats.length) {
     return emptyPanel({ title: 'Inga jämförbara avtal än', text: 'Vi har inga aktiva avtal från andra kommuner att visa här än.' });
   }
-  const cards = cats.map((cat) => {
+  const cardOf = (cat) => {
     const items = [...byCat.get(cat).values()].map((it) => {
       const k = it.kods.size;
       const median = it.slug ? medianText(priceDistribution(head, { productSlug: it.slug })) : 'produkt ej angiven';
@@ -355,7 +371,10 @@ function alternatives({ kommun, head, peers, mine }) {
   <div class="viz-head"><span class="viz-label">${esc(catName(cat))}</span><span class="viz-n">${esc(scope === 'liknande' ? `${fmtInt(nKods)} av ${fmtInt(total)} liknande köper här` : nOf(nKods, 'kommun', 'kommuner'))}</span></div>
   ${rankingBars({ items, max: MAX_ALT, highlight: items.filter((it) => it.mine).map((it) => it.label), noun: 'produkter' })}
 </div>`;
-  }).join('');
+  };
+  const restCats = cats.slice(MAX_ALT_CARDS);
+  const cards = cats.slice(0, MAX_ALT_CARDS).map(cardOf).join('')
+    + (restCats.length ? `<div class="span-12">${fold(`Visa ${nOf(restCats.length, 'kategori', 'kategorier')} till: ${restCats.map(catName).join(', ')}`, `<div class="grid-12 alt-grid">${restCats.map(cardOf).join('')}</div>`)}</div>` : '');
   const lede = scope === 'liknande'
     ? `Produkter i aktiva avtal hos liknande kommuner, efter hur många av dem som har produkten. Median per elev räknas över alla kommuner och visas från ${MIN_N} avtal med känt pris.`
     : `Ingen liknande kommun har aktiva avtal hos oss än, så här visas alla kommuner. Median per elev visas från ${MIN_N} avtal med känt pris.`;
@@ -388,7 +407,6 @@ function renewals({ kommun, mine, head, peers, today, status }) {
       : `${nOf(unknown, 'aktivt avtal anger', 'aktiva avtal anger')} inget slutdatum, så de kan förnyas utan att synas här.`;
     return { html: `<div class="card">${emptyPanel({ title: 'Inga kända förnyelser', text, context: peerLine })}</div>`, basis };
   }
-  const MAX_OWN_LANES = 12;
   const lanes = dated.slice(0, MAX_OWN_LANES).map((f) => {
     const date = f.next_renewal.slice(0, 10);
     const names = productNames(f).join(', ');

@@ -82,8 +82,8 @@ function whiteSpotMap({ ws, label, nameOf, tiles }) {
     classOf: (kod) => cls.get(kod) ?? 'unknown',
     titleOf: (kod) => `${nameOf(kod)}: ${what[cls.get(kod)] ?? 'status okänd'}`,
     legend: [
-      { cls: 'has', label: 'Har avtal i kategorin' },
-      { cls: 'none-done', label: 'Inget avtal, insamling klar' },
+      { cls: 'has', label: 'Har aktivt avtal i kategorin' },
+      { cls: 'none-done', label: 'Inget aktivt avtal, insamling klar' },
       { cls: 'none-open', label: 'Insamling pågår' },
       { cls: 'not-contacted', label: 'Inte kontaktad' },
     ],
@@ -231,9 +231,9 @@ export function renderKategori({ category, facts, stats, statusMap, today, page 
   const ws = whiteSpots(facts, statusMap, { category: slug, allKods: kods.length ? kods : Object.keys(tiles?.tiles ?? {}) });
   const kpis = `<div class="kpi-row">
     ${kpiTile({ label: 'Aktiva avtal', value: avtal.length, unit: 'avtal', basis: `${fmtInt(byContract(all).length)} insamlade totalt`, state: avtal.length ? 'known' : 'unknown', reason: 'Inga aktiva avtal i kategorin än.' })}
-    ${kpiTile({ label: 'Leverantörer', value: shares.length, unit: 'leverantörer', basis: shares.length ? `${fmtInt(shares.filter((s) => s.n_known).length)} med känt värde` : '', state: shares.length ? 'known' : 'unknown', reason: 'Inga leverantörer med aktiva avtal än.' })}
+    ${kpiTile({ label: 'Leverantörer', value: shares.length, unit: 'leverantörer', basis: shares.length ? `${fmtInt(shares.filter((s) => s.slug).length)} i katalogen, ${fmtInt(shares.filter((s) => s.n_known).length)} med känt värde` : '', state: shares.length ? 'known' : 'unknown', reason: 'Inga leverantörer med aktiva avtal än.' })}
     ${kpiTile(renewalTileProps({ avtal, buckets: renewalBuckets(all, { today, months: 12 }), today }))}
-    ${kpiTile({ label: 'Säkra vita fläckar', value: ws.none_done.length, unit: 'kommuner', basis: 'insamlingen klar, inget avtal i kategorin', state: 'known' })}
+    ${kpiTile({ label: 'Säkra vita fläckar', value: ws.none_done.length, unit: 'kommuner', basis: 'insamlingen klar, inget aktivt avtal i kategorin', state: 'known' })}
   </div>`;
 
   // Matrix: SKR huvudgrupp x segment, "Alla" on both axes.

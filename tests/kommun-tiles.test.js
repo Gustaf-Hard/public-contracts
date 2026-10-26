@@ -50,4 +50,13 @@ describe('committed kommun-tiles.json', () => {
     }
     expect(new Set(cells(j.tiles)).size).toBe(290);
   });
+
+  it('reads as Sweden: tall and narrow, Kiruna at the top, Skåne at the bottom, Haparanda east of Strömstad', () => {
+    expect(j.rows / j.cols).toBeGreaterThanOrEqual(2);
+    const t = j.tiles;
+    expect(t['2584'].y).toBeLessThan(4); // Kiruna
+    expect(t['1287'].y).toBeGreaterThan(j.rows - 5); // Trelleborg
+    expect(t['2583'].x).toBeGreaterThan(t['1486'].x); // Haparanda vs Strömstad
+    expect(t['0980'].x).toBeGreaterThan(t['1280'].x); // Gotland east of Malmö
+  });
 });

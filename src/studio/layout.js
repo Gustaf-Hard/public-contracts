@@ -65,7 +65,12 @@ const brand = `<a class="st-brand" href="/studio" data-pane-link aria-label="Med
     </a>`;
 
 export function studioLayout({ title, body, currentPath = '/studio', partial = false, basis = null, searchOptions = [] }) {
-  if (partial) return body;
+  // The basis line rides inside #content, so a pane swap brings a fresh one.
+  const footer = `<footer class="st-footer" data-page-title="${esc(title)} · Mediagraf Studio">
+        <span data-basis>${esc(basisSentence(basis))}</span>
+        <a href="/studio/om" data-pane-link>Om datan</a>
+      </footer>`;
+  if (partial) return body + footer;
   const options = [...new Set(searchOptions.filter(Boolean))]
     .map((o) => `<option value="${esc(o)}"></option>`).join('');
   return `<!doctype html>
@@ -99,11 +104,7 @@ export function studioLayout({ title, body, currentPath = '/studio', partial = f
         <div class="st-topbar-row">${brand}${themeButton}</div>
         ${searchForm('st-q-top')}
       </header>
-      <main id="content" class="st-content" data-path="${esc(currentPath)}">${body}</main>
-      <footer class="st-footer">
-        <span data-basis>${esc(basisSentence(basis))}</span>
-        <a href="/studio/om" data-pane-link>Om datan</a>
-      </footer>
+      <main id="content" class="st-content" data-path="${esc(currentPath)}">${body}${footer}</main>
     </div>
   </div>
   <nav class="st-tabbar" aria-label="Studio, flikar">${navLinks(currentPath)}</nav>

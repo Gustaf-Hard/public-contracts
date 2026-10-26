@@ -37,6 +37,9 @@
         var swap = function () {
           content().innerHTML = html;
           content().dataset.path = clean;
+          // Studio partials carry their page title; the back office has none.
+          var titled = content().querySelector('[data-page-title]');
+          if (titled) document.title = titled.getAttribute('data-page-title');
           content().scrollTop = 0;
           window.scrollTo(0, 0);
           markActive(clean);

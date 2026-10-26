@@ -90,7 +90,7 @@ function hrefWith(action, fields, dropName) {
 // `all: false` drops the "Alla" option and `def` is then the value shown
 // when none is chosen (a chosen value equal to `def` gets no chip).
 export function filterBar({ action = '', fields = [], resultLine = '' } = {}) {
-  const selects = fields.map((f) => {
+  const fieldHtml = (f) => {
     const id = `fb-${String(f.name).replace(/[^a-zA-Z0-9_-]/g, '')}`;
     if (f.type === 'text') {
       return `<label class="fb-field fb-text" for="${esc(id)}">
@@ -107,7 +107,17 @@ export function filterBar({ action = '', fields = [], resultLine = '' } = {}) {
         ${opts.map((o) => `<option value="${esc(o.value)}"${cur && o.value === cur ? ' selected' : ''}>${esc(o.label)}</option>`).join('')}
       </select>
     </label>`;
-  }).join('');
+  };
+  // Secondary fields fold behind "Fler filter"; the fold opens by itself when
+  // one of them is set, so an active filter is never hidden.
+  const primary = fields.filter((f) => !f.secondary);
+  const secondary = fields.filter((f) => f.secondary);
+  const isSet = (f) => f.value && !(f.def != null && String(f.value) === String(f.def));
+  const nSet = secondary.filter(isSet).length;
+  const more = secondary.length
+    ? `<details class="fb-more"${nSet ? ' open' : ''}><summary>Fler filter${nSet ? ` <b>(${nSet} valda)</b>` : ''}</summary><div class="fb-fields">${secondary.map(fieldHtml).join('')}</div></details>`
+    : '';
+  const selects = primary.map(fieldHtml).join('');
   const active = fields.filter((f) => f.value && f.chip !== false && !(f.def != null && String(f.value) === String(f.def)));
   const chips = active.map((f) => {
     const o = f.type === 'text' ? null : (f.options || []).map(opt).find((x) => x.value === String(f.value));
@@ -115,6 +125,7 @@ export function filterBar({ action = '', fields = [], resultLine = '' } = {}) {
   }).join('');
   return `<form class="filter-bar" method="get" action="${esc(action)}" data-pane-form>
   <div class="fb-fields">${selects}<button type="submit" class="fb-submit">Visa</button></div>
+  ${more}
   ${chips || resultLine ? `<div class="fb-status">
     ${chips ? `<div class="fb-chips">${chips}${active.length > 1 ? `<a class="fb-clear" href="${esc(action)}" data-pane-link>Rensa alla</a>` : ''}</div>` : ''}
     ${resultLine ? `<p class="fb-result">${esc(resultLine)}</p>` : ''}

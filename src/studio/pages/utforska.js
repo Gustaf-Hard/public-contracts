@@ -244,6 +244,11 @@ export function renderUtforska({ facts, stats, today, query, page = 1 }) {
   const agg = aggregateFacts(rows);
   const nAvtal = distinctAvtal(rows);
   const nKnown = distinctAvtal(rows.filter((f) => isNum(f.annual_value_sek)));
+  // Avtal whose only party is a hidden utbildningsanordnare are left out of
+  // the explorer; say so, or the totals here disagree with Marknad unexplained.
+  const pool = q.urval === 'alla' ? facts : headline(facts);
+  const shown = new Set(base.map((f) => f.contract_id));
+  const nHidden = new Set(pool.filter((f) => !shown.has(f.contract_id)).map((f) => f.contract_id)).size;
 
   const has = (get) => base.some((f) => get(f) == null);
   const opts = (get) => sortSv(new Set(base.map(get).filter((v) => v != null))).concat(has(get) ? [UNKNOWN] : []);
@@ -253,22 +258,25 @@ export function renderUtforska({ facts, stats, today, query, page = 1 }) {
     { name: 'urval', label: 'Avtal', value: q.urval, def: '', all: false, options: [{ value: '', label: 'Aktiva avtal' }, { value: 'alla', label: 'Alla insamlade' }] },
     { name: 'kategori', label: 'Kategori', value: q.kategori, options: [...CATEGORIES.map((c) => ({ value: c.slug, label: c.label })), { value: UNKNOWN_CATEGORY, label: 'Okänd kategori' }] },
     { name: 'vendor', label: 'Leverantör', value: q.vendor, options: opts((f) => f.company_name) },
-    { name: 'product', label: 'Produkt', value: q.product, options: sortSv(new Set(base.flatMap((f) => f.products))) },
-    { name: 'lan', label: 'Län', value: q.lan, options: opts((f) => f.lan) },
-    { name: 'pricing_model', label: 'Prismodell', value: q.pricing_model, options: [...Object.entries(MODEL_LABEL).map(([value, label]) => ({ value, label })), { value: UNKNOWN, label: 'Okänd prismodell' }] },
-    { name: 'value_band', label: 'Årsvärde', value: q.value_band, options: [...Object.values(BAND_LABELS.value_band), UNKNOWN] },
-    { name: 'length_band', label: 'Avtalslängd', value: q.length_band, options: [...Object.values(BAND_LABELS.length_band), UNKNOWN] },
-    { name: 'renewal_window', label: 'Förnyelse', value: q.renewal_window, options: [...Object.values(BAND_LABELS.renewal_window), UNKNOWN] },
+    { name: 'product', secondary: true, label: 'Produkt', value: q.product, options: sortSv(new Set(base.flatMap((f) => f.products))) },
+    { name: 'lan', secondary: true, label: 'Län', value: q.lan, options: opts((f) => f.lan) },
+    { name: 'pricing_model', secondary: true, label: 'Prismodell', value: q.pricing_model, options: [...Object.entries(MODEL_LABEL).map(([value, label]) => ({ value, label })), { value: UNKNOWN, label: 'Okänd prismodell' }] },
+    { name: 'value_band', secondary: true, label: 'Årsvärde', value: q.value_band, options: [...Object.values(BAND_LABELS.value_band), UNKNOWN] },
+    { name: 'length_band', secondary: true, label: 'Avtalslängd', value: q.length_band, options: [...Object.values(BAND_LABELS.length_band), UNKNOWN] },
+    { name: 'renewal_window', secondary: true, label: 'Förnyelse', value: q.renewal_window, options: [...Object.values(BAND_LABELS.renewal_window), UNKNOWN] },
   ];
   const noun = q.urval === 'alla' ? 'insamlade avtal' : 'aktiva avtal';
-  const resultLine = `${fmtInt(nAvtal)} ${noun}, ${nOf(agg.kommun_count, 'kommun', 'kommuner')}`;
+  const countNoun = nAvtal === 1 ? (q.urval === 'alla' ? 'insamlat avtal' : 'aktivt avtal') : noun;
+  const resultLine = `${fmtInt(nAvtal)} ${countNoun}, ${nOf(agg.kommun_count, 'kommun', 'kommuner')}`;
 
   const gLabel = GROUPS.find((g) => g.value === q.grupp).label.toLowerCase();
   const lead = groups[0];
   const leadAgg = lead ? aggregateFacts(lead.facts) : null;
   const answer = rows.length
-    ? `${fmtInt(nAvtal)} ${noun} från ${nOf(agg.kommun_count, 'kommun', 'kommuner')} matchar. Känt årsvärde ${agg.total_annual_sek == null ? 'okänt' : `${fmtKrCompact(agg.total_annual_sek)}, känt för ${fmtInt(nKnown)} av ${fmtInt(nAvtal)}`}.${lead && q.grupp !== 'kommun' && leadAgg.total_annual_sek != null ? ` Störst efter ${gLabel} är ${groupLabel(q.grupp, lead.key)} med ${fmtKrCompact(leadAgg.total_annual_sek)} per år.` : ''}`
+    ? `${fmtInt(nAvtal)} ${countNoun} från ${nOf(agg.kommun_count, 'kommun', 'kommuner')} matchar. Känt årsvärde ${agg.total_annual_sek == null ? 'okänt' : `${fmtKrCompact(agg.total_annual_sek)}, känt för ${fmtInt(nKnown)} av ${fmtInt(nAvtal)}`}.${lead && q.grupp !== 'kommun' && leadAgg.total_annual_sek != null ? ` Störst efter ${gLabel} är ${groupLabel(q.grupp, lead.key)} med ${fmtKrCompact(leadAgg.total_annual_sek)} per år.` : ''}`
     : 'Inga avtal matchar filtren.';
+  // Only unfiltered: a filtered count would need the hidden rows filtered too.
+  const hiddenNote = nHidden && !FILTER_KEYS.some((k) => k !== 'urval' && q[k]) ? ` ${fmtInt(nHidden)} avtal med utbildningsanordnare utan produkter visas inte här.` : '';
 
   const pages = Math.max(1, Math.ceil(rows.length / UTFORSKA_PAGE_SIZE));
   const cur = Math.min(Math.max(1, Math.trunc(page) || 1), pages);
@@ -285,6 +293,7 @@ export function renderUtforska({ facts, stats, today, query, page = 1 }) {
       <span class="kicker">Utforska</span>
       <h1 class="page-title">Alla avtal, på ditt sätt</h1>
       <p class="lede">${esc(answer)}</p>
+      ${hiddenNote ? `<p class="meta ux-hidden">${esc(hiddenNote.trim())}</p>` : ''}
     </div>
   </div>
 </section>`;

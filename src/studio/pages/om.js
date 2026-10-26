@@ -94,7 +94,7 @@ export function renderOm({ facts, stats, statusMap = new Map(), basis = {}, toda
       <dl class="eh-facts">
         <div class="eh-fact"><dt>Insamlade avtal</dt><dd class="eh-val">${esc(num(b.collected))}</dd><dd class="eh-sub">från ${esc(nOfU(b.kommuner_collected, 'kommun', 'kommuner'))}</dd></div>
         <div class="eh-fact"><dt>Aktiva avtal</dt><dd class="eh-val">${esc(num(b.active))}</dd><dd class="eh-sub">i ${esc(nOfU(b.kommuner_with_avtal, 'kommun', 'kommuner'))}</dd></div>
-        <div class="eh-fact"><dt>Insamling klar</dt><dd class="eh-val">${esc(fmtInt(finished))}</dd><dd class="eh-sub">av ${esc(fmtInt(KOMMUNER_TOTAL))} kommuner</dd></div>
+        <div class="eh-fact"><dt>Insamling klar</dt><dd class="eh-val">${esc(fmtInt(finished))}</dd><dd class="eh-sub">av ${esc(fmtInt(KOMMUNER_TOTAL))} kommuner${sc.dead_end ? `, varav ${esc(fmtInt(sc.dead_end))} utan utlämnade avtal` : ''}</dd></div>
       </dl>
     </div>
   </div>
@@ -104,7 +104,7 @@ export function renderOm({ facts, stats, statusMap = new Map(), basis = {}, toda
   ${p('Vi skickar en begäran om allmänna handlingar enligt offentlighetsprincipen till varje kommuns registrator och ber om kommunens gällande avtal för skolans digitala verktyg: läromedel, lärplattformar, skoladministration, prov, stödverktyg och elevhälsa. Avtalen som kommer tillbaka läses rad för rad: leverantör, produkter, period, årsvärde, prismodell och vilka skolformer avtalet gäller.')}
   ${p('Leverantörs- och produktnamn i avtalen skrivs på många sätt. En katalog läser varje namn som ett företag, en produkt, ett tillägg, en rabatt eller ett segment, så att samma produkt räknas som en.')}
   ${p(`I dag är insamlingen klar i ${nOf(finished, 'kommun', 'kommuner')} och pågår i ${fmtInt(open)}${notContacted ? `. I ${nOf(notContacted, 'kommun', 'kommuner')} har vi inte begärt ut avtal än` : ''}${sc.unknown ? `. För ${nOf(sc.unknown, 'kommun', 'kommuner')} vet vi inte hur långt insamlingen har kommit` : ''}. ${sc.dead_end ? `${nOf(sc.dead_end, 'kommun', 'kommuner')} har avslutat ärendet utan att lämna ut några avtal. De räknas som klara men utan underlag, och studion skriver aldrig att de saknar avtal.` : ''}`)}
-  ${p('Att en kommun saknar avtal i en kategori betyder bara något när insamlingen där är klar. Kartorna skiljer därför på tre saker: inget avtal och insamlingen klar, insamlingen pågår, och inte kontaktad än.')}
+  ${p('Att en kommun saknar avtal i en kategori betyder bara något när insamlingen där är klar. Kartorna skiljer därför på tre saker: inget aktivt avtal och insamlingen klar, insamlingen pågår, och inte kontaktad än.')}
 </div>`;
 
   const aktiv = `<div class="grid-12">

@@ -192,6 +192,7 @@ describe('other components', () => {
       cell: (r, c) => (r.key === 'a' && c.key === '1-3' ? dist([1, 2]) : dist([100, 120, 140, 160, 180 + (c.key === '4-6' ? 50 : 0)])),
     });
     noRawEvil(html);
+    expect(html).not.toContain('lg-unknown'); // no unknown cells, no unknown legend row
     expect(html).toContain('för få');
     expect(html).toContain('n = 2');
     expect(html).toContain('popovertarget="m1-');
@@ -208,6 +209,7 @@ describe('other components', () => {
     });
     expect(count(html, 'is-unknown')).toBe(2);
     expect(html).toContain('okänt');
+    expect(html).toContain('lg-unknown'); // the legend names the unknown swatch
     expect(html).not.toContain('n = 7');
     expect(count(html, 'inga avtal')).toBe(1);
   });
@@ -251,6 +253,21 @@ describe('other components', () => {
     expect(html).toContain('selected');
     expect(html).toContain('Läromedel');
     noRawEvil(html);
+  });
+
+  it('filterBar folds secondary fields and opens the fold when one is set', () => {
+    const f = (value) => [
+      { name: 'kategori', label: 'Kategori', options: [{ value: 'a', label: 'A' }], value: '' },
+      { name: 'lan', label: 'Län', secondary: true, options: [{ value: 'x', label: 'X' }], value },
+    ];
+    const closed = filterBar({ action: '/studio/utforska', fields: f('') });
+    expect(closed).toContain('<details class="fb-more">');
+    expect(closed.indexOf('fb-lan')).toBeGreaterThan(closed.indexOf('fb-more'));
+    expect(closed).not.toContain('valda');
+    const open = filterBar({ action: '/studio/utforska', fields: f('x') });
+    expect(open).toContain('<details class="fb-more" open>');
+    expect(open).toContain('(1 valda)');
+    expect(filterBar({ action: '/x', fields: f('').slice(0, 1) })).not.toContain('fb-more');
   });
 
   it('emptyPanel, entityHeader, evidenceDrawer escape text', () => {

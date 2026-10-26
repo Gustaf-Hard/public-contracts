@@ -303,7 +303,7 @@ export function renderMarknad({ facts, stats, statusMap, today, basis }) {
       ${completenessRing({ covered })}
       <dl class="mk-facts">
         <div><dt>Kommuner med avtal</dt><dd><b>${esc(fmtInt(covered))}</b> av ${esc(fmtInt(KOMMUNER_TOTAL))}</dd></div>
-        <div><dt>Insamling klar</dt><dd><b>${esc(fmtInt(b.done ?? 0))}</b> kommuner</dd></div>
+        <div><dt>Insamling klar</dt><dd><b>${esc(fmtInt(b.done ?? 0))}</b> ${(b.done ?? 0) === 1 ? 'kommun' : 'kommuner'}${b.dead_end ? `, varav ${esc(fmtInt(b.dead_end))} utan utlämnade avtal` : ''}</dd></div>
         <div><dt>Aktiva avtal</dt><dd><b>${esc(fmtInt(active))}</b> av ${esc(fmtInt(collected))} insamlade</dd></div>
       </dl>
     </div>
@@ -314,7 +314,7 @@ export function renderMarknad({ facts, stats, statusMap, today, basis }) {
   const b12 = renewalBuckets(facts, { today, months: 12 });
   const leaders = companyShares(facts).filter((s) => s.n_known).length;
   const kpis = `<div class="kpi-row">
-    ${kpiTile({ label: 'Leverantörer', value: companyShares(facts).length, unit: 'med aktiva avtal', basis: `${fmtInt(leaders)} med känt värde`, state: avtal.length ? 'known' : 'unknown', reason: 'Inga aktiva avtal än.' })}
+    ${kpiTile({ label: 'Leverantörer', value: companyShares(facts).length, unit: 'med aktiva avtal', basis: `${fmtInt(companyShares(facts).filter((s) => s.slug).length)} i katalogen, ${fmtInt(leaders)} med känt värde`, state: avtal.length ? 'known' : 'unknown', reason: 'Inga aktiva avtal än.' })}
     ${kpiTile({ label: 'Kategorier', value: marketByCategory(facts).filter((m) => m.category !== UNKNOWN_CATEGORY).length, unit: `av ${CATEGORIES.length}`, basis: 'med minst ett aktivt avtal', state: avtal.length ? 'known' : 'unknown', reason: 'Inga aktiva avtal än.' })}
     ${kpiTile(renewalTileProps({ avtal, buckets: b12, today }))}
     ${kpiTile({ label: 'Slutdatum okänt', value: b.active_unknown_end ?? 0, unit: 'avtal', basis: 'räknas som aktiva i fyra år från avtalsstart', state: 'known' })}

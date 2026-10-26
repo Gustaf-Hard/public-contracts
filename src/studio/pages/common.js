@@ -164,8 +164,8 @@ export function footprintMap({ tiles, rows, statusMap, stats, entity, nameOf }) 
   for (const k of ws.not_contacted) cls.set(k, 'not-contacted');
   const what = {
     has: `har aktivt avtal med ${entity}`,
-    'none-done': `inget avtal med ${entity}, insamlingen klar`,
-    'none-open': 'insamlingen pågår, inget avtal med ' + entity + ' än',
+    'none-done': `inget aktivt avtal med ${entity}, insamlingen klar`,
+    'none-open': 'insamlingen pågår, inget aktivt avtal med ' + entity + ' än',
     'not-contacted': 'inte kontaktad än',
   };
   return tileMap({
@@ -173,8 +173,8 @@ export function footprintMap({ tiles, rows, statusMap, stats, entity, nameOf }) 
     classOf: (kod) => cls.get(kod) ?? 'unknown',
     titleOf: (kod) => `${nameOf(kod)}: ${what[cls.get(kod)] ?? 'status okänd'}`,
     legend: [
-      { cls: 'has', label: `Har avtal med ${entity}` },
-      { cls: 'none-done', label: 'Inget avtal, insamling klar' },
+      { cls: 'has', label: `Har aktivt avtal med ${entity}` },
+      { cls: 'none-done', label: 'Inget aktivt avtal, insamling klar' },
       { cls: 'none-open', label: 'Insamling pågår' },
       { cls: 'not-contacted', label: 'Inte kontaktad' },
     ],
