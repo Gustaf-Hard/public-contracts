@@ -13,8 +13,10 @@
 // Doubts from catalogue.md "Tveksamheter", with the decision applied (spec
 // §6.1). Reverse any of them by editing the entry it names.
 // Merged (applied):
-//  1. Chas Visual Management -> Unikum (Chas is the company behind Unikum; the
-//     KB lists Chas as a consultancy).
+//  1. Chas Visual Management was merged into Unikum; reversed 2026-10-26
+//     (final review r2 P3): Chas avtal resell Alvis, Haldor, Meitner, Skolon,
+//     DigiExam, Royal Schedule and Exam.net through Adda, so Chas is a channel
+//     and Unikum lines inside a Chas avtal resolve to Unikum by name.
 //  2. Oribi, Oribi Texthelp, Everway, Everway Technology -> Everway (renamed 2023).
 //  3. MV-Nordic -> Vitec MV (rename).
 //  4. Learn-IT Umeå + Samverka.nu: company Learn-IT Umeå, product Samverka.nu.
@@ -297,7 +299,7 @@ export const COMPANIES = [
   // ---------------- Lärplattform ----------------
   { canonical: 'Unikum', slug: 'unikum', category: 'lärplattform', role: 'service', website: 'https://unikum.net',
     note: 'Unikum ägs av Chas Visual Management AB.',
-    vendors: ['unikum', 'chas visual management', 'chas'], brand: /unikum/, defaultProduct: 'Unikum',
+    vendors: ['unikum'], brand: /unikum/, defaultProduct: 'Unikum',
     addOns: [
       A('Unikum Connect', /connect|ber api|\bsynk|provisionering|single sign on|\bsso\b|teams|\bapi\b/),
       A('Unikum Arkiv och gallring', /arkiv|gallring/),
@@ -568,6 +570,7 @@ export const COMPANIES = [
     ['Mediacenter Jönköpings län', 'mediacenter', ['mediacenter jonkopings lan', 'mediacenter jonkoping', 'mediacenter'], null],
     ['Mediecenter Mälardalen', 'mediecenter-malardalen', ['mediecenter malardalen'], null],
     ['Pulsen', 'pulsen', ['pulsen'], 'https://www.pulsen.se'],
+    ['Chas Visual Management', 'chas', ['chas visual management', 'chas'], null],
     ['Softronic', 'softronic', ['softronic'], 'https://www.softronic.se'],
   ].map(([canonical, slug, vendors, website]) => ({ canonical, slug, category: null, role: 'channel', website, vendors, brand: null, products: [] })),
 

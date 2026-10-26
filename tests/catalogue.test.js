@@ -148,8 +148,9 @@ describe('catalogue entries', () => {
     expect(new Set(ps).size).toBe(ps.length);
   });
 
-  // Doubts 1 and 2 merge these KB companies into another catalogue company.
-  const KB_MERGED = { oribi: 'everway', chas: 'unikum' };
+  // Doubt 2 merges this KB company into another catalogue company. Doubt 1
+  // (Chas -> Unikum) was reversed: Chas is a channel of its own (r2 P3).
+  const KB_MERGED = { oribi: 'everway' };
   it('resolves every back-office KB company, with the same slug where both exist', () => {
     for (const kb of KB_COMPANIES) {
       const hit = classifyVendor(kb.canonical);

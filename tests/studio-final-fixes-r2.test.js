@@ -214,3 +214,27 @@ describe('P8. the unit period rule is shared', () => {
     expect(row(facts, c.contract_id).kr_per_elev).toBe(100);
   });
 });
+
+// ------------------------------------------------------------------ P3
+describe('P3. Chas Visual Management is a channel, not Unikum', () => {
+  it('a Chas avtal with an Alvis line and a Unikum line books each to its owner, Chas as the channel', () => {
+    const c = C({ vendor_name: 'Chas Visual Management AB', annual_value_sek: 300000, products: [] });
+    const facts = build([c], {
+      lineItems: [
+        LI(c.contract_id, 'Alvis elevadministration vuxenutbildning', 200000, { period_months: 12 }),
+        LI(c.contract_id, 'Unikum Grundskola - Start Kommun', 100000, { period_months: 12 }),
+      ],
+    });
+    const by = Object.fromEntries(facts.map((f) => [f.company_slug, f]));
+    expect(Object.keys(by).sort()).toEqual(['gotit', 'unikum']);
+    expect(by.gotit).toMatchObject({ annual_value_sek: 200000, channel_slug: 'chas', category: 'skoladministration' });
+    expect(by.unikum).toMatchObject({ annual_value_sek: 100000, channel_slug: 'chas', category: 'larplattform' });
+    expect(companyShares(facts, { category: 'larplattform' }).map((s) => [s.slug, s.value_known_sek])).toEqual([['unikum', 100000]]);
+  });
+  it('a Chas avtal reselling Royal Schedule never becomes Unikum value', () => {
+    const c = C({ vendor_name: 'Chas Visual Management AB', annual_value_sek: 96000, products: ['Royal Schedule'] });
+    const facts = build([c], { lineItems: [LI(c.contract_id, 'Abonnemangsavgift', 96000, { period_months: 12 })] });
+    expect(facts.some((f) => f.company_slug === 'unikum')).toBe(false);
+    expect(facts.find((f) => f.company_slug === 'chas')).toMatchObject({ annual_value_sek: 96000, value_basis: 'unsplit_channel', category: 'skoladministration' });
+  });
+});
