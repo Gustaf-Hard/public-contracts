@@ -538,20 +538,22 @@ const byName = (a, b) => String(a.name).localeCompare(String(b.name), 'sv');
 
 // ---------------- aggregators ----------------
 
-// Per kommun: 'not_contacted' (only INITIAL), 'open', 'done', or
-// 'dead_end': every conversation closed, at least one DEAD_END, and no avtal
-// received. dead_end needs kodsWithAvtal (kommun kods with any collected
-// avtal); without it a closed kommun is 'done', as before. dead_end is NOT
-// evidence of absence: the kommun handed nothing over, so we know nothing
-// about what it buys. Only 'done' counts as a finished collection.
+// Per kommun: 'not_contacted' (only INITIAL), 'open', 'done' (every
+// conversation DONE), 'dead_end' (every conversation closed, at least one
+// DEAD_END, no avtal received) or 'partial' (closed with a DEAD_END, but
+// some avtal did arrive: "delvis utlämnat"). Neither dead_end nor partial is
+// evidence of absence: part of the request ended without avtal, so we do not
+// know everything the kommun buys. dead_end needs kodsWithAvtal (kommun kods
+// with any collected avtal); without it a DEAD_END kommun is 'partial'. Only
+// 'done' counts as a finished collection.
 export function collectionStatus(conversations = [], { kodsWithAvtal = null } = {}) {
   const by = groupBy(conversations.filter((c) => c && c.kommun_kod), (c) => c.kommun_kod);
   const out = new Map();
   for (const [kod, convs] of by) {
     if (convs.every((c) => c.state === 'INITIAL')) out.set(kod, 'not_contacted');
     else if (convs.every((c) => c.state === 'DONE' || c.state === 'DEAD_END')) {
-      const dead = kodsWithAvtal && !kodsWithAvtal.has(kod) && convs.some((c) => c.state === 'DEAD_END');
-      out.set(kod, dead ? 'dead_end' : 'done');
+      const deadEnd = convs.some((c) => c.state === 'DEAD_END');
+      out.set(kod, !deadEnd ? 'done' : kodsWithAvtal && !kodsWithAvtal.has(kod) ? 'dead_end' : 'partial');
     } else out.set(kod, 'open');
   }
   return out;
@@ -689,24 +691,36 @@ export function renewalBuckets(facts, { today, months = 24 } = {}) {
 }
 
 // allKods: the kommun universe (e.g. stats.all() kods); defaults to every
-// kommun the status map or the facts know. Buckets: has (an active avtal in
-// scope), none_done (collection done and no active avtal: the only safe white
-// spot; none_done_expired lists those of them whose avtal in scope have all
-// expired or been replaced), refused (dead_end: nothing handed over, so no
-// claim either way), none_open, not_contacted.
+// kommun the status map or the facts know. Buckets, each kommun in one:
+//   has: an active avtal in scope.
+//   none_done: the safe white spot. Collection done, no avtal at all in
+//     scope (active, expired or replaced) and, with a category, no active
+//     avtal of unknown category (that avtal may be the one in scope).
+//   none_done_expired: done, and every avtal in scope has expired or been
+//     replaced ("avtalet har löpt ut"): they buy here, a sales opening, not
+//     a white spot.
+//   none_done_uncertain: done, nothing in scope, but an active avtal of
+//     unknown category.
+//   refused: dead_end, nothing handed over, so no claim either way.
+//   partial: part of the request ended without avtal ("delvis utlämnat").
+//   none_open, not_contacted.
 export function whiteSpots(facts, statusMap = new Map(), { category, allKods } = {}) {
   const kods = allKods ? [...new Set(allKods)] : [...new Set([...statusMap.keys(), ...facts.map((f) => f.kommun_kod)])];
   const inScope = (f) => !category || catOf(f) === category;
   const has = new Set(headline(facts).filter(inScope).map((f) => f.kommun_kod));
   const hadAny = new Set(facts.filter(inScope).map((f) => f.kommun_kod));
-  const out = { has: [], none_done: [], none_done_expired: [], refused: [], none_open: [], not_contacted: [] };
+  const unknownCat = new Set(category && category !== UNKNOWN_CATEGORY
+    ? headline(facts).filter((f) => f.category == null).map((f) => f.kommun_kod) : []);
+  const out = { has: [], none_done: [], none_done_expired: [], none_done_uncertain: [], refused: [], partial: [], none_open: [], not_contacted: [] };
   for (const kod of kods.filter(Boolean).sort()) {
     const st = statusMap.get(kod);
     if (has.has(kod)) out.has.push(kod);
     else if (st === 'done') {
-      out.none_done.push(kod);
       if (hadAny.has(kod)) out.none_done_expired.push(kod);
+      else if (unknownCat.has(kod)) out.none_done_uncertain.push(kod);
+      else out.none_done.push(kod);
     } else if (st === 'dead_end') out.refused.push(kod);
+    else if (st === 'partial') out.partial.push(kod);
     else if (st === 'open') out.none_open.push(kod);
     else out.not_contacted.push(kod);
   }
@@ -788,6 +802,7 @@ export function dataBasis(facts, statusMap = new Map()) {
     // dead_end is counted on its own, never as a finished collection.
     done: [...statusMap.values()].filter(isCollectionFinished).length,
     dead_end: [...statusMap.values()].filter((s) => s === 'dead_end').length,
+    partial: [...statusMap.values()].filter((s) => s === 'partial').length,
   };
 }
 

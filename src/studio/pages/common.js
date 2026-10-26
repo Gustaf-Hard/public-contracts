@@ -18,6 +18,13 @@ export const distinctCount = (rows, fn) => new Set(rows.map(fn).filter((x) => x 
 export const sumKnown = (rows) => rows.reduce((s, f) => s + (isNum(f.annual_value_sek) ? f.annual_value_sek : 0), 0);
 export const isIso = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}/.test(s);
 
+// "och 5 utan utlämnade avtal, 3 delvis utlämnade": what "klar" leaves out.
+export function notDone(deadEnd, partial) {
+  const bits = [deadEnd ? `${fmtInt(deadEnd)} utan utlämnade avtal` : '', partial ? `${fmtInt(partial)} delvis utlämnade` : ''].filter(Boolean);
+  return bits.length ? `och ${bits.join(', ')}` : '';
+}
+
+
 // One value per avtal: on a company page each avtal has one row, but keep
 // the guard so a product page never double-counts an avtal.
 export function byContract(rows) {
@@ -209,12 +216,15 @@ export function footprintMap({ tiles, rows, statusMap, stats, entity, nameOf }) 
   const cls = new Map();
   for (const k of ws.has) cls.set(k, 'has');
   for (const k of ws.none_done) cls.set(k, 'none-done');
-  for (const k of ws.refused) cls.set(k, 'refused');
+  for (const k of ws.none_done_expired) cls.set(k, 'expired');
+  for (const k of [...ws.refused, ...ws.partial]) cls.set(k, 'refused');
   for (const k of ws.none_open) cls.set(k, 'none-open');
   for (const k of ws.not_contacted) cls.set(k, 'not-contacted');
+  const partial = new Set(ws.partial);
   const what = {
     has: `har aktivt avtal med ${entity}`,
-    'none-done': `inget aktivt avtal med ${entity}, insamlingen klar`,
+    'none-done': `inget avtal med ${entity}, insamlingen klar`,
+    expired: `avtalet med ${entity} har löpt ut eller ersatts, insamlingen klar`,
     refused: 'inga avtal utlämnade, vi vet inte vad kommunen köper',
     'none-open': 'insamlingen pågår, inget aktivt avtal med ' + entity + ' än',
     'not-contacted': 'inte kontaktad än',
@@ -222,11 +232,12 @@ export function footprintMap({ tiles, rows, statusMap, stats, entity, nameOf }) 
   return tileMap({
     tiles,
     classOf: (kod) => cls.get(kod) ?? 'unknown',
-    titleOf: (kod) => `${nameOf(kod)}: ${what[cls.get(kod)] ?? 'status okänd'}`,
+    titleOf: (kod) => `${nameOf(kod)}: ${partial.has(kod) ? 'delvis utlämnat, vi vet inte allt kommunen köper' : what[cls.get(kod)] ?? 'status okänd'}`,
     legend: [
       { cls: 'has', label: `Har aktivt avtal med ${entity}` },
-      { cls: 'none-done', label: 'Inget aktivt avtal, insamling klar' },
-      { cls: 'refused', label: 'Inga avtal utlämnade' },
+      { cls: 'none-done', label: 'Inget avtal, insamling klar' },
+      { cls: 'expired', label: 'Avtalet har löpt ut' },
+      { cls: 'refused', label: 'Inga eller inte alla avtal utlämnade' },
       { cls: 'none-open', label: 'Insamling pågår' },
       { cls: 'not-contacted', label: 'Inte kontaktad' },
     ],

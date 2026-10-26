@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
-  buildStudioFacts, companyShares, marketByCategory, dataBasis,
+  buildStudioFacts, companyShares, marketByCategory, dataBasis, collectionStatus, whiteSpots,
 } from '../src/studio-data.js';
 import { loadKommunStats } from '../src/kommun-stats.js';
 import { renderKommun } from '../src/studio/pages/kommun.js';
+import { renderKategori, findCategory } from '../src/studio/pages/kategori.js';
+import { renderKommuner } from '../src/studio/pages/lists.js';
 
 // Regression tests for the second final review (items P1 to P9, Q1 to Q3).
 // Hand-written fixtures only (the repo is public): real kommun codes (open
@@ -236,5 +238,63 @@ describe('P3. Chas Visual Management is a channel, not Unikum', () => {
     const facts = build([c], { lineItems: [LI(c.contract_id, 'Abonnemangsavgift', 96000, { period_months: 12 })] });
     expect(facts.some((f) => f.company_slug === 'unikum')).toBe(false);
     expect(facts.find((f) => f.company_slug === 'chas')).toMatchObject({ annual_value_sek: 96000, value_basis: 'unsplit_channel', category: 'skoladministration' });
+  });
+});
+
+// ------------------------------------------------------------------ P4, P7
+describe('P4. a safe white spot has no avtal at all in the category', () => {
+  const status = new Map(['0114', '0115', '0117', '0120'].map((k) => [k, 'done']));
+  const facts = build([
+    C({ kommun_kod: '0114', vendor_name: 'Vklass AB', period_start: '2018-01-01', period_end: '2021-12-31', products: ['Vklass'] }), // expired only
+    C({ kommun_kod: '0115', vendor_name: 'Okänd Firma AB', products: [] }), // active, unknown category
+    C({ kommun_kod: '0120', vendor_name: 'Vklass AB', products: ['Vklass'] }), // active
+  ]);
+  it('buckets: expired-only and unknown-category kommuner are not safe', () => {
+    const ws = whiteSpots(facts, status, { category: 'larplattform', allKods: ['0114', '0115', '0117', '0120'] });
+    expect(ws).toMatchObject({ has: ['0120'], none_done: ['0117'], none_done_expired: ['0114'], none_done_uncertain: ['0115'] });
+  });
+  it('without a category, unknown-category avtal are not a reason to doubt (footprint maps)', () => {
+    const ws = whiteSpots(facts.filter((f) => f.company_slug === 'vklass'), status, { allKods: ['0114', '0115', '0117', '0120'] });
+    expect(ws.none_done).toEqual(['0115', '0117']);
+  });
+  it('kategori page: the KPI counts the safe ones, expired get their own tile and sales copy', () => {
+    const html = renderKategori({ category: findCategory('larplattform'), facts, stats, statusMap: status, today: TODAY });
+    const t = text(html);
+    expect(t).toContain('1 kommun har klar insamling och inga avtal alls i lärplattform.');
+    expect(t).toContain('1 kommun har klar insamling där avtalet i lärplattform har löpt ut eller ersatts.');
+    expect(t).toContain('ett läge att höra av sig');
+    expect(t).toContain('1 kommun med klar insamling har aktiva avtal med okänd kategori');
+    expect(t).toMatch(/Säkra vita fläckar 1 kommuner insamlingen klar, inga avtal alls i kategorin; räknas inte: 1 där avtalet har löpt ut, 1 med avtal av okänd kategori/);
+    expect(html).toMatch(/class="tile t-expired[^"]*"[^>]*aria-label="Testby 1: avtalet i lärplattform har löpt ut/);
+  });
+});
+
+describe('P7. any DEAD_END means the collection is not complete evidence of absence', () => {
+  const convs = [
+    { kommun_kod: '0114', state: 'DONE' }, { kommun_kod: '0114', state: 'DEAD_END' },
+    { kommun_kod: '0115', state: 'DONE' },
+  ];
+  const facts = build([C({ kommun_kod: '0114', vendor_name: 'ILT Inläsningstjänst AB', products: ['Polylino'] })]);
+  const status = collectionStatus(convs, { kodsWithAvtal: new Set(facts.map((f) => f.kommun_kod)) });
+  it('DONE + DEAD_END with one läromedel avtal is partial, not a safe white spot for lärplattform', () => {
+    expect(status.get('0114')).toBe('partial');
+    const ws = whiteSpots(facts, status, { category: 'larplattform', allKods: ['0114', '0115'] });
+    expect(ws.none_done).toEqual(['0115']);
+    expect(ws.partial).toEqual(['0114']);
+    expect(dataBasis(facts, status)).toMatchObject({ done: 1, partial: 1, dead_end: 0 });
+  });
+  it('the kommun page says delvis utlämnat, the directory counts it apart from klar', () => {
+    const k = text(renderKommun({ kod: '0114', stats, facts, statusMap: status, today: TODAY }));
+    expect(k).toContain('Delvis utlämnat');
+    expect(k).not.toContain('Insamling klar');
+    const list = text(renderKommuner({ facts, stats, statusMap: status, tiles: { cols: 1, rows: 1, tiles: {} } }));
+    expect(list).toMatch(/Insamling klar 1 och 1 delvis utlämnade/);
+    expect(list).toContain('1 har lämnat ut en del men inte alla');
+  });
+  it('a partial peer is not a peer with finished collection', () => {
+    const peerConvs = [...KODS.slice(1).map((k) => ({ kommun_kod: k, state: 'DONE' })), { kommun_kod: '0115', state: 'DEAD_END' }];
+    const st = collectionStatus(peerConvs, { kodsWithAvtal: new Set(KODS) });
+    const html = text(renderKommun({ kod: '0114', stats, facts, statusMap: st, today: TODAY }));
+    expect(html).toContain('bara de 5 av 6 där insamlingen är klar');
   });
 });

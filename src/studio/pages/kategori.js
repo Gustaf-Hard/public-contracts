@@ -68,38 +68,58 @@ function whiteSpotMap({ ws, label, nameOf, tiles }) {
   const cls = new Map();
   for (const k of ws.has) cls.set(k, 'has');
   for (const k of ws.none_done) cls.set(k, 'none-done');
-  for (const k of ws.refused) cls.set(k, 'refused');
+  for (const k of ws.none_done_expired) cls.set(k, 'expired');
+  for (const k of ws.none_done_uncertain) cls.set(k, 'unknown');
+  for (const k of [...ws.refused, ...ws.partial]) cls.set(k, 'refused');
   for (const k of ws.none_open) cls.set(k, 'none-open');
   for (const k of ws.not_contacted) cls.set(k, 'not-contacted');
   const lower = label.toLowerCase();
-  const expired = new Set(ws.none_done_expired ?? []);
-  const what = {
-    has: `har aktivt avtal i ${lower}`,
-    'none-done': `inget aktivt avtal i ${lower}, insamlingen klar`,
-    refused: 'inga avtal utlämnade, vi vet inte vad kommunen köper',
-    'none-open': `insamlingen pågår, inget aktivt avtal i ${lower} än`,
-    'not-contacted': 'inte kontaktad än',
-  };
-  const tip = (kod) => (expired.has(kod) ? `inget aktivt avtal i ${lower}, bara utgångna eller ersatta, insamlingen klar` : what[cls.get(kod)]);
+  const tipOf = new Map([
+    ...ws.has.map((k) => [k, `har aktivt avtal i ${lower}`]),
+    ...ws.none_done.map((k) => [k, `inga avtal i ${lower}, insamlingen klar`]),
+    ...ws.none_done_expired.map((k) => [k, `avtalet i ${lower} har löpt ut eller ersatts, insamlingen klar`]),
+    ...ws.none_done_uncertain.map((k) => [k, `inget avtal i ${lower}, men aktiva avtal med okänd kategori`]),
+    ...ws.refused.map((k) => [k, 'inga avtal utlämnade, vi vet inte vad kommunen köper']),
+    ...ws.partial.map((k) => [k, 'delvis utlämnat, vi vet inte allt kommunen köper']),
+    ...ws.none_open.map((k) => [k, `insamlingen pågår, inget aktivt avtal i ${lower} än`]),
+    ...ws.not_contacted.map((k) => [k, 'inte kontaktad än']),
+  ]);
   const map = tileMap({
     tiles,
     classOf: (kod) => cls.get(kod) ?? 'unknown',
-    titleOf: (kod) => `${nameOf(kod)}: ${tip(kod) ?? 'status okänd'}`,
+    titleOf: (kod) => `${nameOf(kod)}: ${tipOf.get(kod) ?? 'status okänd'}`,
     legend: [
       { cls: 'has', label: 'Har aktivt avtal i kategorin' },
-      { cls: 'none-done', label: 'Inget aktivt avtal, insamling klar' },
-      { cls: 'refused', label: 'Inga avtal utlämnade' },
+      { cls: 'none-done', label: 'Inga avtal i kategorin, insamling klar' },
+      { cls: 'expired', label: 'Avtalet har löpt ut' },
+      { cls: 'unknown', label: 'Avtal med okänd kategori, eller status okänd' },
+      { cls: 'refused', label: 'Inga eller inte alla avtal utlämnade' },
       { cls: 'none-open', label: 'Insamling pågår' },
       { cls: 'not-contacted', label: 'Inte kontaktad' },
     ],
     label: `Kommuner med avtal i ${lower}`,
   });
-  const nExp = expired.size;
+  const nExp = ws.none_done_expired.length;
+  const nUnc = ws.none_done_uncertain.length;
+  const nRef = ws.refused.length;
+  const nPart = ws.partial.length;
   const side = `<div class="ws-side">
-    <p class="ws-big"><b>${esc(fmtInt(ws.none_done.length))}</b> ${ws.none_done.length === 1 ? 'kommun har' : 'kommuner har'} klar insamling och inget aktivt avtal i ${esc(lower)}.</p>
-    <p class="meta">Det är de säkra vita fläckarna.${nExp ? ` ${esc(nOf(nExp, 'av dem har', 'av dem har'))} utgångna eller ersatta avtal i ${esc(lower)}, så de köper i kategorin men det nya avtalet finns inte hos oss.` : ''} I ${esc(nOf(ws.none_open.length, 'kommun', 'kommuner'))} pågår insamlingen, där kan avtal fortfarande komma in.${ws.refused?.length ? ` ${esc(nOf(ws.refused.length, 'kommun', 'kommuner'))} har inte lämnat ut några avtal, där vet vi inte vad de köper.` : ''}${ws.not_contacted.length ? ` ${esc(nOf(ws.not_contacted.length, 'kommun', 'kommuner'))} har vi inte kontaktat än.` : ''}</p>
+    <p class="ws-big"><b>${esc(fmtInt(ws.none_done.length))}</b> ${ws.none_done.length === 1 ? 'kommun har' : 'kommuner har'} klar insamling och inga avtal alls i ${esc(lower)}.</p>
+    <p class="meta">Det är de säkra vita fläckarna: inget aktivt, utgånget eller ersatt avtal i kategorin, och inga aktiva avtal vi inte har kunnat kategorisera.</p>
+    ${nExp ? `<p class="ws-exp"><b>${esc(fmtInt(nExp))}</b> ${nExp === 1 ? 'kommun har' : 'kommuner har'} klar insamling där avtalet i ${esc(lower)} har löpt ut eller ersatts. De köper i kategorin men det nya avtalet finns inte hos oss, ett läge att höra av sig.</p>` : ''}
+    <p class="meta">${nUnc ? `${esc(nOf(nUnc, 'kommun', 'kommuner'))} med klar insamling har aktiva avtal med okänd kategori, så de kan redan köpa ${esc(lower)}. ` : ''}I ${esc(nOf(ws.none_open.length, 'kommun', 'kommuner'))} pågår insamlingen, där kan avtal fortfarande komma in.${nRef ? ` ${esc(nOf(nRef, 'kommun', 'kommuner'))} har inte lämnat ut några avtal, där vet vi inte vad de köper.` : ''}${nPart ? ` ${esc(nOf(nPart, 'kommun', 'kommuner'))} har lämnat ut en del avtal men inte resten, där vet vi inte allt de köper.` : ''}${ws.not_contacted.length ? ` ${esc(nOf(ws.not_contacted.length, 'kommun', 'kommuner'))} har vi inte kontaktat än.` : ''}</p>
   </div>`;
   return `<div class="ws card"><div class="ws-map">${map}</div>${side}</div>`;
+}
+
+// KPI basis: what the safe count is, and what is left out of it.
+function wsBasis(ws) {
+  const out = [
+    ws.none_done_expired.length ? `${fmtInt(ws.none_done_expired.length)} där avtalet har löpt ut` : '',
+    ws.none_done_uncertain.length ? `${fmtInt(ws.none_done_uncertain.length)} med avtal av okänd kategori` : '',
+    ws.refused.length + ws.partial.length ? `${fmtInt(ws.refused.length + ws.partial.length)} utan alla avtal utlämnade` : '',
+  ].filter(Boolean);
+  return `insamlingen klar, inga avtal alls i kategorin${out.length ? `; räknas inte: ${out.join(', ')}` : ''}`;
 }
 
 // ------------------------------------------------------------ renewals
@@ -239,7 +259,7 @@ export function renderKategori({ category, facts, stats, statusMap, today, page 
     ${kpiTile({ label: 'Aktiva avtal', value: avtal.length, unit: 'avtal', basis: `${fmtInt(byContract(all).length)} insamlade totalt`, state: avtal.length ? 'known' : 'unknown', reason: 'Inga aktiva avtal i kategorin än.' })}
     ${kpiTile({ label: 'Leverantörer', value: shares.length, unit: 'leverantörer', basis: shares.length ? `${fmtInt(shares.filter((s) => s.slug).length)} i katalogen, ${fmtInt(shares.filter((s) => s.n_known).length)} med känt värde` : '', state: shares.length ? 'known' : 'unknown', reason: 'Inga leverantörer med aktiva avtal än.' })}
     ${kpiTile(renewalTileProps({ avtal, buckets: renewalBuckets(all, { today, months: 12 }), today }))}
-    ${kpiTile({ label: 'Säkra vita fläckar', value: ws.none_done.length, unit: 'kommuner', basis: `insamlingen klar, inget aktivt avtal i kategorin${ws.refused.length ? `; ${fmtInt(ws.refused.length)} utan utlämnade avtal räknas inte` : ''}`, state: 'known' })}
+    ${kpiTile({ label: 'Säkra vita fläckar', value: ws.none_done.length, unit: 'kommuner', basis: wsBasis(ws), state: 'known' })}
   </div>`;
 
   // Matrix: SKR huvudgrupp x segment, "Alla" on both axes.

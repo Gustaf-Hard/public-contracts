@@ -42,6 +42,7 @@ const STATUS = Object.freeze({
   not_contacted: { chip: 'Inte kontaktad', cls: 'is-none', text: 'Vi har inte begärt ut kommunens avtal än. Nedan ser du vad liknande kommuner köper och betalar.' },
   open: { chip: 'Insamling pågår', cls: 'is-open', text: 'Kommunen har inte lämnat ut alla avtal än. Siffrorna räknar bara de avtal vi har fått.' },
   done: { chip: 'Insamling klar', cls: 'is-done', text: 'Kommunen har svarat på vår begäran och insamlingen är avslutad.' },
+  partial: { chip: 'Delvis utlämnat', cls: 'is-open', text: 'Kommunen har lämnat ut en del avtal men avslutat resten av vår begäran utan att lämna ut dem. Siffrorna räknar bara de avtal vi har fått, och att något saknas här betyder inte att kommunen saknar avtal.' },
   dead_end: { chip: 'Inga avtal utlämnade', cls: 'is-none', text: 'Kommunen har inte lämnat ut avtal till oss. Insamlingen är avslutad utan underlag, så sidan bygger på liknande kommuner.' },
   unknown: { chip: 'Status okänd', cls: 'is-none', text: 'Vi vet inte hur långt insamlingen har kommit här.' },
 });
@@ -487,7 +488,7 @@ export function renderKommun({ kod, kommun = null, stats, facts, statusMap = new
   const known = avtal.filter((f) => isNum(f.annual_value_sek));
 
   const statusWord = status === 'not_contacted' ? 'vi har inte begärt ut avtal här än'
-    : status === 'open' ? 'insamling pågår' : status === 'done' ? 'insamling klar'
+    : status === 'open' ? 'insamling pågår' : status === 'done' ? 'insamling klar' : status === 'partial' ? 'delvis utlämnat'
       : status === 'dead_end' ? 'kommunen har inte lämnat ut avtal' : 'insamlingens status är okänd';
   const who = [
     isNum(k.folkmangd) ? `${fmtInt(k.folkmangd)} invånare` : null,

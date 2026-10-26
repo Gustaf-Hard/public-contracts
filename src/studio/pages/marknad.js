@@ -11,7 +11,7 @@ import { kpiTile, emptyPanel } from '../components.js';
 import { rankingBars } from '../charts.js';
 import {
   isNum, headline, byContract, categoryLabel, companyHref, kommunHref, kommunNamer,
-  section, renewalTileProps, nOf, isIso,
+  section, renewalTileProps, nOf, isIso, notDone,
 } from './common.js';
 
 export const ADDA_MONTH = '2027-01';
@@ -305,7 +305,7 @@ export function renderMarknad({ facts, stats, statusMap, today, basis }) {
       ${completenessRing({ covered })}
       <dl class="mk-facts">
         <div><dt>Kommuner med avtal</dt><dd><b>${esc(fmtInt(covered))}</b> av ${esc(fmtInt(KOMMUNER_TOTAL))}</dd></div>
-        <div><dt>Insamling klar</dt><dd><b>${esc(fmtInt(b.done ?? 0))}</b> ${(b.done ?? 0) === 1 ? 'kommun' : 'kommuner'}${b.dead_end ? `, och ${esc(fmtInt(b.dead_end))} utan utlämnade avtal` : ''}</dd></div>
+        <div><dt>Insamling klar</dt><dd><b>${esc(fmtInt(b.done ?? 0))}</b> ${(b.done ?? 0) === 1 ? 'kommun' : 'kommuner'}${b.dead_end || b.partial ? `, ${esc(notDone(b.dead_end, b.partial))}` : ''}</dd></div>
         <div><dt>Aktiva avtal</dt><dd><b>${esc(fmtInt(active))}</b> av ${esc(fmtInt(collected))} insamlade</dd></div>
       </dl>
     </div>

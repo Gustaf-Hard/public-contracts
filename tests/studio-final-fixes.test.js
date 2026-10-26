@@ -304,18 +304,19 @@ describe('I. dead_end is not evidence of absence', () => {
   ]);
   it('whiteSpots puts dead_end in refused and flags done kommuner with only expired avtal', () => {
     const ws = whiteSpots(facts, status, { category: 'laromedel', allKods: ['0114', '0115', '0117'] });
-    expect(ws).toMatchObject({ has: ['0117'], none_done: ['0114'], none_done_expired: ['0114'], refused: ['0115'] });
+    // r2 P4: an expired-only kommun is its own bucket, never a safe white spot.
+    expect(ws).toMatchObject({ has: ['0117'], none_done: [], none_done_expired: ['0114'], refused: ['0115'] });
     expect(dataBasis(facts, status)).toMatchObject({ done: 2, dead_end: 1 });
   });
   it('kategori page: säkra vita fläckar count done only, refused tiles are their own class, copy says inget aktivt avtal', () => {
     const html = renderKategori({ category: findCategory('laromedel'), facts, stats, statusMap: status, today: TODAY });
     const t = text(html);
-    expect(t).toContain('1 kommun har klar insamling och inget aktivt avtal i läromedel.');
-    expect(t).toContain('1 av dem har utgångna eller ersatta avtal i läromedel');
+    expect(t).toContain('0 kommuner har klar insamling och inga avtal alls i läromedel.');
+    expect(t).toContain('1 kommun har klar insamling där avtalet i läromedel har löpt ut eller ersatts.');
     expect(t).toContain('1 kommun har inte lämnat ut några avtal, där vet vi inte vad de köper.');
     expect(t).not.toContain('har lämnat ut sina avtal');
     expect(html).toMatch(/class="tile t-refused[^"]*"[^>]*aria-label="Testby 2: inga avtal utlämnade/);
-    expect(html).toContain('<i class="tile t-refused"></i><span>Inga avtal utlämnade</span>');
+    expect(html).toContain('<i class="tile t-refused"></i><span>Inga eller inte alla avtal utlämnade</span>');
   });
 });
 

@@ -305,6 +305,8 @@ a.ct.is-empty { background: var(--hatch), var(--surface-2); border-style: dashed
 .ws { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: var(--s-6); align-items: start; }
 .ws-side { display: flex; flex-direction: column; gap: var(--s-3); padding-top: var(--s-2); }
 .ws-big { font-size: var(--t-md); color: var(--ink-2); line-height: 1.45; }
+.ws-exp { color: var(--ink-2); line-height: 1.45; }
+.ws-exp b { font-weight: 600; color: var(--ink); }
 .ws-big b { display: block; font-family: var(--font-display); font-size: var(--t-3xl); font-weight: 500; line-height: 1; color: var(--ink); margin-bottom: 4px; }
 @media (max-width: 1100px) { .ws { grid-template-columns: 1fr; } }
 .pc-by { font-size: var(--t-sm); margin-top: -8px; }
@@ -667,6 +669,8 @@ const COMPONENT_CSS = `
 .t-has { background: var(--viz-1); }
 .t-has-open { background: var(--tile-has-open); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--viz-1) 60%, transparent); }
 .t-none-done { background: var(--tile-none); }
+/* expired: a ring in the "has" colour on the page surface: had an avtal here, it has run out. No new colour. */
+.t-expired { background: var(--surface); box-shadow: inset 0 0 0 2px var(--viz-1); }
 /* dead_end: grey like none-done but hatched, so it never reads as "insamling klar" or as a pale "pågår" tile. */
 .t-refused { background: var(--hatch), color-mix(in oklab, var(--tile-none) 55%, var(--surface)); box-shadow: inset 0 0 0 1px var(--tile-none); }
 .t-none-open { background: var(--hatch), var(--surface-2); box-shadow: inset 0 0 0 1px var(--line-strong); }

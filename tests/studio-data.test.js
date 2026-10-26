@@ -276,22 +276,23 @@ describe('collectionStatus dead_end', () => {
     { kommun_kod: '9003', state: 'DONE' },
     { kommun_kod: '9004', state: 'DEAD_END' }, { kommun_kod: '9004', state: 'SENT' },
   ];
-  it('a closed kommun with a DEAD_END and no avtal received is dead_end', () => {
+  it('a closed kommun with a DEAD_END and no avtal received is dead_end; with some avtal it is partial', () => {
     const st = collectionStatus(convs, { kodsWithAvtal: new Set(['9001']) });
-    expect(st.get('9001')).toBe('done');
+    expect(st.get('9001')).toBe('partial'); // r2 P7: a DEAD_END is never a complete collection
     expect(st.get('9002')).toBe('dead_end');
     expect(st.get('9003')).toBe('done');
     expect(st.get('9004')).toBe('open');
   });
-  it('without kodsWithAvtal a closed kommun stays done', () => {
-    expect(collectionStatus(convs).get('9002')).toBe('done');
+  it('without kodsWithAvtal a closed kommun with a DEAD_END is partial, never done', () => {
+    expect(collectionStatus(convs).get('9002')).toBe('partial');
+    expect(collectionStatus(convs).get('9003')).toBe('done');
   });
   it('dead_end is not evidence of absence: its own bucket, never a finished collection', () => {
     const st = collectionStatus(convs, { kodsWithAvtal: new Set(['9001']) });
     const ws = whiteSpots([], st, { allKods: ['9002', '9003'] });
     expect(ws.none_done).toEqual(['9003']);
     expect(ws.refused).toEqual(['9002']);
-    expect(dataBasis([], st)).toMatchObject({ done: 2, dead_end: 1 });
+    expect(dataBasis([], st)).toMatchObject({ done: 1, dead_end: 1, partial: 1 });
   });
 });
 
@@ -302,22 +303,25 @@ describe('collectionStatus and whiteSpots', () => {
     { kommun_kod: '9003', state: 'DONE' }, { kommun_kod: '9003', state: 'SENT' },
     { kommun_kod: '9005', state: 'INITIAL' },
   ]);
-  it('done only when every conversation is DONE/DEAD_END', () => {
+  it('done only when every conversation is DONE; a DEAD_END makes it partial', () => {
     expect(status.get('9001')).toBe('done');
-    expect(status.get('9002')).toBe('done');
+    expect(status.get('9002')).toBe('partial');
     expect(status.get('9003')).toBe('open');
     expect(status.get('9005')).toBe('not_contacted');
     expect(status.has('9004')).toBe(false);
   });
-  it('separates the four buckets', () => {
+  it('separates the buckets', () => {
     const facts = build([C({ kommun_kod: '9001' })]);
     const ws = whiteSpots(facts, status, { category: 'laromedel', allKods: ['9001', '9002', '9003', '9004', '9005'] });
-    expect(ws).toEqual({ has: ['9001'], none_done: ['9002'], none_done_expired: [], refused: [], none_open: ['9003'], not_contacted: ['9004', '9005'] });
+    expect(ws).toEqual({
+      has: ['9001'], none_done: [], none_done_expired: [], none_done_uncertain: [], refused: [], partial: ['9002'],
+      none_open: ['9003'], not_contacted: ['9004', '9005'],
+    });
   });
   it('an avtal in another category is a white spot here', () => {
-    const facts = build([C({ kommun_kod: '9002', vendor_name: 'IST', products: [] })]);
-    const ws = whiteSpots(facts, status, { category: 'laromedel', allKods: ['9002'] });
-    expect(ws.none_done).toEqual(['9002']);
+    const facts = build([C({ kommun_kod: '9001', vendor_name: 'IST', products: [] })]);
+    const ws = whiteSpots(facts, status, { category: 'laromedel', allKods: ['9001'] });
+    expect(ws.none_done).toEqual(['9001']);
   });
 });
 

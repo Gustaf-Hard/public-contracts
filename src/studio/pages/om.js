@@ -6,7 +6,7 @@ import { esc } from '../layout.js';
 import { fmtInt, fmtPct } from '../format.js';
 import { MIN_N, KOMMUNER_TOTAL, ACTIVE_YEARS, isCollectionFinished } from '../../studio-data.js';
 import { SIZE_BANDS } from '../../kommun-stats.js';
-import { isIso, isNum, headline, section, nOf, safeAll } from './common.js';
+import { isIso, isNum, headline, section, nOf, safeAll, notDone } from './common.js';
 import { kommunStatus } from './lists.js';
 
 // A basis figure that could not be read is "okänt", never 0.
@@ -27,7 +27,7 @@ export function statusCounts({ facts, stats, statusMap }) {
   const all = safeAll(stats).map((r) => r.kod);
   const kods = all.length ? all : [...new Set([...statusMap.keys(), ...facts.map((f) => f.kommun_kod)])].filter(Boolean);
   const collected = new Set(facts.map((f) => f.kommun_kod));
-  const out = { done: 0, open: 0, dead_end: 0, not_contacted: 0, unknown: 0 };
+  const out = { done: 0, open: 0, partial: 0, dead_end: 0, not_contacted: 0, unknown: 0 };
   for (const kod of kods) out[kommunStatus(statusMap, kod, collected.has(kod))]++;
   return out;
 }
@@ -94,7 +94,7 @@ export function renderOm({ facts, stats, statusMap = new Map(), basis = {}, toda
       <dl class="eh-facts">
         <div class="eh-fact"><dt>Insamlade avtal</dt><dd class="eh-val">${esc(num(b.collected))}</dd><dd class="eh-sub">från ${esc(nOfU(b.kommuner_collected, 'kommun', 'kommuner'))}</dd></div>
         <div class="eh-fact"><dt>Aktiva avtal</dt><dd class="eh-val">${esc(num(b.active))}</dd><dd class="eh-sub">i ${esc(nOfU(b.kommuner_with_avtal, 'kommun', 'kommuner'))}</dd></div>
-        <div class="eh-fact"><dt>Insamling klar</dt><dd class="eh-val">${esc(fmtInt(finished))}</dd><dd class="eh-sub">av ${esc(fmtInt(KOMMUNER_TOTAL))} kommuner${sc.dead_end ? `, och ${esc(fmtInt(sc.dead_end))} utan utlämnade avtal` : ''}</dd></div>
+        <div class="eh-fact"><dt>Insamling klar</dt><dd class="eh-val">${esc(fmtInt(finished))}</dd><dd class="eh-sub">av ${esc(fmtInt(KOMMUNER_TOTAL))} kommuner${sc.dead_end || sc.partial ? `, ${esc(notDone(sc.dead_end, sc.partial))}` : ''}</dd></div>
       </dl>
     </div>
   </div>
@@ -103,8 +103,8 @@ export function renderOm({ facts, stats, statusMap = new Map(), basis = {}, toda
   const insamling = `<div class="om-prose">
   ${p('Vi skickar en begäran om allmänna handlingar enligt offentlighetsprincipen till varje kommuns registrator och ber om kommunens gällande avtal för skolans digitala verktyg: läromedel, lärplattformar, skoladministration, prov, stödverktyg och elevhälsa. Avtalen som kommer tillbaka läses rad för rad: leverantör, produkter, period, årsvärde, prismodell och vilka skolformer avtalet gäller.')}
   ${p('Leverantörs- och produktnamn i avtalen skrivs på många sätt. En katalog läser varje namn som ett företag, en produkt, ett tillägg, en rabatt eller ett segment, så att samma produkt räknas som en.')}
-  ${p(`I dag är insamlingen klar i ${nOf(finished, 'kommun', 'kommuner')} och pågår i ${fmtInt(open)}${notContacted ? `. I ${nOf(notContacted, 'kommun', 'kommuner')} har vi inte begärt ut avtal än` : ''}${sc.unknown ? `. För ${nOf(sc.unknown, 'kommun', 'kommuner')} vet vi inte hur långt insamlingen har kommit` : ''}. ${sc.dead_end ? `${nOf(sc.dead_end, 'kommun', 'kommuner')} har avslutat ärendet utan att lämna ut några avtal. De räknas inte som klara: vi vet inte vad de köper, så de är aldrig vita fläckar och ingår inte bland liknande kommuner med klar insamling. På kartorna är de streckade som "Inga avtal utlämnade".` : ''}`)}
-  ${p('Att en kommun saknar avtal i en kategori betyder bara något när insamlingen där är klar. Kartorna skiljer därför på fyra saker: inget aktivt avtal och insamlingen klar, inga avtal utlämnade, insamlingen pågår, och inte kontaktad än. En kommun med klar insamling vars avtal i kategorin har gått ut har inget aktivt avtal där, men köper troligen i kategorin.')}
+  ${p(`I dag är insamlingen klar i ${nOf(finished, 'kommun', 'kommuner')} och pågår i ${fmtInt(open)}${notContacted ? `. I ${nOf(notContacted, 'kommun', 'kommuner')} har vi inte begärt ut avtal än` : ''}${sc.unknown ? `. För ${nOf(sc.unknown, 'kommun', 'kommuner')} vet vi inte hur långt insamlingen har kommit` : ''}. ${sc.dead_end ? `${nOf(sc.dead_end, 'kommun', 'kommuner')} har avslutat ärendet utan att lämna ut några avtal. De räknas inte som klara: vi vet inte vad de köper, så de är aldrig vita fläckar och ingår inte bland liknande kommuner med klar insamling. På kartorna är de streckade som "Inga eller inte alla avtal utlämnade".` : ''}${sc.partial ? ` ${nOf(sc.partial, 'kommun', 'kommuner')} har lämnat ut en del avtal men avslutat resten av begäran utan avtal. De räknas inte heller som klara: det som saknas kan vara ett avtal de har, så de är aldrig vita fläckar.` : ''}`)}
+  ${p('Att en kommun saknar avtal i en kategori betyder bara något när insamlingen där är klar. Kartorna skiljer därför på inga avtal alls och insamlingen klar, avtal som har löpt ut, inga eller inte alla avtal utlämnade, insamlingen pågår, och inte kontaktad än. En säker vit fläck har klar insamling och inga avtal alls i kategorin, inte heller utgångna, och inga aktiva avtal med okänd kategori. En kommun vars avtal i kategorin har löpt ut köper troligen i kategorin och visas för sig.')}
 </div>`;
 
   const aktiv = `<div class="grid-12">

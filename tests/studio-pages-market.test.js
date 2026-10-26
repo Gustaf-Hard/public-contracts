@@ -265,7 +265,7 @@ describe('/studio/kategori/:slug', () => {
     expect(html.indexOf('ILT Education')).toBeLessThan(html.indexOf('Binogi'));
     expect(html).toContain('class="viz tilemap"');
     const legend = html.slice(html.indexOf('tm-legend'));
-    for (const l of ['Har aktivt avtal i kategorin', 'Inget aktivt avtal, insamling klar', 'Insamling pågår', 'Inte kontaktad']) {
+    for (const l of ['Har aktivt avtal i kategorin', 'Inga avtal i kategorin, insamling klar', 'Avtalet har löpt ut', 'Insamling pågår', 'Inte kontaktad']) {
       expect(legend).toContain(l);
     }
     expect(html).toContain('t-none-done');
@@ -273,10 +273,10 @@ describe('/studio/kategori/:slug', () => {
     noLeaks(html);
   });
 
-  it('the white-spot KPI basis says inget aktivt avtal', async () => {
+  it('the white-spot KPI basis says inga avtal alls (r2 P4)', async () => {
     seedMarket();
     const html = (await body('/studio/kategori/laromedel')).text;
-    expect(html).toContain('insamlingen klar, inget aktivt avtal i kategorin');
+    expect(html).toContain('insamlingen klar, inga avtal alls i kategorin');
     expect(html).toMatch(/\d+ i katalogen, \d+ med känt värde/);
   });
 

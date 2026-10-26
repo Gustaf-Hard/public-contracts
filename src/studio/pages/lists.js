@@ -10,7 +10,7 @@ import { companyShares, isCollectionFinished, KOMMUNER_TOTAL } from '../../studi
 import { filterBar, emptyPanel } from '../components.js';
 import { tileMap } from '../charts.js';
 import {
-  headline, categoryLabel, companyHref, productHref, kommunHref, kommunNamer, section, nOf, safeAll,
+  headline, categoryLabel, companyHref, productHref, kommunHref, kommunNamer, section, nOf, safeAll, notDone,
 } from './common.js';
 
 const CHANNEL_GROUP = 'kanal';
@@ -108,6 +108,7 @@ export const KOMMUN_STATUS = Object.freeze({
   done: { label: 'Insamling klar', tile: 'has', chip: 'is-done' },
   open: { label: 'Insamling pågår', tile: 'none-open', chip: 'is-open' },
   dead_end: { label: 'Inga avtal utlämnade', tile: 'refused', chip: 'is-none' },
+  partial: { label: 'Delvis utlämnat', tile: 'refused', chip: 'is-open' },
   not_contacted: { label: 'Inte kontaktad', tile: 'not-contacted', chip: 'is-none' },
   unknown: { label: 'Status okänd', tile: 'unknown', chip: 'is-none' },
 });
@@ -153,7 +154,7 @@ export function renderKommuner({ facts, stats, statusMap = new Map(), tiles, que
       { cls: 'has', label: 'Insamling klar' },
       { cls: 'has-open', label: 'Pågår, avtal har kommit in' },
       { cls: 'none-open', label: 'Pågår, inga avtal än' },
-      { cls: 'refused', label: 'Inga avtal utlämnade' },
+      { cls: 'refused', label: 'Inga eller inte alla avtal utlämnade' },
       { cls: 'not-contacted', label: 'Inte kontaktad' },
     ],
     label: 'Insamlingens status per kommun',
@@ -180,7 +181,7 @@ export function renderKommuner({ facts, stats, statusMap = new Map(), tiles, que
 
   const withAvtal = rows.filter((r) => r.n).length;
   const finished = rows.filter((r) => isCollectionFinished(r.status)).length;
-  const answer = `Vi har aktiva avtal från ${fmtInt(withAvtal)} av ${fmtInt(KOMMUNER_TOTAL)} kommuner. Insamlingen är klar i ${fmtInt(finished)} och pågår i ${fmtInt(byStatus('open'))}${byStatus('dead_end') ? `, ${fmtInt(byStatus('dead_end'))} har inte lämnat ut några avtal` : ''}${byStatus('not_contacted') ? `, ${fmtInt(byStatus('not_contacted'))} har vi inte kontaktat än` : ''}.`;
+  const answer = `Vi har aktiva avtal från ${fmtInt(withAvtal)} av ${fmtInt(KOMMUNER_TOTAL)} kommuner. Insamlingen är klar i ${fmtInt(finished)} och pågår i ${fmtInt(byStatus('open'))}${byStatus('dead_end') ? `, ${fmtInt(byStatus('dead_end'))} har inte lämnat ut några avtal` : ''}${byStatus('partial') ? `, ${fmtInt(byStatus('partial'))} har lämnat ut en del men inte alla` : ''}${byStatus('not_contacted') ? `, ${fmtInt(byStatus('not_contacted'))} har vi inte kontaktat än` : ''}.`;
 
   return `<section class="entity-header">
   <div class="entity-grid">
@@ -192,7 +193,7 @@ export function renderKommuner({ facts, stats, statusMap = new Map(), tiles, que
     <div class="eh-side">
       <dl class="eh-facts">
         <div class="eh-fact"><dt>Med aktiva avtal</dt><dd class="eh-val">${esc(fmtInt(withAvtal))}</dd><dd class="eh-sub">av ${esc(fmtInt(KOMMUNER_TOTAL))}</dd></div>
-        <div class="eh-fact"><dt>Insamling klar</dt><dd class="eh-val">${esc(fmtInt(byStatus('done')))}</dd><dd class="eh-sub">${esc(byStatus('dead_end') ? `och ${fmtInt(byStatus('dead_end'))} utan utlämnade avtal` : 'kommuner')}</dd></div>
+        <div class="eh-fact"><dt>Insamling klar</dt><dd class="eh-val">${esc(fmtInt(byStatus('done')))}</dd><dd class="eh-sub">${esc(notDone(byStatus('dead_end'), byStatus('partial')) || 'kommuner')}</dd></div>
         <div class="eh-fact"><dt>Pågår</dt><dd class="eh-val">${esc(fmtInt(byStatus('open')))}</dd><dd class="eh-sub">kommuner</dd></div>
       </dl>
     </div>
@@ -205,7 +206,7 @@ ${section({
       action: '/studio/kommuner',
       fields: [
         { name: 'lan', label: 'Län', value: lanFilter, options: lans },
-        { name: 'status', label: 'Status', value: statusFilter, options: ['done', 'open', 'dead_end', 'not_contacted'].map((s) => ({ value: s, label: KOMMUN_STATUS[s].label })) },
+        { name: 'status', label: 'Status', value: statusFilter, options: ['done', 'open', 'partial', 'dead_end', 'not_contacted'].map((s) => ({ value: s, label: KOMMUN_STATUS[s].label })) },
       ],
       resultLine: nOf(list.length, 'kommun', 'kommuner'),
     })}${groups ? `<div class="kl-grid">${groups}</div>` : emptyPanel({ title: 'Ingen kommun matchar filtren' })}`,
