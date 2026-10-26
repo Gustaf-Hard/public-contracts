@@ -86,29 +86,39 @@ function hrefWith(action, fields, dropName) {
   return s ? `${action}?${s}` : action;
 }
 
+// Field options: `type: 'text'` renders a text input instead of a select;
+// `all: false` drops the "Alla" option and `def` is then the value shown
+// when none is chosen (a chosen value equal to `def` gets no chip).
 export function filterBar({ action = '', fields = [], resultLine = '' } = {}) {
   const selects = fields.map((f) => {
     const id = `fb-${String(f.name).replace(/[^a-zA-Z0-9_-]/g, '')}`;
+    if (f.type === 'text') {
+      return `<label class="fb-field fb-text" for="${esc(id)}">
+      <span>${esc(f.label)}</span>
+      <input id="${esc(id)}" name="${esc(f.name)}" type="search" value="${esc(f.value ?? '')}"${f.placeholder ? ` placeholder="${esc(f.placeholder)}"` : ''} autocomplete="off">
+    </label>`;
+    }
     const opts = (f.options || []).map(opt);
+    const cur = String(f.value || (f.def ?? ''));
     return `<label class="fb-field" for="${esc(id)}">
       <span>${esc(f.label)}</span>
       <select id="${esc(id)}" name="${esc(f.name)}">
-        <option value="">Alla</option>
-        ${opts.map((o) => `<option value="${esc(o.value)}"${o.value === String(f.value ?? '') && f.value ? ' selected' : ''}>${esc(o.label)}</option>`).join('')}
+        ${f.all === false ? '' : '<option value="">Alla</option>'}
+        ${opts.map((o) => `<option value="${esc(o.value)}"${cur && o.value === cur ? ' selected' : ''}>${esc(o.label)}</option>`).join('')}
       </select>
     </label>`;
   }).join('');
-  const active = fields.filter((f) => f.value);
+  const active = fields.filter((f) => f.value && f.chip !== false && !(f.def != null && String(f.value) === String(f.def)));
   const chips = active.map((f) => {
-    const o = (f.options || []).map(opt).find((x) => x.value === String(f.value));
+    const o = f.type === 'text' ? null : (f.options || []).map(opt).find((x) => x.value === String(f.value));
     return `<a class="chip is-accent fb-chip" href="${esc(hrefWith(action, fields, f.name))}" data-pane-link aria-label="${esc(`Ta bort filter ${f.label}: ${o ? o.label : f.value}`)}"><span>${esc(f.label)}: <b>${esc(o ? o.label : f.value)}</b></span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg></a>`;
   }).join('');
   return `<form class="filter-bar" method="get" action="${esc(action)}" data-pane-form>
   <div class="fb-fields">${selects}<button type="submit" class="fb-submit">Visa</button></div>
-  <div class="fb-status">
+  ${chips || resultLine ? `<div class="fb-status">
     ${chips ? `<div class="fb-chips">${chips}${active.length > 1 ? `<a class="fb-clear" href="${esc(action)}" data-pane-link>Rensa alla</a>` : ''}</div>` : ''}
     ${resultLine ? `<p class="fb-result">${esc(resultLine)}</p>` : ''}
-  </div>
+  </div>` : ''}
 </form>`;
 }
 

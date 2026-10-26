@@ -15,6 +15,11 @@ import { renderKommun, findKommun } from './pages/kommun.js';
 import { renderMarknad, renderKategorier } from './pages/marknad.js';
 import { renderKategori, findCategory } from './pages/kategori.js';
 import { notFound } from './pages/common.js';
+import { renderFornyelser, renewalRows, renewalsCsv, parseFornyelserQuery } from './pages/fornyelser.js';
+import { renderUtforska, parseUtforskaQuery } from './pages/utforska.js';
+import { renderLeverantorer, renderKommuner, renderSearch, exactSearchHit } from './pages/lists.js';
+import { renderOm } from './pages/om.js';
+import { loadKommunTiles } from './charts.js';
 import path from 'node:path';
 import { existsSync } from 'node:fs';
 
@@ -181,6 +186,52 @@ export function mountStudio(app, {
     }
     const body = renderKommun({ kod: kommun.kod, kommun, stats: data.stats, facts: data.facts, statusMap: data.statusMap, today: data.today, page: pageOf(req) });
     sendStudio(req, res, data, { title: kommun.namn, body });
+  });
+
+  app.get('/studio/fornyelser', (req, res) => {
+    const data = getStudioData();
+    const query = parseFornyelserQuery(req.query);
+    sendStudio(req, res, data, { title: 'Förnyelser', body: renderFornyelser({ facts: data.facts, stats: data.stats, today: data.today, query, page: pageOf(req) }) });
+  });
+
+  app.get('/studio/fornyelser.csv', (req, res) => {
+    const data = getStudioData();
+    const rows = renewalRows({ facts: data.facts, stats: data.stats, today: data.today, query: parseFornyelserQuery(req.query) });
+    res.set('Content-Type', 'text/csv; charset=utf-8');
+    res.set('Content-Disposition', `attachment; filename="fornyelser-${data.today}.csv"`);
+    res.set('Cache-Control', 'private, no-store');
+    res.send(renewalsCsv(rows));
+  });
+
+  app.get('/studio/utforska', (req, res) => {
+    const data = getStudioData();
+    const query = parseUtforskaQuery(req.query);
+    sendStudio(req, res, data, { title: 'Utforska', body: renderUtforska({ facts: data.facts, stats: data.stats, today: data.today, query, page: pageOf(req) }) });
+  });
+
+  app.get('/studio/leverantorer', (req, res) => {
+    const data = getStudioData();
+    const q = typeof req.query.q === 'string' ? req.query.q.slice(0, 120) : '';
+    sendStudio(req, res, data, { title: 'Leverantörer', body: renderLeverantorer({ facts: data.facts, query: { q } }) });
+  });
+
+  app.get('/studio/kommuner', (req, res) => {
+    const data = getStudioData();
+    const tiles = safe(() => loadKommunTiles(), null);
+    sendStudio(req, res, data, { title: 'Kommuner', body: renderKommuner({ facts: data.facts, stats: data.stats, statusMap: data.statusMap, tiles, query: req.query }) });
+  });
+
+  app.get('/studio/sok', (req, res) => {
+    const data = getStudioData();
+    const q = typeof req.query.q === 'string' ? req.query.q.trim().slice(0, 120) : '';
+    const hit = q ? exactSearchHit({ q, stats: data.stats, facts: data.facts }) : null;
+    if (hit) return res.redirect(302, isPartial(req) ? `${hit}?partial=1` : hit);
+    sendStudio(req, res, data, { title: q ? `Sök: ${q}` : 'Sök', body: renderSearch({ q, stats: data.stats, facts: data.facts }) });
+  });
+
+  app.get('/studio/om', (req, res) => {
+    const data = getStudioData();
+    sendStudio(req, res, data, { title: 'Om datan', body: renderOm({ facts: data.facts, stats: data.stats, statusMap: data.statusMap, basis: data.basis, today: data.today, ttlMs: STUDIO_DATA_TTL_MS }) });
   });
 
   // OPERATOR-ONLY. Serves the source file of a stored avtal, the same file as

@@ -351,7 +351,8 @@ export function renewalTimeline({ lanes = [], today, months = 24, laneHead = '' 
 // ------------------------------------------------------------------ tile map
 
 // 'neutral': a kommun the map makes no claim about (e.g. outside a peer group).
-export const TILE_CLASSES = Object.freeze(['has', 'none-done', 'none-open', 'not-contacted', 'highlight', 'neutral', 'unknown']);
+// 'has-open': collection still open but avtal have come in (Kommuner directory).
+export const TILE_CLASSES = Object.freeze(['has', 'has-open', 'none-done', 'none-open', 'not-contacted', 'highlight', 'neutral', 'unknown']);
 const TILE_UNKNOWN_LABEL = 'Status okänd';
 
 let tilesMemo = null;

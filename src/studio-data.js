@@ -230,6 +230,10 @@ export function buildStudioFacts({ contracts = [], lineItems = [], coverage = []
         period_start: c.period_start ?? null,
         period_end: c.period_end ?? null,
         next_renewal: computeNextReviewDate(c, now),
+        // Renewal terms as the avtal states them (Förnyelser shows them).
+        auto_renews: c.auto_renews == null ? null : !!c.auto_renews,
+        extension_option_until: isIso(c.extension_option_until) ? c.extension_option_until.slice(0, 10) : null,
+        last_cancellation_date: isIso(c.last_cancellation_date) ? c.last_cancellation_date.slice(0, 10) : null,
         active: isActive(c, today),
         superseded: false,
         elever_in_scope: null,
