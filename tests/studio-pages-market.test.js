@@ -94,14 +94,16 @@ function seedMarket() {
   for (const [kod, p] of Object.entries(poly)) {
     seedContract({
       kod, vendor: 'ILT Education AB', value: 300000, end: '2027-01-31',
-      received: `2026-05-0${d++}T10:00:00Z`,
+      // Distinct starts: same vendor, dates and value in two kommuner is one
+      // samverkansavtal (r2 P2); these are separate avtal.
+      start: `2025-08-0${d}`, received: `2026-05-0${d++}T10:00:00Z`,
       lines: [{ product_name: 'Polyglutt', unit: 'elev', unit_price_sek: p, period_months: 12 }],
     });
   }
   seedContract({ kod: '1440', vendor: 'Binogi AB', value: 80000, end: '2027-06-30', lines: [{ product_name: 'Binogi' }] });
   seedContract({ kod: '1441', vendor: 'Binogi AB', value: 60000, end: '2027-06-30', lines: [{ product_name: 'Binogi' }] });
   for (const kod of ['1401', '1402', '1441']) {
-    seedContract({ kod, vendor: 'Vklass AB', value: 120000, model: 'fixed', end: '2028-03-31', lines: [{ product_name: 'Vklass' }] });
+    seedContract({ kod, vendor: 'Vklass AB', value: 120000, model: 'fixed', end: '2028-03-31', start: `2025-07-0${d++ - 5}`, lines: [{ product_name: 'Vklass' }] });
   }
   seedContract({ kod: '1440', vendor: 'Unikum', value: null, model: 'tiered', end: '2027-12-31', lines: [{ product_name: 'Unikum' }], received: '2026-09-20T10:00:00Z' });
   seedContract({ kod: '1407', vendor: 'Vklass AB', value: 90000, model: 'fixed', start: '2019-01-01', end: '2022-12-31', lines: [{ product_name: 'Vklass' }] });

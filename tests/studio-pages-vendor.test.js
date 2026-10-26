@@ -216,8 +216,9 @@ describe('/studio/leverantor/:slug', () => {
   });
 
   it('a value-per-elev price (Skolverket elever, no styckpris line) gets its product strip', async () => {
-    for (const kod of ['1440', '0560', '0180', '1480', '1280']) {
-      const { cid } = seedContract({ kod, vendor: 'Binogi AB', value: 180000, model: 'fixed' });
+    // Distinct starts: one samverkansavtal otherwise (r2 P2).
+    for (const [i, kod] of ['1440', '0560', '0180', '1480', '1280'].entries()) {
+      const { cid } = seedContract({ kod, vendor: 'Binogi AB', value: 180000, model: 'fixed', start: `2025-08-0${i + 1}` });
       db.replaceContractCoverage(cid, [
         { product_name: 'Binogi', grade_level: '4-6', status: 'full', student_count: 0 },
         { product_name: 'Binogi', grade_level: '7-9', status: 'full', student_count: 0 },

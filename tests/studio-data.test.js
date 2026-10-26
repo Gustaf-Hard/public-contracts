@@ -417,7 +417,9 @@ describe('renewals, co-occurrence, profile, basis', () => {
     expect(dataBasis(facts, st)).toMatchObject({ active: 4, collected: 5, kommuner_with_avtal: 2, kommuner_collected: 3, kommuner_total: 290, done: 1 });
   });
   it('pricingModelMix counts headline avtal per model, null as okand', () => {
-    const f2 = build([C(), C({ kommun_kod: '9002', pricing_model: null }), C({ kommun_kod: '9003', pricing_model: 'per_student' }), C({ kommun_kod: '9004', vendor_name: 'IST', products: [] })]);
+    // Distinct values: the same vendor, dates and value in kommuner of one
+    // län is one samverkansavtal (r2 P2).
+    const f2 = build([C(), C({ kommun_kod: '9002', pricing_model: null, annual_value_sek: 100010 }), C({ kommun_kod: '9003', pricing_model: 'per_student', annual_value_sek: 100020 }), C({ kommun_kod: '9004', vendor_name: 'IST', products: [] })]);
     expect(pricingModelMix(f2, { category: 'laromedel' })).toEqual([
       { model: 'fixed', n: 1, share: 1 / 3 }, { model: 'okand', n: 1, share: 1 / 3 }, { model: 'per_student', n: 1, share: 1 / 3 },
     ]);

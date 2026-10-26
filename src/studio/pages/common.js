@@ -330,14 +330,21 @@ function periodText(f, today) {
   const e = isIso(f.period_end) ? f.period_end.slice(0, 10) : null;
   let p = s && e ? `${s} till ${e}` : s ? `från ${s}, slut okänt` : e ? `till ${e}` : null;
   if (p == null) p = UNKNOWN;
+  if (f.duplicate_of) return `${p}, samma avtal som ett annat underlag`;
   if (f.superseded) return `${p}, ersatt av nyare avtal`;
   if (!f.active) return `${p}, ${e && e < today ? 'utgånget' : 'räknas inte som aktivt'}`;
   return p;
 }
 
+// "samverkansavtal med 2 kommuner": the value shown is this kommun's share.
+export function jointText(f) {
+  return f.joint ? `samverkansavtal med ${fmtInt(f.joint.n_kommuner)} kommuner, ${f.joint.by === 'elever' ? 'andel efter elever' : 'delat lika'}` : '';
+}
+
 function valueText(f) {
-  if (!isNum(f.annual_value_sek)) return null;
+  if (!isNum(f.annual_value_sek)) return f.joint ? jointText(f) : null;
   const base = `${fmtKrCompact(f.annual_value_sek)}/år`;
+  if (f.joint) return `${base}, ${jointText(f)}`;
   if (f.value_basis === 'unsplit_channel') return `${base}, ej fördelat`;
   if (f.value_basis === 'split') return `${base}, egen del`;
   return base;

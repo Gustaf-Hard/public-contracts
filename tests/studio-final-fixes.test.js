@@ -76,7 +76,8 @@ describe('A. only an active newer avtal supersedes, on like clocks', () => {
     const open = C({ vendor_name: 'ProReNata AB', period_start: '2023-06-13', period_end: null });
     const facts = build([ended, open]);
     expect(row(facts, open.contract_id)).toMatchObject({ active: true, superseded: false });
-    expect(row(facts, ended.contract_id).superseded).toBe(true);
+    // Same start: neither is clearly newer (r2 P1), the ended one is simply expired.
+    expect(row(facts, ended.contract_id)).toMatchObject({ active: false, superseded: false });
   });
   it('an undated avtal received later never hides a running avtal (received_at is not a period start)', () => {
     const running = C({ vendor_name: 'Teachiq', period_start: '2026-07-01', period_end: '2027-06-30', received_at: '2026-07-10T10:00:00Z' });
@@ -194,7 +195,8 @@ describe('E. price distributions count kommuner, not owner rows', () => {
     const cs = [
       C({ kommun_kod: '0114', unit: 'elev', unit_price_sek: 100, products: ['Polylino'] }),
       C({ kommun_kod: '0114', vendor_name: 'Radish AB', unit: 'elev', unit_price_sek: 300, products: ['Magma'] }),
-      ...['0115', '0117', '0120', '0123'].map((kod) => C({ kommun_kod: kod, unit: 'elev', unit_price_sek: 150, products: ['Polylino'] })),
+      // Distinct values: one samverkansavtal otherwise (r2 P2).
+      ...['0115', '0117', '0120', '0123'].map((kod, i) => C({ kommun_kod: kod, unit: 'elev', unit_price_sek: 150, annual_value_sek: 100010 + i * 10, products: ['Polylino'] })),
     ];
     const d = priceDistribution(build(cs), { category: 'laromedel' });
     expect(d.n).toBe(5);
@@ -229,7 +231,9 @@ describe('H. a reseller page counts the avtal it is the vendor of', () => {
   const company = companyBySlug('laromedia');
   it('a fully allocated avtal (zero remainder) and a partly allocated one both count, at their whole value', () => {
     const full = splitAvtal({ kommun_kod: '0114' });
-    const part = splitAvtal({ kommun_kod: '0115' });
+    // A different value: the same vendor, dates and value in two kommuner
+    // would be one samverkansavtal (r2 P2).
+    const part = splitAvtal({ kommun_kod: '0115', annual_value_sek: 90000 });
     const facts = build([full, part], {
       lineItems: [
         LI(full.contract_id, 'Polylino', 60000), LI(full.contract_id, 'Magma', 40000),
@@ -239,7 +243,7 @@ describe('H. a reseller page counts the avtal it is the vendor of', () => {
     expect(facts.some((f) => f.contract_id === full.contract_id && f.company_slug === 'laromedia')).toBe(false);
     const raw = renderLeverantor({ company, facts, stats, statusMap: new Map(), today: TODAY });
     const html = text(raw);
-    expect(html).toContain('har aktiva avtal med 2 kommuner i vårt underlag, med ett känt årsvärde på 200 tkr.');
+    expect(html).toContain('har aktiva avtal med 2 kommuner i vårt underlag, med ett känt årsvärde på 190 tkr.');
     expect(html).toMatch(/2 aktiva, 0 utgångna eller ersatta/);
     expect(raw).toContain('aria-label="Testby 1: har aktivt avtal med LäroMedia');
     expect(raw).toContain('aria-label="Testby 2: har aktivt avtal med LäroMedia');

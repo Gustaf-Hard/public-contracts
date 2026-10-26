@@ -80,23 +80,6 @@ function coverageStudents(covRows, segments) {
   return { count: [...gradeCount.values()].reduce((sum, n) => sum + n, 0), invalid };
 }
 
-// a newer than b: >0, b newer: <0, undecided: 0. Only like clocks are
-// compared: period_start with period_start, received_at only when neither
-// has a start, and an unknown end is never "older" than a known one.
-function compareNewer(a, b) {
-  const day = (v) => (isIso(v) ? v.slice(0, 10) : null);
-  const as = day(a.period_start); const bs = day(b.period_start);
-  if (as && bs && as !== bs) return as > bs ? 1 : -1;
-  if (!as && !bs) {
-    const ar = day(a._received_at); const br = day(b._received_at);
-    if (ar && br && ar !== br) return ar > br ? 1 : -1;
-  }
-  const ae = day(a.period_end); const be = day(b.period_end);
-  if (ae && be && ae !== be) return ae > be ? 1 : -1;
-  return a.contract_id === b.contract_id ? 0 : a.contract_id > b.contract_id ? 1 : -1;
-}
-function isNewer(a, b) { return compareNewer(a, b) > 0; }
-
 export function companyKey(f) {
   if (f.company_slug) return f.company_slug;
   if (f.company_name === UNKNOWN_COMPANY) return `contract:${f.contract_id}`;
@@ -257,9 +240,16 @@ export function buildStudioFacts({ contracts = [], lineItems = [], coverage = []
         attachment_id: c.attachment_id ?? null,
         // Date the avtal reached us (YYYY-MM-DD): "senast inkomna" lists.
         received_at: isIso(c.received_at) ? c.received_at.slice(0, 10) : null,
+        // Same avtal delivered twice (duplicate_of) or by several kommuner
+        // (joint, a samverkansavtal): see markDuplicates and allocateJoint.
+        duplicate_of: null,
+        joint: null,
+        avtal_key: String(c.contract_id),
         _g: g,
         _owner: isOwner,
         _received_at: c.received_at ?? null,
+        _vendor_key: ownerSlug ?? (blank(c.vendor_name) ? `contract:${c.contract_id}` : `name:${ownerName}`),
+        _annual: annual,
       });
     }
     // An unsplit channel remainder with no category of its own takes the
@@ -277,8 +267,10 @@ export function buildStudioFacts({ contracts = [], lineItems = [], coverage = []
     facts.push(...rows);
   }
 
+  markDuplicates(facts);
   markSuperseded(facts);
-  for (const f of facts) delete f._received_at;
+  allocateJoint(facts, stats);
+  for (const f of facts) { delete f._received_at; delete f._vendor_key; delete f._annual; }
   return facts;
 }
 
@@ -318,6 +310,29 @@ function annualUnitPrice({ unit_price_sek: up, unit, quantity: q, amount_sek: am
   return up;
 }
 
+// The elever an owner row covers: the avtal's own stated count when the
+// coverage rows pin it down, else Skolverket elever in the row's segments.
+// null when the row has no segments, the coverage is partial or bad, or the
+// count is unknown.
+function scopeElever(r, g, stats) {
+  if (r.segments.length === 0) return null; // a kommun-wide licence without segments is not normalised
+  const { count, invalid } = coverageStudents(g.cov, r.segments);
+  if (invalid) return null; // a negative or non-numeric count is bad data, not a fallback
+  if (count != null) return { elever: count, basis: 'avtalets_elevantal' };
+  if (stats && !g.cov.some((cv) => cv.status === 'partial')) {
+    const n = stats.eleverIn(r.kommun_kod, r.segments);
+    if (isFiniteNum(n) && n > 0) return { elever: n, basis: 'skolverket' };
+  }
+  return null;
+}
+
+// The line's amount for choosing the main elev line: amount_sek when stated,
+// else unit price x quantity, else 0.
+const lineWeight = ({ l }) => (isFiniteNum(l.amount_sek) && l.amount_sek > 0 ? l.amount_sek
+  : isFiniteNum(l.quantity) && l.quantity > 0 ? l.unit_price_sek * l.quantity : 0);
+const isElevLine = ({ l }) => ELEV_UNIT.test(l.unit ?? '') && isFiniteNum(l.unit_price_sek) && l.unit_price_sek > 0;
+const shortPeriod = (l) => isFiniteNum(l.period_months) && l.period_months > 0 && l.period_months < 12;
+
 function pricePerElev(r, { contract, singleRow, stats }) {
   const g = r._g;
   const model = contract.pricing_model ?? null;
@@ -328,21 +343,35 @@ function pricePerElev(r, { contract, singleRow, stats }) {
   const elevModel = ELEV_MODELS.has(model)
     || ((model == null || model === 'unknown') && ELEV_UNIT.test(contract.unit ?? ''));
   if (!elevModel) return;
+  // The pupils the row covers, also for a styckpris row: spend per elev on a
+  // kommun page divides known value by them. Never for a staff or user
+  // licence (a few teacher seats divided by every pupil would read as the
+  // cheapest price in Sweden).
+  const scope = staffUnit ? null : scopeElever(r, g, stats);
+  if (scope) r.elever_in_scope = scope.elever;
   // Styckpris: a product line of this row priced per elev for a period of at
-  // least 12 months (or no stated period); an explicit >= 12 months wins.
-  const unitLines = g.lines.filter(({ l, r: c }) => ['product', 'segment', 'bundle'].includes(c.kind)
-    && ELEV_UNIT.test(l.unit ?? '') && isFiniteNum(l.unit_price_sek) && l.unit_price_sek > 0
-    && (l.period_months == null || (isFiniteNum(l.period_months) && l.period_months >= 12)))
+  // least 12 months (or no stated period). Of several, the main line: an
+  // explicit >= 12 months first, then the largest amount (the all-subject
+  // licence, not a small add-on title that happens to come first).
+  const unitLines = g.lines.filter((x) => ['product', 'segment', 'bundle'].includes(x.r.kind) && isElevLine(x)
+    && (x.l.period_months == null || (isFiniteNum(x.l.period_months) && x.l.period_months >= 12)))
     .map((x) => ({ ...x, annual: annualUnitPrice(x.l) }))
-    .filter((x) => x.annual != null);
-  const unitLine = unitLines.find(({ l }) => l.period_months != null) ?? unitLines[0];
+    .filter((x) => x.annual != null)
+    .sort((a, b) => (b.l.period_months != null) - (a.l.period_months != null) || lineWeight(b) - lineWeight(a));
+  const unitLine = unitLines[0];
   if (unitLine) {
     r.kr_per_elev = round2(unitLine.annual);
     r.kr_per_elev_basis = 'styckpris';
     r.kr_per_elev_product_slug = unitLine.r.kind === 'bundle' ? null : unitLine.r.productSlug ?? null;
     return;
   }
-  if (singleRow && ELEV_UNIT.test(contract.unit ?? '')) {
+  // The avtal's own unit price, under the same period rule as lines: not when
+  // the avtal runs under 12 months, or its elev lines are priced for a
+  // shorter period (a 6-month line price is not a price per year).
+  const months = contractLengthMonths(contract.period_start, contract.period_end);
+  const shortLines = g.lines.some((x) => isElevLine(x) && shortPeriod(x.l))
+    && !g.lines.some((x) => isElevLine(x) && isFiniteNum(x.l.period_months) && x.l.period_months >= 12);
+  if (singleRow && ELEV_UNIT.test(contract.unit ?? '') && !shortLines && !(months != null && months < 12)) {
     const annual = annualUnitPrice({
       unit_price_sek: contract.unit_price_sek, unit: contract.unit, quantity: contract.quantity,
       amount_sek: contract.annual_value_sek, period_months: null,
@@ -354,41 +383,134 @@ function pricePerElev(r, { contract, singleRow, stats }) {
       return;
     }
   }
-  // Value per elev: never for a staff or user licence (a few teacher seats
-  // divided by every pupil would read as the cheapest price in Sweden).
-  if (staffUnit) return;
-  if (r.segments.length === 0) return; // a kommun-wide licence without segments is not normalised
-  const { count, invalid } = coverageStudents(g.cov, r.segments);
-  if (invalid) return; // a negative or non-numeric count is bad data, not a fallback
-  let elever = null; let basis = null;
-  if (count != null) {
-    elever = count; basis = 'avtalets_elevantal';
-  } else if (stats && !g.cov.some((cv) => cv.status === 'partial')) {
-    const n = stats.eleverIn(r.kommun_kod, r.segments);
-    if (isFiniteNum(n) && n > 0) { elever = n; basis = 'skolverket'; }
-  }
-  if (elever == null) return;
-  r.elever_in_scope = elever;
+  if (staffUnit || !scope) return;
   if (!isFiniteNum(r.annual_value_sek) || r.annual_value_sek <= 0 || !['stated', 'split'].includes(r.value_basis)) return;
-  const v = r.annual_value_sek / elever;
+  const v = r.annual_value_sek / scope.elever;
   if (!Number.isFinite(v)) return;
   r.kr_per_elev = round2(v);
-  r.kr_per_elev_basis = basis;
+  r.kr_per_elev_basis = scope.basis;
 }
 
-// Of several avtal for one kommun x company x product, the newest active one
-// counts.
+const dayOf = (v) => (isIso(v) ? v.slice(0, 10) : null);
+const sameKr = (a, b) => isFiniteNum(a) && isFiniteNum(b) && Math.abs(a - b) <= 1;
+const segmentsOverlap = (a, b) => !a.length || !b.length || a.some((s) => b.includes(s));
+const union = (rows, key) => [...new Set(rows.flatMap((f) => f[key]))];
+
+// One entry per avtal: its rows plus what the avtal-level rules compare.
+function avtalList(facts) {
+  return [...groupBy(facts, (f) => f.contract_id).values()].map((rows) => ({
+    id: rows[0].contract_id,
+    rows,
+    kod: rows[0].kommun_kod,
+    vendor: rows[0]._vendor_key,
+    start: dayOf(rows[0].period_start),
+    end: dayOf(rows[0].period_end),
+    annual: rows[0]._annual,
+    segments: sortGrades(new Set(union(rows, 'segments'))),
+    products: union(rows, 'product_slugs'),
+  }));
+}
+
+// The same avtal delivered twice in one kommun: same vendor, same start and
+// end, the same annual value (or one unknown), overlapping products and
+// segments. The fullest copy counts (see below); every
+// row of the other copies is hidden, so a second delivery never leaves an
+// owner row of its own behind.
+function markDuplicates(facts) {
+  const byKey = groupBy(avtalList(facts).filter((a) => a.kod && a.start), (a) => `${a.kod}\u0000${a.vendor}\u0000${a.start}\u0000${a.end ?? ''}`);
+  for (const list of byKey.values()) {
+    if (list.length < 2) continue;
+    // The fuller copy counts: a known value, then more owner rows and
+    // products (a copy that names Microsoft beside Atea keeps both), then
+    // the lowest id.
+    list.sort((a, b) => (isFiniteNum(b.annual) - isFiniteNum(a.annual)) || b.rows.length - a.rows.length
+      || b.products.length - a.products.length || a.id - b.id);
+    const kept = [];
+    for (const a of list) {
+      const same = kept.find((k) => (a.annual == null || k.annual == null || sameKr(a.annual, k.annual))
+        && segmentsOverlap(a.segments, k.segments)
+        && (!a.products.length || !k.products.length || a.products.some((p) => k.products.includes(p))));
+      if (!same) { kept.push(a); continue; }
+      for (const f of a.rows) { f.superseded = true; f.duplicate_of = same.id; }
+    }
+  }
+}
+
+// Of several avtal for one kommun x company x product, a newer one replaces
+// an older one only when it can: the newer is active, starts strictly later
+// (both starts known), names every product of the older, and covers some of
+// the same school forms (or one side names none). Avtal for different school
+// forms run side by side and both count. A tie is never broken by id or by
+// a day's difference in end date: if neither is clearly newer, both count.
 function markSuperseded(facts) {
-  const groups = groupBy(facts, (f) => `${f.kommun_kod}\u0000${companyKey(f)}`);
+  const groups = groupBy(facts.filter((f) => !f.duplicate_of), (f) => `${f.kommun_kod}\u0000${companyKey(f)}`);
   for (const rows of groups.values()) {
     if (rows.length < 2) continue;
     for (const r of rows) {
-      // Only an active (headline-eligible) avtal can replace another: an
-      // expired or undated addendum never hides a running avtal.
-      r.superseded = rows.some((s) => s.contract_id !== r.contract_id && s.active && isNewer(s, r) && (
-        r.product_slugs.length === 0
+      const rs = dayOf(r.period_start);
+      if (!rs) continue;
+      r.superseded = rows.some((s) => s.contract_id !== r.contract_id && s.active
+        && dayOf(s.period_start) && dayOf(s.period_start) > rs
+        && segmentsOverlap(r.segments, s.segments)
+        && (r.product_slugs.length === 0
           ? s.product_slugs.length === 0
           : r.product_slugs.every((p) => s.product_slugs.includes(p))));
+    }
+  }
+}
+
+// A samverkansavtal delivered by several kommuner: the same vendor, start,
+// end and annual value in different kommuner of one län is one avtal. Its value is
+// shared out to the member kommuner by their elever in the school forms it
+// covers (evenly when any member's elever are unknown), so market totals
+// count it once. kr/elev is the whole value over the members' combined
+// elever; with an even split it is unknown. avtal_key is the same on every
+// copy, so avtal counts count it once too.
+function allocateJoint(facts, stats) {
+  const live = avtalList(facts).filter((a) => !a.rows[0].duplicate_of && a.kod && a.start && a.end && isFiniteNum(a.annual) && a.annual > 0);
+  // Members share a län (the first two digits of the kommun kod): kommunal
+  // samverkan is regional, and two kommuner far apart paying a list price on
+  // the same dates are two avtal.
+  for (const list of groupBy(live, (a) => `${a.vendor}\u0000${a.start}\u0000${a.end}\u0000${String(a.kod).slice(0, 2)}`).values()) {
+    const used = new Set();
+    for (const a of list) {
+      if (used.has(a.id)) continue;
+      const members = [];
+      for (const b of list) {
+        if (used.has(b.id) || !sameKr(a.annual, b.annual) || members.some((m) => m.kod === b.kod)) continue;
+        members.push(b);
+      }
+      if (members.length < 2) continue;
+      for (const m of members) used.add(m.id);
+      const elever = (kod, segs) => {
+        if (!segs.length || !stats) return null;
+        try { const n = stats.eleverIn(kod, segs); return isFiniteNum(n) && n > 0 ? n : null; } catch { return null; }
+      };
+      const counts = members.map((m) => elever(m.kod, m.segments));
+      const byElever = counts.every((n) => n != null);
+      const total = byElever ? counts.reduce((x, n) => x + n, 0) : null;
+      const key = `joint:${Math.min(...members.map((m) => m.id))}`;
+      const kods = members.map((m) => m.kod).sort();
+      members.forEach((m, i) => {
+        const share = byElever ? counts[i] / total : 1 / members.length;
+        for (const f of m.rows) {
+          const full = f.annual_value_sek;
+          f.avtal_key = key;
+          f.joint = { n_kommuner: members.length, kommun_kods: kods, share: round2(share * 10000) / 10000, by: byElever ? 'elever' : 'jamnt' };
+          if (isFiniteNum(full)) f.annual_value_sek = Math.round(full * share);
+          if (f.kr_per_elev_basis === 'styckpris') continue; // a unit price is the same for every member
+          f.kr_per_elev = null; f.kr_per_elev_basis = null;
+          if (!byElever || !isFiniteNum(full) || full <= 0 || !['stated', 'split'].includes(f.value_basis) || f.elever_in_scope == null) {
+            if (!byElever) f.elever_in_scope = null;
+            continue;
+          }
+          const all = members.map((x) => elever(x.kod, f.segments));
+          if (all.some((n) => n == null)) continue;
+          f.kr_per_elev = round2(full / all.reduce((x, n) => x + n, 0));
+          f.kr_per_elev_basis = 'skolverket';
+          f.elever_in_scope = all[i];
+        }
+      });
     }
   }
 }
@@ -405,6 +527,8 @@ function groupBy(items, keyFn) {
   return m;
 }
 const headline = (facts) => facts.filter((f) => f.active && !f.superseded);
+// One avtal: a samverkansavtal delivered by several kommuner shares one key.
+export const avtalOf = (f) => f.avtal_key ?? String(f.contract_id);
 const catOf = (f) => f.category ?? UNKNOWN_CATEGORY;
 const sumKnown = (rows) => rows.reduce((s, f) => s + (isFiniteNum(f.annual_value_sek) ? f.annual_value_sek : 0), 0);
 const nKnown = (rows) => rows.filter((f) => isFiniteNum(f.annual_value_sek)).length;
@@ -474,7 +598,7 @@ export function companyShares(facts, { category } = {}) {
       share_value: totalValue > 0 ? value / totalValue : null,
       kommuner,
       share_kommuner: totalKommuner > 0 ? kommuner / totalKommuner : null,
-      n_avtal: distinct(group, (f) => f.contract_id),
+      n_avtal: distinct(group, avtalOf),
       n_known: nKnown(group),
     });
   }
@@ -488,7 +612,7 @@ export function marketByCategory(facts) {
     out.push({
       category,
       value_known_sek: sumKnown(group),
-      n_avtal: distinct(group, (f) => f.contract_id),
+      n_avtal: distinct(group, avtalOf),
       n_known: nKnown(group),
       kommuner: distinct(group, (f) => f.kommun_kod),
       topCompanies: companyShares(facts, { category }).slice(0, 3)
@@ -522,7 +646,7 @@ export function priceDistribution(facts, opts = {}) {
   const d = distribution(perKommun.map((p) => p.kr_per_elev));
   const values = d.suppressed ? [] : perKommun
     .sort((a, b) => a.kr_per_elev - b.kr_per_elev || String(a.kommun_kod).localeCompare(String(b.kommun_kod)));
-  return { ...d, n_avtal: distinct(rows, (f) => f.contract_id), values };
+  return { ...d, n_avtal: distinct(rows, avtalOf), values };
 }
 
 function monthKey(iso) { return iso.slice(0, 7); }
@@ -545,8 +669,8 @@ export function renewalBuckets(facts, { today, months = 24 } = {}) {
   const tally = (t, f, known) => {
     if (!ids.has(t)) ids.set(t, { all: new Set(), known: new Set() });
     const s = ids.get(t);
-    s.all.add(f.contract_id);
-    if (known) { s.known.add(f.contract_id); t.value_known_sek += f.annual_value_sek; }
+    s.all.add(avtalOf(f));
+    if (known) { s.known.add(avtalOf(f)); t.value_known_sek += f.annual_value_sek; }
     t.n = s.all.size;
     t.n_known = s.known.size;
   };
@@ -606,7 +730,7 @@ function spendRows(rows) {
   return [...groupBy(rows, catOf)].map(([category, group]) => ({
     category,
     value_known_sek: sumKnown(group),
-    n_avtal: distinct(group, (f) => f.contract_id),
+    n_avtal: distinct(group, avtalOf),
     n_known: nKnown(group),
   })).sort((a, b) => b.value_known_sek - a.value_known_sek || a.category.localeCompare(b.category));
 }
@@ -652,12 +776,12 @@ export function kommunProfile(facts, stats, kod, { today = new Date().toISOStrin
 // Footer basis: "X aktiva avtal (Y insamlade) från Z kommuner".
 export function dataBasis(facts, statusMap = new Map()) {
   const head = headline(facts);
-  const activeIds = new Set(head.map((f) => f.contract_id));
-  const unknownEnd = new Set(head.filter((f) => !isIso(f.period_end)).map((f) => f.contract_id));
+  const activeIds = new Set(head.map(avtalOf));
+  const unknownEnd = new Set(head.filter((f) => !isIso(f.period_end)).map(avtalOf));
   return {
     active: activeIds.size,
     active_unknown_end: unknownEnd.size,
-    collected: distinct(facts, (f) => f.contract_id),
+    collected: distinct(facts, avtalOf),
     kommuner_with_avtal: distinct(head.filter((f) => f.kommun_kod), (f) => f.kommun_kod),
     kommuner_collected: distinct(facts.filter((f) => f.kommun_kod), (f) => f.kommun_kod),
     kommuner_total: KOMMUNER_TOTAL,
@@ -674,10 +798,10 @@ function filterRows(facts, { category, companySlug } = {}) {
 // Pricing-model mix over headline rows; n counts avtal, null model -> 'okand'.
 export function pricingModelMix(facts, opts = {}) {
   const rows = filterRows(facts, opts);
-  const total = distinct(rows, (f) => f.contract_id);
+  const total = distinct(rows, avtalOf);
   return [...groupBy(rows, (f) => f.pricing_model ?? UNKNOWN_CATEGORY)]
     .map(([model, group]) => {
-      const n = distinct(group, (f) => f.contract_id);
+      const n = distinct(group, avtalOf);
       return { model, n, share: total > 0 ? n / total : null };
     })
     .sort((a, b) => b.n - a.n || a.model.localeCompare(b.model));
@@ -687,6 +811,6 @@ export function pricingModelMix(facts, opts = {}) {
 export function channelMix(facts, opts = {}) {
   const rows = filterRows(facts, opts);
   return [...groupBy(rows, (f) => f.channel_slug ?? 'direkt')]
-    .map(([channel_slug, group]) => ({ channel_slug, n: distinct(group, (f) => f.contract_id), value_known_sek: sumKnown(group) }))
+    .map(([channel_slug, group]) => ({ channel_slug, n: distinct(group, avtalOf), value_known_sek: sumKnown(group) }))
     .sort((a, b) => b.value_known_sek - a.value_known_sek || b.n - a.n || a.channel_slug.localeCompare(b.channel_slug));
 }

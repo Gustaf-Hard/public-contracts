@@ -25,9 +25,11 @@ const LATEST_MAX = 8;
 export function knownValue(rows) {
   const avtal = new Map();
   for (const f of rows) {
-    const a = avtal.get(f.contract_id) ?? { known: false, value: 0 };
+    // A samverkansavtal is one avtal across its member kommuner.
+    const key = f.avtal_key ?? String(f.contract_id);
+    const a = avtal.get(key) ?? { known: false, value: 0 };
     if (isNum(f.annual_value_sek)) { a.known = true; a.value += f.annual_value_sek; }
-    avtal.set(f.contract_id, a);
+    avtal.set(key, a);
   }
   const vals = [...avtal.values()];
   const known = vals.filter((a) => a.known);

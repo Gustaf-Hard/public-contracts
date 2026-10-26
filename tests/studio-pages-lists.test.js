@@ -90,8 +90,9 @@ function seedContract({
 // avtal in Partille split between Gleerups and NE ends 2027-05-31; one
 // expired avtal; Upplands-Bro kommun (hidden in the studio) as a vendor.
 function seedRenewals() {
-  for (const kod of ['1440', '1401']) {
-    seedContract({ kod, vendor: 'ILT Education AB', value: 300000, end: '2027-01-31', model: 'per_student', lines: [{ product_name: 'Polyglutt', unit: 'elev', unit_price_sek: 140, period_months: 12 }] });
+  // Distinct starts: one samverkansavtal otherwise (r2 P2).
+  for (const [i, kod] of ['1440', '1401'].entries()) {
+    seedContract({ kod, vendor: 'ILT Education AB', value: 300000, end: '2027-01-31', start: `2025-08-0${i + 1}`, model: 'per_student', lines: [{ product_name: 'Polyglutt', unit: 'elev', unit_price_sek: 140, period_months: 12 }] });
   }
   seedContract({ kod: '1402', vendor: 'Vklass AB', value: 120000, end: '2027-03-31', lines: [{ product_name: 'Vklass' }], extra: { extension_option_until: '2028-03-31' } });
   seedContract({ kod: '1440', vendor: 'Binogi AB', value: null, end: '2028-02-29', lines: [{ product_name: 'Binogi' }] });
