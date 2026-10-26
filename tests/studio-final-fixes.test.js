@@ -247,8 +247,8 @@ describe('H. a reseller page counts the avtal it is the vendor of', () => {
     const html = text(raw);
     expect(html).toContain('har aktiva avtal med 2 kommuner i vårt underlag, med ett känt årsvärde på 190 tkr.');
     expect(html).toMatch(/2 aktiva, 0 utgångna eller ersatta/);
-    expect(raw).toContain('aria-label="Testby 1: har aktivt avtal med LäroMedia');
-    expect(raw).toContain('aria-label="Testby 2: har aktivt avtal med LäroMedia');
+    expect(raw).toContain('aria-label="Testby 1: aktivt avtal med LäroMedia Bokhandel Örebro i underlaget');
+    expect(raw).toContain('aria-label="Testby 2: aktivt avtal med LäroMedia Bokhandel Örebro i underlaget');
   });
   it('a reseller product inside another vendor\'s avtal counts only its own row, never that avtal\'s whole value', () => {
     const own = C({ vendor_name: 'Skolon AB', kommun_kod: '0114', annual_value_sek: 50000, products: ['Skolon'] });
@@ -282,21 +282,22 @@ describe('I. dead_end is not evidence of absence', () => {
     C({ kommun_kod: '0114', period_start: '2020-01-01', period_end: '2022-12-31', products: ['Polylino'] }), // expired only
     C({ kommun_kod: '0117', products: ['Polylino'] }),
   ]);
-  it('whiteSpots puts dead_end in refused and flags done kommuner with only expired avtal', () => {
+  it('whiteSpots keeps dead_end as a status, never klar, and flags kommuner with only expired avtal', () => {
     const ws = whiteSpots(facts, status, { category: 'laromedel', allKods: ['0114', '0115', '0117'] });
-    // r2 P4: an expired-only kommun is its own bucket, never a safe white spot.
-    expect(ws).toMatchObject({ has: ['0117'], none_done: [], none_done_expired: ['0114'], refused: ['0115'] });
+    // r4 W1: buckets say what the underlag holds; dead_end is a status.
+    expect(ws).toMatchObject({ has: ['0117'], expired: ['0114'], none: ['0115'] });
+    expect(ws.status.get('0115')).toBe('dead_end');
     expect(dataBasis(facts, status)).toMatchObject({ done: 2, dead_end: 1 });
   });
-  it('kategori page: säkra vita fläckar count done only, refused tiles are their own class, copy says inget aktivt avtal', () => {
+  it('kategori page: a dead_end kommun is the same "inget avtal i underlaget" tile, its status in the name, no claim', () => {
     const html = renderKategori({ category: findCategory('laromedel'), facts, stats, statusMap: status, today: TODAY });
     const t = text(html);
-    expect(t).toContain('0 kommuner har klar insamling och inga avtal alls i läromedel.');
-    expect(t).toContain('1 kommun har klar insamling där avtalet i läromedel har löpt ut eller ersatts.');
-    expect(t).toContain('1 kommun har inte lämnat ut några avtal, där vet vi inte vad de köper.');
+    expect(t).toMatch(/\d+ kommuner har inget avtal i läromedel i underlaget\./);
+    expect(t).toContain('1 utan utlämnade avtal');
+    expect(t).toContain('1 kommun har bara utgångna eller ersatta avtal i läromedel i underlaget.');
     expect(t).not.toContain('har lämnat ut sina avtal');
-    expect(html).toMatch(/class="tile t-refused[^"]*"[^>]*aria-label="Testby 2: inga avtal utlämnade/);
-    expect(html).toContain('<i class="tile t-refused"></i><span>Inga eller inte alla avtal utlämnade</span>');
+    expect(html).toMatch(/class="tile t-none[^"]*"[^>]*aria-label="Testby 2: inget avtal i läromedel i underlaget; inga avtal utlämnade/);
+    expect(html).not.toContain('t-refused');
   });
 });
 

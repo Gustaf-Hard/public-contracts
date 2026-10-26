@@ -336,7 +336,7 @@ export function renderKategorier({ facts }) {
     <div class="eh-main">
       <span class="kicker">Kategorier</span>
       <h1 class="page-title">Marknaden kategori för kategori</h1>
-      <p class="lede">Känt årsvärde, antal kommuner, de största leverantörerna och medianpris per elev för varje kategori. Klicka en kategori för andelar, priser per segment, vita fläckar och förnyelser.</p>
+      <p class="lede">Känt årsvärde, antal kommuner, de största leverantörerna och medianpris per elev för varje kategori. Klicka en kategori för andelar, priser per segment, var underlaget har avtal och förnyelser.</p>
     </div>
   </div>
 </section>

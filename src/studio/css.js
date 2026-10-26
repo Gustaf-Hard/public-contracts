@@ -22,7 +22,7 @@
 // Text on sequential cells (--seq-ink-*) is chosen per step by WCAG contrast:
 //  light ink on steps 0-2 (8.7, 6.4, 4.6:1), white on 3-4 (5.6, 8.4:1);
 //  dark #ece9e2 on steps 0-1 (6.3, 4.2:1), #0f1113 on 2-4 (5.5, 8.0, 11.3:1).
-// Tile map states (Task 10 QA, --pairs all, has / has-open / none-done):
+// Tile map states (Task 10 QA, --pairs all, has / has-open / none):
 //  light #00897b,#c0dad2,#a39c8e: CVD worst 9.1 (protan), normal-vision 16.7
 //  dark  #2aa596,#244442,#646a72: CVD worst 12.9 (deutan), normal-vision 16.4
 //  The tint and the neutral fail the categorical lightness/chroma band on
@@ -668,10 +668,10 @@ const COMPONENT_CSS = `
 .tile { position: relative; display: block; border-radius: 3px; min-width: 0; }
 .t-has { background: var(--viz-1); }
 .t-has-open { background: var(--tile-has-open); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--viz-1) 60%, transparent); }
-.t-none-done { background: var(--tile-none); }
+.t-none { background: var(--tile-none); }
 /* expired: a ring in the "has" colour on the page surface: had an avtal here, it has run out. No new colour. */
 .t-expired { background: var(--surface); box-shadow: inset 0 0 0 2px var(--viz-1); }
-/* dead_end: grey like none-done but hatched, so it never reads as "insamling klar" or as a pale "pågår" tile. */
+/* dead_end: grey like none but hatched, so it never reads as "insamling klar" or as a pale "pågår" tile. */
 .t-refused { background: var(--hatch), color-mix(in oklab, var(--tile-none) 55%, var(--surface)); box-shadow: inset 0 0 0 1px var(--tile-none); }
 .t-none-open { background: var(--hatch), var(--surface-2); box-shadow: inset 0 0 0 1px var(--line-strong); }
 .t-not-contacted { background: transparent; box-shadow: inset 0 0 0 1px var(--line-strong); }

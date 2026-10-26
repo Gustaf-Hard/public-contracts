@@ -255,7 +255,7 @@ describe('/studio/kategorier', () => {
 });
 
 describe('/studio/kategori/:slug', () => {
-  it('läromedel shows a share ranking and a white-spot map with the four classes', async () => {
+  it('läromedel shows a share ranking and a coverage map with the three underlag classes', async () => {
     seedMarket();
     const r = await body('/studio/kategori/laromedel');
     expect(r.status).toBe(200);
@@ -265,32 +265,35 @@ describe('/studio/kategori/:slug', () => {
     expect(html.indexOf('ILT Education')).toBeLessThan(html.indexOf('Binogi'));
     expect(html).toContain('class="viz tilemap"');
     const legend = html.slice(html.indexOf('tm-legend'));
-    for (const l of ['Har aktivt avtal i kategorin', 'Inga avtal i kategorin, insamling klar', 'Avtalet har löpt ut', 'Insamling pågår', 'Inte kontaktad']) {
+    for (const l of ['Aktivt avtal i underlaget', 'Bara utgångna eller ersatta avtal i underlaget', 'Inget avtal i underlaget']) {
       expect(legend).toContain(l);
     }
-    expect(html).toContain('t-none-done');
-    expect(html).toContain('t-none-open');
+    expect(html).toContain('t-none');
+    expect(html).not.toContain('t-none-open');
+    expect(html).not.toContain('t-none-done');
     noLeaks(html);
   });
 
-  it('the white-spot KPI basis says inga avtal alls (r2 P4)', async () => {
+  it('the coverage KPI is "Utan avtal i underlaget" with a basis, never a safe white spot (r4 W1)', async () => {
     seedMarket();
     const html = (await body('/studio/kategori/laromedel')).text;
-    expect(html).toContain('insamlingen klar, inga avtal alls i kategorin');
+    expect(html).toContain('Utan avtal i underlaget');
+    expect(html).toMatch(/varav \d+ med klar insamling; mejl och sammanställningar kan nämna leverantörer vi inte har avtal för/);
+    expect(html).not.toMatch(/Säkra vita fläckar|insamlingen klar, inga avtal/);
     expect(html).toMatch(/\d+ i katalogen, \d+ med känt värde/);
   });
 
   it('white-spot legend counts add up to the tiles, and an expired avtal is not "has"', async () => {
     seedMarket();
     const html = (await body('/studio/kategori/larplattform')).text;
-    const map = html.slice(html.indexOf('id="vita-flackar"'), html.indexOf('id="fornyelser"'));
+    const map = html.slice(html.indexOf('id="tackning"'), html.indexOf('id="fornyelser"'));
     const tiles = (map.match(/<span class="tile t-/g) || []).length;
     expect(tiles).toBeGreaterThan(200);
     const legend = map.slice(map.indexOf('tm-legend'), map.indexOf('</ul>', map.indexOf('tm-legend')));
     const counts = [...legend.matchAll(/<b>([\d\s\u00a0]+)<\/b>/g)].map((m) => Number(m[1].replace(/\D/g, '')));
     expect(counts.reduce((a, b) => a + b, 0)).toBe(tiles);
     // Öckerö: only an expired Vklass avtal in lärplattform, collection open
-    expect(map).toMatch(/class="tile t-none-open[^"]*"[^>]*aria-label="Öckerö: insamlingen pågår/);
+    expect(map).toMatch(/class="tile t-expired[^"]*"[^>]*aria-label="Öckerö: bara utgångna eller ersatta avtal i lärplattform i underlaget; insamling pågår/);
     expect(map).not.toMatch(/class="tile t-has[^"]*"[^>]*aria-label="Öckerö/);
     expect(map).toMatch(/class="tile t-has[^"]*"[^>]*aria-label="Partille/);
   });
@@ -298,7 +301,7 @@ describe('/studio/kategori/:slug', () => {
   it('has the segment matrix, pricing-model mix, renewal lanes per company and product cards', async () => {
     seedMarket();
     const html = (await body('/studio/kategori/laromedel')).text;
-    const order = ['id="andelar"', 'id="pris"', 'id="prismodell"', 'id="vita-flackar"', 'id="fornyelser"', 'id="produkter"', 'id="underlag"'];
+    const order = ['id="andelar"', 'id="pris"', 'id="prismodell"', 'id="tackning"', 'id="fornyelser"', 'id="produkter"', 'id="underlag"'];
     const pos = order.map((id) => html.indexOf(id));
     expect(pos.every((p) => p > 0)).toBe(true);
     expect([...pos].sort((a, b) => a - b)).toEqual(pos);

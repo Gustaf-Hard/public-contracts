@@ -185,7 +185,7 @@ export function evidenceDrawer({ rows = [], total = null, page = 1, pageHref = (
     <table class="st-table cards ev-table">
       <thead><tr><th>Kommun</th><th>Period</th><th class="r">Värde per år</th><th>Prismodell</th><th class="r">Källa</th></tr></thead>
       <tbody>${body}</tbody>
-    </table>${nav}` : '<p class="meta">Inga avtal att visa.</p>'}
+    </table>${nav}` : '<p class="meta">Inga avtal i underlaget att visa.</p>'}
   </div>
 </details>`;
 }

@@ -101,16 +101,16 @@ export function renderGallery({ stats = null, today = '2026-10-26', tiles = null
     if (kod === '1440') return 'highlight';
     const h = (parseInt(kod, 10) * 2654435761) >>> 0;
     const v = h % 100;
-    return v < 46 ? 'has' : v < 62 ? 'none-done' : v < 80 ? 'none-open' : 'not-contacted';
+    return v < 46 ? 'has' : v < 62 ? 'none' : v < 80 ? 'none-open' : 'not-contacted';
   };
   const tileTitle = (kod) => {
     const c = tileClass(kod);
-    const what = { has: 'har avtal med Exempelförlaget', 'none-done': 'inget avtal, insamlingen klar', 'none-open': 'insamling pågår', 'not-contacted': 'inte kontaktad än', highlight: 'du är här' }[c];
+    const what = { has: 'har avtal med Exempelförlaget', none: 'inget avtal i underlaget', 'none-open': 'insamling pågår', 'not-contacted': 'inte kontaktad än', highlight: 'du är här' }[c];
     return `${nameOf(kod)}: ${what}`;
   };
   const legend = [
     { cls: 'has', label: 'Har avtal' },
-    { cls: 'none-done', label: 'Inget avtal, insamling klar' },
+    { cls: 'none', label: 'Inget avtal i underlaget' },
     { cls: 'none-open', label: 'Insamling pågår' },
     { cls: 'not-contacted', label: 'Inte kontaktad' },
     { cls: 'highlight', label: 'Vald kommun' },

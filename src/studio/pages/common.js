@@ -6,7 +6,7 @@
 import { esc } from '../layout.js';
 import { fmtInt, fmtKrCompact, UNKNOWN } from '../format.js';
 import { CATEGORIES, companyBySlug, productBySlug } from '../../catalogue.js';
-import { companyShares, priceDistribution, priceRowFilter, whiteSpots, inRequest, MIN_N } from '../../studio-data.js';
+import { companyShares, priceDistribution, priceRowFilter, whiteSpots, MIN_N } from '../../studio-data.js';
 import { evidenceDrawer, EVIDENCE_PAGE_SIZE, emptyPanel } from '../components.js';
 import { stripPlot, rankingBars, renewalTimeline, tileMap } from '../charts.js';
 
@@ -220,51 +220,65 @@ export function categoryContext({ facts, category, highlightSlug = null, nameOf 
 
 // ------------------------------------------------------------------ map
 
-// Footprint: `has` comes from the entity's own active avtal; every other
-// kommun says what we know about collection there, never "no avtal" unless
-// collection is done, the entity's category is part of our request, and we
-// hold no underlag from the kommun that we have not gone through or that
-// names the entity or its category (whiteSpots scope).
-export function footprintMap({ tiles, rows, statusMap, stats, entity, nameOf, underlag = null, scope = null }) {
-  const allKods = safeAll(stats).map((r) => r.kod);
-  const ws = whiteSpots(rows, statusMap, { allKods: allKods.length ? allKods : Object.keys(tiles?.tiles ?? {}), underlag, scope: scope ?? { category: null, companySlug: null } });
-  const requested = !scope || (scope.category ? inRequest(scope.category) : !scope.companySlug);
+// Collection status as a neutral fact beside what the underlag holds (r4 W1).
+export const COLLECTION_TEXT = Object.freeze({
+  done: 'insamling klar',
+  unreviewed: 'insamling klar, underlag ej genomgånget',
+  open: 'insamling pågår',
+  not_contacted: 'insamling ej påbörjad',
+  dead_end: 'inga avtal utlämnade',
+  partial: 'delvis utlämnat',
+  unknown: 'insamlingens status okänd',
+});
+const STATUS_ORDER = ['done', 'unreviewed', 'open', 'partial', 'dead_end', 'not_contacted', 'unknown'];
+
+// "60 med klar insamling (4 med underlag ej genomgånget), 30 där insamlingen
+// pågår ...": the none bucket per collection status, for the copy beside a map.
+export function noneStatusText(ws) {
+  const n = ws.noneByStatus;
+  const bits = [
+    n.done + n.unreviewed ? `${fmtInt(n.done + n.unreviewed)} med klar insamling${n.unreviewed ? ` (${fmtInt(n.unreviewed)} med underlag ej genomgånget)` : ''}` : '',
+    n.open ? `${fmtInt(n.open)} där insamlingen pågår` : '',
+    n.partial ? `${fmtInt(n.partial)} delvis utlämnade` : '',
+    n.dead_end ? `${fmtInt(n.dead_end)} utan utlämnade avtal` : '',
+    n.not_contacted ? `${fmtInt(n.not_contacted)} där insamlingen inte har börjat` : '',
+    n.unknown ? `${fmtInt(n.unknown)} med okänd status` : '',
+  ].filter(Boolean);
+  return bits.join(', ');
+}
+
+// One map for kategori and footprint (leverantör, produkt) pages. A tile says
+// only what the underlag holds: an active avtal, only expired or replaced
+// ones, or none. Collection status is in the tile's name and in the copy,
+// never in its colour, so no tile reads as "confirmed none".
+export function coverageMap({ ws, tiles, nameOf, what, label }) {
   const cls = new Map();
   for (const k of ws.has) cls.set(k, 'has');
-  for (const k of ws.none_done) cls.set(k, 'none-done');
-  for (const k of ws.none_done_expired) cls.set(k, 'expired');
-  for (const k of [...ws.unreviewed, ...ws.none_done_uncertain]) cls.set(k, 'unknown');
-  for (const k of ws.not_in_request) cls.set(k, 'neutral');
-  for (const k of [...ws.refused, ...ws.partial]) cls.set(k, 'refused');
-  for (const k of ws.none_open) cls.set(k, 'none-open');
-  for (const k of ws.not_contacted) cls.set(k, 'not-contacted');
-  const partial = new Set(ws.partial);
-  const unreviewed = new Set(ws.unreviewed);
-  const what = {
-    has: `har aktivt avtal med ${entity}`,
-    'none-done': `inget avtal med ${entity}, insamlingen klar`,
-    expired: `avtalet med ${entity} har löpt ut eller ersatts, insamlingen klar`,
-    unknown: 'underlag ej genomgånget, vi säger inget om avtal saknas',
-    neutral: 'ingår inte i vår begäran, vi vet inte om avtal finns',
-    refused: 'inga avtal utlämnade, vi vet inte vad kommunen köper',
-    'none-open': 'insamlingen pågår, inget aktivt avtal med ' + entity + ' än',
-    'not-contacted': 'inte kontaktad än',
-  };
+  for (const k of ws.expired) cls.set(k, 'expired');
+  for (const k of ws.none) cls.set(k, 'none');
+  const tip = { has: `aktivt avtal ${what} i underlaget`, expired: `bara utgångna eller ersatta avtal ${what} i underlaget`, none: `inget avtal ${what} i underlaget` };
   return tileMap({
     tiles,
     classOf: (kod) => cls.get(kod) ?? 'unknown',
-    titleOf: (kod) => `${nameOf(kod)}: ${partial.has(kod) ? 'delvis utlämnat, vi vet inte allt kommunen köper' : unreviewed.has(kod) ? what.unknown : cls.get(kod) === 'unknown' ? 'status okänd' : what[cls.get(kod)] ?? 'status okänd'}`,
+    titleOf: (kod) => `${nameOf(kod)}: ${cls.has(kod) ? `${tip[cls.get(kod)]}; ${COLLECTION_TEXT[ws.status.get(kod) ?? 'unknown']}` : 'status okänd'}`,
     legend: [
-      { cls: 'has', label: `Har aktivt avtal med ${entity}` },
-      ...(requested ? [{ cls: 'none-done', label: 'Inget avtal, insamling klar' }] : [{ cls: 'neutral', label: 'Ingår inte i begäran, insamling klar' }]),
-      { cls: 'expired', label: 'Avtalet har löpt ut' },
-      ...(ws.unreviewed.length ? [{ cls: 'unknown', label: 'Underlag ej genomgånget, eller status okänd' }] : []),
-      { cls: 'refused', label: 'Inga eller inte alla avtal utlämnade' },
-      { cls: 'none-open', label: 'Insamling pågår' },
-      { cls: 'not-contacted', label: 'Inte kontaktad' },
+      { cls: 'has', label: 'Aktivt avtal i underlaget' },
+      { cls: 'expired', label: 'Bara utgångna eller ersatta avtal i underlaget' },
+      { cls: 'none', label: 'Inget avtal i underlaget' },
     ],
-    label: `Kommuner med avtal med ${entity}`,
+    label,
   });
+}
+
+// Footprint: `has` comes from the entity's own active avtal. Every other
+// kommun says only what the underlag holds and, separately, how far
+// collection has come (whiteSpots scope picks "underlag ej genomgånget").
+export function footprintMap({ tiles, rows, statusMap, stats, entity, nameOf, underlag = null, scope = null }) {
+  const allKods = safeAll(stats).map((r) => r.kod);
+  const ws = whiteSpots(rows, statusMap, { allKods: allKods.length ? allKods : Object.keys(tiles?.tiles ?? {}), underlag, scope: scope ?? { category: null, companySlug: null } });
+  const map = coverageMap({ ws, tiles, nameOf, what: `med ${entity}`, label: `Kommuner med avtal med ${entity} i underlaget` });
+  const status = noneStatusText(ws);
+  return `${map}${ws.none.length ? `<p class="meta fp-note">${esc(`${nOf(ws.none.length, 'kommun', 'kommuner')} har inget avtal med ${entity} i underlaget${status ? `: ${status}` : ''}. Det betyder inte att avtal saknas: mejl, fakturor och sammanställningar kan nämna leverantörer vi inte har avtal för.`)}</p>` : ''}`;
 }
 
 // ------------------------------------------------------------------ renewals

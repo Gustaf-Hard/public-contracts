@@ -1,6 +1,6 @@
 // /studio/kategori/:slug (spec §7.5 item 2). Market size and shares, price
-// per elev by kommungrupp and segment, pricing models, white spots and
-// renewals for one category. Vendor questions 3, 6, 7, 10; buyer 3, 4.
+// per elev by kommungrupp and segment, pricing models, where the underlag
+// has avtal, and renewals for one category. Vendor questions 3, 6, 7, 10; buyer 3, 4.
 // Kommun names appear for who has what and when it renews (public record),
 // never as a price ranking.
 
@@ -12,11 +12,11 @@ import {
   KOMMUNER_TOTAL, UNKNOWN_CATEGORY, MIN_N, inRequest,
 } from '../../studio-data.js';
 import { entityHeader, kpiTile, emptyPanel, STRIP_SEGMENTS } from '../components.js';
-import { segmentMatrix, renewalTimeline, tileMap, loadKommunTiles } from '../charts.js';
+import { segmentMatrix, renewalTimeline, loadKommunTiles } from '../charts.js';
 import {
   isNum, headline, byContract, byAvtal, distinctCount, kommunNamer, productNames, productHref, companyHref,
   section, breadcrumb, priceStrip, medianText, evidenceSection, renewalTileProps, peerGroupKods,
-  modelLabel, safeAll, nOf, RENEWAL_MONTHS, isIso,
+  modelLabel, safeAll, nOf, RENEWAL_MONTHS, isIso, coverageMap, noneStatusText,
 } from './common.js';
 import { knownValue, shareBar, topThree, vendorRankings } from './marknad.js';
 
@@ -62,78 +62,29 @@ function modelMix({ facts, category }) {
 </figure>`;
 }
 
-// ------------------------------------------------------------ white spots
+// ------------------------------------------------------------ coverage map
 
-// Classes: no new colour. "Underlag ej genomgånget" and "okänd kategori"
-// share the hatched unknown tile (neither is a claim); a category outside
-// our request uses the neutral tile, it says nothing about absence.
+// What the underlag holds per kommun in the category (coverageMap), with the
+// collection status beside it as a neutral fact. Never an absence claim (r4
+// W1): a kommun without an avtal in the underlag may still have one.
 function whiteSpotMap({ ws, label, nameOf, tiles, requested }) {
-  const cls = new Map();
-  for (const k of ws.has) cls.set(k, 'has');
-  for (const k of ws.none_done) cls.set(k, 'none-done');
-  for (const k of ws.none_done_expired) cls.set(k, 'expired');
-  for (const k of [...ws.unreviewed, ...ws.none_done_uncertain]) cls.set(k, 'unknown');
-  for (const k of ws.not_in_request) cls.set(k, 'neutral');
-  for (const k of [...ws.refused, ...ws.partial]) cls.set(k, 'refused');
-  for (const k of ws.none_open) cls.set(k, 'none-open');
-  for (const k of ws.not_contacted) cls.set(k, 'not-contacted');
   const lower = label.toLowerCase();
-  const tipOf = new Map([
-    ...ws.has.map((k) => [k, `har aktivt avtal i ${lower}`]),
-    ...ws.none_done.map((k) => [k, `inga avtal i ${lower}, insamlingen klar`]),
-    ...ws.none_done_expired.map((k) => [k, `avtalet i ${lower} har löpt ut eller ersatts, insamlingen klar`]),
-    ...ws.unreviewed.map((k) => [k, 'underlag ej genomgånget, kommunen har skickat underlag vi inte har läst eller som pekar på kategorin']),
-    ...ws.none_done_uncertain.map((k) => [k, `inget avtal i ${lower}, men aktiva avtal med okänd kategori`]),
-    ...ws.not_in_request.map((k) => [k, `${lower} ingår inte i vår begäran, vi vet inte om avtal finns`]),
-    ...ws.refused.map((k) => [k, 'inga avtal utlämnade, vi vet inte vad kommunen köper']),
-    ...ws.partial.map((k) => [k, 'delvis utlämnat, vi vet inte allt kommunen köper']),
-    ...ws.none_open.map((k) => [k, `insamlingen pågår, inget aktivt avtal i ${lower} än`]),
-    ...ws.not_contacted.map((k) => [k, 'inte kontaktad än']),
-  ]);
-  const map = tileMap({
-    tiles,
-    classOf: (kod) => cls.get(kod) ?? 'unknown',
-    titleOf: (kod) => `${nameOf(kod)}: ${tipOf.get(kod) ?? 'status okänd'}`,
-    legend: [
-      { cls: 'has', label: 'Har aktivt avtal i kategorin' },
-      ...(requested ? [{ cls: 'none-done', label: 'Inga avtal i kategorin, insamling klar' }] : []),
-      { cls: 'expired', label: 'Avtalet har löpt ut' },
-      ...(requested
-        ? [{ cls: 'unknown', label: 'Underlag ej genomgånget, avtal med okänd kategori, eller status okänd' }]
-        : [{ cls: 'neutral', label: 'Ingår inte i begäran, insamling klar' }]),
-      { cls: 'refused', label: 'Inga eller inte alla avtal utlämnade' },
-      { cls: 'none-open', label: 'Insamling pågår' },
-      { cls: 'not-contacted', label: 'Inte kontaktad' },
-    ],
-    label: `Kommuner med avtal i ${lower}`,
-  });
-  const nExp = ws.none_done_expired.length;
-  const nUnc = ws.none_done_uncertain.length;
-  const nRev = ws.unreviewed.length;
-  const nRef = ws.refused.length;
-  const nPart = ws.partial.length;
-  const lead = requested
-    ? `<p class="ws-big"><b>${esc(fmtInt(ws.none_done.length))}</b> ${ws.none_done.length === 1 ? 'kommun har' : 'kommuner har'} klar insamling och inga avtal alls i ${esc(lower)}.</p>
-    <p class="meta">Det är de säkra vita fläckarna: inget aktivt, utgånget eller ersatt avtal i kategorin, inga aktiva avtal vi inte har kunnat kategorisera, och inget underlag från kommunen som vi inte har gått igenom.</p>`
-    : `<p class="ws-big">${esc(label)} ingår inte i vår begäran.</p>
-    <p class="meta">Vi begär ut avtal om lärplattformar, digitala läromedel och licenser och administrativa system för undervisningen. En kommun som inte har skickat avtal i ${esc(lower)} har inte sagt att den saknar sådana, så vi visar inga vita fläckar här. ${esc(nOf(ws.not_in_request.length, 'kommun', 'kommuner'))} med klar insamling har inga avtal i kategorin hos oss.</p>`;
+  const map = coverageMap({ ws, tiles, nameOf, what: `i ${lower}`, label: `Kommuner med avtal i ${lower} i underlaget` });
+  const nExp = ws.expired.length;
+  const status = noneStatusText(ws);
   const side = `<div class="ws-side">
-    ${lead}
-    ${nExp ? `<p class="ws-exp"><b>${esc(fmtInt(nExp))}</b> ${nExp === 1 ? 'kommun har' : 'kommuner har'} klar insamling där avtalet i ${esc(lower)} har löpt ut eller ersatts. De köper i kategorin men det nya avtalet finns inte hos oss, ett läge att höra av sig.</p>` : ''}
-    <p class="meta">${nRev ? `${esc(nOf(nRev, 'kommun', 'kommuner'))} med klar insamling har skickat underlag vi inte har gått igenom än, eller fakturor och orderlistor som pekar på ${esc(lower)}, så där säger vi inget om avtal saknas. ` : ''}${nUnc ? `${esc(nOf(nUnc, 'kommun', 'kommuner'))} med klar insamling har aktiva avtal med okänd kategori, så de kan redan köpa ${esc(lower)}. ` : ''}I ${esc(nOf(ws.none_open.length, 'kommun', 'kommuner'))} pågår insamlingen, där kan avtal fortfarande komma in.${nRef ? ` ${esc(nOf(nRef, 'kommun', 'kommuner'))} har inte lämnat ut några avtal, där vet vi inte vad de köper.` : ''}${nPart ? ` ${esc(nOf(nPart, 'kommun', 'kommuner'))} har lämnat ut en del avtal men inte resten, där vet vi inte allt de köper.` : ''}${ws.not_contacted.length ? ` ${esc(nOf(ws.not_contacted.length, 'kommun', 'kommuner'))} har vi inte kontaktat än.` : ''}</p>
+    <p class="ws-big"><b>${esc(fmtInt(ws.none.length))}</b> ${ws.none.length === 1 ? 'kommun har' : 'kommuner har'} inget avtal i ${esc(lower)} i underlaget.</p>
+    <p class="meta">${status ? `${esc(status)}. ` : ''}Det betyder inte att de saknar avtal: mejl, fakturor och sammanställningar kan nämna leverantörer vi inte har avtal för, och en kommun skickar det den hittar.${requested ? '' : ` ${esc(label)} ingår inte i vår begäran, så kommunerna har ingen anledning att skicka sådana avtal till oss.`}</p>
+    ${nExp ? `<p class="ws-exp"><b>${esc(fmtInt(nExp))}</b> ${nExp === 1 ? 'kommun har' : 'kommuner har'} bara utgångna eller ersatta avtal i ${esc(lower)} i underlaget. De har köpt i kategorin, ett nyare avtal kan finnas utan att vi har det.</p>` : ''}
   </div>`;
   return `<div class="ws card"><div class="ws-map">${map}</div>${side}</div>`;
 }
 
-// KPI basis: what the safe count is, and what is left out of it.
-function wsBasis(ws) {
-  const out = [
-    ws.none_done_expired.length ? `${fmtInt(ws.none_done_expired.length)} där avtalet har löpt ut` : '',
-    ws.unreviewed.length ? `${fmtInt(ws.unreviewed.length)} med underlag ej genomgånget` : '',
-    ws.none_done_uncertain.length ? `${fmtInt(ws.none_done_uncertain.length)} med avtal av okänd kategori` : '',
-    ws.refused.length + ws.partial.length ? `${fmtInt(ws.refused.length + ws.partial.length)} utan alla avtal utlämnade` : '',
-  ].filter(Boolean);
-  return `insamlingen klar, inga avtal alls i kategorin och inget ogenomgånget underlag${out.length ? `; räknas inte: ${out.join(', ')}` : ''}`;
+// KPI basis: how many of the kommuner without an avtal in the underlag have a
+// finished collection, and why that is still not a claim.
+function wsBasis(ws, { requested, label }) {
+  const done = ws.noneByStatus.done + ws.noneByStatus.unreviewed;
+  return `varav ${fmtInt(done)} med klar insamling; mejl och sammanställningar kan nämna leverantörer vi inte har avtal för${requested ? '' : `; ${label.toLowerCase()} ingår inte i vår begäran`}`;
 }
 
 // ------------------------------------------------------------ renewals
@@ -277,9 +228,7 @@ export function renderKategori({ category, facts, stats, statusMap, today, page 
     ${kpiTile({ label: 'Aktiva avtal', value: avtal.length, unit: 'avtal', basis: `${fmtInt(byAvtal(all).length)} insamlade totalt`, state: avtal.length ? 'known' : 'unknown', reason: 'Inga aktiva avtal i kategorin än.' })}
     ${kpiTile({ label: 'Leverantörer', value: shares.length, unit: 'leverantörer', basis: shares.length ? `${fmtInt(shares.filter((s) => s.slug).length)} i katalogen, ${fmtInt(shares.filter((s) => s.n_known).length)} med känt värde` : '', state: shares.length ? 'known' : 'unknown', reason: 'Inga leverantörer med aktiva avtal än.' })}
     ${kpiTile(renewalTileProps({ avtal, buckets: renewalBuckets(all, { today, months: 12 }), today }))}
-    ${requested
-    ? kpiTile({ label: 'Säkra vita fläckar', value: ws.none_done.length, unit: 'kommuner', basis: wsBasis(ws), state: 'known' })
-    : kpiTile({ label: 'Säkra vita fläckar', value: null, state: 'unknown', reason: `${label} ingår inte i vår begäran, så vi säger inget om var avtal saknas.` })}
+    ${kpiTile({ label: 'Utan avtal i underlaget', value: ws.none.length, unit: 'kommuner', basis: wsBasis(ws, { requested, label }), state: 'known' })}
   </div>`;
 
   // Matrix: SKR huvudgrupp x segment, "Alla" on both axes.
@@ -317,7 +266,7 @@ ${header}
 ${section({ id: 'andelar', kicker: 'Andelar', title: `Vem säljer ${lower}`, note: 'aktiva avtal, andel av känt värde och av kommunerna med avtal i kategorin', body: vendorRankings({ facts, category: slug }) })}
 ${section({ id: 'pris', kicker: 'Pris', title: 'Pris per elev och år', note: 'en punkt per kommun; matrisen visar median per kommungrupp och segment, klicka en ruta för spridning', body: priceBody })}
 ${section({ id: 'prismodell', kicker: 'Prismodell', title: 'Hur kategorin prissätts', note: 'andel av aktiva avtal per prismodell', body: `<div class="card">${modelMix({ facts, category: slug })}</div>` })}
-${section({ id: 'vita-flackar', kicker: 'Vita fläckar', title: requested ? `Kommuner utan avtal i ${lower}` : `Var vi har avtal i ${lower}`, note: requested ? 'håll över en ruta för namn; "insamling pågår" betyder inte att avtal saknas' : 'håll över en ruta för namn; kategorin ingår inte i vår begäran', body: whiteSpotMap({ ws, label, nameOf, tiles, requested }) })}
+${section({ id: 'tackning', kicker: 'Täckning', title: `Var underlaget har avtal i ${lower}`, note: `håll över en ruta för namn och insamlingens status; inget avtal i underlaget betyder inte att avtal saknas${requested ? '' : ', och kategorin ingår inte i vår begäran'}`, body: whiteSpotMap({ ws, label, nameOf, tiles, requested }) })}
 ${section({ id: 'fornyelser', kicker: 'Förnyelser', title: 'Avtal som förnyas eller löper ut, per leverantör', note: renew.basis, body: `<div class="card">${renew.html}</div>` })}
 ${section({ id: 'produkter', kicker: 'Produkter', title: `Produkter i ${lower}`, note: 'efter antal kommuner med aktivt avtal', body: productCards({ facts, category: slug, rows, kommunerTotal: kommuner }) })}
 ${section({ id: 'underlag', kicker: 'Underlag', title: 'Avtalen bakom siffrorna', note: `${fmtInt(ev.active)} aktiva, ${fmtInt(ev.old)} utgångna eller ersatta`, body: ev.html })}`;

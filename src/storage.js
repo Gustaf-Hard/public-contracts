@@ -1896,7 +1896,7 @@ export function openDb(path) {
   }
 
   // Mediagraf Studio: what we hold per kommun that is NOT an analysed avtal,
-  // so the studio never claims "inget avtal i X, insamlingen klar" while the
+  // so the studio marks a done kommun "underlag ej genomgånget" while
   // evidence sits unread on our own disk (the same honesty rule as the
   // T_REQUEST_MISSING gate). Read-only, no schema change.
   //   unread: every stored attachment with no contracts row, pending or

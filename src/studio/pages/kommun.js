@@ -209,7 +209,7 @@ function spendSection({ kommun, profile, head, peers, stats, mine, statusMap }) 
     const tick = few ? '' : `<span class="sc-med" style="left:${p(d.median)}" tabindex="0"><span class="tip" role="tooltip"><strong>${esc(kr(d.median))}</strong><span>median bland ${esc(fmtInt(d.n))} liknande med klar insamling</span><span>mittersta hälften ${esc(fmtPrice(d.p25))} till ${esc(kr(d.p75))}</span></span></span>`;
     const ownText = ownKnown ? `<b>${esc(kr(o))}</b>`
       : s ? `<b class="muted">${m?.counted ? 'elevantal saknas' : s.n_known ? 'skolformer okända' : 'värde okänt'}</b>`
-        : hasOwn ? '<b class="muted">inget avtal</b>' : '';
+        : hasOwn ? '<b class="muted">inget avtal i underlaget</b>' : '';
     const peerText = few
       ? `<small class="sc-few">för få liknande med klar insamling (n = ${esc(fmtInt(d.n))})</small>`
       : `<small>median bland ${esc(fmtInt(d.n))} liknande med klar insamling: ${esc(kr(d.median))}</small>`;
@@ -548,7 +548,7 @@ export function renderKommun({ kod, kommun = null, stats, facts, statusMap = new
     ? `Vi har ${nOf(avtal.length, 'aktivt avtal', 'aktiva avtal')} härifrån, ${statusWord}.`
     : status === 'not_contacted' ? `Sidan bygger på liknande kommuner: ${statusWord}.`
       : status === 'open' ? `Inga aktiva avtal tolkade än, ${statusWord}.`
-        : status === 'done' ? `Vi har inga aktiva avtal härifrån, ${statusWord}.`
+        : status === 'done' ? `Inga aktiva avtal härifrån i underlaget, ${statusWord}.`
           : status === 'dead_end' ? `Sidan bygger på liknande kommuner: ${statusWord}.` : 'Inga aktiva avtal i underlaget.'}`;
 
   const facts3 = avtal.length

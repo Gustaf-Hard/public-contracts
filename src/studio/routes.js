@@ -61,9 +61,9 @@ export function makeStudioData({ db, statsLoader = loadKommunStats, now = () => 
       : [];
     const statusMap = collectionStatus(db ? db.listAllConversations() : [], { kodsWithAvtal: new Set(facts.map((f) => f.kommun_kod)) });
     const basis = { ...dataBasis(facts, statusMap), updated: today };
-    // What we hold but have not read, or that is not an avtal: an absence
-    // claim ("inga avtal, insamlingen klar") must respect it. Fails closed:
-    // if it cannot be read, no kommun is a safe white spot.
+    // What we hold but have not read, or that is not an avtal: a done
+    // kommun with such underlag is shown as "underlag ej genomgånget". Fails
+    // closed: if it cannot be read, every done kommun is.
     const underlag = db ? safe(() => underlagEvidence(db.listStudioUnderlag()), null) ?? { unavailable: true } : { unavailable: true };
     const data = { facts, stats, statusMap, basis, today, underlag, searchOptions: buildSearchOptions(stats) };
     memo = { db, today, at: ms, data };

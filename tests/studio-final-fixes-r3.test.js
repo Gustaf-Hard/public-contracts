@@ -259,55 +259,52 @@ describe('R2. no absence claim while underlag sits unread, or for a category we 
       documents: [{ kommun_kod: '0115', vendor_name: null, summary: 'Inköp av digitala läromedel via en återförsäljare.', products: [], lines: [] }],
     });
     const lm = whiteSpots(facts, status, { category: 'laromedel', allKods: kods, underlag });
-    expect(lm.none_done).toEqual(['0117', '0120']);
-    expect(lm.unreviewed).toEqual(['0114', '0115']);
+    expect(lm.none).toEqual(kods);
+    expect(kods.map((k) => lm.status.get(k))).toEqual(['unreviewed', 'unreviewed', 'done', 'done']);
     const lp = whiteSpots(facts, status, { category: 'larplattform', allKods: kods, underlag });
-    expect(lp.unreviewed).toEqual(['0114']);
-    expect(lp.none_done).toEqual(['0115', '0117', '0120']);
+    expect(kods.map((k) => lp.status.get(k))).toEqual(['unreviewed', 'done', 'done', 'done']);
   });
 
-  it('fails closed: when the underlag cannot be read, no kommun is a safe white spot', () => {
+  it('fails closed: when the underlag cannot be read, every done kommun is underlag ej genomgånget', () => {
     const ws = whiteSpots(facts, status, { category: 'laromedel', allKods: kods, underlag: { unavailable: true } });
-    expect(ws.none_done).toEqual([]);
-    expect(ws.unreviewed).toEqual(kods);
+    expect(ws.noneByStatus).toMatchObject({ done: 0, unreviewed: 4 });
   });
 
-  it('elevhälsa, övrigt and unknown are outside the request: never a white spot', () => {
+  it('elevhälsa, övrigt and unknown: same neutral buckets as any category', () => {
     for (const category of ['elevhalsa', 'ovrigt', 'okand']) {
       const ws = whiteSpots(facts, status, { category, allKods: kods, underlag: underlagEvidence({}) });
-      expect(ws.none_done).toEqual([]);
-      expect(ws.not_in_request.length).toBeGreaterThan(0);
+      expect(ws.none.length + ws.has.length + ws.expired.length).toBe(4);
     }
   });
 
-  it('the elevhälsa page shows no safe white spots and says the category is not part of the request', () => {
+  it('the elevhälsa page says the category is not part of the request beside a neutral map', () => {
     const html = renderKategori({ category: findCategory('elevhalsa'), facts, stats, statusMap: status, today: TODAY, underlag: underlagEvidence({}) });
     const t = text(html);
-    expect(t).toContain('Elevhälsa ingår inte i vår begäran.');
-    expect(t).toMatch(/Säkra vita fläckar okänt Elevhälsa ingår inte i vår begäran, så vi säger inget om var avtal saknas/);
-    expect(html).not.toContain('class="tile t-none-done');
-    expect(t).not.toContain('Det är de säkra vita fläckarna');
+    expect(t).toContain('Elevhälsa ingår inte i vår begäran, så kommunerna har ingen anledning att skicka sådana avtal till oss.');
+    expect(t).toMatch(/Utan avtal i underlaget \d+ kommuner varav 4 med klar insamling; mejl och sammanställningar kan nämna leverantörer vi inte har avtal för; elevhälsa ingår inte i vår begäran/);
+    expect(t).not.toMatch(/vita fläck|säkra/i);
   });
 
-  it('the läromedel page counts an order-list kommun apart, hatched, not as a safe white spot', () => {
+  it('the läromedel page shows an order-list kommun as the same tile with underlag ej genomgånget in its name and in the counts', () => {
     const underlag = underlagEvidence({ documents: [{ kommun_kod: '0115', vendor_name: null, summary: 'Inköp av digitala läromedel.', products: [], lines: [] }] });
     const html = renderKategori({ category: findCategory('laromedel'), facts, stats, statusMap: status, today: TODAY, underlag });
     const t = text(html);
-    expect(t).toContain('3 kommuner har klar insamling och inga avtal alls i läromedel.');
-    expect(t).toContain('1 kommun med klar insamling har skickat underlag vi inte har gått igenom än');
-    expect(t).toMatch(/räknas inte: 1 med underlag ej genomgånget/);
-    expect(html).toMatch(/class="tile t-unknown[^"]*"[^>]*aria-label="Testby 2: underlag ej genomgånget/);
+    expect(t).toMatch(/\d+ kommuner har inget avtal i läromedel i underlaget\./);
+    expect(t).toContain('4 med klar insamling (1 med underlag ej genomgånget)');
+    expect(html).toMatch(/class="tile t-none[^"]*"[^>]*aria-label="Testby 2: inget avtal i läromedel i underlaget; insamling klar, underlag ej genomgånget/);
+    expect(html).not.toMatch(/class="tile t-unknown[^"]*"[^>]*aria-label="Testby 2/);
   });
 
-  it('a footprint map for an elevhälsa company claims no absence', () => {
+  it('a footprint map claims no absence for any category', () => {
     const pr = build([C({ kommun_kod: '0120', vendor_name: 'ProReNata AB', products: [] })]);
     const tiles = { cols: 2, rows: 2, tiles: { '0114': { x: 0, y: 0 }, '0115': { x: 1, y: 0 }, '0117': { x: 0, y: 1 }, '0120': { x: 1, y: 1 } } };
     const html = footprintMap({ tiles, rows: pr, statusMap: status, stats, entity: 'Prorenata', nameOf: (k) => k, underlag: underlagEvidence({}), scope: { category: 'elevhalsa', companySlug: 'prorenata' } });
-    expect(html).not.toContain('t-none-done');
-    expect(html).toContain('Ingår inte i begäran');
+    expect(html).toMatch(/aria-label="0114: inget avtal med Prorenata i underlaget; insamling klar"/);
     const lm = footprintMap({ tiles, rows: [], statusMap: status, stats, entity: 'Binogi', nameOf: (k) => k, underlag: underlagEvidence({ unread: [{ kommun_kod: '0114', filename: 'x.pdf', mime_type: 'application/pdf' }] }), scope: { category: 'laromedel', companySlug: 'binogi' } });
-    expect((lm.match(/class="tile t-none-done[^"]*" tabindex/g) || []).length).toBe(3);
-    expect(lm).toMatch(/aria-label="0114: underlag ej genomgånget/);
+    expect((lm.match(/class="tile t-none[^"]*" tabindex/g) || []).length).toBe(4);
+    expect(lm).toMatch(/aria-label="0114: inget avtal med Binogi i underlaget; insamling klar, underlag ej genomgånget"/);
+    expect(lm).toContain('Det betyder inte att avtal saknas');
+    expect(lm).not.toMatch(/insamlingen klar|inget avtal med Binogi,/);
   });
 
   describe('storage listStudioUnderlag and makeStudioData', () => {

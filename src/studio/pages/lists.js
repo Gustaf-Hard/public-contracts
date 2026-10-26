@@ -153,7 +153,7 @@ export function renderKommuner({ facts, stats, statusMap = new Map(), tiles, que
     legend: [
       { cls: 'has', label: 'Insamling klar' },
       { cls: 'has-open', label: 'Pågår, avtal har kommit in' },
-      { cls: 'none-open', label: 'Pågår, inga avtal än' },
+      { cls: 'none-open', label: 'Pågår, inga avtal i underlaget än' },
       { cls: 'refused', label: 'Inga eller inte alla avtal utlämnade' },
       { cls: 'not-contacted', label: 'Inte kontaktad' },
     ],

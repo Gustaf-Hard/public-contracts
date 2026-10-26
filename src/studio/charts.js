@@ -359,9 +359,10 @@ export function renewalTimeline({ lanes = [], today, months = 24, laneHead = '' 
 // 'has-open': collection still open but avtal have come in (Kommuner directory).
 // 'refused': the kommun closed the request without handing anything over
 // (dead_end), so the map claims nothing about what it buys.
-// 'expired': collection done and the kommun's avtal in scope have all run
-// out or been replaced: it buys here, the new avtal is not with us.
-export const TILE_CLASSES = Object.freeze(['has', 'has-open', 'none-done', 'expired', 'refused', 'none-open', 'not-contacted', 'highlight', 'neutral', 'unknown']);
+// 'none': no avtal in scope in the underlag, whatever the collection status
+// (never a claim that the kommun has none).
+// 'expired': the underlag holds only expired or replaced avtal in scope.
+export const TILE_CLASSES = Object.freeze(['has', 'has-open', 'none', 'expired', 'refused', 'none-open', 'not-contacted', 'highlight', 'neutral', 'unknown']);
 const TILE_UNKNOWN_LABEL = 'Status okänd';
 
 let tilesMemo = null;
