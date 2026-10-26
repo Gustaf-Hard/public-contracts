@@ -269,7 +269,7 @@ export function buildStudioFacts({ contracts = [], lineItems = [], coverage = []
 
   markDuplicates(facts);
   markSuperseded(facts);
-  allocateJoint(facts, stats);
+  allocateJoint(facts);
   for (const f of facts) { delete f._received_at; delete f._vendor_key; delete f._annual; }
   return facts;
 }
@@ -478,13 +478,17 @@ function markSuperseded(facts) {
 }
 
 // A samverkansavtal delivered by several kommuner: the same vendor, start,
-// end and annual value in different kommuner of one län is one avtal. Its value is
-// shared out to the member kommuner by their elever in the school forms it
-// covers (evenly when any member's elever are unknown), so market totals
-// count it once. kr/elev is the whole value over the members' combined
-// elever; with an even split it is unknown. avtal_key is the same on every
-// copy, so avtal counts count it once too.
-function allocateJoint(facts, stats) {
+// end and annual value in different kommuner of one län is one avtal. We
+// rarely know every member or how the cost is shared (a copy may come from
+// two of four members), so nothing is allocated: every copy carries
+// joint.whole_value_sek (the whole avtal's value), the lowest-id copy keeps
+// it as annual_value_sek so market totals count it once, the other copies
+// have no value of their own (annual_value_sek null). No copy has a price
+// per elev: the whole value over one member's elever is not that member's
+// price. avtal_key is the same on every copy, so avtal counts count it once.
+// Kommun pages show it as "samverkansavtal (N kommuner), andel okänd" and
+// leave it out of the kommun's spend and of peer comparisons.
+function allocateJoint(facts) {
   const live = avtalList(facts).filter((a) => !a.rows[0].duplicate_of && a.kod && a.start && a.end && isFiniteNum(a.annual) && a.annual > 0);
   // Members share a län (the first two digits of the kommun kod): kommunal
   // samverkan is regional, and two kommuner far apart paying a list price on
@@ -500,34 +504,17 @@ function allocateJoint(facts, stats) {
       }
       if (members.length < 2) continue;
       for (const m of members) used.add(m.id);
-      const elever = (kod, segs) => {
-        if (!segs.length || !stats) return null;
-        try { const n = stats.eleverIn(kod, segs); return isFiniteNum(n) && n > 0 ? n : null; } catch { return null; }
-      };
-      const counts = members.map((m) => elever(m.kod, m.segments));
-      const byElever = counts.every((n) => n != null);
-      const total = byElever ? counts.reduce((x, n) => x + n, 0) : null;
-      const key = `joint:${Math.min(...members.map((m) => m.id))}`;
+      const primary = Math.min(...members.map((m) => m.id));
+      const key = `joint:${primary}`;
       const kods = members.map((m) => m.kod).sort();
-      members.forEach((m, i) => {
-        const share = byElever ? counts[i] / total : 1 / members.length;
+      for (const m of members) {
         for (const f of m.rows) {
-          const full = f.annual_value_sek;
           f.avtal_key = key;
-          f.joint = { n_kommuner: members.length, kommun_kods: kods, share: round2(share * 10000) / 10000, by: byElever ? 'elever' : 'jamnt' };
-          if (isFiniteNum(full)) f.annual_value_sek = Math.round(full * share);
-          if (f.kr_per_elev_basis === 'styckpris') continue; // a unit price is the same for every member
-          const valuePerElev = f.kr_per_elev != null;
-          f.kr_per_elev = null; f.kr_per_elev_basis = null;
-          if (!byElever) { f.elever_in_scope = null; continue; } // an even split has no per-elev reading
-          const all = members.map((x) => elever(x.kod, f.segments));
-          if (f.elever_in_scope != null && all[i] != null) f.elever_in_scope = all[i];
-          if (!valuePerElev || !isFiniteNum(full) || full <= 0 || all.some((n) => n == null)) continue;
-          f.kr_per_elev = round2(full / all.reduce((x, n) => x + n, 0));
-          f.kr_per_elev_basis = 'skolverket';
-          f.elever_in_scope = all[i];
+          f.joint = { n_kommuner: members.length, kommun_kods: kods, whole_value_sek: f.annual_value_sek, counted_here: m.id === primary };
+          if (m.id !== primary) { f.annual_value_sek = null; f.value_basis = null; }
+          f.kr_per_elev = null; f.kr_per_elev_basis = null; f.kr_per_elev_product_slug = null;
         }
-      });
+      }
     }
   }
 }
@@ -544,6 +531,11 @@ function groupBy(items, keyFn) {
   return m;
 }
 const headline = (facts) => facts.filter((f) => f.active && !f.superseded);
+// A row as one kommun sees it: a samverkansavtal has no known value of its
+// own for a member kommun (the share is unknown), so it is left out of the
+// kommun's spend and of every peer comparison. joint.whole_value_sek keeps
+// the whole avtal's value for display.
+export const kommunView = (f) => (f.joint ? { ...f, annual_value_sek: null, value_basis: null } : f);
 // One avtal: a samverkansavtal delivered by several kommuner shares one key.
 export const avtalOf = (f) => f.avtal_key ?? String(f.contract_id);
 const catOf = (f) => f.category ?? UNKNOWN_CATEGORY;
@@ -763,13 +755,16 @@ function spendRows(rows) {
     value_known_sek: sumKnown(group),
     n_avtal: distinct(group, avtalOf),
     n_known: nKnown(group),
+    n_joint: distinct(group.filter((f) => f.joint), avtalOf),
   })).sort((a, b) => b.value_known_sek - a.value_known_sek || a.category.localeCompare(b.category));
 }
 
 // peerMedianByCategory: { category: distribution } over peers' known spend in
 // that category. A peer with no known value there is unknown, not 0.
+// Samverkansavtal count as avtal but never as the kommun's known spend
+// (kommunView).
 export function kommunProfile(facts, stats, kod, { today = new Date().toISOString().slice(0, 10) } = {}) {
-  const rows = headline(facts);
+  const rows = headline(facts).map(kommunView);
   const mine = rows.filter((f) => f.kommun_kod === kod);
   const spendByCategory = spendRows(mine);
 

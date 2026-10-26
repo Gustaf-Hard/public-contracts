@@ -137,35 +137,9 @@ describe('P2. a samverkansavtal delivered by several kommuner is one avtal', () 
     products: ['IST Administration'], ...o,
   });
   const allSeg = ['Förskola', ...F9, 'Gymnasiet', 'Komvux'];
-  it('GGVV shape: the same IST avtal from two kommuner counts once, split by elever', () => {
-    const a = ist('0662'); const b = ist('0617', { annual_value_sek: 2300000.51 });
-    const facts = build([a, b], { coverage: [...covFor(a.contract_id, 'IST Administration', allSeg), ...covFor(b.contract_id, 'IST Administration', allSeg)] });
-    const ra = row(facts, a.contract_id); const rb = row(facts, b.contract_id);
-    // elever 1950 and 610 in the covered school forms: 76.17 % and 23.83 %.
-    expect(ra.annual_value_sek + rb.annual_value_sek).toBe(2300000);
-    expect(ra.annual_value_sek).toBe(Math.round(2300000 * 1950 / 2560));
-    expect(ra.joint).toMatchObject({ n_kommuner: 2, kommun_kods: ['0617', '0662'], by: 'elever' });
-    expect(ra.kr_per_elev).toBe(898.44); // 2 300 000 / 2 560 combined elever
-    expect(rb.kr_per_elev).toBe(898.44);
-    expect(ra.avtal_key).toBe(rb.avtal_key);
-    const sk = companyShares(facts, { category: 'skoladministration' }).find((s) => s.slug === 'ist');
-    expect(sk).toMatchObject({ value_known_sek: 2300000, n_avtal: 1, kommuner: 2 });
-    expect(marketByCategory(facts).find((m) => m.category === 'skoladministration').n_avtal).toBe(1);
-    expect(dataBasis(facts).active).toBe(1);
-  });
-  it('the kommun page shows its share and says samverkansavtal med 2 kommuner', () => {
-    const a = ist('0662'); const b = ist('0617');
-    const facts = build([a, b], { coverage: [...covFor(a.contract_id, 'IST Administration', allSeg), ...covFor(b.contract_id, 'IST Administration', allSeg)] });
-    const html = text(renderKommun({ kod: '0617', stats, facts, statusMap: new Map([['0617', 'done']]), today: TODAY }));
-    expect(html).toContain('samverkansavtal med 2 kommuner');
-    expect(html).toMatch(/Känt årsvärde 548 tkr/);
-    expect(html).not.toMatch(/2,3 mkr/);
-  });
-  it('even split when a member has no elever for the covered school forms; then kr/elev is unknown', () => {
-    const a = ist('0662'); const b = ist('0617');
-    const facts = build([a, b]); // no coverage: no segments, no elever
-    expect(row(facts, a.contract_id)).toMatchObject({ annual_value_sek: 1150000, kr_per_elev: null, joint: { by: 'jamnt' } });
-  });
+  // The elever split (GGVV, kommun share, even split) was replaced in round
+  // 3 (R3): a samverkansavtal is shown whole with "andel okänd" and gives no
+  // price per elev. See studio-final-fixes-r3.test.js.
   it('kommuner in different län, or with different values or dates, are separate avtal', () => {
     const facts = build([ist('0662'), ist('2480'), ist('0617', { annual_value_sek: 900000 }), ist('0114', { period_end: '2029-07-31' })]);
     expect(facts.every((f) => f.joint == null)).toBe(true);

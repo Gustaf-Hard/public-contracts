@@ -347,15 +347,20 @@ function periodText(f, today) {
   return p;
 }
 
-// "samverkansavtal med 2 kommuner": the value shown is this kommun's share.
+// "samverkansavtal (3 kommuner), andel okänd": we do not know each member's
+// share, so a value shown with it is the whole avtal's.
 export function jointText(f) {
-  return f.joint ? `samverkansavtal med ${fmtInt(f.joint.n_kommuner)} kommuner, ${f.joint.by === 'elever' ? 'andel efter elever' : 'delat lika'}` : '';
+  return f.joint ? `samverkansavtal (${fmtInt(f.joint.n_kommuner)} kommuner), andel okänd` : '';
+}
+// "2,3 mkr/år för hela avtalet" for a samverkansavtal, else null.
+export function jointValueText(f) {
+  return f.joint && isNum(f.joint.whole_value_sek) ? `${fmtKrCompact(f.joint.whole_value_sek)}/år för hela avtalet` : null;
 }
 
 function valueText(f) {
-  if (!isNum(f.annual_value_sek)) return f.joint ? jointText(f) : null;
+  if (f.joint) return [jointValueText(f), jointText(f)].filter(Boolean).join(', ');
+  if (!isNum(f.annual_value_sek)) return null;
   const base = `${fmtKrCompact(f.annual_value_sek)}/år`;
-  if (f.joint) return `${base}, ${jointText(f)}`;
   if (f.value_basis === 'unsplit_channel') return `${base}, ej fördelat`;
   if (f.value_basis === 'split') return `${base}, egen del`;
   return base;

@@ -10,13 +10,13 @@
 import { esc } from '../layout.js';
 import { fmtInt, fmtKrCompact, fmtPrice, basisLine, monthsUntil } from '../format.js';
 import { CATEGORIES, companyBySlug, productBySlug } from '../../catalogue.js';
-import { kommunProfile, priceDistribution, priceRowFilter, distribution, renewalBuckets, UNKNOWN_CATEGORY } from '../../studio-data.js';
+import { kommunProfile, kommunView, priceDistribution, priceRowFilter, distribution, renewalBuckets, UNKNOWN_CATEGORY } from '../../studio-data.js';
 import { GRADE_LEVELS as GRADE_ORDER } from '../../vendor-analytics.js';
 import { entityHeader, kpiTile, emptyPanel } from '../components.js';
 import { stripPlot, rankingBars, renewalTimeline, tileMap, niceDomain, loadKommunTiles } from '../charts.js';
 import {
   isNum, headline, sumKnown, byContract, consolidateByContract, categoryLabel, modelLabel, productName, productNames,
-  companyHref, productHref, section, breadcrumb, medianText, evidenceSection, renewalTileProps, jointText,
+  companyHref, productHref, section, breadcrumb, medianText, evidenceSection, renewalTileProps, jointText, jointValueText,
   safeAll, nOf, MIN_N, isIso,
 } from './common.js';
 
@@ -107,9 +107,10 @@ export function perElevByCategory(rows, { eleverIn, completeOnly = false } = {})
   const by = new Map();
   for (const f of rows) {
     const c = catOf(f);
-    if (!by.has(c)) by.set(c, { value: 0, segs: new Set(), counted: 0, leftOut: 0 });
+    if (!by.has(c)) by.set(c, { value: 0, segs: new Set(), counted: 0, leftOut: 0, joint: 0 });
     const e = by.get(c);
-    if (isNum(f.annual_value_sek) && hasScope(f)) {
+    // A samverkansavtal has no known share for this kommun (kommunView).
+    if (f.joint) { e.leftOut += 1; e.joint += 1; } else if (isNum(f.annual_value_sek) && hasScope(f)) {
       e.value += f.annual_value_sek; e.counted += 1;
       for (const g of f.segments) e.segs.add(g);
     } else e.leftOut += 1;
@@ -117,10 +118,10 @@ export function perElevByCategory(rows, { eleverIn, completeOnly = false } = {})
   const out = new Map();
   for (const [c, e] of by) {
     if (completeOnly && e.leftOut) continue;
-    if (!e.counted) { out.set(c, { perElev: null, value: null, elever: null, counted: 0, leftOut: e.leftOut }); continue; }
+    if (!e.counted) { out.set(c, { perElev: null, value: null, elever: null, counted: 0, leftOut: e.leftOut, joint: e.joint }); continue; }
     let elever = null;
     try { const n = eleverIn?.(GRADE_ORDER.filter((g) => e.segs.has(g))); elever = isNum(n) && n > 0 ? n : null; } catch { elever = null; }
-    out.set(c, { perElev: elever ? e.value / elever : null, value: e.value, elever, counted: e.counted, leftOut: e.leftOut });
+    out.set(c, { perElev: elever ? e.value / elever : null, value: e.value, elever, counted: e.counted, leftOut: e.leftOut, joint: e.joint });
   }
   return out;
 }
@@ -182,7 +183,8 @@ function spendSection({ kommun, profile, head, peers, stats, mine, statusMap }) 
     const ownKnown = isNum(o);
     const few = d.suppressed;
     const nPeers = peerAny.get(c)?.size ?? 0;
-    const left = m?.leftOut ? `, ${fmtInt(m.leftOut)} utan känt värde eller skolformer räknas inte` : '';
+    const nLeft = (m?.leftOut ?? 0) - (m?.joint ?? 0);
+    const left = `${nLeft ? `, ${fmtInt(nLeft)} utan känt värde eller skolformer räknas inte` : ''}${m?.joint ? `, ${nOf(m.joint, 'samverkansavtal', 'samverkansavtal')} med okänd andel räknas inte` : ''}`;
     const name = `<div class="sc-name"><b>${esc(catName(c))}</b><small>${esc(s
       ? `${nOf(s.n_avtal, 'avtal', 'avtal')}${!s.n_known ? ', värde okänt' : s.n_known < s.n_avtal ? `, värde känt för ${fmtInt(s.n_known)}` : ''}${left}`
       : hasOwn ? 'inga aktiva avtal här' : `${fmtInt(nPeers)} liknande köper här`)}</small></div>`;
@@ -262,7 +264,7 @@ function priceRows({ kommun, mine, facts, peers, today }) {
     const via = f.channel_slug && f.channel_slug !== f.company_slug ? companyBySlug(f.channel_slug)?.canonical ?? null : null;
     const bits = [
       catName(catOf(f)),
-      isNum(f.annual_value_sek) ? `${fmtKrCompact(f.annual_value_sek)}/år` : 'årsvärde okänt',
+      f.joint ? jointValueText(f) ?? 'årsvärde okänt' : isNum(f.annual_value_sek) ? `${fmtKrCompact(f.annual_value_sek)}/år` : 'årsvärde okänt',
       via ? `via ${via}` : null,
       f.joint ? jointText(f) : null,
       modelLabel(f.pricing_model),
@@ -501,8 +503,11 @@ function safeTiles() {
 export function renderKommun({ kod, kommun = null, stats, facts, statusMap = new Map(), today, page = 1 }) {
   if (!isIso(today)) throw new Error('renderKommun requires today as YYYY-MM-DD');
   const k = kommun ?? findKommun({ kod, stats, facts });
-  const all = facts.filter((f) => f.kommun_kod === k.kod);
-  const head = headline(facts);
+  // kommunView: a samverkansavtal is listed, but its value is the whole
+  // avtal's and the kommun's share is unknown, so it is never the kommun's
+  // spend and never a peer's.
+  const all = facts.filter((f) => f.kommun_kod === k.kod).map(kommunView);
+  const head = headline(facts).map(kommunView);
   const mine = headline(all);
   // Whole avtal: a channel avtal's owner rows add up to its value.
   const avtal = consolidateByContract(mine);
@@ -516,6 +521,7 @@ export function renderKommun({ kod, kommun = null, stats, facts, statusMap = new
   const profile = kommunProfile(facts, stats, k.kod, { today });
   const elever = safeElever(stats, k.kod);
   const known = avtal.filter((f) => isNum(f.annual_value_sek));
+  const jointAvtal = avtal.filter((f) => f.joint);
 
   const statusWord = status === 'not_contacted' ? 'vi har inte begärt ut avtal här än'
     : status === 'open' ? 'insamling pågår' : status === 'done' ? 'insamling klar' : status === 'partial' ? 'delvis utlämnat'
@@ -535,7 +541,7 @@ export function renderKommun({ kod, kommun = null, stats, facts, statusMap = new
     ? [
       { label: 'Elever F-9', value: elever, sub: 'kommunal regi' },
       { label: 'Aktiva avtal', value: avtal.length, sub: `${fmtInt(byContract(all).length)} insamlade` },
-      { label: 'Känt årsvärde', value: known.length ? fmtKrCompact(sumKnown(known)) : null, sub: basisLine(known.length, avtal.length) },
+      { label: 'Känt årsvärde', value: known.length ? fmtKrCompact(sumKnown(known)) : null, sub: `${basisLine(known.length, avtal.length)}${jointAvtal.length ? `, ${nOf(jointAvtal.length, 'samverkansavtal', 'samverkansavtal')} med okänd andel räknas inte` : ''}` },
     ]
     : [
       { label: 'Elever F-9', value: elever, sub: 'kommunal regi' },

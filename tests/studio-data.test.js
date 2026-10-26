@@ -328,7 +328,9 @@ describe('collectionStatus and whiteSpots', () => {
 
 describe('priceDistribution', () => {
   const priced = (n) => build(Array.from({ length: n }, (_, i) => C({
-    kommun_kod: `900${i + 1}`, unit: 'elev', unit_price_sek: 100 + i * 10, pricing_model: 'per_student',
+    // Distinct values: the same vendor, dates and value in one län would be
+    // one samverkansavtal, which has no price per elev (round 3 R3).
+    kommun_kod: `900${i + 1}`, unit: 'elev', unit_price_sek: 100 + i * 10, pricing_model: 'per_student', annual_value_sek: 100000 + i * 1000,
   })));
   it('n = 4 is suppressed, no values', () => {
     const d = priceDistribution(priced(4), { productSlug: 'polylino' });

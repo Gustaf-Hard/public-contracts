@@ -147,3 +147,69 @@ describe('R1. only a clear renewal supersedes an older avtal', () => {
     expect(row(facts, b.contract_id)).toMatchObject({ superseded: false, segments: F9 });
   });
 });
+
+// ------------------------------------------------------------------ R3
+describe('R3. a samverkansavtal is shown whole, with andel okänd, and never as a member\'s price', () => {
+  const ALLSEG = ['Förskola', ...F9, 'Gymnasiet', 'Komvux'];
+  const ist = (kod, o = {}) => C({
+    vendor_name: 'IST', kommun_kod: kod, annual_value_sek: 2000000, period_start: '2022-07-01', period_end: '2029-06-30',
+    products: ['IST Administration'], ...o,
+  });
+  const ggvv = () => {
+    const a = ist('0662'); const b = ist('0617', { annual_value_sek: 2000000.4 });
+    const facts = build([a, b], { coverage: [...covFor(a.contract_id, 'IST Administration', ALLSEG), ...covFor(b.contract_id, 'IST Administration', ALLSEG)] });
+    return { a, b, facts };
+  };
+
+  it('GGVV shape: one avtal, the whole value counted once, no copy priced per elev', () => {
+    const { a, b, facts } = ggvv();
+    const ra = row(facts, a.contract_id); const rb = row(facts, b.contract_id);
+    expect(ra).toMatchObject({ annual_value_sek: 2000000, kr_per_elev: null, joint: { n_kommuner: 2, kommun_kods: ['0617', '0662'], whole_value_sek: 2000000, counted_here: true } });
+    expect(rb).toMatchObject({ annual_value_sek: null, kr_per_elev: null, joint: { whole_value_sek: 2000000, counted_here: false } });
+    expect(ra.avtal_key).toBe(rb.avtal_key);
+    const sk = companyShares(facts, { category: 'skoladministration' }).find((s) => s.slug === 'ist');
+    expect(sk).toMatchObject({ value_known_sek: 2000000, n_avtal: 1, kommuner: 2 });
+    expect(marketByCategory(facts).find((m) => m.category === 'skoladministration')).toMatchObject({ n_avtal: 1, value_known_sek: 2000000 });
+    expect(dataBasis(facts).active).toBe(1);
+    expect(priceDistribution(facts, { productSlug: 'ist-administration' }).n).toBe(0);
+  });
+
+  it('both member pages say samverkansavtal (2 kommuner), andel okänd, show the whole value as the whole avtal, and give no ert pris', () => {
+    const { facts } = ggvv();
+    for (const kod of ['0662', '0617']) {
+      const html = text(renderKommun({ kod, stats, facts, statusMap: new Map([[kod, 'done']]), today: TODAY }));
+      expect(html).toContain('samverkansavtal (2 kommuner), andel okänd');
+      expect(html).toMatch(/2 mkr\/år för hela avtalet/);
+      expect(html).not.toContain('ert pris');
+      // The kommun's known spend leaves the samverkansavtal out.
+      expect(html).toMatch(/Känt årsvärde okänt känd för 0 av 1 avtal, 1 samverkansavtal med okänd andel räknas inte/);
+      expect(html).toContain('1 samverkansavtal med okänd andel räknas inte');
+    }
+  });
+
+  it('spend per elev leaves a samverkansavtal out, and a peer whose category holds one is not compared', () => {
+    const { a, facts } = ggvv();
+    const rows = facts.filter((f) => f.contract_id === a.contract_id).map((f) => ({ ...f, annual_value_sek: null }));
+    const own = perElevByCategory(rows, { eleverIn: () => 1000 }).get('skoladministration');
+    expect(own).toMatchObject({ counted: 0, joint: 1, perElev: null });
+    expect(perElevByCategory(rows, { eleverIn: () => 1000, completeOnly: true }).has('skoladministration')).toBe(false);
+    // A joint row carries a whole value only on one copy; spend still excludes it.
+    const withValue = facts.filter((f) => f.contract_id === a.contract_id);
+    expect(perElevByCategory(withValue, { eleverIn: () => 1000 }).get('skoladministration')).toMatchObject({ counted: 0, joint: 1 });
+  });
+
+  it('partners are never each other\'s peers in a price strip: a joint styckpris is not a price', () => {
+    // Tempus shape: two copies of one avtal with a per-elev line price.
+    const line = (id) => ({ contract_id: id, product_name: 'Tempus Barn', amount_sek: null, unit_price_sek: 75, unit: 'elev', quantity: null, period_months: 12 });
+    const a = C({ vendor_name: 'Tempus', kommun_kod: '0662', annual_value_sek: 170000, pricing_model: 'per_student', products: ['Tempus Barn'] });
+    const b = C({ vendor_name: 'Tempus', kommun_kod: '0617', annual_value_sek: 170000, pricing_model: 'per_student', products: ['Tempus Barn'] });
+    const facts = build([a, b], { lineItems: [line(a.contract_id), line(b.contract_id)] });
+    expect(facts.every((f) => f.kr_per_elev == null)).toBe(true);
+    expect(row(facts, a.contract_id).joint.n_kommuner).toBe(2);
+    expect(priceDistribution(facts, { productSlug: 'tempus-barn' }).n).toBe(0);
+    // Separate avtal (different value) keep their price.
+    const c = C({ vendor_name: 'Tempus', kommun_kod: '0665', annual_value_sek: 99000, pricing_model: 'per_student', products: ['Tempus Barn'] });
+    const f2 = build([c], { lineItems: [line(c.contract_id)] });
+    expect(row(f2, c.contract_id).kr_per_elev).toBe(75);
+  });
+});

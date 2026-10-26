@@ -61,7 +61,9 @@ function conversation(kod, state) {
   return id;
 }
 
-function seedContract({ kod, vendor, value = 100000, start = '2025-08-01', end = '2027-07-31', model = 'per_student', lines = [], state = 'DELIVERING' }) {
+// value defaults differ per call: the same vendor, dates and value in one län
+// would be one samverkansavtal (r2 P2), which has no price per elev (r3 R3).
+function seedContract({ kod, vendor, value = 100000 + (seq + 1) * 10, start = '2025-08-01', end = '2027-07-31', model = 'per_student', lines = [], state = 'DELIVERING' }) {
   const convId = conversation(kod, state);
   const msgId = db.recordMessage({
     conversation_id: convId, gmail_message_id: `gm-${++seq}`,

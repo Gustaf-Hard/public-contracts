@@ -44,7 +44,9 @@ afterEach(() => {
 
 let seq = 0;
 function seedContract({
-  kod, vendor, value = 100000, start = '2025-08-01', end = '2027-07-31', model = 'per_student',
+  // value defaults differ per call: the same vendor, dates and value in one
+  // län would be one samverkansavtal, which has no price per elev (r3 R3).
+  kod, vendor, value = 100000 + (seq + 1) * 10, start = '2025-08-01', end = '2027-07-31', model = 'per_student',
   lines = [], filename = 'Avtal_Anna_Andersson.pdf', state = 'DELIVERING',
   mime = 'application/pdf', savedPath = null, writeFile = true, isContract = 1,
 }) {
@@ -86,7 +88,8 @@ function seedIlt() {
   const prices = { '1440': 110, '0560': 130, '0180': 150, '1480': 170, '1280': 190 };
   for (const [kod, p] of Object.entries(prices)) {
     seedContract({
-      kod, vendor: 'ILT Education AB', value: 300000,
+      // value differs per kommun: 1440 and 1480 share a län (r3 R3).
+      kod, vendor: 'ILT Education AB', value: 300000 + p,
       lines: [
         { product_name: 'Polyglutt skola F-3', unit: 'elev', unit_price_sek: p, period_months: 12 },
         { product_name: 'Polylino' },
@@ -94,7 +97,7 @@ function seedIlt() {
       ],
     });
     if (kod !== '1280') {
-      seedContract({ kod, vendor: 'ILT Education AB', value: 40000, end: '2027-01-31',
+      seedContract({ kod, vendor: 'ILT Education AB', value: 40000 + p, end: '2027-01-31',
         lines: [{ product_name: 'Begreppa', unit: 'elev', unit_price_sek: p - 60, period_months: 12 }] });
     }
   }
