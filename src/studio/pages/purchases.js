@@ -9,7 +9,7 @@ import { companyBySlug, productBySlug } from '../../catalogue.js';
 import { purchaseEvidenceLabel, purchaseKommuner, upcomingLicenceEnds, purchaseDocuments, channelName } from '../../studio-purchases.js';
 import { companyHref, productHref, kommunHref, nOf } from './common.js';
 
-const MAX_COMPANIES = 12;
+const MAX_COMPANIES = 8;
 const MAX_ENDS = 8;
 const MAX_KOMMUNER = 20;
 
@@ -18,9 +18,10 @@ const link = (href, text) => (href ? `<a href="${esc(href)}" data-pane-link>${es
 const productLabel = (slug) => productBySlug(slug)?.product.name ?? null;
 
 // "licensperiod till 2026-06-30 (läsår 2025/26)", "licensperiod okänd".
-export function licenceText(p) {
+export function licenceText(p, today = null) {
   if (!p.licence_end) return 'licensperiod okänd';
-  return `licensperiod till ${p.licence_end}${p.licence_basis === 'lasar' && p.school_year ? ` (läsår ${p.school_year})` : ''}`;
+  const ended = today && p.licence_end < today;
+  return `licensperiod ${ended ? 'slutade' : 'till'} ${p.licence_end}${p.licence_basis === 'lasar' && p.school_year ? ` (läsår ${p.school_year})` : ''}`;
 }
 
 const rowName = (p) => p.product ?? p.supplier ?? 'okänd rad';
@@ -47,7 +48,7 @@ function docLine(rows) {
   const docs = purchaseDocuments(rows);
   const stated = docs.filter((d) => d.stated_total_sek != null);
   const bits = [`${nOf(docs.length, 'dokument', 'dokument')}, ${nOf(rows.length, 'rad', 'rader')}`];
-  for (const d of stated) bits.push(`ett dokument anger själv totalt ${fmtKrCompact(d.stated_total_sek)}`);
+  for (const d of stated) bits.push(`${docs.length === 1 ? 'dokumentet' : 'ett av dokumenten'} anger själv totalt ${fmtKrCompact(d.stated_total_sek)}`);
   return bits.join('; ');
 }
 
@@ -63,13 +64,19 @@ export function kommunPurchaseSection({ rows = [], today }) {
   const cards = [...byLabel.entries()].sort((a, b) => b[1].length - a[1].length).map(([label, ps], i) => {
     const groups = companyGroups(ps);
     const unknown = ps.filter((p) => !p.company_slug);
-    const li = groups.slice(0, MAX_COMPANIES).map((g) => {
+    const item = (g) => {
       const products = [...new Set(g.rows.map((p) => p.product_slug).filter(Boolean))];
-      const names = products.map((s) => link(productHref(s), productLabel(s) ?? s)).join(', ');
+      const names = products.map((sl) => link(productHref(sl), productLabel(sl) ?? sl)).join(', ');
       const latest = g.rows.filter((p) => p.licence_end).sort((a, b) => b.licence_end.localeCompare(a.licence_end))[0];
-      return `<li><div class="pu-co">${link(companyHref(g.slug), g.name)}${names ? `<span class="pu-prod">${names}</span>` : ''}</div><span class="meta">${esc(`${nOf(g.rows.length, 'rad', 'rader')}, ${latest ? licenceText(latest) : 'licensperiod okänd'}`)}</span></li>`;
-    }).join('');
-    const restCo = groups.length > MAX_COMPANIES ? `<p class="meta">${esc(`${nOf(groups.length - MAX_COMPANIES, 'leverantör', 'leverantörer')} till i listan.`)}</p>` : '';
+      // One row: its own amount as the list states it. Several rows are
+      // never added up.
+      const one = g.rows.length === 1 && typeof g.rows[0].amount_sek === 'number' ? `, ${fmtKrCompact(g.rows[0].amount_sek)} enligt listan` : '';
+      return `<li><div class="pu-co">${link(companyHref(g.slug), g.name)}${names ? `<span class="pu-prod">${names}</span>` : ''}</div><span class="meta">${esc(`${nOf(g.rows.length, 'rad', 'rader')}${one}, ${latest ? licenceText(latest, today) : 'licensperiod okänd'}`)}</span></li>`;
+    };
+    const li = groups.slice(0, MAX_COMPANIES).map(item).join('');
+    const restCo = groups.length > MAX_COMPANIES
+      ? fold(`Visa ${nOf(groups.length - MAX_COMPANIES, 'leverantör', 'leverantörer')} till`, `<ul class="pu-list">${groups.slice(MAX_COMPANIES).map(item).join('')}</ul>`)
+      : '';
     const unk = unknown.length
       ? fold(`${nOf(unknown.length, 'rad', 'rader')} som vi inte kan koppla till en leverantör i katalogen`, `<ul class="pu-raw">${unknown.slice(0, 60).map((p) => `<li>${esc([p.supplier, p.product].filter(Boolean).join(': '))}</li>`).join('')}</ul>${unknown.length > 60 ? `<p class="meta">${esc(`och ${fmtInt(unknown.length - 60)} till.`)}</p>` : ''}`)
       : '';
