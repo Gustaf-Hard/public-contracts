@@ -90,6 +90,15 @@ export const TICK_STALE_THRESHOLD_MIN = 60;
 // the cap entirely and is the no-SQL escape hatch.
 export const MAX_ANALYSIS_ATTEMPTS = 5;
 
+// Purchase and licence lists (2026-10-27, src/purchase-list.js): the
+// non-avtal document types a list is filed under, and the cap on failed
+// extraction attempts per document. The extraction is run by hand
+// (scripts/17-extract-purchases.js), so its bookkeeping lives on its own table
+// and never touches attachments.analysis_attempts, which bounds the contract
+// analysis.
+export const PURCHASE_DOC_TYPES = Object.freeze(['följebrev_sammanställning', 'prislista', 'övrigt']);
+export const MAX_PURCHASE_ATTEMPTS = 3;
+
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS conversations (
   id INTEGER PRIMARY KEY,
@@ -460,6 +469,45 @@ export function openDb(path) {
     if (!attCols.includes('analysis_parked_alerted_at')) {
       db.exec('ALTER TABLE attachments ADD COLUMN analysis_parked_alerted_at TEXT');
     }
+
+    // Purchase rows (2026-10-27): rows read out of purchase and licence lists
+    // (order histories, licence overviews), one table per row and one per
+    // document. Additive: new tables only, nothing existing changes.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS purchase_rows (
+        id INTEGER PRIMARY KEY,
+        attachment_id INTEGER NOT NULL REFERENCES attachments(id),
+        row_index INTEGER NOT NULL,
+        supplier TEXT,
+        product TEXT,
+        channel TEXT,
+        quantity REAL,
+        unit TEXT,
+        unit_price_sek REAL,
+        amount_sek REAL,
+        order_date TEXT,
+        period_start TEXT,
+        period_end TEXT,
+        school_year TEXT,
+        grades TEXT,
+        order_ref TEXT,
+        method TEXT NOT NULL,
+        extracted_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_purchase_rows_attachment ON purchase_rows(attachment_id);
+      CREATE TABLE IF NOT EXISTS purchase_documents (
+        attachment_id INTEGER PRIMARY KEY REFERENCES attachments(id),
+        status TEXT NOT NULL,
+        method TEXT,
+        channel TEXT,
+        stated_total_sek REAL,
+        row_count INTEGER NOT NULL DEFAULT 0,
+        attempts INTEGER NOT NULL DEFAULT 0,
+        last_error TEXT,
+        extracted_at TEXT,
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+    `);
 
     // Handoff-task backfill (2026-09-06 design §2): the NEWEST handoff-
     // classified inbound per conversation seeds a task, so hänvisningar that
@@ -1945,6 +1993,102 @@ export function openDb(path) {
     };
   }
 
+  // ---- Purchase rows (2026-10-27, src/purchase-list.js) ----
+
+  // Replace one attachment's purchase rows and its document record in ONE
+  // transaction: a re-extraction never leaves half the old rows beside half
+  // the new, and a failed insert keeps the old rows. isList=false records a
+  // "not a purchase list" verdict with no rows.
+  function replacePurchaseRows(attachmentId, { rows = [], method, channel = null, stated_total_sek = null, isList = true } = {}) {
+    if (!['xlsx', 'llm'].includes(method)) throw new Error(`replacePurchaseRows: method must be xlsx or llm, got ${method}`);
+    const ins = db.prepare(`
+      INSERT INTO purchase_rows (attachment_id, row_index, supplier, product, channel, quantity, unit, unit_price_sek,
+                                 amount_sek, order_date, period_start, period_end, school_year, grades, order_ref, method)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+    db.transaction(() => {
+      db.prepare('DELETE FROM purchase_rows WHERE attachment_id = ?').run(attachmentId);
+      const list = isList ? rows : [];
+      list.forEach((r, i) => {
+        ins.run(
+          attachmentId, i, r.supplier ?? null, r.product ?? null, r.channel ?? null, num(r.quantity), r.unit ?? null,
+          num(r.unit_price_sek), num(r.amount_sek), r.order_date ?? null, r.period_start ?? null, r.period_end ?? null,
+          r.school_year ?? null, Array.isArray(r.grades) && r.grades.length ? JSON.stringify(r.grades) : null,
+          r.order_ref ?? null, method,
+        );
+      });
+      db.prepare(`
+        INSERT INTO purchase_documents (attachment_id, status, method, channel, stated_total_sek, row_count, attempts, last_error, extracted_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, 0, NULL, datetime('now'), datetime('now'))
+        ON CONFLICT(attachment_id) DO UPDATE SET status = excluded.status, method = excluded.method, channel = excluded.channel,
+          stated_total_sek = excluded.stated_total_sek, row_count = excluded.row_count, attempts = 0, last_error = NULL,
+          extracted_at = excluded.extracted_at, updated_at = excluded.updated_at
+      `).run(attachmentId, isList && list.length ? 'rows' : 'not_list', method, channel ?? null, num(stated_total_sek), list.length);
+    })();
+  }
+
+  // One failed extraction. A permanent failure parks at once
+  // (MAX_PURCHASE_ATTEMPTS); stored rows from an earlier success stay.
+  // Returns the attempt count.
+  function recordPurchaseFailure(attachmentId, { reason, permanent = false } = {}) {
+    const cur = db.prepare('SELECT status, attempts FROM purchase_documents WHERE attachment_id = ?').get(attachmentId);
+    const attempts = permanent ? MAX_PURCHASE_ATTEMPTS : Math.min(MAX_PURCHASE_ATTEMPTS, (cur?.attempts ?? 0) + 1);
+    const status = cur?.status === 'rows' ? 'rows' : 'failed';
+    db.prepare(`
+      INSERT INTO purchase_documents (attachment_id, status, attempts, last_error, updated_at)
+      VALUES (?, ?, ?, ?, datetime('now'))
+      ON CONFLICT(attachment_id) DO UPDATE SET status = excluded.status, attempts = excluded.attempts,
+        last_error = excluded.last_error, updated_at = excluded.updated_at
+    `).run(attachmentId, status, attempts, String(reason ?? 'transient:unknown'));
+    return attempts;
+  }
+
+  function getPurchaseDocument(attachmentId) {
+    return db.prepare('SELECT * FROM purchase_documents WHERE attachment_id = ?').get(attachmentId) ?? null;
+  }
+
+  // Analysed documents that are not avtal and may be purchase lists, with
+  // the kommun and the purchase bookkeeping so far.
+  function listPurchaseCandidates() {
+    const types = PURCHASE_DOC_TYPES.map(() => '?').join(', ');
+    return db.prepare(`
+      SELECT a.id, a.filename, a.saved_path, a.mime_type, a.message_id,
+             conv.kommun_kod, conv.kommun_namn, c.document_type,
+             pd.status AS purchase_status, COALESCE(pd.attempts, 0) AS purchase_attempts, pd.last_error AS purchase_error,
+             pd.row_count AS purchase_row_count
+      FROM contracts c
+      JOIN attachments a ON a.id = c.attachment_id
+      JOIN messages m ON m.id = a.message_id
+      JOIN conversations conv ON conv.id = m.conversation_id
+      LEFT JOIN purchase_documents pd ON pd.attachment_id = a.id
+      WHERE c.is_contract = 0 AND c.document_type IN (${types})
+      ORDER BY a.id
+    `).all(...PURCHASE_DOC_TYPES);
+  }
+
+  // Every stored purchase row with its kommun and document facts, for the
+  // studio. No filename: it can carry a person's name.
+  function listPurchaseRows() {
+    return db.prepare(`
+      SELECT pr.id, pr.attachment_id, pr.row_index, pr.supplier, pr.product, pr.channel, pr.quantity, pr.unit,
+             pr.unit_price_sek, pr.amount_sek, pr.order_date, pr.period_start, pr.period_end, pr.school_year,
+             pr.grades, pr.order_ref, pr.method, pr.extracted_at,
+             conv.kommun_kod, conv.kommun_namn, m.received_at,
+             pd.stated_total_sek, pd.channel AS document_channel
+      FROM purchase_rows pr
+      JOIN attachments a ON a.id = pr.attachment_id
+      JOIN messages m ON m.id = a.message_id
+      JOIN conversations conv ON conv.id = m.conversation_id
+      LEFT JOIN purchase_documents pd ON pd.attachment_id = pr.attachment_id
+      ORDER BY pr.attachment_id, pr.row_index
+    `).all().map((r) => {
+      let grades = [];
+      try { grades = r.grades ? JSON.parse(r.grades) : []; } catch { grades = []; }
+      return { ...r, grades: Array.isArray(grades) ? grades : [] };
+    });
+  }
+
   // Every kommun we hold ANY stored contract for (is_contract=1, any vendor)
   // — the row universe for the product-coverage drill-down. `collection_done`
   // says whether we may draw confident negative conclusions ("not sold to
@@ -2325,6 +2469,11 @@ export function openDb(path) {
     listContractsForKommun,
     listContractFacts,
     listStudioUnderlag,
+    replacePurchaseRows,
+    recordPurchaseFailure,
+    getPurchaseDocument,
+    listPurchaseCandidates,
+    listPurchaseRows,
     listKommunerWithContracts,
     listConversationsDueForRefresh,
     listVendorsOverview,
