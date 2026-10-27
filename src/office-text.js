@@ -151,3 +151,112 @@ export function officeTextFromBuffer(buffer, filename, { maxChars = 200_000 } = 
   if (!text) return null;
   return text.length > maxChars ? text.slice(0, maxChars) : text;
 }
+
+// Column letters ("A", "AB") to a 0-based index.
+function colIndex(ref) {
+  const letters = /^([A-Z]+)/.exec(String(ref ?? ''))?.[1];
+  if (!letters) return null;
+  let n = 0;
+  for (const ch of letters) n = n * 26 + (ch.charCodeAt(0) - 64);
+  return n - 1;
+}
+
+// Worksheet part name -> sheet name, from workbook.xml and its rels. Falls
+// back to "sheetN" when the workbook does not say.
+function sheetNames(files) {
+  const out = new Map();
+  const wb = files['xl/workbook.xml'] ? strFromU8(files['xl/workbook.xml']) : '';
+  const rels = files['xl/_rels/workbook.xml.rels'] ? strFromU8(files['xl/_rels/workbook.xml.rels']) : '';
+  const targets = new Map();
+  for (const m of rels.matchAll(/<Relationship\b[^>]*>/g)) {
+    const id = /\bId="([^"]+)"/.exec(m[0])?.[1];
+    const target = /\bTarget="([^"]+)"/.exec(m[0])?.[1];
+    if (id && target) targets.set(id, `xl/${target.replace(/^\/?xl\//, '').replace(/^\//, '')}`);
+  }
+  let i = 0;
+  for (const m of wb.matchAll(/<sheet\b[^>]*>/g)) {
+    i += 1;
+    const name = decodeXml(/\bname="([^"]*)"/.exec(m[0])?.[1] ?? '');
+    const rid = /\br:id="([^"]+)"/.exec(m[0])?.[1];
+    const part = (rid && targets.get(rid)) || `xl/worksheets/sheet${i}.xml`;
+    out.set(part, name || `sheet${i}`);
+  }
+  return out;
+}
+
+// Every worksheet as rows of cells, cell geometry kept: a purchase list read
+// column by column needs to know that "Fakt.belopp" is column R. A cell is a
+// string, a number, an ISO date (date-formatted cells only, as in
+// officeTextFromBuffer) or null for a gap. Empty rows are dropped;
+// rowNumbers[i] is the sheet row number of rows[i]. null when the file is not
+// a readable xlsx. Sheets come in workbook order.
+export function xlsxSheetsFromBuffer(buffer, filename) {
+  if (!buffer?.length || !/\.xlsx$/i.test(String(filename ?? ''))) return null;
+  let files;
+  try {
+    files = unzipSync(new Uint8Array(buffer));
+  } catch {
+    return null;
+  }
+  try {
+    const sst = files['xl/sharedStrings.xml'];
+    const shared = sst ? sharedStrings(strFromU8(sst)) : [];
+    const dateStyles = files['xl/styles.xml'] ? dateStyleIndexes(strFromU8(files['xl/styles.xml'])) : new Set();
+    const names = sheetNames(files);
+    const parts = Object.keys(files).filter((n) => /^xl\/worksheets\/[^/]+\.xml$/i.test(n));
+    const order = [...names.keys()];
+    parts.sort((a, b) => {
+      const ia = order.indexOf(a); const ib = order.indexOf(b);
+      if (ia !== -1 || ib !== -1) return (ia === -1 ? 1e9 : ia) - (ib === -1 ? 1e9 : ib);
+      return Number(/(\d+)\.xml$/i.exec(a)?.[1] ?? 0) - Number(/(\d+)\.xml$/i.exec(b)?.[1] ?? 0);
+    });
+    const sheets = [];
+    for (const part of parts) {
+      const xml = strFromU8(files[part]);
+      const rows = [];
+      const rowNumbers = [];
+      let lastRow = 0;
+      for (const row of xml.matchAll(/<row\b([^>]*?)(?:\/>|>([\s\S]*?)<\/row>)/g)) {
+        const rnum = Number(/\br="(\d+)"/.exec(row[1])?.[1] ?? lastRow + 1);
+        lastRow = rnum;
+        const cells = [];
+        let nextCol = 0;
+        for (const cell of (row[2] ?? '').matchAll(/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
+          const attrs = cell[1];
+          const inner = cell[2] ?? '';
+          const col = colIndex(/\br="([A-Z]+)\d*"/.exec(attrs)?.[1]) ?? nextCol;
+          nextCol = col + 1;
+          const type = /\bt="([^"]+)"/.exec(attrs)?.[1] ?? 'n';
+          let v = null;
+          if (type === 's') {
+            const idx = Number(/<v>([\s\S]*?)<\/v>/.exec(inner)?.[1]);
+            v = shared[idx] ?? null;
+          } else if (type === 'inlineStr') {
+            v = textFromXml(inner, 't').join('') || null;
+          } else if (type === 'str' || type === 'e' || type === 'b') {
+            v = decodeXml(/<v>([\s\S]*?)<\/v>/.exec(inner)?.[1] ?? '').trim() || null;
+          } else {
+            const raw = decodeXml(/<v>([\s\S]*?)<\/v>/.exec(inner)?.[1] ?? '').trim();
+            if (raw) {
+              const n = Number(raw);
+              const styleIdx = Number(/\bs="(\d+)"/.exec(attrs)?.[1] ?? -1);
+              const iso = dateStyles.has(styleIdx) ? serialToIso(n) : null;
+              v = iso ?? (Number.isFinite(n) ? n : raw);
+            }
+          }
+          if (typeof v === 'string') v = v.trim() || null;
+          while (cells.length < col) cells.push(null);
+          cells[col] = v;
+        }
+        while (cells.length && cells[cells.length - 1] == null) cells.pop();
+        if (!cells.length) continue;
+        rows.push(cells);
+        rowNumbers.push(rnum);
+      }
+      sheets.push({ name: names.get(part) ?? part.replace(/^.*\//, '').replace(/\.xml$/i, ''), rows, rowNumbers });
+    }
+    return sheets;
+  } catch {
+    return null;
+  }
+}
