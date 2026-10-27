@@ -266,6 +266,15 @@ describe('LLM path', () => {
     expect(out.rows[1]).toMatchObject({ quantity: 30, unit: 'elev', period_end: '2026-07-31', grades: ['1-3'], order_ref: 'A-1' });
   });
 
+  it('never copies the document\'s order window onto the rows as a licensperiod', () => {
+    const out = rowsFromLlm({
+      is_purchase_list: true, channel: 'skolon', school_year: null, period_start: '2025-01-01', period_end: '2026-12-31', stated_total_sek: null,
+      rows: [{ supplier: 'Binogi Sverige AB', product: 'Huvudmanslicens 1 år Binogi', quantity: 0, unit: '', amount_sek: 10, period_start: '', period_end: '', school_year: '', grades: [], order_ref: '' }],
+    }, { filename: 'x.pdf' });
+    expect(out.rows[0].period_end).toBeNull();
+    expect(out.rows[0].period_start).toBeNull();
+  });
+
   it('sends a PDF as a document block with the schema, and reports failures through onFailure', async () => {
     const create = vi.fn(async () => ({ content: [{ type: 'text', text: JSON.stringify({ is_purchase_list: true, channel: null, school_year: null, period_start: null, period_end: null, stated_total_sek: null, rows: [] }) }] }));
     const client = { messages: { create } };

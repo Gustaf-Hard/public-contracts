@@ -416,7 +416,7 @@ Uppgift: avgör om dokumentet är en sådan lista över köp eller licenser, och
 Regler:
 - is_purchase_list: true när dokumentet räknar upp köpta produkter, licenser eller kostnader rad för rad. false för brev, avtalstext, beslut och annat.
 - channel: "skolon", "atea" eller "laromedia" när dokumentet säger att köpen gjorts via den kanalen, annars null.
-- school_year: läsåret dokumentet gäller som "2025/26", annars null. period_start / period_end: perioden hela dokumentet gäller som ISO-datum, annars null.
+- school_year: läsåret dokumentet gäller som "2025/26", annars null. period_start / period_end: perioden hela dokumentet gäller som ISO-datum (t.ex. perioden köpen gjordes under), annars null. Skriv inte dokumentets period på raderna.
 - stated_total_sek: totalsumman ENDAST om dokumentet själv anger den. Räkna aldrig ihop rader själv. null annars.
 - rows: en post per rad i listan, i dokumentets ordning. Är en rad en leverantör med underrader per produkt: skriv av underraderna (produktraderna), inte leverantörens summarad. Finns bara leverantörsrader: en post per leverantör med product "".
   - supplier: leverantören som det står. product: produkten eller licensen som det står, "" om raden inte nämner någon.
@@ -483,8 +483,6 @@ export function countUnionParams(schema) {
 export function rowsFromLlm(answer, { filename = '' } = {}) {
   const docChannel = CHANNELS.includes(answer?.channel) ? answer.channel : channelFrom(filename);
   const docYear = parseSchoolYear(answer?.school_year) ?? parseSchoolYear(filename);
-  const docStart = parseDate(answer?.period_start);
-  const docEnd = parseDate(answer?.period_end);
   const rows = [];
   for (const r of answer?.rows ?? []) {
     const row = normalisePurchaseRow({
@@ -494,8 +492,11 @@ export function rowsFromLlm(answer, { filename = '' } = {}) {
       quantity: r.quantity,
       unit: r.unit,
       amount_sek: r.amount_sek,
-      period_start: parseDate(r.period_start) ?? (parseDate(r.period_end) ? null : docStart),
-      period_end: parseDate(r.period_end) ?? (parseDate(r.period_start) ? null : docEnd),
+      // The document's own period ("inköpta under 2025-01-01 till 2026-12-31")
+      // is when the orders were placed, not any row's licensperiod, so it is
+      // never copied onto the rows.
+      period_start: parseDate(r.period_start),
+      period_end: parseDate(r.period_end),
       school_year: parseSchoolYear(r.school_year) ?? docYear,
       grades: r.grades,
       order_ref: r.order_ref,
