@@ -369,7 +369,7 @@ export function renewalTimeline({ lanes = [], today, months = 24, laneHead = '' 
 // 'none': no avtal in scope in the underlag, whatever the collection status
 // (never a claim that the kommun has none).
 // 'expired': the underlag holds only expired or replaced avtal in scope.
-export const TILE_CLASSES = Object.freeze(['has', 'has-open', 'none', 'expired', 'refused', 'none-open', 'not-contacted', 'highlight', 'neutral', 'unknown']);
+export const TILE_CLASSES = Object.freeze(['has', 'has-open', 'none', 'expired', 'refused', 'none-open', 'not-contacted', 'highlight', 'neutral', 'unknown', 'purchase']);
 const TILE_UNKNOWN_LABEL = 'Status okänd';
 
 let tilesMemo = null;

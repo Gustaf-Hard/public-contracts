@@ -14,6 +14,8 @@ import {
   companyHref, productHref, section, breadcrumb, priceStrip, medianText, categoryContext,
   footprintMap, renewalSection, evidenceSection, renewalTileProps, peerGroupKods, MIN_N,
 } from './common.js';
+import { entityPurchaseSection, purchaseAnswerText } from './purchases.js';
+import { purchasesFor, purchaseKods } from '../../studio-purchases.js';
 
 function substitutes({ facts, product, category }) {
   if (!category) return emptyPanel({ title: 'Kategorin är okänd', text: 'Utan kategori kan vi inte säga vilka produkter som gör samma jobb.' });
@@ -43,7 +45,7 @@ function substitutes({ facts, product, category }) {
   ${rankingBars({ items, max: 8, noun: 'produkter' })}</div>`;
 }
 
-export function renderProdukt({ product, company, facts, stats, statusMap, today, page = 1, underlag = null }) {
+export function renderProdukt({ product, company, facts, stats, statusMap, today, page = 1, underlag = null, purchases = [] }) {
   const slug = product.slug;
   const all = facts.filter((f) => f.product_slugs.includes(slug) || f.kr_per_elev_product_slug === slug);
   const rows = headline(all);
@@ -64,9 +66,11 @@ export function renderProdukt({ product, company, facts, stats, statusMap, today
   const pricedAvtal = byAvtal(rows.filter((f) => isNum(f.kr_per_elev) && f.kr_per_elev > 0 && priceRowFilter({ productSlug: slug })(f))).length;
   const nPriced = dist.n;
 
+  const bought = purchasesFor(purchases, { productSlug: slug });
+  const boughtKods = purchaseKods(bought);
   const answer = `${product.whatItIs} ${avtal.length
     ? `Finns i aktiva avtal hos ${fmtInt(kommuner)} ${kommuner === 1 ? 'kommun' : 'kommuner'}.`
-    : 'Vi har inga aktiva avtal som nämner produkten än.'}`;
+    : 'Vi har inga aktiva avtal som nämner produkten än.'}${purchaseAnswerText({ kommuner: boughtKods.size, entity: product.name })}`;
 
   const header = entityHeader({
     kicker: `Produkt från ${company.canonical} · ${catLabel}`,
@@ -151,7 +155,8 @@ ${header}
 <section class="section">${kpis}</section>
 ${section({ id: 'pris', kicker: 'Pris', title: 'Pris per elev och år', note: 'en punkt per kommun; per segment räknas bara avtal som gäller enbart produkten', body: priceBody })}
 ${matrix}
-${section({ id: 'karta', kicker: 'Var', title: 'Kommuner som använder produkten', note: `${fmtInt(kommuner)} kommuner med aktivt avtal, håll över en ruta för namn`, body: `<div class="card map-card">${footprintMap({ tiles, rows: all, statusMap, stats, entity: product.name, nameOf, underlag, scope: { category: product.category ?? company.category ?? null, companySlug: company.slug } })}</div>` })}
+${section({ id: 'karta', kicker: 'Var', title: 'Kommuner som använder produkten', note: `${fmtInt(kommuner)} kommuner med aktivt avtal, håll över en ruta för namn`, body: `<div class="card map-card">${footprintMap({ tiles, rows: all, statusMap, stats, entity: product.name, nameOf, underlag, scope: { category: product.category ?? company.category ?? null, companySlug: company.slug }, purchaseKods: boughtKods })}</div>` })}
+${bought.length ? section({ id: 'inkop', kicker: 'Inköpslistor', title: 'Finns i kommunernas inköpslistor', note: 'köp, inte avtal; räknas inte i avtalssiffrorna eller i pris per elev', body: entityPurchaseSection({ rows: bought, today, entity: product.name, nameOf }) }) : ''}
 ${section({ id: 'alternativ', kicker: 'Alternativ', title: 'Produkter som gör samma jobb', body: substitutes({ facts, product, category }) })}
 ${section({ id: 'fornyelser', kicker: 'Förnyelser', title: 'Avtal som förnyas eller löper ut', note: renew.basis, body: `<div class="card">${renew.html}</div>` })}
 ${section({ id: 'underlag', kicker: 'Underlag', title: 'Avtalen bakom siffrorna', note: `${fmtInt(ev.active)} aktiva, ${fmtInt(ev.old)} utgångna eller ersatta`, body: ev.html })}`;

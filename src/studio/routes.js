@@ -5,6 +5,7 @@
 
 import { buildStudioFacts, collectionStatus, dataBasis, underlagEvidence } from '../studio-data.js';
 import { loadKommunStats } from '../kommun-stats.js';
+import { buildPurchaseFacts } from '../studio-purchases.js';
 import { companies } from '../catalogue.js';
 import { studioLayout } from './layout.js';
 import { renderGallery } from './gallery.js';
@@ -65,7 +66,13 @@ export function makeStudioData({ db, statsLoader = loadKommunStats, now = () => 
     // kommun with such underlag is shown as "underlag ej genomgånget". Fails
     // closed: if it cannot be read, every done kommun is.
     const underlag = db ? safe(() => underlagEvidence(db.listStudioUnderlag()), null) ?? { unavailable: true } : { unavailable: true };
-    const data = { facts, stats, statusMap, basis, today, underlag, searchOptions: buildSearchOptions(stats) };
+    // Purchase rows from purchase and licence lists: their own evidence
+    // level, never part of `facts` (so never an avtal, never in a median).
+    // A db without the table or the method reads as no purchases.
+    const purchases = db && typeof db.listPurchaseRows === 'function'
+      ? safe(() => buildPurchaseFacts({ rows: db.listPurchaseRows(), today }), [])
+      : [];
+    const data = { facts, stats, statusMap, basis, today, underlag, purchases, searchOptions: buildSearchOptions(stats) };
     memo = { db, today, at: ms, data };
     return data;
   };
@@ -158,7 +165,7 @@ export function mountStudio(app, {
         body: notFound({ what: 'Leverantören finns inte', text: 'Vi känner inte till någon leverantör med den adressen. Sök efter namnet eller gå till listan över leverantörer.' }),
       });
     }
-    const body = renderLeverantor({ company, facts: data.facts, stats: data.stats, statusMap: data.statusMap, underlag: data.underlag, today: data.today, page: pageOf(req) });
+    const body = renderLeverantor({ company, facts: data.facts, stats: data.stats, statusMap: data.statusMap, underlag: data.underlag, today: data.today, page: pageOf(req), purchases: data.purchases });
     sendStudio(req, res, data, { title: company.canonical, body });
   });
 
@@ -171,7 +178,7 @@ export function mountStudio(app, {
         body: notFound({ what: 'Produkten finns inte', text: 'Vi känner inte till någon produkt med den adressen. Sök efter namnet eller gå till leverantören.' }),
       });
     }
-    const body = renderProdukt({ product: hit.product, company: hit.company, facts: data.facts, stats: data.stats, statusMap: data.statusMap, underlag: data.underlag, today: data.today, page: pageOf(req) });
+    const body = renderProdukt({ product: hit.product, company: hit.company, facts: data.facts, stats: data.stats, statusMap: data.statusMap, underlag: data.underlag, today: data.today, page: pageOf(req), purchases: data.purchases });
     sendStudio(req, res, data, { title: hit.product.name, body });
   });
 
@@ -188,7 +195,7 @@ export function mountStudio(app, {
         }),
       });
     }
-    const body = renderKommun({ kod: kommun.kod, kommun, stats: data.stats, facts: data.facts, statusMap: data.statusMap, today: data.today, page: pageOf(req) });
+    const body = renderKommun({ kod: kommun.kod, kommun, stats: data.stats, facts: data.facts, statusMap: data.statusMap, today: data.today, page: pageOf(req), purchases: data.purchases });
     sendStudio(req, res, data, { title: kommun.namn, body });
   });
 
@@ -235,7 +242,7 @@ export function mountStudio(app, {
 
   app.get('/studio/om', (req, res) => {
     const data = getStudioData();
-    sendStudio(req, res, data, { title: 'Om datan', body: renderOm({ facts: data.facts, stats: data.stats, statusMap: data.statusMap, basis: data.basis, today: data.today, ttlMs: STUDIO_DATA_TTL_MS }) });
+    sendStudio(req, res, data, { title: 'Om datan', body: renderOm({ facts: data.facts, stats: data.stats, statusMap: data.statusMap, basis: data.basis, today: data.today, ttlMs: STUDIO_DATA_TTL_MS, purchases: data.purchases }) });
   });
 
   // OPERATOR-ONLY. Serves the source file of a stored avtal, the same file as

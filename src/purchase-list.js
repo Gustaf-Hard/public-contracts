@@ -518,7 +518,7 @@ function getClient(apiKey) {
 
 // A long list is many output tokens; stream when the client can, so the SDK
 // does not refuse a long non-streaming request.
-const MAX_TOKENS = 32000;
+const MAX_TOKENS = 64000;
 async function callModel(client, params) {
   if (typeof client.messages.stream === 'function') {
     return client.messages.stream(params).finalMessage();

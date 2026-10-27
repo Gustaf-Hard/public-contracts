@@ -16,6 +16,8 @@ import {
   floorText, elevCoverageText, ELEV_BASIS,
 } from './common.js';
 import { STRIP_SEGMENTS } from '../components.js';
+import { entityPurchaseSection, purchaseAnswerText } from './purchases.js';
+import { purchasesFor, purchaseKods } from '../../studio-purchases.js';
 
 const MAX_STRIPS = 3;
 
@@ -157,7 +159,7 @@ function channels({ rows, facts, slug, company }) {
 </div>`;
 }
 
-export function renderLeverantor({ company, facts, stats, statusMap, today, page = 1, underlag = null }) {
+export function renderLeverantor({ company, facts, stats, statusMap, today, page = 1, underlag = null, purchases = [] }) {
   const slug = company.slug;
   // Owner rows: what the company itself sells (product cards, prices, share).
   const all = facts.filter((f) => f.company_slug === slug);
@@ -183,6 +185,10 @@ export function renderLeverantor({ company, facts, stats, statusMap, today, page
   // A share of 0 % from an unknown value would be a false claim.
   const share = category && value != null ? companyShares(facts, { category }).find((s) => s.slug === slug)?.share_value ?? null : null;
 
+  // Purchase rows: own evidence level, never counted as avtal above.
+  const bought = purchasesFor(purchases, { companySlug: slug, viaChannel: isChannel });
+  const boughtKods = purchaseKods(bought);
+
   const roleWord = company.role === 'channel' ? 'Återförsäljare' : 'Leverantör';
   // The value is a floor of the underlag; its coverage is the underlag's in
   // the company's category (all categories when it has none), in elever.
@@ -191,11 +197,12 @@ export function renderLeverantor({ company, facts, stats, statusMap, today, page
   const answer = avtal.length
     ? `${company.canonical} har aktiva avtal med ${nOf(kommuner, 'kommun', 'kommuner')} i vårt underlag${value != null ? `, värda ${floorText(value)}. ${covText} (${ELEV_BASIS})` : ''}.${company.note ? ` ${company.note}` : ''}`
     : `Vi har inga aktiva avtal med ${company.canonical} än.${avtalAll.length ? ` ${fmtInt(byContract(avtalAll).length)} äldre avtal finns i underlaget.` : ''}`;
+  const answerFull = answer + purchaseAnswerText({ kommuner: boughtKods.size, viaChannel: isChannel, entity: company.canonical });
 
   const header = entityHeader({
     kicker: category ? `${roleWord} · ${catLabel}` : roleWord,
     title: company.canonical,
-    answer,
+    answer: answerFull,
     facts: [
       { label: 'Kommuner', value: kommuner, sub: 'med minst ett aktivt avtal' },
       { label: 'Minst per år i underlaget', value: value == null ? null : fmtKrCompact(value), sub: `${basisLine(known.length, avtal.length)}, en lägsta nivå` },
@@ -265,7 +272,8 @@ export function renderLeverantor({ company, facts, stats, statusMap, today, page
 ${header}
 <section class="section">${kpis}</section>
 ${section({ id: 'produkter', kicker: 'Produkter', title: `Det här köper kommunerna av ${company.canonical}`, note: rows.some((f) => f.product_slugs.length) ? `stapeln visar andel av leverantörens ${nOf(kommuner, 'kommun', 'kommuner')}, segment från avtal som gäller enbart produkten` : '', body: productCards({ company, rows, facts, kommunerTotal: kommuner }) })}
-${section({ id: 'karta', kicker: 'Var', title: 'Kommuner med avtal', note: `${nOf(kommuner, 'kommun', 'kommuner')}, håll över en ruta för namn`, body: `<div class="card map-card">${footprintMap({ tiles, rows: avtalAll, statusMap, stats, entity: company.canonical, nameOf, underlag, scope: { category: company.category ?? null, companySlug: company.slug } })}</div>` })}
+${section({ id: 'karta', kicker: 'Var', title: 'Kommuner med avtal', note: `${nOf(kommuner, 'kommun', 'kommuner')}, håll över en ruta för namn`, body: `<div class="card map-card">${footprintMap({ tiles, rows: avtalAll, statusMap, stats, entity: company.canonical, nameOf, underlag, scope: { category: company.category ?? null, companySlug: company.slug }, purchaseKods: boughtKods })}</div>` })}
+${bought.length ? section({ id: 'inkop', kicker: 'Inköpslistor', title: isChannel ? `Köpt via ${company.canonical}` : 'Finns i kommunernas inköpslistor', note: 'köp, inte avtal; räknas inte i avtalssiffrorna eller i pris per elev', body: entityPurchaseSection({ rows: bought, today, entity: company.canonical, nameOf, viaChannel: isChannel }) }) : ''}
 ${section({ id: 'pris', kicker: 'Pris', title: 'Pris per elev och år', note: `en punkt per kommun, kommunens namn när du håller över`, body: priceBody })}
 ${section({ id: 'konkurrenter', kicker: 'Grannar', title: 'Andra leverantörer i samma kommuner', body: competitors({ rows, facts, slug, category }) })}
 ${section({ id: 'fornyelser', kicker: 'Förnyelser', title: 'Avtal som förnyas eller löper ut', note: renew.basis, body: `<div class="card">${renew.html}</div>` })}

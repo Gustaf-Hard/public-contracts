@@ -19,6 +19,8 @@ import {
   companyHref, productHref, section, breadcrumb, medianText, evidenceSection, renewalTileProps, jointText, jointValueText,
   safeAll, nOf, MIN_N, isIso,
 } from './common.js';
+import { kommunPurchaseSection } from './purchases.js';
+import { purchasesFor } from '../../studio-purchases.js';
 
 // Elever the per-elev spend is divided by: kommunal regi, förskoleklass to åk 9.
 export const F9 = Object.freeze(['Förskoleklass', '1-3', '4-6', '7-9']);
@@ -515,7 +517,7 @@ function safeTiles() {
 
 // ------------------------------------------------------------ page
 
-export function renderKommun({ kod, kommun = null, stats, facts, statusMap = new Map(), today, page = 1 }) {
+export function renderKommun({ kod, kommun = null, stats, facts, statusMap = new Map(), today, page = 1, purchases = [] }) {
   if (!isIso(today)) throw new Error('renderKommun requires today as YYYY-MM-DD');
   const k = kommun ?? findKommun({ kod, stats, facts });
   // kommunView: a samverkansavtal is listed, but its value is the whole
@@ -538,6 +540,14 @@ export function renderKommun({ kod, kommun = null, stats, facts, statusMap = new
   const known = avtal.filter((f) => isNum(f.annual_value_sek));
   const jointAvtal = avtal.filter((f) => f.joint);
 
+  // Purchase rows from the kommun's own lists: their own evidence level,
+  // never an avtal (they are not in `avtal`, `mine` or any median).
+  const bought = purchasesFor(purchases, { kommunKod: k.kod });
+  const boughtCompanies = new Set(bought.map((p) => p.company_slug).filter(Boolean)).size;
+  const boughtText = bought.length
+    ? ` Kommunens inköpslistor visar dessutom ${boughtCompanies ? `köp hos ${nOf(boughtCompanies, 'leverantör', 'leverantörer')} i katalogen` : nOf(bought.length, 'köprad', 'köprader')}, som köp och inte som avtal.`
+    : '';
+
   const statusWord = status === 'not_contacted' ? 'vi har inte begärt ut avtal här än'
     : status === 'open' ? 'insamling pågår' : status === 'done' ? 'insamling klar' : status === 'partial' ? 'delvis utlämnat'
       : status === 'dead_end' ? 'kommunen har inte lämnat ut avtal' : 'insamlingens status är okänd';
@@ -550,7 +560,7 @@ export function renderKommun({ kod, kommun = null, stats, facts, statusMap = new
     : status === 'not_contacted' ? `Sidan bygger på liknande kommuner: ${statusWord}.`
       : status === 'open' ? `Inga aktiva avtal tolkade än, ${statusWord}.`
         : status === 'done' ? `Inga aktiva avtal härifrån i underlaget, ${statusWord}.`
-          : status === 'dead_end' ? `Sidan bygger på liknande kommuner: ${statusWord}.` : 'Inga aktiva avtal i underlaget.'}`;
+          : status === 'dead_end' ? `Sidan bygger på liknande kommuner: ${statusWord}.` : 'Inga aktiva avtal i underlaget.'}${boughtText}`;
 
   const facts3 = avtal.length
     ? [
@@ -597,6 +607,7 @@ ${header}
 ${kpis}
 ${overlapSection({ profile, mine })}
 ${section({ id: 'kop', kicker: 'Köp', title: avtal.length ? 'Så här köper ni' : 'Så här köper liknande kommuner', note: `per kategori, ${groupWord}`, body: spendSection({ kommun: k, profile, head, peers, stats, mine, statusMap }) })}
+${bought.length ? section({ id: 'inkop', kicker: 'Inköpslistor', title: 'Köpt via kanal och i inköpslistor', note: 'köp, inte avtal; räknas inte i årsvärde eller pris per elev', body: kommunPurchaseSection({ rows: bought, today }) }) : ''}
 ${priceSection}
 ${section({ id: 'alternativ', kicker: 'Alternativ', title: avtal.length ? 'Vad liknande kommuner använder' : 'Vad liknande kommuner köper', note: 'efter antal kommuner, ni markerade', body: alternatives({ kommun: k, head, peers, mine }) })}
 ${section({ id: 'fornyelser', kicker: 'Förnyelser', title: 'När avtalen löper ut', note: renew.basis, body: renew.html })}

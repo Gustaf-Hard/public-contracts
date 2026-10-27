@@ -680,6 +680,24 @@ const COMPONENT_CSS = `
   .tl-months { margin-top: var(--s-3); }
 }
 
+/* ---------- purchase rows (köp via kanal, inköpslistor) ---------- */
+.pu-lede { margin-bottom: var(--s-4); max-width: 80ch; }
+.pu-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: var(--s-4); margin-bottom: var(--s-4); }
+.pu-card { display: flex; flex-direction: column; gap: var(--s-3); }
+.pu-mark { display: inline-block; width: 12px; height: 12px; margin-right: 8px; vertical-align: -1px; border-radius: 3px; background: radial-gradient(circle at center, var(--viz-3) 0 30%, transparent 34%), color-mix(in oklab, var(--viz-3) 22%, var(--surface)); box-shadow: inset 0 0 0 1.5px var(--viz-3); }
+.pu-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.pu-list li { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 2px var(--s-3); padding: 8px 0; border-bottom: 1px solid var(--line); font-size: var(--t-sm); }
+.pu-list li:last-child { border-bottom: 0; }
+.pu-co { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pu-co > a, .pu-co > span:first-child { font-weight: 600; }
+.pu-prod { color: var(--ink-2); font-size: var(--t-xs); }
+.pu-raw { margin: var(--s-2) 0 0; padding-left: 1.1em; font-size: var(--t-xs); color: var(--ink-2); columns: 2 220px; }
+.pu-ends { display: flex; flex-direction: column; gap: var(--s-3); }
+.pu-end-list { list-style: none; margin: 0; padding: 0; }
+.pu-end-list li { display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; gap: var(--s-3); align-items: baseline; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: var(--t-sm); }
+.pu-end-list b { font-variant-numeric: tabular-nums; }
+@container (max-width: 520px) { .pu-end-list li { grid-template-columns: 1fr; gap: 2px; } }
+
 /* ---------- tile map ---------- */
 .tilemap { display: grid; grid-template-columns: minmax(0, 260px) minmax(160px, 1fr); gap: var(--s-5); align-items: start; }
 .tm-grid { display: grid; grid-template-columns: repeat(var(--tm-cols), minmax(0, 1fr)); grid-template-rows: repeat(var(--tm-rows), minmax(0, 1fr)); gap: 2px; width: 100%; }
@@ -696,6 +714,8 @@ const COMPONENT_CSS = `
 .t-highlight { background: var(--viz-highlight); box-shadow: 0 0 0 2px var(--surface), 0 0 0 3.5px var(--viz-highlight); z-index: 2; }
 .t-neutral { background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line); }
 .t-unknown { background: var(--hatch), transparent; outline: 1px dashed var(--ink-3); outline-offset: -1px; }
+/* purchase: bought via a channel or in the kommun's inköpslista, no active avtal. Its own colour and a dot, never the avtal fill. */
+.t-purchase { background: radial-gradient(circle at center, var(--viz-3) 0 30%, transparent 34%), color-mix(in oklab, var(--viz-3) 22%, var(--surface)); box-shadow: inset 0 0 0 1.5px var(--viz-3); }
 .tm-grid .tile:hover, .tm-grid .tile:focus-visible { z-index: 10; outline: 2px solid var(--ink); outline-offset: 1px; border-radius: 3px; }
 .tm-grid .tile:hover::after, .tm-grid .tile:focus-visible::after {
   content: attr(data-tip); position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);

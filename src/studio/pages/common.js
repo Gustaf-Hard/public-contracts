@@ -266,21 +266,32 @@ export function noneStatusText(ws) {
 // only what the underlag holds: an active avtal, only expired or replaced
 // ones, or none. Collection status is in the tile's name and in the copy,
 // never in its colour, so no tile reads as "confirmed none".
-export function coverageMap({ ws, tiles, nameOf, what, label }) {
+export function coverageMap({ ws, tiles, nameOf, what, label, purchaseKods = null }) {
   const cls = new Map();
   for (const k of ws.has) cls.set(k, 'has');
   for (const k of ws.expired) cls.set(k, 'expired');
   for (const k of ws.none) cls.set(k, 'none');
   const tip = { has: `aktivt avtal ${what} i underlaget`, expired: `bara utgångna eller ersatta avtal ${what} i underlaget`, none: `inget avtal ${what} i underlaget` };
+  // Purchase rows are their own marker, never an avtal: a kommun with an
+  // active avtal stays "has"; one without gets the purchase tile, and its
+  // tooltip still says what the avtal underlag holds.
+  const bought = (kod) => !!purchaseKods?.has(kod);
+  const classOf = (kod) => {
+    const c = cls.get(kod);
+    if (c && c !== 'has' && bought(kod)) return 'purchase';
+    return c ?? 'unknown';
+  };
+  const legend = [
+    { cls: 'has', label: 'Aktivt avtal i underlaget' },
+    { cls: 'expired', label: 'Bara utgångna eller ersatta avtal i underlaget' },
+    { cls: 'none', label: 'Inget avtal i underlaget' },
+  ];
+  if (purchaseKods?.size) legend.splice(1, 0, { cls: 'purchase', label: 'Köpt via kanal eller i inköpslista, inget aktivt avtal i underlaget' });
   return tileMap({
     tiles,
-    classOf: (kod) => cls.get(kod) ?? 'unknown',
-    titleOf: (kod) => `${nameOf(kod)}: ${cls.has(kod) ? `${tip[cls.get(kod)]}; ${COLLECTION_TEXT[ws.status.get(kod) ?? 'unknown']}` : 'status okänd'}`,
-    legend: [
-      { cls: 'has', label: 'Aktivt avtal i underlaget' },
-      { cls: 'expired', label: 'Bara utgångna eller ersatta avtal i underlaget' },
-      { cls: 'none', label: 'Inget avtal i underlaget' },
-    ],
+    classOf,
+    titleOf: (kod) => `${nameOf(kod)}: ${cls.has(kod) ? `${tip[cls.get(kod)]}${bought(kod) ? '; finns i kommunens inköpslista' : ''}; ${COLLECTION_TEXT[ws.status.get(kod) ?? 'unknown']}` : 'status okänd'}`,
+    legend,
     label,
   });
 }
@@ -288,12 +299,15 @@ export function coverageMap({ ws, tiles, nameOf, what, label }) {
 // Footprint: `has` comes from the entity's own active avtal. Every other
 // kommun says only what the underlag holds and, separately, how far
 // collection has come (whiteSpots scope picks "underlag ej genomgånget").
-export function footprintMap({ tiles, rows, statusMap, stats, entity, nameOf, underlag = null, scope = null }) {
+// purchaseKods: kommuner whose purchase lists show the entity, drawn as their
+// own marker; they never move a kommun into `has`.
+export function footprintMap({ tiles, rows, statusMap, stats, entity, nameOf, underlag = null, scope = null, purchaseKods = null }) {
   const allKods = safeAll(stats).map((r) => r.kod);
   const ws = whiteSpots(rows, statusMap, { allKods: allKods.length ? allKods : Object.keys(tiles?.tiles ?? {}), underlag, scope: scope ?? { category: null, companySlug: null } });
-  const map = coverageMap({ ws, tiles, nameOf, what: `med ${entity}`, label: `Kommuner med avtal med ${entity} i underlaget` });
+  const map = coverageMap({ ws, tiles, nameOf, what: `med ${entity}`, label: `Kommuner med avtal med ${entity} i underlaget`, purchaseKods });
   const status = noneStatusText(ws);
-  return `${map}${ws.none.length ? `<p class="meta fp-note">${esc(`${nOf(ws.none.length, 'kommun', 'kommuner')} har inget avtal med ${entity} i underlaget${status ? `: ${status}` : ''}. Det betyder inte att avtal saknas: mejl, fakturor och sammanställningar kan nämna leverantörer vi inte har avtal för.`)}</p>` : ''}`;
+  const boughtNone = purchaseKods ? ws.none.filter((k) => purchaseKods.has(k)).length : 0;
+  return `${map}${ws.none.length ? `<p class="meta fp-note">${esc(`${nOf(ws.none.length, 'kommun', 'kommuner')} har inget avtal med ${entity} i underlaget${status ? `: ${status}` : ''}.${boughtNone ? ` ${fmtInt(boughtNone)} av dem har ${entity} i en inköpslista.` : ''} Det betyder inte att avtal saknas: mejl, fakturor och sammanställningar kan nämna leverantörer vi inte har avtal för.`)}</p>` : ''}`;
 }
 
 // ------------------------------------------------------------------ renewals
