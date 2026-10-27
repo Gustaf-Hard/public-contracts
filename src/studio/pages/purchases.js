@@ -6,7 +6,7 @@
 import { esc } from '../layout.js';
 import { fmtInt, fmtKrCompact, monthsUntil } from '../format.js';
 import { companyBySlug, productBySlug } from '../../catalogue.js';
-import { purchaseEvidenceLabel, purchaseKommuner, upcomingLicenceEnds, purchaseDocuments, channelName } from '../../studio-purchases.js';
+import { purchaseEvidenceLabel, purchaseKommuner, upcomingLicenceEnds, purchaseDocuments } from '../../studio-purchases.js';
 import { companyHref, productHref, kommunHref, nOf } from './common.js';
 
 const MAX_COMPANIES = 8;
@@ -96,7 +96,7 @@ ${endsList(rows, today) ? `<div class="card">${endsList(rows, today)}</div>` : '
 export function entityPurchaseSection({ rows = [], today, entity, nameOf = (k) => k, viaChannel = false }) {
   if (!rows.length) return '';
   const ks = purchaseKommuner(rows);
-  const li = ks.slice(0, MAX_KOMMUNER).map((k) => `<li><div class="pu-co">${link(kommunHref(k.kommun_kod), nameOf(k.kommun_kod) ?? k.kommun_namn)}<span class="pu-prod">${esc(k.labels.join(', '))}</span></div><span class="meta">${esc(`${nOf(k.n, 'rad', 'rader')}, ${k.latest_end ? `licensperiod till ${k.latest_end}${k.basis === 'lasar' ? ' (läsårets slut)' : ''}` : 'licensperiod okänd'}`)}</span></li>`).join('');
+  const li = ks.slice(0, MAX_KOMMUNER).map((k) => `<li><div class="pu-co">${link(kommunHref(k.kommun_kod), nameOf(k.kommun_kod) ?? k.kommun_namn)}<span class="pu-prod">${esc(k.labels.join(', '))}</span></div><span class="meta">${esc(`${nOf(k.n, 'rad', 'rader')}, ${k.latest_end ? `licensperiod ${k.latest_end < today ? 'slutade' : 'till'} ${k.latest_end}${k.basis === 'lasar' ? ' (läsårets slut)' : ''}` : 'licensperiod okänd'}`)}</span></li>`).join('');
   const more = ks.length > MAX_KOMMUNER ? `<p class="meta">${esc(`${nOf(ks.length - MAX_KOMMUNER, 'kommun', 'kommuner')} till.`)}</p>` : '';
   const lede = viaChannel
     ? `Kommuner vars inköpslistor eller orderhistorik visar köp via ${entity}. Det är köp, inte avtal, och de räknas inte i avtalssiffrorna ovan eller i medianer per elev.`
@@ -104,7 +104,7 @@ export function entityPurchaseSection({ rows = [], today, entity, nameOf = (k) =
   const ends = endsList(rows, today);
   return `<div class="grid-12">
   <div class="span-${ends ? 7 : 12} card">
-    <div class="viz-head"><span class="viz-label"><i class="pu-mark" aria-hidden="true"></i>${esc(viaChannel ? `Köpt via ${channelName(rows.find((p) => p.channel_slug)?.channel_slug) ?? entity}` : 'Finns i kommunernas inköpslistor')}</span><span class="viz-n">${esc(nOf(ks.length, 'kommun', 'kommuner'))}</span></div>
+    <div class="viz-head"><span class="viz-label"><i class="pu-mark" aria-hidden="true"></i>${esc('Kommuner med köprader')}</span><span class="viz-n">${esc(nOf(ks.length, 'kommun', 'kommuner'))}</span></div>
     <p class="meta card-lede">${esc(lede)}</p>
     <ul class="pu-list">${li}</ul>${more}
   </div>

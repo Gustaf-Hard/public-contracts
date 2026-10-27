@@ -148,6 +148,7 @@ describe('leverantör and produkt pages', () => {
     expect(t).toContain('har aktiva avtal med 1 kommun i vårt underlag');
     expect(t).toContain('Binogi finns också i inköpslistor från 2 kommuner');
     expect(t).toContain('id="inkop"');
+    expect(t).toContain('licensperiod till 2027-05-31');
   });
 
   it('the channel page lists what was bought through it', async () => {
