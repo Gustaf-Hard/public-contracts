@@ -15,7 +15,7 @@ import { filterBar, emptyPanel } from '../components.js';
 import { rankingBars } from '../charts.js';
 import {
   isNum, isIso, headline, categoryLabel, companyHref, productHref, kommunHref, kommunNamer,
-  productNames, section, nOf, modelLabel, MODEL_LABEL,
+  productNames, section, nOf, modelLabel, MODEL_LABEL, floorText,
 } from './common.js';
 
 export const UTFORSKA_PAGE_SIZE = 50;
@@ -277,7 +277,7 @@ export function renderUtforska({ facts, stats, today, query, page = 1 }) {
   const lead = groups[0];
   const leadAgg = lead ? aggregateFacts(lead.facts) : null;
   const answer = rows.length
-    ? `${fmtInt(nAvtal)} ${countNoun} från ${nOf(agg.kommun_count, 'kommun', 'kommuner')} matchar. Känt årsvärde ${agg.total_annual_sek == null ? 'okänt' : `${fmtKrCompact(agg.total_annual_sek)}, känt för ${fmtInt(nKnown)} av ${fmtInt(nAvtal)}`}.${lead && q.grupp !== 'kommun' && leadAgg.total_annual_sek != null ? ` Störst efter ${gLabel} är ${groupLabel(q.grupp, lead.key)} med ${fmtKrCompact(leadAgg.total_annual_sek)} per år.` : ''}`
+    ? `${fmtInt(nAvtal)} ${countNoun} från ${nOf(agg.kommun_count, 'kommun', 'kommuner')} matchar. ${agg.total_annual_sek == null ? 'Årsvärdet är okänt' : `Värda ${floorText(agg.total_annual_sek)}, värdet känt för ${fmtInt(nKnown)} av ${fmtInt(nAvtal)}`}.${lead && q.grupp !== 'kommun' && leadAgg.total_annual_sek != null ? ` Störst efter ${gLabel} är ${groupLabel(q.grupp, lead.key)} med minst ${fmtKrCompact(leadAgg.total_annual_sek)} per år i underlaget.` : ''}`
     : 'Inga avtal matchar filtren.';
   // Only unfiltered: a filtered count would need the hidden rows filtered too.
   const hiddenNote = nHidden && !FILTER_KEYS.some((k) => k !== 'urval' && q[k]) ? ` ${fmtInt(nHidden)} avtal med utbildningsanordnare utan produkter visas inte här.` : '';

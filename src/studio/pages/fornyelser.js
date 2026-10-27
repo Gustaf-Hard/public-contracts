@@ -11,7 +11,7 @@ import { UNKNOWN_CATEGORY, KOMMUNER_TOTAL } from '../../studio-data.js';
 import { filterBar, emptyPanel, STRIP_SEGMENTS } from '../components.js';
 import {
   isNum, isIso, headline, categoryLabel, companyHref, productHref, kommunHref, kommunNamer,
-  productName, section, nOf, safeAll,
+  productName, section, nOf, safeAll, floorText,
 } from './common.js';
 import { ADDA_MONTH, ADDA_NOTE } from './marknad.js';
 
@@ -371,7 +371,7 @@ export function renderFornyelser({ facts, stats, today, query, page = 1 }) {
   const passed = new Set(head.filter((f) => isIso(f.next_renewal) && f.next_renewal.slice(0, 10) < today).map((f) => f.contract_id)).size;
 
   const answer = rows.length
-    ? `${nOf(rows.length, 'avtal', 'avtal')} i ${nOf(kommuner, 'kommun', 'kommuner')} löper ut eller kan förnyas de närmaste ${q.man} månaderna${filtered ? ' med de valda filtren' : ''}. ${known.length ? `Känt årsvärde ${fmtKrCompact(value)}, känt för ${fmtInt(known.length)} av ${fmtInt(rows.length)}.` : 'Inget av dem har känt värde.'}${peak && peak[1] > 1 ? ` Flest i ${peakText}, ${fmtInt(peak[1])} avtal.` : ''}`
+    ? `${nOf(rows.length, 'avtal', 'avtal')} i ${nOf(kommuner, 'kommun', 'kommuner')} löper ut eller kan förnyas de närmaste ${q.man} månaderna${filtered ? ' med de valda filtren' : ''}. ${known.length ? `Värda ${floorText(value)}, värdet känt för ${fmtInt(known.length)} av ${fmtInt(rows.length)}.` : 'Inget av dem har känt värde.'}${peak && peak[1] > 1 ? ` Flest i ${peakText}, ${fmtInt(peak[1])} avtal.` : ''}`
     : `Inga aktiva avtal löper ut eller kan förnyas de närmaste ${q.man} månaderna${filtered ? ' med de valda filtren' : ''}.`;
 
   const header = `<section class="entity-header fx-hero">
@@ -385,7 +385,7 @@ export function renderFornyelser({ facts, stats, today, query, page = 1 }) {
       <dl class="eh-facts">
         <div class="eh-fact"><dt>Avtal</dt><dd class="eh-val">${esc(fmtInt(rows.length))}</dd><dd class="eh-sub">inom ${esc(String(q.man))} mån</dd></div>
         <div class="eh-fact"><dt>Kommuner</dt><dd class="eh-val">${esc(fmtInt(kommuner))}</dd><dd class="eh-sub">av ${esc(fmtInt(KOMMUNER_TOTAL))}</dd></div>
-        <div class="eh-fact${known.length ? '' : ' is-unknown'}"><dt>Känt årsvärde</dt><dd class="eh-val">${esc(known.length ? fmtKrCompact(value) : 'okänt')}</dd><dd class="eh-sub">${esc(rows.length ? `känt för ${fmtInt(known.length)} av ${fmtInt(rows.length)}` : 'inga avtal')}</dd></div>
+        <div class="eh-fact${known.length ? '' : ' is-unknown'}"><dt>Minst per år i underlaget</dt><dd class="eh-val">${esc(known.length ? fmtKrCompact(value) : 'okänt')}</dd><dd class="eh-sub">${esc(rows.length ? `känt för ${fmtInt(known.length)} av ${fmtInt(rows.length)}` : 'inga avtal')}</dd></div>
       </dl>
     </div>
   </div>

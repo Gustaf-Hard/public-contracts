@@ -306,6 +306,8 @@ describe('/studio/utforska', () => {
     const r = await body('/studio/utforska');
     expect(r.text).toContain('1 avtal med utbildningsanordnare utan produkter visas inte här.');
     expect(r.text).toContain('1 aktivt avtal från 1 kommun matchar');
+    // a sum over the matching avtal is a floor of the underlag
+    expect(r.text.replace(/\u00a0/g, ' ')).toMatch(/matchar\. Värda minst [\d,]+ (mkr|tkr) per år i underlaget, värdet känt för 1 av 1\./);
     const f = await body('/studio/utforska?kategori=larplattform');
     expect(f.text).not.toContain('utbildningsanordnare');
   });
@@ -439,5 +441,29 @@ describe('/studio/om', () => {
     expect(r.text).toContain('alla liknande kommuner som har ett känt pris per elev för produkten');
     expect(r.text).toContain('insamlingen klar i 1 kommun och pågår i 4. I 2 kommuner har vi inte begärt ut avtal än');
     noLeaks(r.text);
+  });
+});
+
+describe('/studio/om, sums and elev coverage', () => {
+  it('says the sums are floors, never an estimate, and how elev coverage is computed', async () => {
+    seedRenewals();
+    const t = (await body('/studio/om')).text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').replace(/ /g, ' ');
+    expect(t).toContain('Summorna är en lägsta nivå');
+    expect(t).toContain('räknar inte upp');
+    expect(t).toContain('åk 1-9');
+    expect(t).toContain('kommunens egna skolor');
+    expect(t).toContain('utan känt elevantal');
+    expect(t).toMatch(/Kommunerna med avtal i underlaget har \d+ % av eleverna i grundskolan/);
+    expect(t).toContain('av känt värde i underlaget');
+  });
+});
+
+describe('/studio/leverantorer, sums are floors', () => {
+  it('group and card values say "minst" and "i underlaget"', async () => {
+    seedRenewals();
+    const t = (await body('/studio/leverantorer')).text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').replace(/ /g, ' ');
+    expect(t).toMatch(/med aktiva avtal, värda minst [\d,]+ (mkr|tkr) per år i underlaget/);
+    expect(t).toMatch(/minst [\d,]+ (mkr|tkr) \/år/);
+    expect(t).not.toMatch(/\/år känt/);
   });
 });

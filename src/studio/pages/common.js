@@ -4,7 +4,7 @@
 // a person, or a back-office link.
 
 import { esc } from '../layout.js';
-import { fmtInt, fmtKrCompact, UNKNOWN } from '../format.js';
+import { fmtInt, fmtKrCompact, fmtPct, UNKNOWN } from '../format.js';
 import { CATEGORIES, companyBySlug, productBySlug } from '../../catalogue.js';
 import { companyShares, priceDistribution, priceRowFilter, whiteSpots, MIN_N } from '../../studio-data.js';
 import { evidenceDrawer, EVIDENCE_PAGE_SIZE, emptyPanel } from '../components.js';
@@ -17,6 +17,21 @@ export const headline = (facts) => facts.filter((f) => f.active && !f.superseded
 export const distinctCount = (rows, fn) => new Set(rows.map(fn).filter((x) => x != null)).size;
 export const sumKnown = (rows) => rows.reduce((s, f) => s + (isNum(f.annual_value_sek) ? f.annual_value_sek : 0), 0);
 export const isIso = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}/.test(s);
+
+// A sum of known values is a floor of what the underlag holds, never the
+// market: "minst 119 mkr per år i underlaget".
+export const floorText = (value) => (isNum(value) ? `minst ${fmtKrCompact(value)} per år i underlaget` : 'värde okänt');
+
+// "Kommunerna med avtal i underlaget har 50 % av eleverna i grundskolan"
+// (elevCoverage: åk 1-9, kommunal regi). Unknown elever are named, never 0.
+export function elevCoverageText(cov, { who = 'Kommunerna med avtal i underlaget' } = {}) {
+  if (!cov || !isNum(cov.share)) return 'Elevtäckningen är okänd';
+  const unk = cov.kommuner_unknown ? `, ${nOf(cov.kommuner_unknown, 'kommun', 'kommuner')} utan känt elevantal räknas inte` : '';
+  return `${who} har ${fmtPct(cov.share)} av eleverna i grundskolan${unk}`;
+}
+
+// The basis line under a coverage figure.
+export const ELEV_BASIS = 'åk 1-9 i kommunens egna skolor, Skolverket';
 
 // "och 5 utan utlämnade avtal, 3 delvis utlämnade": what "klar" leaves out.
 export function notDone(deadEnd, partial) {
@@ -298,7 +313,7 @@ export function renewalTileProps({ avtal, buckets, today }) {
     };
   }
   const valueText = !n ? '' : nKnown === 0 ? ', värde okänt' : nKnown < n
-    ? `, ${fmtKrCompact(value)}/år känt för ${fmtInt(nKnown)} av ${fmtInt(n)}`
+    ? `, minst ${fmtKrCompact(value)}/år i underlaget, känt för ${fmtInt(nKnown)} av ${fmtInt(n)}`
     : `, ${fmtKrCompact(value)}/år`;
   return {
     label: 'Förnyas inom 12 mån', value: n, unit: 'avtal', state: dated < avtal.length ? 'partial' : 'known',

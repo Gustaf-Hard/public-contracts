@@ -6,12 +6,12 @@
 import { esc } from '../layout.js';
 import { fmtInt, fmtKrCompact, fmtPct, fmtPrice } from '../format.js';
 import { CATEGORIES, companyBySlug } from '../../catalogue.js';
-import { companyShares, marketByCategory, priceDistribution, renewalBuckets, KOMMUNER_TOTAL, UNKNOWN_CATEGORY, MIN_N } from '../../studio-data.js';
+import { companyShares, marketByCategory, priceDistribution, renewalBuckets, elevCoverage, KOMMUNER_TOTAL, UNKNOWN_CATEGORY, MIN_N } from '../../studio-data.js';
 import { kpiTile, emptyPanel } from '../components.js';
 import { rankingBars } from '../charts.js';
 import {
   isNum, headline, byContract, categoryLabel, companyHref, kommunHref, kommunNamer,
-  section, renewalTileProps, nOf, isIso, notDone,
+  section, renewalTileProps, nOf, isIso, notDone, floorText, elevCoverageText, ELEV_BASIS,
 } from './common.js';
 
 export const ADDA_MONTH = '2027-01';
@@ -72,8 +72,8 @@ export function shareBar(top = [], { compact = false } = {}) {
   const aria = known.map((t) => `${t.name} ${fmtPct(t.share)}`).join(', ') + (rest > 0.0005 ? `, övriga ${fmtPct(rest)}` : '');
   const list = top.map((t, i) => `<li><i class="share-sw s${i + 1}"></i><span class="share-name">${esc(t.name)}</span><b>${esc(isNum(t.share) ? fmtPct(t.share) : 'okänt')}</b></li>`).join('');
   return `<div class="share${compact ? ' is-compact' : ''}">
-  ${compact ? '' : '<span class="share-cap">Största leverantörer, andel av känt årsvärde</span>'}
-  <div class="share-bar" role="img" aria-label="${esc(`Andel av känt värde: ${aria}`)}">${segs}</div>
+  ${compact ? '' : '<span class="share-cap">Största leverantörer, andel av känt årsvärde i underlaget</span>'}
+  <div class="share-bar" role="img" aria-label="${esc(`Andel av känt värde i underlaget: ${aria}`)}">${segs}</div>
   <ol class="share-list">${list}</ol>
 </div>`;
 }
@@ -86,7 +86,13 @@ export function topThree(facts, category) {
   return companyShares(facts, { category }).slice(0, 3).map((s) => ({ name: s.name, share: s.n_known ? s.share_value : null }));
 }
 
-export function categoryCards({ facts, includeEmpty = false }) {
+// "67 % av eleverna i grundskolan" for a card; unknown stays unknown.
+function elevShareShort(cov) {
+  if (!cov || !isNum(cov.share)) return 'elevtäckning okänd';
+  return `${fmtPct(cov.share)} av eleverna i grundskolan${cov.kommuner_unknown ? `, ${nOf(cov.kommuner_unknown, 'kommun', 'kommuner')} utan känt elevantal` : ''}`;
+}
+
+export function categoryCards({ facts, stats = null, includeEmpty = false }) {
   const market = new Map(marketByCategory(facts).map((m) => [m.category, m]));
   const cats = CATEGORIES.map((c) => ({ ...c, m: market.get(c.slug) ?? null }))
     .filter((c) => includeEmpty || c.m)
@@ -104,18 +110,20 @@ export function categoryCards({ facts, includeEmpty = false }) {
     const kv = knownValue(rows);
     const dist = priceDistribution(facts, { category: c.slug });
     const reach = m.kommuner / KOMMUNER_TOTAL;
+    const cov = elevCoverage(facts, stats, { category: c.slug });
     const priced = !dist.suppressed && isNum(dist.median);
     return `<a class="card ct is-link" href="${esc(href)}" data-pane-link style="--i:${i}">
   <div class="ct-head"><h3 class="ct-name">${esc(c.label)}</h3><span class="viz-n">${esc(nOf(m.n_avtal, 'avtal', 'avtal'))}</span></div>
   <div class="ct-value${kv.value == null ? ' is-unknown' : ''}">
-    <span class="ct-num">${esc(kv.value == null ? 'värde okänt' : fmtKrCompact(kv.value))}</span>${kv.value == null ? '' : '<span class="ct-unit">per år</span>'}
+    ${kv.value == null ? '<span class="ct-num">värde okänt</span>' : `<span class="ct-pre">minst</span><span class="ct-num">${esc(fmtKrCompact(kv.value))}</span><span class="ct-unit">per år i underlaget</span>`}
     <span class="meta">${esc(basisOf(kv))}</span>
   </div>
   <div class="ct-reach">
     <div class="ct-reach-row"><span><b>${esc(fmtInt(m.kommuner))}</b> ${m.kommuner === 1 ? 'kommun' : 'kommuner'}</span><span class="meta">av ${esc(fmtInt(KOMMUNER_TOTAL))}</span></div>
     <div class="meter ct-meter"><span class="meter-fill grow-x" style="width:${(reach * 100).toFixed(1)}%;--i:${i}"></span></div>
+    <span class="meta ct-elev">kommunerna har ${esc(elevShareShort(cov))}</span>
   </div>
-  <div class="ct-share"><span class="ct-sub">Största leverantörer, andel av känt värde</span>${shareBar(topThree(facts, c.slug), { compact: true })}</div>
+  <div class="ct-share"><span class="ct-sub">Största leverantörer, andel av känt värde i underlaget</span>${shareBar(topThree(facts, c.slug), { compact: true })}</div>
   <div class="ct-price${priced ? '' : ' is-unknown hatch'}">${priced
     ? `median <b>${esc(fmtPrice(dist.median))}</b> kr/elev <span class="meta">n = ${esc(fmtInt(dist.n))}</span>`
     : `<span>${esc(dist.n ? `för få kommuner med pris per elev (n = ${fmtInt(dist.n)})` : 'inget känt pris per elev')}</span><span class="meta">median visas från ${MIN_N}</span>`}</div>
@@ -123,7 +131,7 @@ export function categoryCards({ facts, includeEmpty = false }) {
   }).join('');
   const unk = market.get(UNKNOWN_CATEGORY);
   const unkLine = unk
-    ? `<p class="meta ct-foot">${esc(nOf(unk.n_avtal, 'aktivt avtal', 'aktiva avtal'))} från ${esc(nOf(unk.kommuner, 'kommun', 'kommuner'))} har ingen känd kategori${unk.n_known ? `, känt värde ${esc(fmtKrCompact(unk.value_known_sek))} per år` : ''}. De räknas i totalen men inte i någon kategori.</p>`
+    ? `<p class="meta ct-foot">${esc(nOf(unk.n_avtal, 'aktivt avtal', 'aktiva avtal'))} från ${esc(nOf(unk.kommuner, 'kommun', 'kommuner'))} har ingen känd kategori${unk.n_known ? `, värda ${esc(floorText(unk.value_known_sek))}` : ''}. De räknas i totalen men inte i någon kategori.</p>`
     : '';
   if (!cards) return emptyPanel({ title: 'Inga aktiva avtal än', text: 'När de första avtalen är tolkade visas kategorierna här.' }) + unkLine;
   return `<div class="ct-grid">${cards}</div>${unkLine}`;
@@ -233,8 +241,8 @@ export function vendorRankings({ facts, category = null, max = 8, highlight = nu
   const kv = knownValue(headline(facts).filter((f) => !category || (f.category ?? UNKNOWN_CATEGORY) === category));
   if (!shares.length) return emptyPanel({ title: 'Inga leverantörer med aktiva avtal än' });
   return `<div class="grid-12">
-  <div class="span-6 card"><div class="viz-head"><span class="viz-label">Efter känt årsvärde</span><span class="viz-n">andel av känt värde</span></div>
-    <p class="meta card-lede">Värdet är ${esc(basisOf(kv))}. Leverantörer utan känt värde ligger sist.</p>
+  <div class="span-6 card"><div class="viz-head"><span class="viz-label">Efter känt årsvärde</span><span class="viz-n">andel av känt värde i underlaget</span></div>
+    <p class="meta card-lede">Värdet är ${esc(basisOf(kv))}. Summorna är en lägsta nivå: bara avtal i underlaget med känt värde räknas. Leverantörer utan känt värde ligger sist.</p>
     ${rankingBars({ items: byValue, max, noun, highlight })}</div>
   <div class="span-6 card"><div class="viz-head"><span class="viz-label">Efter antal kommuner</span><span class="viz-n">andel av kommunerna med avtal</span></div>
     <p class="meta card-lede">Räknar kommuner med minst ett aktivt avtal, oavsett om värdet är känt.</p>
@@ -278,6 +286,39 @@ function latestReceived({ facts, nameOf }) {
 
 // ------------------------------------------------------------ pages
 
+// The hero's lead: median kr per elev and year per category, only where at
+// least MIN_N distinct kommuner have a known price (priceDistribution's own
+// rules). A median holds on partial data in a way a sum does not.
+export function categoryMedians(facts) {
+  const shown = [];
+  let hidden = 0;
+  for (const c of CATEGORIES) {
+    if (c.slug === UNKNOWN_CATEGORY) continue;
+    const held = headline(facts).some((f) => f.category === c.slug);
+    if (!held) continue;
+    const dist = priceDistribution(facts, { category: c.slug });
+    if (dist.suppressed || !isNum(dist.median)) { hidden++; continue; }
+    shown.push({ slug: c.slug, label: c.label, median: dist.median, n: dist.n });
+  }
+  shown.sort((a, b) => b.n - a.n || a.label.localeCompare(b.label, 'sv'));
+  return { shown, hidden };
+}
+
+function heroMedians(facts) {
+  const { shown, hidden } = categoryMedians(facts);
+  const list = shown.map((m, i) => `<li style="--i:${i}"><a class="mk-price" href="/studio/kategori/${esc(encodeURIComponent(m.slug))}" data-pane-link>
+      <span class="mk-cat">${esc(m.label)}</span>
+      <span class="mk-pval"><b class="mk-pnum">${esc(fmtPrice(m.median))}</b><span class="mk-punit">kr per elev</span></span>
+      <span class="mk-pn">n = ${esc(nOf(m.n, 'kommun', 'kommuner'))}</span>
+    </a></li>`).join('');
+  const basis = `En kommun räknas en gång per kategori, med medianen av sina egna priser. Visas från ${MIN_N} kommuner med känt pris per elev${hidden ? `; ${nOf(hidden, 'kategori', 'kategorier')} med avtal har färre` : ''}.`;
+  return `<div class="mk-prices">
+        <span class="mk-plabel">Median per elev och år</span>
+        ${list ? `<ol class="mk-price-list">${list}</ol>` : `<p class="mk-none">Inget medianpris än: det visas från ${MIN_N} kommuner med känt pris per elev.</p>`}
+        <p class="mk-basis">${esc(basis)}</p>
+      </div>`;
+}
+
 export function renderMarknad({ facts, stats, statusMap, today, basis }) {
   const b = basis ?? {};
   const head = headline(facts);
@@ -285,26 +326,29 @@ export function renderMarknad({ facts, stats, statusMap, today, basis }) {
   const kv = knownValue(head);
   const nameOf = kommunNamer(stats, facts);
   const covered = b.kommuner_with_avtal ?? 0;
+  const cov = elevCoverage(facts, stats);
   const leader = companyShares(facts).find((s) => s.n_known && isNum(s.share_value));
   const active = b.active ?? 0;
   const collected = b.collected ?? 0;
-  const lede = `Underlaget är ${nOf(active, 'aktivt avtal', 'aktiva avtal')} (${fmtInt(collected)} ${collected === 1 ? 'insamlat' : 'insamlade'}) från ${fmtInt(covered)} av ${fmtInt(KOMMUNER_TOTAL)} kommuner, begärda som allmänna handlingar och tolkade rad för rad.${leader ? ` Störst är ${leader.name} med ${fmtPct(leader.share_value)} av det kända värdet.` : ''}`;
+  const lede = `Underlaget är ${nOf(active, 'aktivt avtal', 'aktiva avtal')} (${fmtInt(collected)} ${collected === 1 ? 'insamlat' : 'insamlade'}) från ${fmtInt(covered)} av ${fmtInt(KOMMUNER_TOTAL)} kommuner, begärda som allmänna handlingar och tolkade rad för rad.${leader ? ` Störst är ${leader.name} med ${fmtPct(leader.share_value)} av känt värde i underlaget.` : ''}`;
+  const floor = kv.total
+    ? `<p class="mk-floor"><span>Känt årsvärde: <b>${esc(floorText(kv.value))}</b>, ${esc(basisOf(kv))}.</span> <span>${esc(elevCoverageText(cov))} (${esc(ELEV_BASIS)}).</span></p>`
+    : '<p class="mk-floor">Inga aktiva avtal än.</p>';
 
   const header = `<section class="entity-header mk-hero">
   <div class="entity-grid">
     <div class="eh-main">
       <span class="kicker">Marknad · Skolans digitala verktyg</span>
       <h1 class="page-title">Vad Sveriges kommuner betalar för skolans digitala verktyg</h1>
-      <div class="mk-value${kv.value == null ? ' is-unknown' : ''}">
-        <span class="mk-num">${esc(kv.value == null ? 'okänt' : fmtKrCompact(kv.value))}</span>${kv.value == null ? '' : '<span class="mk-unit">per år i kända avtalsvärden</span>'}
-      </div>
-      <p class="mk-basis">${esc(kv.total ? `värdet är ${basisOf(kv)}` : 'inga aktiva avtal än')}</p>
+      ${heroMedians(facts)}
+      ${floor}
       <p class="lede">${esc(lede)}</p>
     </div>
     <div class="mk-side">
       ${completenessRing({ covered })}
       <dl class="mk-facts">
         <div><dt>Kommuner med avtal</dt><dd><b>${esc(fmtInt(covered))}</b> av ${esc(fmtInt(KOMMUNER_TOTAL))}</dd></div>
+        <div><dt>Deras elever</dt><dd>${cov && isNum(cov.share) ? `<b>${esc(fmtPct(cov.share))}</b> av grundskolans` : 'okänt'}</dd></div>
         <div><dt>Insamling klar</dt><dd><b>${esc(fmtInt(b.done ?? 0))}</b> ${(b.done ?? 0) === 1 ? 'kommun' : 'kommuner'}${b.dead_end || b.partial ? `, ${esc(notDone(b.dead_end, b.partial))}` : ''}</dd></div>
         <div><dt>Aktiva avtal</dt><dd><b>${esc(fmtInt(active))}</b> av ${esc(fmtInt(collected))} insamlade</dd></div>
       </dl>
@@ -324,21 +368,21 @@ export function renderMarknad({ facts, stats, statusMap, today, basis }) {
 
   return `${header}
 <section class="section">${kpis}</section>
-${section({ id: 'kategorier', kicker: 'Kategorier', title: 'Hur stor är varje kategori', note: 'känt årsvärde, kommuner och de tre största leverantörerna', body: categoryCards({ facts }) })}
+${section({ id: 'kategorier', kicker: 'Kategorier', title: 'Hur stor är varje kategori', note: 'känt årsvärde i underlaget, kommuner och deras elever, de tre största leverantörerna', body: categoryCards({ facts, stats }) })}
 ${section({ id: 'fornyelser', kicker: 'Förnyelser', title: 'Det här kommer upp för upphandling', note: `${WAVE_MONTHS} månader framåt, håll över en stapel för detaljer`, body: `<div class="card">${renewalWave({ buckets, today, foot: waveFoot(facts, today) })}</div>` })}
 ${section({ id: 'leverantorer', kicker: 'Leverantörer', title: 'Största leverantörer', note: 'alla kategorier, aktiva avtal', body: vendorRankings({ facts }) })}
 ${section({ id: 'senaste', kicker: 'Senast inkomna', title: 'Avtal vi har fått in senast', note: 'kommun, leverantör och datum då avtalet kom in', body: `<div class="card">${latestReceived({ facts, nameOf })}</div>` })}`;
 }
 
-export function renderKategorier({ facts }) {
+export function renderKategorier({ facts, stats = null }) {
   return `<section class="entity-header">
   <div class="entity-grid">
     <div class="eh-main">
       <span class="kicker">Kategorier</span>
       <h1 class="page-title">Marknaden kategori för kategori</h1>
-      <p class="lede">Känt årsvärde, antal kommuner, de största leverantörerna och medianpris per elev för varje kategori. Klicka en kategori för andelar, priser per segment, var underlaget har avtal och förnyelser.</p>
+      <p class="lede">Känt årsvärde i underlaget (en lägsta nivå, inte hela marknaden), antal kommuner och deras elever, de största leverantörerna och medianpris per elev för varje kategori. Klicka en kategori för andelar, priser per segment, var underlaget har avtal och förnyelser.</p>
     </div>
   </div>
 </section>
-${section({ id: 'kategorier', kicker: 'Alla kategorier', title: 'Kategorier efter känt årsvärde', note: 'aktiva avtal', body: categoryCards({ facts, includeEmpty: true }) })}`;
+${section({ id: 'kategorier', kicker: 'Alla kategorier', title: 'Kategorier efter känt årsvärde', note: 'aktiva avtal', body: categoryCards({ facts, stats, includeEmpty: true }) })}`;
 }

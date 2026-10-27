@@ -8,7 +8,7 @@ import { esc } from '../layout.js';
 import { fmtInt, fmtKrCompact, fmtPct, fmtPrice } from '../format.js';
 import { CATEGORIES, companies } from '../../catalogue.js';
 import {
-  companyShares, companyKey, priceDistribution, pricingModelMix, renewalBuckets, whiteSpots, distribution,
+  companyShares, companyKey, priceDistribution, pricingModelMix, renewalBuckets, whiteSpots, distribution, elevCoverage,
   KOMMUNER_TOTAL, UNKNOWN_CATEGORY, MIN_N, inRequest,
 } from '../../studio-data.js';
 import { entityHeader, kpiTile, emptyPanel, STRIP_SEGMENTS } from '../components.js';
@@ -17,6 +17,7 @@ import {
   isNum, headline, byContract, byAvtal, distinctCount, kommunNamer, productNames, productHref, companyHref,
   section, breadcrumb, priceStrip, medianText, evidenceSection, renewalTileProps, peerGroupKods,
   modelLabel, safeAll, nOf, RENEWAL_MONTHS, isIso, coverageMap, noneStatusText, laneValue,
+  floorText, elevCoverageText, ELEV_BASIS,
 } from './common.js';
 import { knownValue, shareBar, topThree, vendorRankings } from './marknad.js';
 
@@ -203,9 +204,10 @@ export function renderKategori({ category, facts, stats, statusMap, today, page 
   const dist = priceDistribution(facts, { category: slug });
   const leader = shares.find((s) => s.n_known && isNum(s.share_value));
   const tiles = safeTiles();
+  const cov = elevCoverage(facts, stats, { category: slug });
 
   const answer = avtal.length
-    ? `${nOf(kommuner, 'kommun', 'kommuner')} i vårt underlag har aktiva avtal i ${lower} med ${nOf(shares.length, 'leverantör', 'leverantörer')}${kv.value != null ? `, till ett känt värde av ${fmtKrCompact(kv.value)} per år` : ''}.${leader ? ` Störst är ${leader.name} med ${fmtPct(leader.share_value)} av det kända värdet.` : ''}`
+    ? `${nOf(kommuner, 'kommun', 'kommuner')} i vårt underlag har aktiva avtal i ${lower} med ${nOf(shares.length, 'leverantör', 'leverantörer')}${kv.value != null ? `, värda ${floorText(kv.value)}` : ''}. ${elevCoverageText(cov, { who: `Kommunerna med avtal i ${lower}` })} (${ELEV_BASIS}).${leader ? ` Störst är ${leader.name} med ${fmtPct(leader.share_value)} av känt värde i underlaget.` : ''}`
     : `Vi har inga aktiva avtal i ${lower} än. Kartan nedan visar var vi har frågat.`;
 
   const header = entityHeader({
@@ -213,8 +215,8 @@ export function renderKategori({ category, facts, stats, statusMap, today, page 
     title: label,
     answer,
     facts: [
-      { label: 'Känt årsvärde', value: kv.value == null ? null : fmtKrCompact(kv.value), sub: kv.total ? `känt för ${fmtInt(kv.known)} av ${fmtInt(kv.total)} avtal` : 'inga aktiva avtal' },
-      { label: 'Kommuner', value: kommuner, unit: `av ${fmtInt(KOMMUNER_TOTAL)}`, sub: 'med minst ett aktivt avtal' },
+      { label: 'Minst per år i underlaget', value: kv.value == null ? null : fmtKrCompact(kv.value), sub: kv.total ? `känt för ${fmtInt(kv.known)} av ${fmtInt(kv.total)} avtal, en lägsta nivå` : 'inga aktiva avtal' },
+      { label: 'Kommuner', value: kommuner, unit: `av ${fmtInt(KOMMUNER_TOTAL)}`, sub: `med minst ett aktivt avtal${cov && isNum(cov.share) ? `, ${fmtPct(cov.share)} av grundskolans elever` : ''}` },
       { label: 'Median per elev', value: dist.suppressed ? null : fmtPrice(dist.median), unit: dist.suppressed ? '' : 'kr/elev', sub: dist.suppressed ? medianText(dist) : `n = ${fmtInt(dist.n)} kommuner med känt pris` },
     ],
     viz: avtal.length ? shareBar(topThree(facts, slug)) : '',
@@ -262,7 +264,7 @@ export function renderKategori({ category, facts, stats, statusMap, today, page 
   return `${breadcrumb([{ label: 'Kategorier', href: '/studio/kategorier' }, { label }])}
 ${header}
 <section class="section">${kpis}</section>
-${section({ id: 'andelar', kicker: 'Andelar', title: `Vem säljer ${lower}`, note: 'aktiva avtal, andel av känt värde och av kommunerna med avtal i kategorin', body: vendorRankings({ facts, category: slug }) })}
+${section({ id: 'andelar', kicker: 'Andelar', title: `Vem säljer ${lower}`, note: 'aktiva avtal, andel av känt värde i underlaget och av kommunerna med avtal i kategorin', body: vendorRankings({ facts, category: slug }) })}
 ${section({ id: 'pris', kicker: 'Pris', title: 'Pris per elev och år', note: 'en punkt per kommun; matrisen visar median per kommungrupp och segment, klicka en ruta för spridning', body: priceBody })}
 ${section({ id: 'prismodell', kicker: 'Prismodell', title: 'Hur kategorin prissätts', note: 'andel av aktiva avtal per prismodell', body: `<div class="card">${modelMix({ facts, category: slug })}</div>` })}
 ${section({ id: 'tackning', kicker: 'Täckning', title: `Var underlaget har avtal i ${lower}`, note: `håll över en ruta för namn och insamlingens status; inget avtal i underlaget betyder inte att avtal saknas${requested ? '' : ', och kategorin ingår inte i vår begäran'}`, body: whiteSpotMap({ ws, label, nameOf, tiles, requested }) })}

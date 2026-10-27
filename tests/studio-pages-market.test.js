@@ -173,7 +173,7 @@ describe('/studio (Marknad)', () => {
     seedMarket();
     const html = (await body('/studio')).text;
     // 5 x 300 000 + 80 000 + 60 000 + 3 x 120 000 = 2 000 000
-    expect(html).toContain('mk-num">2 mkr<');
+    expect(html).toContain('Känt årsvärde: <b>minst 2 mkr per år i underlaget</b>');
     expect(html).toContain('känt för 10 av 11 aktiva avtal');
   });
 
@@ -330,5 +330,80 @@ describe('/studio/kategori/:slug', () => {
       expect(r.text).toContain('data-studio');
       expect(r.text).toContain('Kategorin finns inte');
     }
+  });
+});
+
+// Sums are floors of the underlag; coverage is told in elever (grundskolan
+// åk 1-9). Fixture: 9 kommuner with 2 700 grundskola elever each.
+const plain = (html) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').replace(/ /g, ' ');
+
+describe('sums are floors, coverage is in elever', () => {
+  it('the Marknad hero leads with median kr/elev per category, not the mkr total', async () => {
+    seedMarket();
+    const html = (await body('/studio')).text;
+    const hero = html.slice(html.indexOf('mk-hero'), html.indexOf('</section>', html.indexOf('mk-hero')));
+    const t = plain(hero);
+    expect(t).not.toContain('i kända avtalsvärden');
+    expect(t).toContain('Median per elev och år');
+    // läromedel: Polyglutt in five kommuner, median 140; lärplattform has no price
+    expect(hero).toMatch(/href="\/studio\/kategori\/laromedel"/);
+    expect(t).toMatch(/Läromedel 140 kr per elev n = 5 kommuner/);
+    expect(t).not.toMatch(/Lärplattform \d+ kr per elev/);
+    expect(t.indexOf('Median per elev och år')).toBeLessThan(t.indexOf('minst 2 mkr per år i underlaget'));
+    // the floor and the elev coverage next to it: 6 of 9 kommuner
+    expect(t).toContain('minst 2 mkr per år i underlaget');
+    expect(t).toContain('Kommunerna med avtal i underlaget har 67 % av eleverna i grundskolan');
+    expect(t).toContain('grundskolan (åk 1-9 i kommunens egna skolor, Skolverket)');
+    // the share leader is a share within the underlag
+    expect(t).toContain('Störst är ILT Education med 75 % av känt värde i underlaget');
+    expect(html).not.toContain('av det kända värdet');
+    noLeaks(html);
+  });
+
+  it('category cards label the sum as a floor and give the category elev coverage', async () => {
+    seedMarket();
+    for (const path of ['/studio', '/studio/kategorier']) {
+      const html = (await body(path)).text;
+      const cards = html.slice(html.indexOf('ct-grid'));
+      const lm = plain(cards.slice(cards.indexOf('kategori/laromedel'), cards.indexOf('kategori/larplattform')));
+      expect(lm, path).toContain('minst 1,6 mkr per år i underlaget');
+      expect(lm, path).toContain('67 % av eleverna i grundskolan');
+      expect(lm, path).toContain('andel av känt värde i underlaget');
+      const lp = plain(cards.slice(cards.indexOf('kategori/larplattform')));
+      // Vklass in three kommuner and Unikum in Ale: 4 of 9
+      expect(lp, path).toContain('44 % av eleverna i grundskolan');
+      noLeaks(html);
+    }
+  });
+
+  it('a kategori page says floor, coverage and share within the underlag', async () => {
+    seedMarket();
+    const html = (await body('/studio/kategori/larplattform')).text;
+    const t = plain(html);
+    expect(t).toContain('värda minst 360 tkr per år i underlaget');
+    expect(t).toContain('Kommunerna med avtal i lärplattform har 44 % av eleverna i grundskolan');
+    expect(t).toContain('Minst per år i underlaget');
+    expect(t).toContain('av känt värde i underlaget');
+    expect(t).not.toContain('av det kända värdet');
+    expect(t).not.toMatch(/Känt årsvärde 360/);
+    noLeaks(html);
+  });
+
+  it('an unknown elev count is unknown on the page, never 0 %', async () => {
+    seedMarket();
+    const stats = loadKommunStats({
+      data: {
+        kommuner: Object.fromEntries(KOMMUNER.map(([kod, namn, grupp]) => [kod, {
+          namn, kommungrupp: grupp, elever: kod === '1440' ? { ...ELEVER, '4-6': null } : ELEVER,
+        }])),
+      },
+    });
+    const a = createDashboardApp({
+      db, municipalitiesLoader: () => [], env: {}, slackClient: null, gmailClient: {}, contractsDir,
+      studioDeps: { statsLoader: () => stats, now: () => new Date('2026-10-26T09:00:00Z') },
+    });
+    const t = plain((await get(a, '/studio?partial=1')).text);
+    // 5 x 2 700 of 8 x 2 700 known; Ale is out of both sides and named
+    expect(t).toContain('Kommunerna med avtal i underlaget har 63 % av eleverna i grundskolan, 1 kommun utan känt elevantal räknas inte');
   });
 });

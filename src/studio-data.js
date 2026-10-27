@@ -735,6 +735,44 @@ export function marketByCategory(facts) {
   return out.sort((a, b) => b.value_known_sek - a.value_known_sek || b.n_avtal - a.n_avtal || a.category.localeCompare(b.category));
 }
 
+// Elev coverage of the underlag: grundskolans elever (åk 1-9, kommunal regi,
+// Skolverket) in the kommuner with an active avtal (in `category` when
+// given), over the elever of every kommun in the stats. The one school form
+// known for every kommun, so the share means the same everywhere. A kommun
+// whose elev count is unknown (or not in the stats) is left out of both
+// sides and counted, never added as 0. null without stats. Never an
+// extrapolation: it says how much of the country the underlag comes from.
+export const COVERAGE_GRADES = Object.freeze(['1-3', '4-6', '7-9']);
+
+export function elevCoverage(facts, stats, { category } = {}) {
+  if (!stats || typeof stats.all !== 'function') return null;
+  let rows = headline(facts);
+  if (category) rows = rows.filter((f) => catOf(f) === category);
+  const kods = new Set(rows.map((f) => f.kommun_kod).filter((k) => k != null));
+  const eleverOf = (kod) => stats.eleverIn(kod, COVERAGE_GRADES);
+  let total = 0;
+  let totalUnknown = 0;
+  for (const r of stats.all()) {
+    const n = eleverOf(r.kod);
+    if (isFiniteNum(n)) total += n; else totalUnknown++;
+  }
+  let covered = 0;
+  let unknown = 0;
+  for (const kod of kods) {
+    const n = eleverOf(kod);
+    if (isFiniteNum(n)) covered += n; else unknown++;
+  }
+  return {
+    grades: COVERAGE_GRADES,
+    kommuner: kods.size,
+    kommuner_unknown: unknown,
+    elever_covered: covered,
+    elever_total: total,
+    total_unknown: totalUnknown,
+    share: total > 0 ? Math.min(1, covered / total) : null,
+  };
+}
+
 // The row filter of priceDistribution without the price itself, so a page
 // can count the avtal the plot could have shown ("utan känt pris").
 export function priceRowFilter({ productSlug, category, segment, kommunKods } = {}) {

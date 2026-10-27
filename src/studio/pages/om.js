@@ -4,10 +4,11 @@
 
 import { esc } from '../layout.js';
 import { fmtInt, fmtPct } from '../format.js';
-import { MIN_N, KOMMUNER_TOTAL, ACTIVE_YEARS, isCollectionFinished } from '../../studio-data.js';
+import { MIN_N, KOMMUNER_TOTAL, ACTIVE_YEARS, isCollectionFinished, elevCoverage } from '../../studio-data.js';
 import { SIZE_BANDS } from '../../kommun-stats.js';
-import { isIso, isNum, headline, section, nOf, safeAll, notDone } from './common.js';
+import { isIso, isNum, headline, section, nOf, safeAll, notDone, floorText, elevCoverageText } from './common.js';
 import { kommunStatus } from './lists.js';
+import { knownValue } from './marknad.js';
 
 // A basis figure that could not be read is "okänt", never 0.
 const num = (n) => (isNum(n) ? fmtInt(n) : 'okänt');
@@ -138,6 +139,16 @@ export function renderOm({ facts, stats, statusMap = new Map(), basis = {}, toda
   ${p('Årsvärdet är avtalets värde omräknat till ett år. Okänt värde räknas aldrig som noll, och varje summa visar hur många avtal värdet är känt för.')}
 </div>`;
 
+  const kv = knownValue(headline(facts));
+  const cov = elevCoverage(facts, stats);
+  const summor = `<div class="om-prose">
+  ${p(`Summorna är en lägsta nivå, inte marknadens storlek. En summa i kronor räknar bara aktiva avtal i underlaget med känt värde. I dag har ${nOfU(b.kommuner_with_avtal, 'kommun', 'kommuner')} av ${fmtInt(KOMMUNER_TOTAL)} aktiva avtal i underlaget, och värdet är känt för ${fmtInt(kv.known)} av ${nOf(kv.total, 'aktivt avtal', 'aktiva avtal')}. Det ger ${kv.value == null ? 'inget känt värde än' : floorText(kv.value)}. Kommuner vi inte har avtal från och avtal utan känt värde räknas inte, så den verkliga summan är högre. Därför står det "minst" och "i underlaget" vid varje summa.`)}
+  ${p('En leverantörs andel är dess andel av känt värde i underlaget, alltså av summan av de avtal med känt värde som vi har. Den säger inte hur stor leverantörens andel är av hela marknaden.')}
+  ${p(`Hur stor del av landet underlaget kommer från räknar vi i elever, inte i kommuner, eftersom kommunerna är olika stora. Vi räknar eleverna i grundskolan åk 1-9 i kommunens egna skolor enligt Skolverket${laar ? `, läsåret ${laar}` : ''}. Grundskolan finns i alla kommuner, så måttet betyder samma sak överallt. Fristående skolor ingår inte. Täckningen är eleverna i de kommuner som har minst ett aktivt avtal i underlaget, delat med eleverna i alla landets kommuner. För en kategori räknas bara kommuner med ett aktivt avtal i den kategorin. En kommun utan känt elevantal räknas inte, varken bland kommunerna med avtal eller i landet, och sidan säger hur många det gäller.`)}
+  ${p(`I dag: ${elevCoverageText(cov)}.`)}
+  ${p('Vi räknar inte upp underlaget till en uppskattning av hela marknaden. Kommunerna i underlaget är inte ett slumpmässigt urval, så en sådan siffra skulle se säkrare ut än den är. Medianpriser per elev håller bättre när underlaget är ofullständigt, därför visas de först på marknadssidan.')}
+</div>`;
+
   const minN = `<div class="om-prose">
   ${p(`Prisdiagrammen visar en punkt per kommun. Har en kommun flera avtal med känt pris i samma jämförelse räknas den en gång, med medianen av sina egna priser. Median, kvartiler och prisprickar visas bara när minst ${MIN_N} kommuner har känt pris per elev. Med färre visar vi en streckad ruta med texten "för få kommuner" och antalet, och inga enskilda prickar. Det gäller prisdiagrammen, cellerna i prismatriserna och medianpriserna på kategori- och produktkorten. Ett avtal som gäller flera skolformer räknas i varje skolform det omfattar.`)}
   ${p(`På en kommuns sida räknas jämförelserna i kommuner. Kommunens pris för en produkt jämförs med liknande kommuner när minst ${MIN_N} av dem har känt pris för produkten. Är de färre jämför vi med alla kommuner med känt pris, och är också de färre än ${MIN_N} visas bara kommunens eget pris, utan jämförelse. Medianen för vad liknande kommuner lägger per elev och kategori visas från ${MIN_N} kommuner.`)}
@@ -169,6 +180,7 @@ export function renderOm({ facts, stats, statusMap = new Map(), basis = {}, toda
   return `${header}
 ${section({ id: 'insamling', kicker: 'Insamling', title: 'Hur avtalen samlas in', body: insamling })}
 ${section({ id: 'aktiva', kicker: 'Aktiva avtal', title: 'Vilka avtal som räknas', body: aktiv })}
+${section({ id: 'summor', kicker: 'Summor', title: 'Summorna är en lägsta nivå', body: summor })}
 ${section({ id: 'kr-elev', kicker: 'Pris per elev', title: 'Hur kr per elev räknas', body: krElev })}
 ${section({ id: 'for-fa', kicker: 'För få kommuner', title: `Inget visas under ${MIN_N} kommuner`, body: minN })}
 ${section({ id: 'liknande', kicker: 'Liknande kommuner', title: 'Vem en kommun jämförs med', body: peers })}

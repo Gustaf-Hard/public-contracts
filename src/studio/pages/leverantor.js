@@ -6,13 +6,14 @@
 import { esc } from '../layout.js';
 import { fmtInt, fmtKrCompact, fmtPct, basisLine, monthsUntil } from '../format.js';
 import { companyBySlug } from '../../catalogue.js';
-import { companyShares, coOccurrence, priceDistribution, renewalBuckets } from '../../studio-data.js';
+import { companyShares, coOccurrence, priceDistribution, renewalBuckets, elevCoverage } from '../../studio-data.js';
 import { entityHeader, kpiTile, segmentStrip, emptyPanel } from '../components.js';
 import { rankingBars, loadKommunTiles } from '../charts.js';
 import {
   isNum, headline, distinctCount, sumKnown, byContract, consolidateByContract, categoryLabel, kommunNamer, productNames,
   companyHref, productHref, section, breadcrumb, priceStrip, medianText, categoryContext,
   footprintMap, renewalSection, evidenceSection, renewalTileProps, MIN_N, nOf,
+  floorText, elevCoverageText, ELEV_BASIS,
 } from './common.js';
 import { STRIP_SEGMENTS } from '../components.js';
 
@@ -183,8 +184,12 @@ export function renderLeverantor({ company, facts, stats, statusMap, today, page
   const share = category && value != null ? companyShares(facts, { category }).find((s) => s.slug === slug)?.share_value ?? null : null;
 
   const roleWord = company.role === 'channel' ? 'Återförsäljare' : 'Leverantör';
+  // The value is a floor of the underlag; its coverage is the underlag's in
+  // the company's category (all categories when it has none), in elever.
+  const cov = elevCoverage(facts, stats, category ? { category } : {});
+  const covText = elevCoverageText(cov, { who: category ? `Kommunerna med avtal i ${catLabel.toLowerCase()}` : 'Kommunerna med avtal i underlaget' });
   const answer = avtal.length
-    ? `${company.canonical} har aktiva avtal med ${nOf(kommuner, 'kommun', 'kommuner')} i vårt underlag${value != null ? `, med ett känt årsvärde på ${fmtKrCompact(value)}` : ''}.${company.note ? ` ${company.note}` : ''}`
+    ? `${company.canonical} har aktiva avtal med ${nOf(kommuner, 'kommun', 'kommuner')} i vårt underlag${value != null ? `, värda ${floorText(value)}. ${covText} (${ELEV_BASIS})` : ''}.${company.note ? ` ${company.note}` : ''}`
     : `Vi har inga aktiva avtal med ${company.canonical} än.${avtalAll.length ? ` ${fmtInt(byContract(avtalAll).length)} äldre avtal finns i underlaget.` : ''}`;
 
   const header = entityHeader({
@@ -193,9 +198,9 @@ export function renderLeverantor({ company, facts, stats, statusMap, today, page
     answer,
     facts: [
       { label: 'Kommuner', value: kommuner, sub: 'med minst ett aktivt avtal' },
-      { label: 'Känt årsvärde', value: value == null ? null : fmtKrCompact(value), sub: basisLine(known.length, avtal.length) },
+      { label: 'Minst per år i underlaget', value: value == null ? null : fmtKrCompact(value), sub: `${basisLine(known.length, avtal.length)}, en lägsta nivå` },
       category
-        ? { label: `Andel av ${catLabel.toLowerCase()}`, value: share == null ? null : fmtPct(share), sub: share == null ? 'leverantörens värde är okänt' : isChannel ? 'egna produkter, av känt årsvärde i kategorin' : 'av känt årsvärde i kategorin' }
+        ? { label: `Andel av ${catLabel.toLowerCase()}`, value: share == null ? null : fmtPct(share), sub: share == null ? 'leverantörens värde är okänt' : isChannel ? 'egna produkter, av känt årsvärde i kategorin i underlaget' : 'av känt årsvärde i kategorin i underlaget' }
         : { label: 'Aktiva avtal', value: avtal.length, sub: `${fmtInt(byContract(avtalAll).length)} insamlade` },
     ],
     viz: segmentStrip(unionSegments(rows)),

@@ -179,11 +179,27 @@ const PAGE_CSS = `
 /* ---------- marknad + kategori (Task 8) ---------- */
 .mk-hero .entity-grid { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); align-items: center; }
 .mk-hero .page-title { font-size: var(--t-2xl); max-width: 24ch; }
-.mk-value { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px var(--s-3); margin-top: var(--s-5); }
-.mk-num { font-family: var(--font-display); font-size: var(--t-4xl); font-weight: 500; line-height: 1; letter-spacing: -.03em; font-variant-numeric: lining-nums tabular-nums; color: var(--ink); }
-.mk-unit { font-size: var(--t-md); color: var(--ink-2); }
-.mk-value.is-unknown .mk-num { color: var(--ink-3); }
-.mk-basis { margin-top: var(--s-2); font-size: var(--t-sm); color: var(--ink-3); }
+/* hero lead: median kr/elev per category (holds on partial data) */
+.mk-prices { margin-top: var(--s-5); }
+.mk-plabel { display: block; font-size: var(--t-xs); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-3); margin-bottom: var(--s-2); }
+.mk-price-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; border-top: 1px solid var(--line); max-width: 560px; }
+.mk-price-list li { border-bottom: 1px solid var(--line); }
+.mk-price { display: grid; grid-template-columns: minmax(0, 1fr) auto 9.5em; align-items: baseline; column-gap: var(--s-4); padding: var(--s-2) var(--s-1); color: var(--ink); transition: background var(--dur) var(--ease); }
+.mk-price:hover { text-decoration: none; background: var(--surface-2); }
+.mk-price:hover .mk-cat { color: var(--accent); }
+.mk-cat { font-size: var(--t-md); color: var(--ink); transition: color var(--dur) var(--ease); }
+.mk-pval { display: flex; align-items: baseline; gap: 6px; justify-self: end; }
+.mk-pnum { font-family: var(--font-display); font-size: var(--t-xl); font-weight: 500; line-height: 1.1; font-variant-numeric: lining-nums tabular-nums; }
+.mk-punit { font-size: var(--t-sm); color: var(--ink-2); }
+.mk-pn { font-size: var(--t-xs); color: var(--ink-3); font-variant-numeric: tabular-nums; text-align: right; }
+@container (max-width: 480px) {
+  .mk-price { grid-template-columns: minmax(0, 1fr) auto; }
+  .mk-pn { grid-column: 1 / -1; text-align: left; }
+}
+.mk-none { padding: var(--s-3); border-radius: var(--r-2); background: var(--hatch), var(--surface-2); border: 1px dashed var(--line-strong); font-size: var(--t-sm); color: var(--ink-2); }
+.mk-basis { margin-top: var(--s-2); font-size: var(--t-xs); color: var(--ink-3); max-width: 70ch; }
+.mk-floor { margin-top: var(--s-4); font-size: var(--t-sm); color: var(--ink-2); max-width: 70ch; }
+.mk-floor b { color: var(--ink); font-weight: 600; }
 .mk-hero .lede { margin-top: var(--s-4); font-size: var(--t-md); }
 .mk-side { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--s-5); align-items: center; padding: var(--s-4) var(--s-5); border-radius: var(--r-3); background: color-mix(in oklab, var(--surface) 70%, transparent); border: 1px solid var(--line); }
 .mk-facts { margin: 0; display: flex; flex-direction: column; gap: var(--s-3); }
@@ -216,6 +232,8 @@ a.ct:hover .ct-name { color: var(--accent); }
 .ct-num { font-family: var(--font-display); font-size: var(--t-2xl); font-weight: 500; line-height: 1; font-variant-numeric: lining-nums tabular-nums; }
 .ct-value.is-unknown .ct-num { font-size: var(--t-lg); color: var(--ink-3); }
 .ct-unit { font-size: var(--t-sm); color: var(--ink-2); }
+.ct-pre { font-size: var(--t-sm); color: var(--ink-2); }
+.ct-elev { font-variant-numeric: tabular-nums; }
 .ct-reach { display: flex; flex-direction: column; gap: 6px; }
 .ct-reach-row { display: flex; justify-content: space-between; align-items: baseline; font-size: var(--t-sm); color: var(--ink-2); }
 .ct-reach-row b { font-size: var(--t-lg); font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }

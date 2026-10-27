@@ -348,3 +348,19 @@ describe('/studio/underlag/:attachmentId', () => {
     expect((await get(app(), '/studio/underlag/abc')).status).toBe(404);
   });
 });
+
+describe('leverantör sums are floors of the underlag', () => {
+  const plain = (html) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').replace(/ /g, ' ');
+  it('labels the value as a floor, the share as within the underlag, and gives elev coverage', async () => {
+    seedIlt();
+    const html = (await get(app(), '/studio/leverantor/ilt')).text;
+    const t = plain(html);
+    expect(t).toContain('Minst per år i underlaget');
+    expect(t).toMatch(/har aktiva avtal med 5 kommuner i vårt underlag, värda minst [\d,]+ (mkr|tkr) per år i underlaget\./);
+    expect(t).toContain('av känt årsvärde i kategorin i underlaget');
+    // läromedel: ILT in five kommuner (Radish in two of them) of 7
+    expect(t).toContain('Kommunerna med avtal i läromedel har 71 % av eleverna i grundskolan');
+    expect(t).not.toMatch(/Känt årsvärde \d/);
+    noLeaks(html);
+  });
+});

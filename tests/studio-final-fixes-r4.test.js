@@ -212,7 +212,8 @@ describe('W3 and X1. a samverkansavtal on Förnyelser is the whole avtal, status
 
   it('the page counts the whole value once and labels each row', () => {
     const t = text(renderFornyelser({ facts, stats, today: TODAY }));
-    expect(t).toContain('Känt årsvärde 177 tkr');
+    expect(t).toContain('Värda minst 177 tkr per år i underlaget');
+    expect(t).toContain('Minst per år i underlaget 177 tkr');
     expect(t).toContain('hela avtalet, samverkansavtal, kopior från Testby 1, Testby 2, andel okänd');
   });
 

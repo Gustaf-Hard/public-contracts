@@ -245,7 +245,7 @@ describe('H. a reseller page counts the avtal it is the vendor of', () => {
     expect(facts.some((f) => f.contract_id === full.contract_id && f.company_slug === 'laromedia')).toBe(false);
     const raw = renderLeverantor({ company, facts, stats, statusMap: new Map(), today: TODAY });
     const html = text(raw);
-    expect(html).toContain('har aktiva avtal med 2 kommuner i vårt underlag, med ett känt årsvärde på 190 tkr.');
+    expect(html).toContain('har aktiva avtal med 2 kommuner i vårt underlag, värda minst 190 tkr per år i underlaget.');
     expect(html).toMatch(/2 aktiva, 0 utgångna eller ersatta/);
     expect(raw).toContain('aria-label="Testby 1: aktivt avtal med LäroMedia Bokhandel Örebro i underlaget');
     expect(raw).toContain('aria-label="Testby 2: aktivt avtal med LäroMedia Bokhandel Örebro i underlaget');
@@ -256,7 +256,7 @@ describe('H. a reseller page counts the avtal it is the vendor of', () => {
     const facts = build([own, other], { lineItems: [LI(other.contract_id, 'SchoolSoft', 380000), LI(other.contract_id, 'Skolon', 20000)] });
     expect(row(facts, other.contract_id, 'skolon').annual_value_sek).toBe(20000);
     const html = text(renderLeverantor({ company: companyBySlug('skolon'), facts, stats, statusMap: new Map(), today: TODAY }));
-    expect(html).toContain('har aktiva avtal med 2 kommuner i vårt underlag, med ett känt årsvärde på 70 tkr.');
+    expect(html).toContain('har aktiva avtal med 2 kommuner i vårt underlag, värda minst 70 tkr per år i underlaget.');
   });
 });
 

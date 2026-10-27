@@ -10,7 +10,7 @@ import { companyShares, isCollectionFinished, KOMMUNER_TOTAL } from '../../studi
 import { filterBar, emptyPanel } from '../components.js';
 import { tileMap } from '../charts.js';
 import {
-  headline, categoryLabel, companyHref, productHref, kommunHref, kommunNamer, section, nOf, safeAll, notDone,
+  headline, categoryLabel, companyHref, productHref, kommunHref, kommunNamer, section, nOf, safeAll, notDone, floorText,
 } from './common.js';
 
 const CHANNEL_GROUP = 'kanal';
@@ -31,7 +31,7 @@ function companyCard(c, s, max, i) {
     const h = productHref(p.slug);
     return h ? `<a href="${esc(h)}" data-pane-link>${esc(p.name)}</a>` : esc(p.name);
   });
-  const value = s && s.n_known ? `<b>${esc(fmtKrCompact(s.value_known_sek))}</b>/år känt` : '<span class="muted">värde okänt</span>';
+  const value = s && s.n_known ? `minst <b>${esc(fmtKrCompact(s.value_known_sek))}</b>/år` : '<span class="muted">värde okänt</span>';
   return `<article class="card dir-card" style="--i:${i}">
   <h3 class="dir-name"><a href="${esc(href)}" data-pane-link>${esc(c.canonical)}</a></h3>
   ${shown.length ? `<p class="dir-prods">${shown.join(', ')}${prods.length > 3 ? ` <span class="muted">och ${esc(fmtInt(prods.length - 3))} till</span>` : ''}</p>` : ''}
@@ -68,7 +68,7 @@ export function renderLeverantorer({ facts, query = {} }) {
       id: `grupp-${g.slug}`,
       kicker: g.slug === CHANNEL_GROUP ? 'Kanaler' : 'Kategori',
       title: g.label,
-      note: `${nOf(active.length, 'leverantör', 'leverantörer')} med aktiva avtal${total ? `, känt värde ${fmtKrCompact(total)}/år` : ''}`,
+      note: `${nOf(active.length, 'leverantör', 'leverantörer')} med aktiva avtal${total ? `, värda ${floorText(total)}` : ''}`,
       body: `${cards ? `<div class="dir-grid">${cards}</div>` : ''}${idleHtml}`,
     });
   }).filter(Boolean).join('\n');
