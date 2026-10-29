@@ -45,12 +45,77 @@ describe('judgeXlsx: rejected documents', () => {
     expect(judgeXlsx([sheet(LIST)], { filename: 'Avtalsregister 2026.xlsx' }).verdict).toBe('skip');
   });
 
-  it(`a table over ${PURCHASE_ROW_CAP} rows is not a purchase list`, () => {
+  it(`a table over ${PURCHASE_ROW_CAP} rows with no channel or licence signal is not a purchase list`, () => {
     expect(PURCHASE_ROW_CAP).toBe(2000);
-    const big = [['Leverantör', 'Produkt', 'Antal', 'Belopp'], ...Array.from({ length: PURCHASE_ROW_CAP + 1 }, (_, i) => [`Exempel ${i} AB`, `Vara ${i}`, 1, i + 1])];
-    const j = judgeXlsx([sheet(big)], { filename: 'Skolon.xlsx' });
+    const big = [['Leverantör', 'Produkt', 'Belopp'], ...Array.from({ length: PURCHASE_ROW_CAP + 1 }, (_, i) => [`Exempel ${i} AB`, `Vara ${i}`, i + 1])];
+    const j = judgeXlsx([sheet(big)], { filename: 'Sammanställning.xlsx' });
     expect(j.verdict).toBe('skip');
     expect(j.reason).toMatch(/2000/);
+  });
+});
+
+// Fix wave 3 Q7: the cap is checked before any extraction path, and a big
+// list that IS a channel or licence list is recorded partial, not "not a list".
+describe('judgeXlsx: the row cap (Q7)', () => {
+  const many = (head, row) => [head, ...Array.from({ length: PURCHASE_ROW_CAP + 1 }, (_, i) => row(i))];
+
+  it('a big channel list is partial, "för stor för automatisk läsning", with no rows', () => {
+    const j = judgeXlsx([sheet(many(['Leverantör', 'Produkt', 'Antal', 'Belopp'], (i) => [`Exempel ${i} AB`, `Vara ${i}`, 1, i + 1]))], { filename: 'Skolon.xlsx' });
+    expect(j.verdict).toBe('partial');
+    expect(j.reason).toBe(`för stor för automatisk läsning (${PURCHASE_ROW_CAP + 2} rader)`);
+    expect(j.rows).toEqual([]);
+    expect(j.reason).not.toMatch(/inte en inköpslista/);
+  });
+
+  it('an unrecognised big workbook never reaches the LLM: skipped without a signal, partial with one', () => {
+    const big = many(['Namn', 'Värde'], (i) => [`Exempel ${i}`, i]);
+    const none = judgeXlsx([sheet(big)], { filename: 'Data.xlsx' });
+    expect(none.verdict).toBe('skip');
+    expect(none.reason).toMatch(/över 2000 rader/);
+    const lic = judgeXlsx([sheet(big, 'Licenser')], { filename: 'Data.xlsx' });
+    expect(lic.verdict).toBe('partial');
+    expect(lic.reason).toMatch(/^för stor för automatisk läsning \(\d+ rader\)$/);
+  });
+
+  it('extractPurchases records an oversized document without calling the LLM', async () => {
+    const create = vi.fn();
+    const cell = (ref, v) => (typeof v === 'number' ? `<c r="${ref}"><v>${v}</v></c>` : `<c r="${ref}" t="inlineStr"><is><t>${v}</t></is></c>`);
+    const rows = many(['Namn', 'Värde'], (i) => [`Exempel ${i}`, i]);
+    const buf = Buffer.from(zipSync({ 'xl/worksheets/sheet1.xml': strToU8(`<worksheet><sheetData>${rows.map((r, i) => `<row r="${i + 1}">${r.map((v, j) => cell(`${'AB'[j]}${i + 1}`, v)).join('')}</row>`).join('')}</sheetData></worksheet>`) }));
+    const skip = await extractPurchases({ buffer: buf, filename: 'Data.xlsx' }, { client: { messages: { create } } });
+    expect(skip).toMatchObject({ method: 'xlsx', is_list: false, rows: [] });
+    expect(skip.skipped).toMatch(/över 2000 rader/);
+    const part = await extractPurchases({ buffer: buf, filename: 'Skolon export.xlsx' }, { client: { messages: { create } } });
+    expect(part).toMatchObject({ method: 'xlsx', is_list: false, rows: [] });
+    expect(part.too_large).toMatch(/^för stor för automatisk läsning/);
+    expect(create).not.toHaveBeenCalled();
+  });
+});
+
+// Fix wave 3 Q5: each sheet is judged on its own.
+describe('judgeXlsx: each sheet on its own (Q5)', () => {
+  const LEDGERISH = [['Leverantör', 'Belopp'], ['Exempel El AB', 500], ['Exempel Bygg AB', 900]];
+
+  it('a sheet named as a ledger or register is rejected even beside a real licence sheet', () => {
+    for (const name of ['Leverantörsreskontra', 'Verifikationer', 'Avtalsregister', 'Avtalskatalog', 'Fakturor']) {
+      const j = judgeXlsx([sheet(LIST, 'Skolon'), sheet(LEDGERISH, name)], { filename: 'x.xlsx' });
+      expect(j.verdict, name).toBe('rows');
+      expect(j.rows.map((r) => r.supplier), name).toEqual(['Binogi', 'Exempel AB']);
+      expect(j.partial, name).toEqual([name]);
+    }
+  });
+
+  it('a sheet with no signal of its own is not read because another sheet has one', () => {
+    const j = judgeXlsx([sheet(LIST, 'Skolon'), sheet([['Leverantör', 'Produkt', 'Belopp'], ['Annan AB', 'Annat', 70], ['Tredje AB', 'Tredje', 80]], 'Övrigt')], { filename: 'x.xlsx' });
+    expect(j.verdict).toBe('rows');
+    expect(j.rows.map((r) => r.supplier)).toEqual(['Binogi', 'Exempel AB']);
+    expect(j.partial).toEqual(['Övrigt']);
+  });
+
+  it('a channel in the filename still vouches for every sheet', () => {
+    const j = judgeXlsx([sheet(LIST, 'Köp'), sheet([['Leverantör', 'Produkt', 'Belopp'], ['Annan AB', 'Annat', 70], ['Tredje AB', 'Tredje', 80]], 'Mer')], { filename: 'Skolon 2025.xlsx' });
+    expect(j.rows).toHaveLength(4);
+    expect(j.partial).toEqual([]);
   });
 });
 
@@ -60,6 +125,13 @@ describe('judgeXlsx: partial workbooks (E5)', () => {
     expect(j.verdict).toBe('rows');
     expect(j.partial).toEqual(['Pivot']);
     expect(j.rows).toHaveLength(2);
+  });
+
+  // Fix wave 3 Q6: one populated column is still data we did not read.
+  it('a populated single-column sheet is unread data, so the workbook is partial', () => {
+    const j = judgeXlsx([sheet(LIST, 'Köp'), sheet([['Produkt'], ['Polyglutt'], ['Unikum']], 'Licenser')], { filename: 'Skolon.xlsx' });
+    expect(j.verdict).toBe('rows');
+    expect(j.partial).toEqual(['Licenser']);
   });
 
   it('an empty or one-line extra sheet does not make it partial', () => {

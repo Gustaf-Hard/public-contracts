@@ -2055,8 +2055,10 @@ export function openDb(path, { readonly = false } = {}) {
   // the document is then 'partial', never fully extracted, and last_error
   // names them. `skipped` (E1): a reason the document is not a purchase list
   // (a ledger, an avtal register, over the row cap); status 'skipped', no
-  // rows, old rows removed.
-  function replacePurchaseRows(attachmentId, { rows = [], method, channel = null, stated_total_sek = null, isList = true, partial = [], skipped = null } = {}) {
+  // rows, old rows removed. `tooLarge` (fix wave 3 Q7): a channel or licence
+  // list over the row cap; status 'partial' with no rows and last_error
+  // "partial: <reason>", so the operator sees a list we did not read.
+  function replacePurchaseRows(attachmentId, { rows = [], method, channel = null, stated_total_sek = null, isList = true, partial = [], skipped = null, tooLarge = null } = {}) {
     if (!['xlsx', 'llm'].includes(method)) throw new Error(`replacePurchaseRows: method must be xlsx or llm, got ${method}`);
     const ins = db.prepare(`
       INSERT INTO purchase_rows (attachment_id, row_index, supplier, product, channel, quantity, unit, unit_price_sek,
@@ -2066,7 +2068,7 @@ export function openDb(path, { readonly = false } = {}) {
     const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
     db.transaction(() => {
       db.prepare('DELETE FROM purchase_rows WHERE attachment_id = ?').run(attachmentId);
-      const list = isList && !skipped ? rows : [];
+      const list = isList && !skipped && !tooLarge ? rows : [];
       list.forEach((r, i) => {
         ins.run(
           attachmentId, i, r.supplier ?? null, r.product ?? null, r.channel ?? null, num(r.quantity), r.unit ?? null,
@@ -2083,9 +2085,9 @@ export function openDb(path, { readonly = false } = {}) {
           extracted_at = excluded.extracted_at, updated_at = excluded.updated_at
       `).run(
         attachmentId,
-        skipped ? 'skipped' : !(isList && list.length) ? 'not_list' : partial.length ? 'partial' : 'rows',
-        method, channel ?? null, skipped ? null : num(stated_total_sek), list.length,
-        skipped ? `skipped:${skipped}` : list.length && partial.length ? `partial: oläst blad ${partial.join(', ')}` : null,
+        skipped ? 'skipped' : tooLarge ? 'partial' : !(isList && list.length) ? 'not_list' : partial.length ? 'partial' : 'rows',
+        method, channel ?? null, skipped || tooLarge ? null : num(stated_total_sek), list.length,
+        skipped ? `skipped:${skipped}` : tooLarge ? `partial: ${tooLarge}` : list.length && partial.length ? `partial: oläst blad ${partial.join(', ')}` : null,
       );
     })();
   }

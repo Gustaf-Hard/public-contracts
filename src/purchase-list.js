@@ -324,6 +324,11 @@ export function extractXlsxPurchases(sheets = [], { filename = '' } = {}) {
 // filename, a sheet name, the lines above the header or a header cell, or
 // licence/order columns (antal, licens..., ordernummer, orderdatum,
 // licensperiod). Ledgers and registers are skipped outright.
+// Fix wave 3 Q5: each sheet is judged on its own. A sheet named or headed as a
+// ledger or register is rejected and never contributes rows, whatever the
+// other sheets are; a sheet is read only on its own signal or the filename's.
+// Fix wave 3 Q7: the row cap is checked before any extraction path, the LLM's
+// included.
 export const PURCHASE_ROW_CAP = 2000;
 // Office text handed to the LLM; longer is truncated, and a truncated list
 // is never stored as complete (E6).
@@ -331,19 +336,35 @@ export const PURCHASE_TEXT_MAX = 200_000;
 
 const LEDGER_NAME = /reskontra|verifikation|huvudbok|bokforingsorder/;
 const REGISTER_NAME = /avtalsregister|avtalskatalog/;
+const INVOICE_NAME = /faktur/;
 const LEDGER_HEADER = /^verifikation|reskontra/;
 const INVOICE_NO_HEADER = /\bfaktura ?nr\b|fakturanummer|fakturanr/;
 const REGISTER_HEADER = /^avtalsnamn$/;
 const LICENCE_WORD_RE = /licens/;
 const ORDER_HEADER = /^(order ?nr|ordernummer|order|order id|best(allnings)? ?nr|bestallningsnummer|orderdatum|bestallningsdatum)$/;
-const hasData = (sh) => (sh.rows ?? []).filter((r) => r.filter((c) => c != null && c !== '').length >= 2).length >= 2;
+const filled = (r) => (r ?? []).some((c) => c != null && c !== '');
+const dataRows = (sh) => (sh.rows ?? []).filter(filled).length;
+// Data we did not read (fix wave 3 Q6): two populated rows, even in a single
+// column ("Produkt / Polyglutt / Unikum"). A lone title line is not data.
+const hasData = (sh) => dataRows(sh) >= 2;
+
+// A sheet's own name rejects it: a ledger, a register, or an invoice sheet
+// that names no channel.
+function nameReject(sh, quantityColumn = false) {
+  const n = normName(sh.name ?? '');
+  if (LEDGER_NAME.test(n)) return 'verifikationslista eller leverantörsreskontra (bladnamnet)';
+  if (REGISTER_NAME.test(n)) return 'avtalsregister (bladnamnet)';
+  if (INVOICE_NAME.test(n) && !quantityColumn && !channelFrom(sh.name)) return 'leverantörsreskontra (fakturablad, inga antal)';
+  return null;
+}
 
 function sheetSignals(t, sh) {
   const heads = (t.header ?? []).filter((c) => typeof c === 'string').map((c) => normName(c));
-  const reject = heads.some((h) => LEDGER_HEADER.test(h)) ? 'verifikationslista eller leverantörsreskontra'
-    : heads.some((h) => REGISTER_HEADER.test(h)) ? 'avtalsregister (kolumnen Avtalsnamn)'
-      : heads.some((h) => INVOICE_NO_HEADER.test(h)) && t.map.columns.quantity == null ? 'leverantörsreskontra (fakturanummer, inga antal)'
-        : null;
+  const reject = nameReject(sh, t.map.columns.quantity != null)
+    ?? (heads.some((h) => LEDGER_HEADER.test(h)) ? 'verifikationslista eller leverantörsreskontra'
+      : heads.some((h) => REGISTER_HEADER.test(h)) ? 'avtalsregister (kolumnen Avtalsnamn)'
+        : heads.some((h) => INVOICE_NO_HEADER.test(h)) && t.map.columns.quantity == null ? 'leverantörsreskontra (fakturanummer, inga antal)'
+          : null);
   const text = [sh.name, ...(t.above ?? []), ...(t.header ?? []).filter((c) => typeof c === 'string')].join(' ');
   const positive = Boolean(channelFrom(sh.name, (t.above ?? []).join(' '), heads.join(' ')))
     || LICENCE_WORD_RE.test(normName(text))
@@ -352,40 +373,62 @@ function sheetSignals(t, sh) {
   return { reject, positive };
 }
 
+// A sheet no table was found in: a channel or the word licens in its name or
+// first lines is still a positive signal (for the row cap).
+function rawPositive(sh) {
+  const top = (sh.rows ?? []).slice(0, 20).flat().filter((c) => typeof c === 'string').join(' ');
+  return Boolean(channelFrom(sh.name, top)) || LICENCE_WORD_RE.test(normName(`${sh.name ?? ''} ${top}`));
+}
+
 // judgeXlsx(sheets, { filename }) -> { verdict, reason?, rows, partial,
 // stated_total_sek, channel }
-//   verdict 'rows'  write these rows (method xlsx); `partial` names sheets
-//                   that hold data we did not read (E5): the document is
-//                   recorded partial, never fully extracted
-//   verdict 'skip'  not a purchase list (ledger, register, over the row cap):
-//                   recorded skipped with `reason`, no rows
-//   verdict 'llm'   no positive signal and nothing rejected: the LLM, which
-//                   asks is_purchase_list, decides
+//   verdict 'rows'     write these rows (method xlsx); `partial` names sheets
+//                      that hold data we did not read (E5): rejected sheets,
+//                      sheets with no signal of their own, sheets with no
+//                      table. The document is recorded partial, never fully
+//                      extracted
+//   verdict 'partial'  (Q7) a channel or licence list over the row cap: no
+//                      rows, recorded partial with `reason` ("för stor för
+//                      automatisk läsning (N rader)") so the operator sees it
+//   verdict 'skip'     not a purchase list (ledger, register, over the row cap
+//                      with no signal): recorded skipped with `reason`, no rows
+//   verdict 'llm'      no positive signal and nothing rejected: the LLM, which
+//                      asks is_purchase_list, decides
 export function judgeXlsx(sheets = [], { filename = '' } = {}) {
   const fname = normName(filename);
   const empty = { rows: [], partial: [], stated_total_sek: null, channel: channelFrom(filename) };
   if (LEDGER_NAME.test(fname)) return { ...empty, verdict: 'skip', reason: 'leverantörsreskontra eller verifikationslista (filnamnet)' };
   if (REGISTER_NAME.test(fname)) return { ...empty, verdict: 'skip', reason: 'avtalsregister (filnamnet)' };
   const docPositive = Boolean(channelFrom(filename)) || LICENCE_WORD_RE.test(fname);
-  const accepted = []; const unread = []; const rejected = [];
+  const accepted = []; const unread = []; const rejected = []; const quiet = [];
   let positive = docPositive;
+  let rawRows = 0;
   for (const sh of sheets ?? []) {
     const t = readTable(sh, { filename });
-    if (!t) { if (hasData(sh)) unread.push(sh.name); continue; }
+    if (!t) {
+      const why = hasData(sh) ? nameReject(sh) : null;
+      if (why) { rejected.push({ name: sh.name, reason: why }); continue; }
+      rawRows += dataRows(sh);
+      if (rawPositive(sh)) positive = true;
+      if (hasData(sh)) unread.push(sh.name);
+      continue;
+    }
     const sig = sheetSignals(t, sh);
     if (sig.reject) { rejected.push({ name: sh.name, reason: sig.reject }); continue; }
+    rawRows += dataRows(sh);
     if (sig.positive) positive = true;
-    accepted.push(sh);
+    if (sig.positive || docPositive) accepted.push(sh); else quiet.push(sh);
   }
-  if (!accepted.length && rejected.length) return { ...empty, verdict: 'skip', reason: rejected[0].reason };
-  if (!accepted.length) return { ...empty, verdict: 'llm' };
-  if (!positive) return { ...empty, verdict: rejected.length ? 'skip' : 'llm', ...(rejected.length ? { reason: rejected[0].reason } : {}) };
+  if (rawRows > PURCHASE_ROW_CAP) {
+    return positive
+      ? { ...empty, verdict: 'partial', reason: `för stor för automatisk läsning (${rawRows} rader)` }
+      : { ...empty, verdict: 'skip', reason: `över ${PURCHASE_ROW_CAP} rader (${rawRows}): inte en inköpslista` };
+  }
+  if (!accepted.length && !quiet.length && rejected.length) return { ...empty, verdict: 'skip', reason: rejected[0].reason };
+  if (!accepted.length) return quiet.length && rejected.length ? { ...empty, verdict: 'skip', reason: rejected[0].reason } : { ...empty, verdict: 'llm' };
   const x = extractXlsxPurchases(accepted, { filename });
-  if (x.rows.length > PURCHASE_ROW_CAP) {
-    return { ...empty, verdict: 'skip', reason: `över ${PURCHASE_ROW_CAP} rader (${x.rows.length}): inte en inköpslista` };
-  }
   if (!looksLikePurchaseList(x.rows)) return { ...empty, verdict: 'llm' };
-  return { verdict: 'rows', rows: x.rows, partial: [...rejected.map((r) => r.name), ...unread], stated_total_sek: x.stated_total_sek, channel: x.channel };
+  return { verdict: 'rows', rows: x.rows, partial: [...rejected.map((r) => r.name), ...quiet.map((q) => q.name), ...unread], stated_total_sek: x.stated_total_sek, channel: x.channel };
 }
 
 // A list is rows of product (or supplier) with an amount, a quantity or a
@@ -660,7 +703,7 @@ export async function extractPurchasesWithLlm({ pdf = null, text = null, ctx = {
 // no LLM; one it rejects: a skip, no LLM. Anything else (PDF, an xlsx with no
 // signal, a docx) goes to the LLM, unless its text would be truncated.
 // Returns { method, is_list, rows, stated_total_sek, channel, skipped?,
-// partial? } or null when nothing could be read (the failure went to
+// partial?, too_large? } or null when nothing could be read (the failure went to
 // onFailure, or no key).
 export async function extractPurchases({ buffer, filename = '', kommun_namn = null } = {}, { env = process.env, client = null, onFailure = null } = {}) {
   const ctx = { kommun_namn, filename };
@@ -669,6 +712,7 @@ export async function extractPurchases({ buffer, filename = '', kommun_namn = nu
     if (!sheets) { onFailure?.({ permanent: true, reason: 'permanent:office_parse_error', message: 'not a readable xlsx' }); return null; }
     const j = judgeXlsx(sheets, { filename });
     if (j.verdict === 'skip') return { method: 'xlsx', is_list: false, rows: [], stated_total_sek: null, channel: j.channel, skipped: j.reason };
+    if (j.verdict === 'partial') return { method: 'xlsx', is_list: false, rows: [], stated_total_sek: null, channel: j.channel, too_large: j.reason };
     if (j.verdict === 'rows') {
       return { method: 'xlsx', is_list: true, rows: j.rows, stated_total_sek: j.stated_total_sek, channel: j.channel, partial: j.partial };
     }

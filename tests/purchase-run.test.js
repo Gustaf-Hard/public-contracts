@@ -144,6 +144,23 @@ describe('runPurchaseExtraction', () => {
     expect((await runPurchaseExtraction({ db, apply: true })).candidates).toBe(0);
   });
 
+  // Fix wave 3 Q7.
+  it('an oversized channel list is recorded partial with its size, rows none, and is not retried', async () => {
+    const big = [['Namn', 'Värde'], ...Array.from({ length: 2001 }, (_, i) => [`Exempel ${i}`, i])];
+    const a = seed('Skolon export.xlsx', xlsx(big));
+    const create = vi.fn();
+    const res = await runPurchaseExtraction({ db, apply: true, client: { messages: { create } } });
+    expect(create).not.toHaveBeenCalled();
+    expect(res.partial).toBe(1);
+    expect(db.getPurchaseDocument(a)).toMatchObject({ status: 'partial', row_count: 0 });
+    expect(db.getPurchaseDocument(a).last_error).toBe('partial: för stor för automatisk läsning (2002 rader)');
+    expect(db.listPurchaseRows()).toHaveLength(0);
+    expect((await runPurchaseExtraction({ db, apply: true })).candidates).toBe(0);
+    const dry = await runPurchaseExtraction({ db, force: true });
+    expect(dry.partial).toBe(1);
+    expect(dry.would_call_llm).toBe(0);
+  });
+
   it('the dry run reports a skip without writing it', async () => {
     const a = seed('Lista avtal.xlsx', xlsx(REGISTER));
     const res = await runPurchaseExtraction({ db });

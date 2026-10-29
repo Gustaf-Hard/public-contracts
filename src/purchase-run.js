@@ -91,6 +91,12 @@ export async function runPurchaseExtraction({
           log(`purchases DRY #${att.id} (${att.kommun_namn ?? ''}): hoppas över, ${j.reason}`);
           continue;
         }
+        if (j.verdict === 'partial') {
+          result.partial += 1;
+          result.documents.push({ id: att.id, kommun_kod: att.kommun_kod, method: 'xlsx', rows: null, too_large: j.reason, written: false });
+          log(`purchases DRY #${att.id} (${att.kommun_namn ?? ''}): delvis, ${j.reason}`);
+          continue;
+        }
         if (j.verdict === 'rows') {
           if (j.partial.length) result.partial += 1;
           result.documents.push({ id: att.id, kommun_kod: att.kommun_kod, method: 'xlsx', rows: j.rows, stated_total_sek: j.stated_total_sek, partial: j.partial, written: false });
@@ -112,12 +118,14 @@ export async function runPurchaseExtraction({
       continue;
     }
     const partial = out.partial ?? [];
-    db.replacePurchaseRows(att.id, { rows: out.rows, method: out.method, channel: out.channel, stated_total_sek: out.stated_total_sek, isList: out.is_list, partial, skipped: out.skipped ?? null });
+    db.replacePurchaseRows(att.id, { rows: out.rows, method: out.method, channel: out.channel, stated_total_sek: out.stated_total_sek, isList: out.is_list, partial, skipped: out.skipped ?? null, tooLarge: out.too_large ?? null });
     if (out.skipped) result.skipped += 1;
+    else if (out.too_large) result.partial += 1;
     else if (out.is_list) { result.written += 1; if (partial.length) result.partial += 1; } else result.not_list += 1;
-    result.documents.push({ id: att.id, kommun_kod: att.kommun_kod, method: out.method, rows: out.skipped ? null : out.rows, stated_total_sek: out.stated_total_sek, ...(out.skipped ? { skipped: out.skipped } : {}), partial, written: true });
+    result.documents.push({ id: att.id, kommun_kod: att.kommun_kod, method: out.method, rows: out.skipped || out.too_large ? null : out.rows, stated_total_sek: out.stated_total_sek, ...(out.skipped ? { skipped: out.skipped } : {}), ...(out.too_large ? { too_large: out.too_large } : {}), partial, written: true });
     log(out.skipped
       ? `purchases SKIPPED #${att.id} (${att.kommun_namn ?? ''}): ${out.skipped}`
+      : out.too_large ? `purchases PARTIAL #${att.id} (${att.kommun_namn ?? ''}): ${out.too_large}`
       : `purchases ${out.is_list ? 'WROTE' : 'NOT A LIST'} #${att.id} (${att.kommun_namn ?? ''}): ${out.rows.length} rader, ${out.method}${partial.length ? `, delvis (oläst blad: ${partial.join(', ')})` : ''}`);
   }
 
