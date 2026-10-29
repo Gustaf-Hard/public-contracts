@@ -266,14 +266,16 @@ function readTable(sheet, { filename }) {
   return { rows: out, total, map, header: rows[h], above, docChannel };
 }
 
-// A row's full identity (fix wave 2 E4): its order reference when it has
-// one, else every field that can tell two orders apart. Equal supplier and
-// product is not a repeat: a later läsår, another budget unit or a new order
-// has its own row.
+// A row's full identity (fix wave 2 E4): every field that can tell two
+// orders apart. Equal supplier and product is not a repeat: a later läsår,
+// another budget unit or a new order has its own row. With an order
+// reference (fix wave 3 Q4) the identity is the reference plus product,
+// amount, period and quantity, never the reference alone: one order (or
+// invoice) number can carry several products with no line column.
 const dupKey = (r) => (r.order_ref
-  ? `ref\u0000${normName(r.order_ref)}`
-  : [normName(r.supplier), normName(r.product), r.amount_sek, r.period_start, r.period_end, r.quantity, r.school_year, r.order_date]
-    .map((v) => (v == null ? '' : String(v))).join('\u0000'));
+  ? ['ref', normName(r.order_ref), normName(r.product), r.amount_sek, r.period_start, r.period_end, r.quantity]
+  : [normName(r.supplier), normName(r.product), r.amount_sek, r.period_start, r.period_end, r.quantity, r.school_year, r.order_date])
+  .map((v) => (v == null ? '' : String(v))).join('\u0000');
 
 // Every recognisable table in the workbook. A later sheet that repeats a row
 // already read (the same identity: a summary tab of the first) adds only its

@@ -203,11 +203,27 @@ describe('extractXlsxPurchases', () => {
     expect(out.rows.filter((r) => r.supplier === 'NE').map((r) => r.school_year)).toEqual(['2023/24', '2024/25']);
   });
 
-  it('an order reference is the identity when there is one', () => {
+  it('an order reference with the same line is a repeat; the supplier spelling does not matter', () => {
     const a = sheet([['Ordernummer', 'Leverantör', 'Produkt', 'Belopp'], ['EX-1', 'Binogi', 'Binogi', 100], ['EX-2', 'Binogi', 'Binogi', 100]], 'Ordrar');
-    const b = sheet([['Ordernummer', 'Leverantör', 'Produkt', 'Belopp'], ['EX-1', 'Binogi', 'Binogi licens', 100], ['EX-3', 'Binogi', 'Binogi', 100]], 'Kopia');
+    const b = sheet([['Ordernummer', 'Leverantör', 'Produkt', 'Belopp'], ['EX-1', 'Binogi AB', 'Binogi', 100], ['EX-3', 'Binogi', 'Binogi', 100]], 'Kopia');
     const out = extractXlsxPurchases([a, b], { filename: 'x.xlsx' });
     expect(out.rows.map((r) => r.order_ref)).toEqual(['EX-1', 'EX-2', 'EX-3']);
+  });
+
+  // Fix wave 3 Q4: order_ref alone is never the identity.
+  it('two products under one order reference on different sheets are both kept', () => {
+    const a = sheet([['Ordernummer', 'Leverantör', 'Produkt', 'Antal', 'Belopp'], ['EX-1', 'Binogi', 'Binogi', 10, 100]], 'Ordrar');
+    const b = sheet([['Ordernummer', 'Leverantör', 'Produkt', 'Antal', 'Belopp'], ['EX-1', 'ILT Education', 'Polyglutt', 20, 200]], 'Fler');
+    const out = extractXlsxPurchases([a, b], { filename: 'x.xlsx' });
+    expect(out.rows.map((r) => [r.order_ref, r.product, r.amount_sek])).toEqual([['EX-1', 'Binogi', 100], ['EX-1', 'Polyglutt', 200]]);
+  });
+
+  it('one order reference with another amount, quantity or period is another line', () => {
+    const head = ['Ordernummer', 'Leverantör', 'Produkt', 'Antal', 'Belopp', 'Startdatum', 'Slutdatum'];
+    const a = sheet([head, ['EX-1', 'Binogi', 'Binogi', 10, 100, '2025-08-01', '2026-07-31']], 'A');
+    const b = sheet([head, ['EX-1', 'Binogi', 'Binogi', 10, 120, '2025-08-01', '2026-07-31'], ['EX-1', 'Binogi', 'Binogi', 12, 100, '2025-08-01', '2026-07-31'], ['EX-1', 'Binogi', 'Binogi', 10, 100, '2026-08-01', '2027-07-31'], ['EX-1', 'Binogi', 'Binogi', 10, 100, '2025-08-01', '2026-07-31']], 'B');
+    const out = extractXlsxPurchases([a, b], { filename: 'x.xlsx' });
+    expect(out.rows).toHaveLength(4);
   });
 
   it('says unrecognised when no sheet has a usable header', () => {
