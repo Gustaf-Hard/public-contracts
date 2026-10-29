@@ -28,3 +28,27 @@ describe('ärende page probe fold', () => {
     expect(html).not.toMatch(/<details class="probe-fold">/);
   });
 });
+
+// Fix wave 2 P7: the fold is computed now, the open draft was written then.
+// A name the draft still asks about that the probe has since struck is
+// flagged, so the operator edits before approving.
+describe('ärende page probe fold: names struck since the draft', () => {
+  const probe = {
+    categories: [{ category: 'laromedel', label: 'Läromedel', names: ['Skolplus'] }],
+    struck: [{ name: 'Binogi', reason: 'nämns i kommunens underlag' }, { name: 'NE', reason: 'avtal finns' }],
+  };
+  const body = 'Hej,\n\nStämmer det att kommunen inte har avtal för något av följande?\n\n- Läromedel: Binogi, Skolplus eller liknande\n- Prov och bedömning: DigiExam\n\nNE har vi redan.\n';
+
+  it('warns with the count, the names and their reasons', () => {
+    const html = renderArenden({ cases: [], selected: { ...selected(probe), escalations: [{ id: 1, draft_body: body, draft_template: 'T_CROSSCHECK' }] }, selectedId: 7 });
+    expect(html).toContain('1 namn i utkastet är nu strukna: Binogi (nämns i kommunens underlag)');
+    // NE is only in the prose, not on a probe line: not flagged.
+    expect(html).not.toMatch(/NE \(avtal finns\)/);
+  });
+
+  it('labels the fold as computed now, and says nothing when the draft is still current', () => {
+    const html = renderArenden({ cases: [], selected: { ...selected(probe), escalations: [{ id: 1, draft_body: '- Läromedel: Skolplus' }] }, selectedId: 7 });
+    expect(html).toMatch(/Probe-listan \(beräknad nu\)/);
+    expect(html).not.toMatch(/är nu strukna/);
+  });
+});

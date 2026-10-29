@@ -376,6 +376,35 @@ export function renderProbeList(probe) {
     .join('\n');
 }
 
+// The names a drafted probe asks about: every "- Label: A, B eller liknande"
+// line of a draft body. Prose is not read, only probe lines.
+export function probeNamesInDraft(body) {
+  const out = [];
+  for (const line of String(body ?? '').split(/\r?\n/)) {
+    const m = /^- [^:]+: (.+)$/.exec(line.trim());
+    if (!m) continue;
+    for (const n of m[1].replace(/ eller liknande$/, '').split(', ')) if (n.trim()) out.push(n.trim());
+  }
+  return out;
+}
+
+// Fix wave 2 P7: a draft's probe is a snapshot; the probe now may have struck
+// names the draft still asks about (a newer delivery, a purchase list). Which
+// of the draft's names the CURRENT probe strikes, with the reason.
+export function struckSinceDraft(probe, bodies = []) {
+  const reasons = new Map((probe?.struck ?? []).map((x) => [x.name, x.reason]));
+  const seen = new Set();
+  const out = [];
+  for (const b of bodies) {
+    for (const name of probeNamesInDraft(b)) {
+      if (seen.has(name) || !reasons.has(name)) continue;
+      seen.add(name);
+      out.push({ name, reason: reasons.get(name) });
+    }
+  }
+  return out;
+}
+
 // Unreadable stats mean unknown skolformer: the probe keeps asking.
 function safeStats() {
   try { return loadKommunStats(); } catch { return null; }

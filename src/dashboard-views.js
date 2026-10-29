@@ -14,7 +14,7 @@ import {
   UNKNOWN,
 } from '../public/explorer-core.js';
 import { STAGES } from './pipeline.js';
-import { renderProbeList } from './probe-list.js';
+import { renderProbeList, struckSinceDraft } from './probe-list.js';
 import { CATEGORY_LABELS } from './vendor-kb.js';
 import { GRADE_LEVELS, slugifyProductName } from './vendor-analytics.js';
 import { matchResellers, RESELLERS } from './resellers.js';
@@ -439,6 +439,7 @@ const baseCss = `
   details.probe-fold > summary { cursor: pointer; }
   details.probe-fold .probe-lines { white-space: pre-wrap; margin: 8px 0; font: inherit; }
   details.probe-fold .probe-struck { margin: 4px 0 0; padding-left: 18px; }
+  .probe-stale { margin: 12px 0 0; padding: 8px 10px; border-left: 3px solid var(--warn); font-size: 13px; }
   details.queue-fold > summary { cursor: pointer; list-style: none; }
   details.queue-fold > summary::-webkit-details-marker { display: none; }
   details.queue-fold[open] > summary { margin-bottom: 8px; }
@@ -2422,20 +2423,27 @@ function renderCaseDetailPane(selected, gmailReady) {
     ${replyBoxes}
     ${blankReply ? '' : blankReplyHtml}
     ${renderHandoffSuggestions(handoff_targets, conv.id, gmailReady)}
-    ${renderProbeFold(probe)}
+    ${renderProbeFold(probe, escalations)}
     ${renderCaseActions(conv, gmailReady, returnTo)}
   </div>`;
 }
 
 // The probe list (src/probe-list.js) a T_REQUEST_MISSING / T_CROSSCHECK draft
-// asks, and why each other catalogue name was struck, folded away.
-function renderProbeFold(probe) {
+// asks, and why each other catalogue name was struck, folded away. It is
+// computed NOW; an open draft carries the probe as of when it was written, so
+// names the draft still asks about that are struck by now are flagged above
+// the fold (fix wave 2 P7): the operator edits before approving.
+function renderProbeFold(probe, escalations = []) {
   if (!probe) return '';
   const asked = (probe.categories ?? []).reduce((n, c) => n + (c.names?.length ?? 0) + (c.more ?? 0), 0);
   const struck = probe.struck ?? [];
   const lines = renderProbeList(probe);
-  return `<details class="probe-fold">
-    <summary class="muted">Probe-listan: ${asked} frågas, ${struck.length} strukna</summary>
+  const stale = struckSinceDraft(probe, (escalations ?? []).map((e) => e?.draft_body).filter(Boolean));
+  const warn = stale.length
+    ? `<p class="probe-stale">${stale.length} namn i utkastet är nu strukna: ${stale.map((x) => `${escapeHtml(x.name)} (${escapeHtml(x.reason)})`).join(', ')}</p>`
+    : '';
+  return `${warn}<details class="probe-fold">
+    <summary class="muted">Probe-listan (beräknad nu): ${asked} frågas, ${struck.length} strukna</summary>
     ${lines ? `<pre class="probe-lines">${escapeHtml(lines)}</pre>` : '<p class="muted">Inget kvar att fråga om.</p>'}
     ${struck.length ? `<ul class="probe-struck">${struck.map((x) => `<li><strong>${escapeHtml(x.name)}</strong>: ${escapeHtml(x.reason)}</li>`).join('')}</ul>` : ''}
   </details>`;
