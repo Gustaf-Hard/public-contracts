@@ -137,20 +137,25 @@ function mentionCompanies(m) {
 
 // Which skolformer the kommun runs schools in, from the kommun-stats snapshot
 // (src/kommun-stats.js, elever in kommunal regi). A kommun missing from a
-// Skolverket export that loaded fine has no school of that form (false); a
+// Skolverket export that loaded fine, or below the form's minimum (see
+// MIN_GYMNASIE_ELEVER), has no school of that form (false); a
 // failed source, or a kommun not in the snapshot, is unknown (null).
+// Operator decision 2026-10-29: fewer than this many gymnasieskola elever in
+// kommunal regi is most likely introduktionsprogram only, not a gymnasieskola
+// with its own lärplattform, so the probe treats it as no school.
+export const MIN_GYMNASIE_ELEVER = 50;
+
 const FORM_SOURCES = {
-  grundskola: { levels: ['1-3', '4-6', '7-9'], source: 'siris_6_grundskola' },
-  gymnasiet: { levels: ['Gymnasiet'], source: 'siris_57_gymnasieskola' },
+  grundskola: { levels: ['1-3', '4-6', '7-9'], source: 'siris_6_grundskola', min: 1 },
+  gymnasiet: { levels: ['Gymnasiet'], source: 'siris_57_gymnasieskola', min: MIN_GYMNASIE_ELEVER },
 };
 export function skolformerFromStats(stats, kommunKod) {
   const rec = stats?.get?.(String(kommunKod)) ?? null;
   const out = {};
-  for (const [form, { levels, source }] of Object.entries(FORM_SOURCES)) {
+  for (const [form, { levels, source, min }] of Object.entries(FORM_SOURCES)) {
     if (!rec) { out[form] = null; continue; }
-    const vals = levels.map((l) => rec.elever?.[l]);
-    if (vals.some((v) => typeof v === 'number' && v > 0)) out[form] = true;
-    else if (vals.some((v) => v === 0) && vals.every((v) => v == null || v === 0)) out[form] = false;
+    const nums = levels.map((l) => rec.elever?.[l]).filter((v) => typeof v === 'number' && Number.isFinite(v));
+    if (nums.length) out[form] = nums.reduce((a, b) => a + b, 0) >= min;
     else out[form] = stats.data?.sources?.[source]?.status === 'ok' ? false : null;
   }
   return out;

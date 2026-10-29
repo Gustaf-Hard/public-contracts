@@ -2,7 +2,8 @@
 // catalogue, minus everything this kommun has shown us. Hand-written fixtures
 // only: the repo is public, so no real kommun data.
 import { describe, it, expect } from 'vitest';
-import { buildProbeList, renderProbeList, collectMentions, skolformerFromStats, PROBE_CAP } from '../src/probe-list.js';
+import { buildProbeList, renderProbeList, collectMentions, skolformerFromStats, PROBE_CAP, MIN_GYMNASIE_ELEVER } from '../src/probe-list.js';
+import { classifyVendor } from '../src/catalogue.js';
 import { loadKommunStats } from '../src/kommun-stats.js';
 
 const K = '9001';
@@ -249,5 +250,24 @@ describe('buildProbeList: skolformer the kommun does not run', () => {
       const probe = buildProbeList({ kommunKod: K, contracts: [avtal(1, 'Unikum', ['Unikum'])], skolformer });
       expect(entries(probe, 'larplattform')[0].note).toBe('för gymnasiet');
     }
+  });
+});
+
+describe('buildProbeList: operator decisions 2026-10-29', () => {
+  const statsWith = (gy) => loadKommunStats({ data: {
+    sources: { siris_6_grundskola: { status: 'ok' }, siris_57_gymnasieskola: { status: 'ok' } },
+    kommuner: { 9001: { elever: { '1-3': 200, '4-6': 210, '7-9': 190, Gymnasiet: gy } } },
+  } });
+
+  it(`fewer than ${MIN_GYMNASIE_ELEVER} gymnasieskola elever counts as no kommunal gymnasieskola`, () => {
+    expect(MIN_GYMNASIE_ELEVER).toBe(50);
+    expect(skolformerFromStats(statsWith(49), '9001').gymnasiet).toBe(false);
+    expect(skolformerFromStats(statsWith(50), '9001').gymnasiet).toBe(true);
+  });
+
+  it('never probes Microsoft, Google Workspace or Adobe, but the catalogue still knows them', () => {
+    const names = allNames(buildProbeList({ kommunKod: K }));
+    for (const n of ['Microsoft', 'Google Workspace', 'Google', 'Adobe']) expect(names).not.toContain(n);
+    for (const v of ['Microsoft', 'Google', 'Adobe']) expect(classifyVendor(v)).toMatchObject({ role: 'service' });
   });
 });

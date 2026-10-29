@@ -614,8 +614,8 @@ skolon.products = [
 //               (member associations, hotel booking, alarms, companies whose
 //               offer we do not know). Never probed.
 //   probeCategory  show the company under another studio category than its
-//               own (Microsoft and Google are office suites, not the
-//               kommun's one lärplattform: they go under Övrigt).
+//               own. (Unused since Microsoft, Google and Adobe became
+//               probe:false; kept for the next such case.)
 //   functions   what the company's system does for a kommun, PRIMARY FIRST.
 //               Every function below is exclusive: a kommun normally has one
 //               supplier for it. A held avtal covers the functions of the
@@ -668,8 +668,11 @@ const PROBE = {
   meitner: { functions: ['larplattform', 'elevregister'] },
   showbie: { functions: ['larplattform'] },
   aleido: { functions: ['larplattform'] },
-  microsoft: { probeCategory: 'ovrigt' },
-  google: { probeName: 'Google Workspace', probeCategory: 'ovrigt' },
+  // Operator decision 2026-10-29: office licences, not the school market.
+  // Still catalogued and recognised everywhere else; only never probed.
+  microsoft: { probe: false },
+  google: { probe: false },
+  adobe: { probe: false },
   tietoevry: { probeName: 'Tietoevry (Edlevo)', functions: ['elevregister', 'franvaro', 'barnomsorg', 'vuxenutbildning'], products: { 'Lifecare': [] } },
   ist: {
     functions: ['elevregister', 'franvaro', 'schema', 'barnomsorg', 'vuxenutbildning'],
