@@ -14,6 +14,7 @@ import {
   UNKNOWN,
 } from '../public/explorer-core.js';
 import { STAGES } from './pipeline.js';
+import { renderProbeList } from './probe-list.js';
 import { CATEGORY_LABELS } from './vendor-kb.js';
 import { GRADE_LEVELS, slugifyProductName } from './vendor-analytics.js';
 import { matchResellers, RESELLERS } from './resellers.js';
@@ -434,6 +435,10 @@ const baseCss = `
   .queue-more { display: block; margin-top: 8px; font-size: 12px; color: var(--fg-muted); }
   .queue-more:hover { color: var(--fg); }
   details.queue-fold { background: none; padding: 0; margin: 0; }
+  details.probe-fold { margin: 12px 0; font-size: 13px; }
+  details.probe-fold > summary { cursor: pointer; }
+  details.probe-fold .probe-lines { white-space: pre-wrap; margin: 8px 0; font: inherit; }
+  details.probe-fold .probe-struck { margin: 4px 0 0; padding-left: 18px; }
   details.queue-fold > summary { cursor: pointer; list-style: none; }
   details.queue-fold > summary::-webkit-details-marker { display: none; }
   details.queue-fold[open] > summary { margin-bottom: 8px; }
@@ -2350,7 +2355,7 @@ function renderBlankReplyBox({ conv, seed = '', to = '', subject = '', gmailRead
 
 function renderCaseDetailPane(selected, gmailReady) {
   if (!selected) return '<div class="detail-empty"><p class="muted">Välj ett ärende i listan till vänster.</p></div>';
-  const { conv, messages, attachmentsByMsg, signatures, escalations, parked_escalations = [], deferred_escalations = [], threads = [], handoff_targets = [], needs_draft = false, draft_seed = '', draft_to = '', draft_subject = '', follow_up } = selected;
+  const { conv, messages, attachmentsByMsg, signatures, escalations, parked_escalations = [], deferred_escalations = [], threads = [], handoff_targets = [], needs_draft = false, draft_seed = '', draft_to = '', draft_subject = '', follow_up, probe = null } = selected;
   const returnTo = `/arenden/${conv.id}`;
   const duration = caseDuration(conv, messages);
   const fuBadge = fmtFollowUpBadge(follow_up?.date, follow_up?.source);
@@ -2417,8 +2422,23 @@ function renderCaseDetailPane(selected, gmailReady) {
     ${replyBoxes}
     ${blankReply ? '' : blankReplyHtml}
     ${renderHandoffSuggestions(handoff_targets, conv.id, gmailReady)}
+    ${renderProbeFold(probe)}
     ${renderCaseActions(conv, gmailReady, returnTo)}
   </div>`;
+}
+
+// The probe list (src/probe-list.js) a T_REQUEST_MISSING / T_CROSSCHECK draft
+// asks, and why each other catalogue name was struck, folded away.
+function renderProbeFold(probe) {
+  if (!probe) return '';
+  const asked = (probe.categories ?? []).reduce((n, c) => n + (c.names?.length ?? 0) + (c.more ?? 0), 0);
+  const struck = probe.struck ?? [];
+  const lines = renderProbeList(probe);
+  return `<details class="probe-fold">
+    <summary class="muted">Probe-listan: ${asked} frågas, ${struck.length} strukna</summary>
+    ${lines ? `<pre class="probe-lines">${escapeHtml(lines)}</pre>` : '<p class="muted">Inget kvar att fråga om.</p>'}
+    ${struck.length ? `<ul class="probe-struck">${struck.map((x) => `<li><strong>${escapeHtml(x.name)}</strong>: ${escapeHtml(x.reason)}</li>`).join('')}</ul>` : ''}
+  </details>`;
 }
 
 // The kommun redirected us. Offer one ärende per address it named, with the two

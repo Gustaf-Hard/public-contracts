@@ -267,3 +267,17 @@ export function renderProbeList(probe) {
     .map((c) => `- ${c.label}${c.note ? ` ${c.note}` : ''}: ${c.names.join(', ')}${c.more ? ' eller liknande' : ''}`)
     .join('\n');
 }
+
+// The one IO wrapper: the probe for one kommun read from an open pilot DB
+// (src/storage.js). Contracts and purchase rows are fleet-wide so each
+// category follows footprint; mentions are the kommun's own, across all its
+// conversations (an avtal a handoff conversation delivered is still held).
+export function probeFromDb(db, kommunKod) {
+  return buildProbeList({
+    kommunKod,
+    contracts: db.listContractFacts(),
+    purchaseRows: db.listPurchaseRows(),
+    coverage: db.listCoverage(),
+    mentions: collectMentions(db.listContractInfoForKommun(kommunKod)),
+  });
+}

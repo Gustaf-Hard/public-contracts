@@ -38,6 +38,7 @@ import {
   mergeContacts,
 } from './dashboard-views.js';
 import { resellerBySlug } from './resellers.js';
+import { probeFromDb } from './probe-list.js';
 import {
   buildContractFacts, buildVendorRollups, buildMarketSummary, buildProductRollups,
   buildProductCoverageByKommun, slugifyProductName, companyFacts,
@@ -1216,6 +1217,10 @@ export function createDashboardApp({
   app.get('/arenden/:id', (req, res) => {
     const cases = loadCaseSummaries(db);
     const detail = loadCaseDetail(db, parseInt(req.params.id, 10), kommunByKod);
+    // Display only: a probe that cannot be computed hides its fold, never the page.
+    if (detail) {
+      try { detail.probe = probeFromDb(db, detail.conv.kommun_kod); } catch { detail.probe = null; }
+    }
     res.set('Content-Type', 'text/html; charset=utf-8');
     if (!detail) {
       return res.status(404).send(renderArenden({

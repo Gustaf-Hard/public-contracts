@@ -2,7 +2,7 @@ import { T_INITIAL, T_PRECISION, T_RECEIPT, T_FOLLOWUP_NUDGE, T_FOLLOWUP_CLOSE, 
 import { REQUEUED_REASON_PREFIX } from './storage.js';
 import { computeKommunReview } from './contract-lifecycle.js';
 import { matchWatchlist } from './watchlist.js';
-import { buildProbeList, collectMentions } from './probe-list.js';
+import { probeFromDb } from './probe-list.js';
 import { parseHandoffTargets } from './handoff.js';
 import { buildCoverageFacts } from './coverage.js';
 import { classify, isCloserText } from './classifier.js';
@@ -36,20 +36,9 @@ function isRequeuedDraft(esc, log) {
   return requeued;
 }
 
-// The follow-up probe for one kommun (2026-10-29): the whole catalogue minus
-// what this kommun has shown us. Contracts and purchase rows are fleet-wide so
-// each category is ordered by footprint; mentions are the kommun's own, across
-// all its conversations. Kommun-wide, not per conversation: an avtal a handoff
-// conversation delivered is still held.
-function probeForKommun(db, conv) {
-  return buildProbeList({
-    kommunKod: conv.kommun_kod,
-    contracts: db.listContractFacts(),
-    purchaseRows: db.listPurchaseRows(),
-    coverage: db.listCoverage(),
-    mentions: collectMentions(db.listContractInfoForKommun(conv.kommun_kod)),
-  });
-}
+// The follow-up probe for one kommun (src/probe-list.js): kommun-wide, not
+// per conversation.
+const probeForKommun = (db, conv) => probeFromDb(db, conv.kommun_kod);
 
 function fromHeader(env) {
   return `${env.GMAIL_FROM_NAME} <${env.GMAIL_USER_EMAIL}>`;
