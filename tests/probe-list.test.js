@@ -28,7 +28,10 @@ describe('buildProbeList: the Bollebygd-like shape', () => {
       avtal(3, 'SchoolSoft', ['SchoolSoft EA', 'Elevadministration skola', 'Barnadministration förskola']),
     ],
     coverage: cov(3, '1-3', '4-6', '7-9', 'Gymnasiet'),
-    purchaseRows: ['Natur & Kultur', 'Liber', 'Sanoma Utbildning', 'Selessia AB (Nomp)', 'Musikoteket AB', 'Bitopia AB'].map((s) => bought(s)),
+    // Suppliers match a catalogue alias exactly (fix wave 2 E2); Nomp is
+    // named on the product line, as a Skolon order row does.
+    purchaseRows: [...['Natur & Kultur', 'Liber', 'Sanoma Utbildning', 'Musikoteket AB', 'Bitopia AB'].map((s) => bought(s)),
+      { kommun_kod: K, supplier: 'Selessia AB', product: 'Nomp', channel: 'skolon' }],
   });
 
   it('lists the läromedel nobody has shown us, by the name a kommun knows', () => {

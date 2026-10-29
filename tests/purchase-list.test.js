@@ -223,9 +223,23 @@ describe('classifyPurchaseRow', () => {
     expect(c.channel_slug).toBe('skolon');
   });
 
-  it('a supplier-only row is the supplier\'s, and a supplier name can name the product', () => {
+  it('a supplier-only row is the supplier\'s when the name IS a catalogue alias', () => {
     expect(classifyPurchaseRow({ supplier: 'Gleerups Utbildning AB', product: null })).toMatchObject({ company_slug: 'gleerups', product_slug: null });
-    expect(classifyPurchaseRow({ supplier: 'Exempel AB/ Matteappen Magma', product: null })).toMatchObject({ company_slug: 'radish', product_slug: 'magma' });
+    expect(classifyPurchaseRow({ supplier: 'Binogi Sverige AB', product: null }).company_slug).toBe('binogi');
+    expect(classifyPurchaseRow({ supplier: 'Nomp, AB.', product: null }).company_slug).toBe('nomp');
+  });
+
+  // Fix wave 2 E2: a ledger's payee column is unconstrained text. Only exact
+  // equality with an alias (after AB/Aktiebolag/Sverige/Sweden and
+  // punctuation) attributes a row; the product field may still be classified.
+  it('a supplier name that merely contains a catalogue word matches nothing', () => {
+    for (const supplier of ['Exempel Elfirma Stig AB', 'Stig Exempelbygg AB', 'Magma Exempelbygg AB', 'Clio Exempelfastigheter AB', 'Tyra Exempelsdotter', 'Exempelhotellet AB', 'Exempel AB/ Matteappen Magma']) {
+      expect(classifyPurchaseRow({ supplier, product: null }).company_slug, supplier).toBeNull();
+    }
+  });
+
+  it('the product field is still classified', () => {
+    expect(classifyPurchaseRow({ supplier: 'Exempel AB', product: 'Matteappen Magma' })).toMatchObject({ company_slug: 'radish', product_slug: 'magma' });
   });
 
   it('the channel\'s own product stays the channel\'s', () => {

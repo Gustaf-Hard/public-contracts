@@ -362,15 +362,29 @@ export function normalisePurchaseRow(raw = {}, { channel = null } = {}) {
 // ---------------------------------------------------------------- catalogue
 
 const OWNER_KINDS = new Set(['product', 'bundle', 'unresolved', 'segment', 'addon']);
+
+// Fix wave 2 E2: the supplier column of a list can be anything (a ledger's
+// payees, a private person), so a supplier names a catalogue company only by
+// EXACT equality with one of its aliases, after lower case, punctuation and
+// the company-form words (AB, Aktiebolag, Sverige, Sweden) are stripped. No
+// token or substring matching: "Magma Exempelbygg AB" is not Magma.
+const FORM_WORDS = /(?:^| )(ab|aktiebolag|sverige|sweden)$/;
+export function supplierCompany(raw) {
+  if (blank(raw)) return null;
+  let n = normName(raw);
+  while (FORM_WORDS.test(n)) n = n.replace(FORM_WORDS, '').trim();
+  return n ? classifyVendor(n) : null;
+}
 const productCategory = (slug) => productBySlug(slug)?.product.category ?? null;
 
 // The catalogue company and product a row is about. Bought through a channel,
 // a row belongs to the product's owner: the line is classified without the
 // channel as owner, or every unknown title would become the channel's own
 // platform. A supplier that is not a channel owns the row when the product
-// line names nobody else.
+// line names nobody else. The supplier is matched strictly (supplierCompany);
+// only the PRODUCT text goes through classifyLine.
 export function classifyPurchaseRow(row = {}) {
-  const vendor = blank(row.supplier) ? null : classifyVendor(row.supplier);
+  const vendor = supplierCompany(row.supplier);
   const supplierIsChannel = vendor?.role === 'channel';
   const channel = CHANNELS.includes(row.channel) ? row.channel : supplierIsChannel ? vendor.slug : channelFrom(row.supplier);
   const owner = vendor && !supplierIsChannel ? vendor.slug : null;
@@ -386,14 +400,6 @@ export function classifyPurchaseRow(row = {}) {
     }
   }
   if (!company && owner) company = owner;
-  if (!company && !supplierIsChannel && !blank(row.supplier)) {
-    const r = classifyLine(null, row.supplier);
-    if (OWNER_KINDS.has(r.kind) && r.companySlug) {
-      company = r.companySlug;
-      if (r.kind === 'product') product = r.productSlug ?? null;
-      kind = r.kind;
-    }
-  }
   // A channel's own product only when the line names it (Skolon's platform).
   if (!company && supplierIsChannel && blank(row.product)) company = null;
   const c = company ? companyBySlug(company) : null;
