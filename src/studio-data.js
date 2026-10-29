@@ -752,9 +752,10 @@ export function elevCoverage(facts, stats, { category } = {}) {
   const eleverOf = (kod) => stats.eleverIn(kod, COVERAGE_GRADES);
   let total = 0;
   let totalUnknown = 0;
+  let totalKnown = 0;
   for (const r of stats.all()) {
     const n = eleverOf(r.kod);
-    if (isFiniteNum(n)) total += n; else totalUnknown++;
+    if (isFiniteNum(n)) { total += n; totalKnown++; } else totalUnknown++;
   }
   let covered = 0;
   let unknown = 0;
@@ -769,6 +770,8 @@ export function elevCoverage(facts, stats, { category } = {}) {
     elever_covered: covered,
     elever_total: total,
     total_unknown: totalUnknown,
+    // The basis of the share when any kommun's elevantal is unknown (S1).
+    kommuner_known_total: totalKnown,
     share: total > 0 ? Math.min(1, covered / total) : null,
   };
 }

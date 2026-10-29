@@ -77,15 +77,23 @@ describe('floor and coverage copy', () => {
     expect(floorText(null)).toBe('värde okänt');
   });
 
-  it('coverage names the school form and the basis', () => {
+  // Fix wave 2 S1: the fixture has one kommun (Fyrby) with unknown elever,
+  // so every share states its basis, never an unqualified national figure.
+  it('coverage names the school form and, when any kommun is unknown, its basis', () => {
     const c = elevCoverage([fact('9001'), fact('9002')], stats);
-    expect(elevCoverageText(c)).toBe('Kommunerna med avtal i underlaget har 30 % av eleverna i grundskolan');
-    expect(elevCoverageText(c, { who: 'Kommunerna med avtal i läromedel' })).toBe('Kommunerna med avtal i läromedel har 30 % av eleverna i grundskolan');
+    expect(c.kommuner_known_total).toBe(4);
+    expect(elevCoverageText(c)).toBe('Kommunerna med avtal i underlaget har 30 % av eleverna i grundskolan i de 4 kommuner där elevantalet är känt');
+    expect(elevCoverageText(c, { who: 'Kommunerna med avtal i läromedel' })).toBe('Kommunerna med avtal i läromedel har 30 % av eleverna i grundskolan i de 4 kommuner där elevantalet är känt');
+  });
+
+  it('with every elevantal known the share needs no basis', () => {
+    const known = loadKommunStats({ data: { kommuner: { '9001': { namn: 'Ettby', elever: E() }, '9003': { namn: 'Treby', elever: E() } } } });
+    expect(elevCoverageText(elevCoverage([fact('9001')], known))).toBe('Kommunerna med avtal i underlaget har 50 % av eleverna i grundskolan');
   });
 
   it('coverage says when a kommun with avtal has unknown elever', () => {
     const c = elevCoverage([fact('9001'), fact('9004')], stats);
-    expect(elevCoverageText(c)).toBe('Kommunerna med avtal i underlaget har 10 % av eleverna i grundskolan, 1 kommun utan känt elevantal räknas inte');
+    expect(elevCoverageText(c)).toBe('Kommunerna med avtal i underlaget har 10 % av eleverna i grundskolan i de 4 kommuner där elevantalet är känt, 1 kommun utan känt elevantal räknas inte');
   });
 
   it('unknown coverage is "okänd", never 0 %', () => {

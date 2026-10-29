@@ -86,10 +86,12 @@ export function topThree(facts, category) {
   return companyShares(facts, { category }).slice(0, 3).map((s) => ({ name: s.name, share: s.n_known ? s.share_value : null }));
 }
 
-// "67 % av eleverna i grundskolan" for a card; unknown stays unknown.
+// "67 % av eleverna i grundskolan" for a card; unknown stays unknown. With
+// any kommun's elevantal unknown, the share states its basis (S1).
 function elevShareShort(cov) {
   if (!cov || !isNum(cov.share)) return 'elevtäckning okänd';
-  return `${fmtPct(cov.share)} av eleverna i grundskolan${cov.kommuner_unknown ? `, ${nOf(cov.kommuner_unknown, 'kommun', 'kommuner')} utan känt elevantal` : ''}`;
+  const basis = cov.total_unknown > 0 && isNum(cov.kommuner_known_total) ? ` i ${nOf(cov.kommuner_known_total, 'kommun', 'kommuner')} med känt elevantal` : '';
+  return `${fmtPct(cov.share)} av eleverna i grundskolan${basis}${cov.kommuner_unknown ? `, ${nOf(cov.kommuner_unknown, 'kommun', 'kommuner')} utan känt elevantal` : ''}`;
 }
 
 export function categoryCards({ facts, stats = null, includeEmpty = false }) {
