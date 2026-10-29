@@ -441,3 +441,41 @@ describe('fix wave 3 Q1: every company a line or mention names is struck', () =>
     expect(allNames(probe)).not.toContain('Tietoevry (Edlevo)');
   });
 });
+
+// Fix wave 3 Q9: a product no coverage row names takes the whole avtal's
+// skolformer, unless its own name says which.
+describe('fix wave 3 Q9: an unnamed product falls back to the whole avtal', () => {
+  const covP = (contractId, product, level) => ({ contract_id: contractId, product_name: product, grade_level: level, status: 'full' });
+  const both = { grundskola: true, gymnasiet: true };
+
+  it('NE Digitala prov in an NE 360 avtal whose rows cover gymnasiet settles prov for gymnasiet', () => {
+    const probe = buildProbeList({
+      kommunKod: K, skolformer: both,
+      contracts: [avtal(1, 'NE', ['NE 360', 'Digitala prov'])],
+      coverage: [covP(1, 'NE 360', '7-9'), covP(1, 'NE 360', 'Gymnasiet')],
+    });
+    expect(entries(probe, 'prov').filter((e) => e.note)).toEqual([]);
+    expect(namesIn(probe, 'prov')).not.toContain('DigiExam');
+    expect(reasonFor(probe, 'DigiExam')).toMatch(/digitala prov finns redan via NE/);
+  });
+
+  it('IST Lärande in an IST avtal whose rows name only IST Administration takes those rows', () => {
+    const probe = buildProbeList({
+      kommunKod: K, skolformer: both,
+      contracts: [avtal(1, 'IST', ['IST Administration', 'IST Lärande'])],
+      coverage: [covP(1, 'IST Administration', '1-3'), covP(1, 'IST Administration', 'Introduktionsprogrammet')],
+    });
+    expect(entries(probe, 'larplattform')).toEqual([]);
+  });
+
+  it('a product whose own name gives its skolform keeps it: IST Lärande Grundskola still leaves gymnasiet open', () => {
+    const probe = buildProbeList({
+      kommunKod: K, skolformer: both,
+      contracts: [avtal(1, 'IST', ['IST Administration', 'IST Lärande Grundskola'])],
+      coverage: [covP(1, 'IST Administration', '7-9'), covP(1, 'IST Administration', 'Gymnasiet')],
+    });
+    const lp = entries(probe, 'larplattform');
+    expect(lp).toHaveLength(1);
+    expect(lp[0].note).toBe('för gymnasiet');
+  });
+});

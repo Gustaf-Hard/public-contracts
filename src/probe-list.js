@@ -181,8 +181,9 @@ function contractUnits(c, lines = []) {
 // The skolformer each unit of one avtal covers. A coverage row that names a
 // product (or company) of the avtal covers that unit only (fix wave 2 P5); a
 // row that names nothing we can place covers every unit, as before. A unit's
-// own product name adds its levels ("Unikum gymnasiet"). Unknown counts as
-// grundskolan only; rows that name only other levels (förskola, komvux) cover
+// own product name adds its levels ("Unikum gymnasiet"). A unit no row names
+// and whose name gives no level takes the whole avtal (fix wave 3 Q9).
+// Unknown counts as grundskolan only; rows that name only other levels (förskola, komvux) cover
 // neither school form.
 function unitForms(c, covRows, units) {
   const vendor = blank(c.vendor_name) ? null : classifyVendor(c.vendor_name);
@@ -199,11 +200,16 @@ function unitForms(c, covRows, units) {
   }
   const contractLevels = new Set();
   for (const n of c.products ?? []) for (const f of levelsToForms(mapUnitToGradeLevels(String(n ?? '')))) contractLevels.add(f);
+  const allLevels = covRows.map((row) => row.grade_level);
   return units.map((u, i) => {
-    const levels = [...named[i], ...generic];
-    const forms = levelsToForms(levels);
     const own = u.name ? levelsToForms(mapUnitToGradeLevels(String(u.name))) : contractLevels;
-    for (const f of own) forms.add(f);
+    // Fix wave 3 Q9: a unit no coverage row names, and whose own name gives
+    // no skolform, takes the whole avtal (every row, every product name):
+    // "Digitala prov" in an NE 360 avtal whose rows name only NE 360.
+    const whole = !named[i].length && !(u.name && own.size);
+    const levels = whole ? allLevels : [...named[i], ...generic];
+    const forms = levelsToForms(levels);
+    for (const f of whole ? contractLevels : own) forms.add(f);
     if (forms.size) return forms;
     return levels.length ? new Set() : new Set(['grundskola']);
   });
