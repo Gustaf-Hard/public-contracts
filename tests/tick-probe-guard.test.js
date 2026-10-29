@@ -92,7 +92,7 @@ describe('T_REQUEST_MISSING probe guard', () => {
     const esc = escFor(id);
     expect(esc.draft_template).toBe('T_REQUEST_MISSING');
     expect(esc.draft_body).not.toMatch(PROBE);
-    expect(esc.reason).toMatch(/probe utelämnad: 1 oläst/);
+    expect(esc.reason).toMatch(/probe utelämnad: 1 oläst dokument i kommunen/);
   });
 
   it('P6: a probe that throws keeps T_REQUEST_MISSING with its facts, without the probe', async () => {
@@ -140,7 +140,7 @@ describe('T_CROSSCHECK probe guard', () => {
     expect(esc.draft_body).not.toMatch(PROBE);
     expect(esc.draft_body).not.toMatch(/Finns något av dem/);
     expect(esc.draft_body).not.toMatch(/betraktar jag min begäran som besvarad/);
-    expect(esc.reason).toMatch(/probe utelämnad: 1 oläst/);
+    expect(esc.reason).toMatch(/probe utelämnad: 1 oläst dokument i kommunen/);
   });
 
   it('P6: a probe that throws never crashes ingest; the mail is recorded and drafted without the probe', async () => {

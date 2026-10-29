@@ -45,7 +45,7 @@ function isRequeuedDraft(esc, log) {
 function probeForKommun(db, conv, log) {
   try {
     const unread = db.countUnreadAnalysableAttachmentsForKommun(conv.kommun_kod);
-    if (unread > 0) return { probe: null, note: `probe utelämnad: ${unread} olästa dokument i kommunen` };
+    if (unread > 0) return { probe: null, note: `probe utelämnad: ${unread} ${unread === 1 ? 'oläst dokument' : 'olästa dokument'} i kommunen` };
     return { probe: probeFromDb(db, conv.kommun_kod), note: null };
   } catch (e) {
     log?.(`probe error for ${conv.kommun_namn}/${conv.role}: ${e.message}`);
