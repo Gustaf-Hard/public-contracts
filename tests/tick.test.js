@@ -1116,8 +1116,11 @@ describe('runTick — contract-aware delivery draft', () => {
     await runTick(makeDeps({ gmail: fakeGmail({ listResult: [{ id: 'cov-1' }], getResult: { 'cov-1': delivery('cov-1', 'att-c1', 'Magma.pdf') } }), analyseContracts: analyseBatch1 }));
     // The kommun's purchase list shows Binogi bought via Skolon: known, so the
     // probe must not ask about it.
-    const att1 = db.raw.prepare('SELECT a.id FROM attachments a JOIN messages m ON m.id = a.message_id WHERE m.conversation_id = ?').get(convId);
-    db.replacePurchaseRows(att1.id, { rows: [{ supplier: 'Binogi Sverige AB', product: null, channel: 'skolon' }], method: 'xlsx', channel: 'skolon' });
+    // (A purchase list is its own non-avtal document: rows on an avtal are not read.)
+    const att1 = db.raw.prepare('SELECT a.id, a.message_id FROM attachments a JOIN messages m ON m.id = a.message_id WHERE m.conversation_id = ?').get(convId);
+    const listAtt = db.recordAttachment({ message_id: att1.message_id, filename: 'Skolon.xlsx', saved_path: '/nonexistent/Skolon.xlsx', mime_type: null, size_bytes: 1 });
+    db.recordContract({ attachment_id: listAtt, is_contract: 0, document_type: 'följebrev_sammanställning' });
+    db.replacePurchaseRows(listAtt, { rows: [{ supplier: 'Binogi Sverige AB', product: null, channel: 'skolon' }], method: 'xlsx', channel: 'skolon' });
 
     // Batch 2: a följebrev naming an undocumented service, so a draft is due.
     const analyseBatch2 = async ({ db: d, onlyMessageId }) => {
