@@ -152,4 +152,14 @@ describe('runPurchaseExtraction', () => {
     expect(res.documents[0].skipped).toMatch(/avtalsregister/);
     expect(db.getPurchaseDocument(a)).toBeNull();
   });
+
+  // Review minor M8 (one-line fix): a present file in a dry run is still a
+  // candidate that was found, so three missing beside it is no environment fault.
+  it('the dry run reports no environment fault when some files are present', async () => {
+    seed('a.xlsx', null); seed('b.xlsx', null); seed('c.xlsx', null);
+    seed('Skolon.xlsx', xlsx(LIST));
+    const res = await runPurchaseExtraction({ db });
+    expect(res.env_fault).toBeNull();
+  });
 });
+

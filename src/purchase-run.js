@@ -121,7 +121,7 @@ export async function runPurchaseExtraction({
       : `purchases ${out.is_list ? 'WROTE' : 'NOT A LIST'} #${att.id} (${att.kommun_namn ?? ''}): ${out.rows.length} rader, ${out.method}${partial.length ? `, delvis (oläst blad: ${partial.join(', ')})` : ''}`);
   }
 
-  if (missing.length >= MIN_ENV_FAULT_MISSING && missing.length === result.attempted) {
+  if (missing.length >= MIN_ENV_FAULT_MISSING && missing.length === list.length) {
     result.env_fault = 'contracts_dir_unavailable';
     log(`purchases ENVIRONMENT FAULT: alla ${missing.length} filer saknas på disk, inget bokfört. Är kontraktsvolymen monterad?`);
   } else {
