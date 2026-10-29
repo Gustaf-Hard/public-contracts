@@ -318,12 +318,15 @@ CREATE TABLE IF NOT EXISTS contract_coverage (
 CREATE INDEX IF NOT EXISTS idx_coverage_contract ON contract_coverage(contract_id);
 `;
 
-export function openDb(path) {
-  const db = new Database(path);
-  db.pragma('journal_mode = WAL');
+// `readonly` (fix wave 2 E7): a dry run that must write nothing. The file
+// must exist, nothing sets the journal mode, and migrate() refuses.
+export function openDb(path, { readonly = false } = {}) {
+  const db = readonly ? new Database(path, { readonly: true, fileMustExist: true }) : new Database(path);
+  if (!readonly) db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
 
   function migrate() {
+    if (readonly) throw new Error('migrate() on a read-only database');
     db.exec(SCHEMA);
     // Idempotent ALTERs for databases created before these columns existed.
     // SQLite has no IF NOT EXISTS for ADD COLUMN, so we probe with PRAGMA.
@@ -2109,18 +2112,25 @@ export function openDb(path) {
 
   // Analysed documents that are not avtal and may be purchase lists, with
   // the kommun and the purchase bookkeeping so far.
+  // Whether migrate() has created the purchase tables. A read-only dry run on
+  // an older DB reads the candidates without them.
+  function hasPurchaseTables() {
+    return db.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE type = 'table' AND name IN ('purchase_rows', 'purchase_documents')").get().n === 2;
+  }
+
   function listPurchaseCandidates() {
     const types = PURCHASE_DOC_TYPES.map(() => '?').join(', ');
+    const book = hasPurchaseTables();
     return db.prepare(`
       SELECT a.id, a.filename, a.saved_path, a.mime_type, a.message_id,
              conv.kommun_kod, conv.kommun_namn, c.document_type,
-             pd.status AS purchase_status, COALESCE(pd.attempts, 0) AS purchase_attempts, pd.last_error AS purchase_error,
-             pd.row_count AS purchase_row_count
+             ${book ? `pd.status AS purchase_status, COALESCE(pd.attempts, 0) AS purchase_attempts, pd.last_error AS purchase_error,
+             pd.row_count AS purchase_row_count` : 'NULL AS purchase_status, 0 AS purchase_attempts, NULL AS purchase_error, NULL AS purchase_row_count'}
       FROM contracts c
       JOIN attachments a ON a.id = c.attachment_id
       JOIN messages m ON m.id = a.message_id
       JOIN conversations conv ON conv.id = m.conversation_id
-      LEFT JOIN purchase_documents pd ON pd.attachment_id = a.id
+      ${book ? 'LEFT JOIN purchase_documents pd ON pd.attachment_id = a.id' : ''}
       WHERE c.is_contract = 0 AND c.document_type IN (${types})
       ORDER BY a.id
     `).all(...PURCHASE_DOC_TYPES);
@@ -2528,7 +2538,7 @@ export function openDb(path) {
     listContractsForKommun,
     listContractFacts,
     listStudioUnderlag,
-    replacePurchaseRows,
+    replacePurchaseRows, hasPurchaseTables,
     recordPurchaseFailure,
     getPurchaseDocument,
     listPurchaseCandidates,

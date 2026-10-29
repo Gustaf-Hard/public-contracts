@@ -3,7 +3,7 @@
 // compilations filed as följebrev_sammanställning) into purchase_rows.
 // Not part of the 15-minute tick; run by hand.
 //
-//   node scripts/17-extract-purchases.js                       # dry run: no writes, no LLM calls
+//   node scripts/17-extract-purchases.js                       # dry run: read-only DB, no LLM calls
 //   node scripts/17-extract-purchases.js --apply               # write rows (LLM for PDFs and unmapped sheets)
 //   node scripts/17-extract-purchases.js --apply --attachment=<id>
 //   options: --force (re-extract done or parked documents)  --limit=N
@@ -25,8 +25,10 @@ const flag = (name) => process.argv.includes(`--${name}`);
 const apply = flag('apply');
 const onlyArg = arg('attachment');
 const show = arg('show') ? parseInt(arg('show'), 10) : 0;
-const db = openDb(process.env.PILOT_DB_PATH ?? 'data/pilot.db');
-db.migrate();
+// A dry run opens the DB read-only and never migrates: it writes nothing.
+const db = openDb(process.env.PILOT_DB_PATH ?? 'data/pilot.db', { readonly: !apply });
+if (apply) db.migrate();
+else if (!db.hasPurchaseTables()) console.log('Purchase-tabellerna finns inte än i databasen; --apply skapar dem (migrate).');
 
 const res = await runPurchaseExtraction({
   db,
