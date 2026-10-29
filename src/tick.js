@@ -37,8 +37,11 @@ function isRequeuedDraft(esc, log) {
 }
 
 // The follow-up probe for one kommun (src/probe-list.js): kommun-wide, not
-// per conversation. Never throws (fix wave 2 P6): a display-grade list must not
-// change the template or crash ingest, so a failure degrades to "no probe".
+// per conversation. Never throws (fix wave 2 P6, ruled in fix wave 3): a
+// display-grade list must not change the template or crash ingest. When the
+// probe fails on the receipt path, T_REQUEST_MISSING stays, without the
+// probe, and the reason notes it: the facts are still true and only the probe
+// is dropped.
 // While ANY analysable file of the kommun sits unread, pending or parked (P2),
 // the probe is left out: we cannot ask whether they lack an avtal that may be
 // lying unread on our own disk. `note` goes on the escalation reason.
@@ -795,7 +798,9 @@ async function dispatchEscalationForIngest(pending, deps) {
       if (choice.template === 'T_REQUEST_MISSING') {
         // Probe first (it never throws), then assign all three together: a
         // throw anywhere above leaves a clean T_RECEIPT, never a
-        // T_REQUEST_MISSING without its facts.
+        // T_REQUEST_MISSING without its facts. A failed probe (P6 ruling)
+        // keeps T_REQUEST_MISSING, without the probe, and the reason notes
+        // it: the facts are still true and only the probe is dropped.
         const { probe, note } = probeForKommun(db, updated, deps.log);
         if (note) addReason(note);
         draftTemplate = 'T_REQUEST_MISSING';

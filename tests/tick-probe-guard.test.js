@@ -95,7 +95,10 @@ describe('T_REQUEST_MISSING probe guard', () => {
     expect(esc.reason).toMatch(/probe utelämnad: 1 oläst dokument i kommunen/);
   });
 
-  it('P6: a probe that throws keeps T_REQUEST_MISSING with its facts, without the probe', async () => {
+  // P6 as ruled (fix wave 3): when the probe fails on the receipt path,
+  // T_REQUEST_MISSING stays, without the probe, and the reason notes it. The
+  // facts are still true and only the probe is dropped.
+  it('P6: a probe that fails on the receipt path keeps T_REQUEST_MISSING, without the probe, and the reason notes it', async () => {
     db.listPurchaseRows = () => { throw new Error('boom'); };
     const id = await run();
     const esc = escFor(id);
