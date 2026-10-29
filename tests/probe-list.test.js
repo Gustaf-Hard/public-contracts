@@ -468,6 +468,16 @@ describe('fix wave 3 Q9: an unnamed product falls back to the whole avtal', () =
     expect(entries(probe, 'larplattform')).toEqual([]);
   });
 
+  it('whole-avtal rows that name only förskola for another product leave this one at grundskolan, as unknown does', () => {
+    const probe = buildProbeList({
+      kommunKod: K, skolformer: { grundskola: true, gymnasiet: false },
+      contracts: [avtal(1, 'Unikum', ['Kommunabonnemang Start', 'Unikum Stödinsatser Förskola'])],
+      coverage: [covP(1, 'Unikum Stödinsatser Förskola', 'Förskola')],
+    });
+    expect(entries(probe, 'larplattform')).toEqual([]);
+    expect(reasonFor(probe, 'Vklass')).toMatch(/lärplattform finns redan via Unikum/);
+  });
+
   it('a product whose own name gives its skolform keeps it: IST Lärande Grundskola still leaves gymnasiet open', () => {
     const probe = buildProbeList({
       kommunKod: K, skolformer: both,

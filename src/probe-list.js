@@ -211,7 +211,11 @@ function unitForms(c, covRows, units) {
     const forms = levelsToForms(levels);
     for (const f of whole ? contractLevels : own) forms.add(f);
     if (forms.size) return forms;
-    return levels.length ? new Set() : new Set(['grundskola']);
+    // Rows naming only other levels cover neither school form. In the
+    // whole-avtal fallback only the generic rows speak for this unit; rows
+    // naming other products ("Stödinsatser Förskola") say nothing about it:
+    // unknown, so grundskolan.
+    return (whole ? generic.length : levels.length) ? new Set() : new Set(['grundskola']);
   });
 }
 
