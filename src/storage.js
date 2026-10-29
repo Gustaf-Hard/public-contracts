@@ -1782,12 +1782,16 @@ export function openDb(path) {
     `).all(conversationId);
   }
 
-  // Same projection for EVERY conversation of one kommun (central, handoffs,
-  // förvaltningar). Feeds the probe list's mentions (src/probe-list.js): a
-  // company the kommun named in any of its documents is known already.
-  function listContractInfoForKommun(kommunKod) {
-    return db.prepare(`
-      SELECT c.is_contract AS is_contract, v.name AS vendor_name, c.analysis_json AS analysis_json, c.document_type AS document_type
+  // Every document one kommun sent that we have read (any contracts row,
+  // avtal or not: faktura, licensbevis, PUB-avtal, prislista, följebrev),
+  // across all its conversations, with the vendor, products, line items,
+  // filename and summary. Feeds the probe list (src/probe-list.js,
+  // documentCompanies): a company named anywhere in it is known already.
+  // Read-only, no schema change.
+  function listProbeDocumentsForKommun(kommunKod) {
+    const rows = db.prepare(`
+      SELECT c.id AS contract_id, c.is_contract AS is_contract, c.document_type AS document_type,
+             v.name AS vendor_name, c.analysis_json AS analysis_json, a.filename AS filename, c.summary AS summary
       FROM attachments a
       JOIN contracts c ON c.attachment_id = a.id
       JOIN messages m ON m.id = a.message_id
@@ -1796,6 +1800,18 @@ export function openDb(path) {
       WHERE conv.kommun_kod = ?
       ORDER BY a.id
     `).all(kommunKod);
+    if (!rows.length) return [];
+    const ids = rows.map((r) => r.contract_id);
+    const prodMap = productsForContractIds(ids);
+    const lines = new Map();
+    for (const l of db.prepare(`
+      SELECT contract_id, product_name FROM contract_line_items
+      WHERE contract_id IN (${ids.map(() => '?').join(',')}) ORDER BY contract_id, id
+    `).all(...ids)) {
+      if (!lines.has(l.contract_id)) lines.set(l.contract_id, []);
+      lines.get(l.contract_id).push(l.product_name);
+    }
+    return rows.map((r) => ({ ...r, products: prodMap.get(r.contract_id) ?? [], lines: lines.get(r.contract_id) ?? [] }));
   }
 
   // Filenames per message for the WHOLE conversation, in attachment-id order.
@@ -2475,7 +2491,7 @@ export function openDb(path) {
     listParkedAnalysesToAlert,
     markParkedAnalysesAlerted,
     listContractInfoForMessage,
-    listContractInfoForConversation, listContractInfoForKommun,
+    listContractInfoForConversation, listProbeDocumentsForKommun,
     listAttachmentsForConversation,
     countUnreadAnalysableAttachments,
     listContractDeliveryEvents,

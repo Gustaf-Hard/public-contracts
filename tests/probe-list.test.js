@@ -157,13 +157,17 @@ describe('buildProbeList: mentions in sammanställningar', () => {
     expect(namesIn(probe, 'larplattform')).toContain('itslearning');
   });
 
-  it('a mention the evidence gate rejects (shut down, PUB-avtal) strikes nothing', () => {
+  // Fix wave 2 P1: the evidence gate decides what we may CLAIM is missing,
+  // not what we already know. A probe is a question, so striking every name
+  // the kommun wrote down is the safe direction.
+  it('a mention the evidence gate rejects (shut down, PUB-avtal) still strikes the company', () => {
     const probe = buildProbeList({ kommunKod: K, mentions: [
       { vendor: 'Haldor', product: 'Haldor (nedlagt)' },
       { vendor: 'Binogi', product: 'Personuppgiftsbiträdesavtal' },
     ] });
-    expect(allNames(probe)).toContain('Haldor');
-    expect(allNames(probe)).toContain('Binogi');
+    expect(allNames(probe)).not.toContain('Haldor');
+    expect(allNames(probe)).not.toContain('Binogi');
+    expect(reasonFor(probe, 'Binogi')).toBe('nämns i kommunens underlag');
   });
 
   it('collectMentions reads mentioned_agreements out of analysis_json', () => {
@@ -269,5 +273,108 @@ describe('buildProbeList: operator decisions 2026-10-29', () => {
     const names = allNames(buildProbeList({ kommunKod: K }));
     for (const n of ['Microsoft', 'Google Workspace', 'Google', 'Adobe']) expect(names).not.toContain(n);
     for (const v of ['Microsoft', 'Google', 'Adobe']) expect(classifyVendor(v)).toMatchObject({ role: 'service' });
+  });
+});
+
+// Fix wave 2 (2026-10-29). Hand-written fixtures only.
+const doc = (fields) => ({ contract_id: null, is_contract: 0, document_type: 'övrigt', vendor_name: null, analysis_json: null, filename: null, summary: null, products: [], lines: [], ...fields });
+
+describe('fix wave 2 P1: any document the kommun sent strikes its company', () => {
+  it('the vendor of a non-avtal document (a PUB-avtal, no mentions) is struck', () => {
+    const probe = buildProbeList({ kommunKod: K, documents: [doc({ document_type: 'personuppgiftsbiträdesavtal', analysis_json: JSON.stringify({ vendor_name: 'Vklass', products: [], mentioned_agreements: [] }) })] });
+    expect(allNames(probe)).not.toContain('Vklass');
+    expect(reasonFor(probe, 'Vklass')).toBe('nämns i kommunens underlag');
+  });
+
+  it('a vendor stored on the row (prislista) is struck too', () => {
+    const probe = buildProbeList({ kommunKod: K, documents: [doc({ document_type: 'prislista', vendor_name: 'Haldor' })] });
+    expect(allNames(probe)).not.toContain('Haldor');
+  });
+
+  it('an invoice naming only a product strikes the product owner', () => {
+    const probe = buildProbeList({ kommunKod: K, documents: [doc({ document_type: 'övrigt', analysis_json: JSON.stringify({ vendor_name: null, products: ['Bingel'], mentioned_agreements: [] }) })] });
+    expect(allNames(probe)).not.toContain('Sanoma Utbildning');
+  });
+
+  it('a licence certificate line item strikes the product owner', () => {
+    const probe = buildProbeList({ kommunKod: K, documents: [doc({ lines: ['Verksamhetslicens InPrint 4'] })] });
+    expect(allNames(probe)).not.toContain('Symbolbruket (Widgit)');
+  });
+
+  it('a filename or summary naming a company strikes it', () => {
+    const probe = buildProbeList({ kommunKod: K, documents: [
+      doc({ filename: 'Erbjudande Binogi.pdf' }),
+      doc({ summary: 'Ett följebrev från förvaltningen. Licenser för Polyglutt, och ett avtal med Haldor.' }),
+    ] });
+    expect(allNames(probe)).not.toContain('Binogi');
+    expect(allNames(probe)).not.toContain('ILT (Inläsningstjänst)');
+    expect(allNames(probe)).not.toContain('Haldor');
+  });
+
+  it('a mention inside an avtal document strikes too, but settles no function', () => {
+    const probe = buildProbeList({ kommunKod: K, documents: [doc({ is_contract: 1, analysis_json: { mentioned_agreements: [{ vendor: 'Unikum', product: '' }] } })] });
+    expect(allNames(probe)).not.toContain('Unikum');
+    expect(namesIn(probe, 'larplattform')).toContain('itslearning');
+  });
+});
+
+describe('fix wave 2 P3: an avtal under a channel strikes the companies it names', () => {
+  it('a channel avtal with a generic product line strikes the company in its filename', () => {
+    const probe = buildProbeList({ kommunKod: K, contracts: [{ ...avtal(1, 'Online Partner', ['Digitala prov']), filename: 'Trelson Avtal EX-0000 Digitala prov.pdf', summary: 'Avtal om digitala prov.' }] });
+    expect(allNames(probe)).not.toContain('Trelson');
+    expect(reasonFor(probe, 'Trelson')).toBe('avtal finns');
+  });
+
+  it('and the companies its summary or line items name', () => {
+    const probe = buildProbeList({
+      kommunKod: K,
+      contracts: [{ ...avtal(7, 'Atea', ['Programvaror']), filename: 'Avtal programvaror.pdf', summary: 'Avrop av Haldor lärplattform via ramavtal.' }],
+      documents: [doc({ contract_id: 7, is_contract: 1, lines: ['Licens DigiExam'] })],
+    });
+    expect(reasonFor(probe, 'Haldor')).toBe('avtal finns');
+    expect(reasonFor(probe, 'DigiExam')).toBe('avtal finns');
+  });
+});
+
+describe('fix wave 2 P4: functions are resolved per product, then united', () => {
+  it('adding a tagged sibling product never removes coverage', () => {
+    const one = buildProbeList({ kommunKod: K, contracts: [avtal(1, 'Vklass', ['Vklass'])], skolformer: { grundskola: true, gymnasiet: false } });
+    const two = buildProbeList({ kommunKod: K, contracts: [avtal(1, 'Vklass', ['Vklass', 'Vklass Närvaro'])], skolformer: { grundskola: true, gymnasiet: false } });
+    expect(entries(one, 'larplattform')).toEqual([]);
+    expect(entries(two, 'larplattform')).toEqual([]);
+    expect(reasonFor(two, 'itslearning')).toMatch(/lärplattform finns redan via Vklass/);
+  });
+
+  it('a product tagged with no functions still adds nothing', () => {
+    const probe = buildProbeList({ kommunKod: K, contracts: [avtal(1, 'Teachiq', ['Kunskapsmatrisen'])] });
+    expect(namesIn(probe, 'prov')).toContain('DigiExam');
+  });
+});
+
+describe('fix wave 2 P5: skolform coverage follows the product the row names', () => {
+  const covP = (contractId, product, level) => ({ contract_id: contractId, product_name: product, grade_level: level, status: 'full' });
+
+  it('a channel avtal with Unikum for grundskolan and DigiExam for gymnasiet keeps the other two questions', () => {
+    const probe = buildProbeList({
+      kommunKod: K,
+      contracts: [avtal(1, 'Atea', ['Unikum', 'DigiExam'])],
+      coverage: [covP(1, 'Unikum', '7-9'), covP(1, 'DigiExam', 'Gymnasiet')],
+    });
+    const lp = entries(probe, 'larplattform');
+    expect(lp).toHaveLength(1);
+    expect(lp[0].note).toBe('för gymnasiet');
+    // Lexplore and StudyBee settle no function, so they stay on a plain line.
+    const notes = entries(probe, 'prov').map((e) => e.note).filter(Boolean);
+    expect(notes).toEqual(['för grundskolan']);
+  });
+
+  it('a coverage row that names no product keeps covering the whole avtal', () => {
+    const probe = buildProbeList({
+      kommunKod: K,
+      contracts: [avtal(1, 'Atea', ['Unikum', 'DigiExam'])],
+      coverage: [covP(1, 'Hela avtalet', '7-9'), covP(1, 'Hela avtalet', 'Gymnasiet')],
+    });
+    expect(entries(probe, 'larplattform')).toEqual([]);
+    expect(namesIn(probe, 'prov')).not.toContain('Dugga');
   });
 });

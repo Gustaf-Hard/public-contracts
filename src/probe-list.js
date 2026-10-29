@@ -5,8 +5,9 @@
 //
 //   1. companies we hold an avtal from (any stored contract row, active or not),
 //   2. companies in its purchase rows (bought via Skolon, Atea, Läromedia...)
-//      or named in its own documents where the evidence gate accepts the
-//      mention (src/coverage.js), since those are known already,
+//      or named anywhere in a document it sent (documentCompanies: an
+//      invoice, a licensbevis, a PUB-avtal, a mention the evidence gate
+//      would reject), since those are known already,
 //   3. exclusive functions (catalogue-def.js "Probe fields") an avtal already
 //      covers: lärplattform, prov and elevhälsojournal per skolform, the
 //      skoladministration functions (elevregister, schema, frånvaro, ...)
@@ -22,7 +23,6 @@
 import { CATEGORIES, companies, classifyVendor, classifyLine, productBySlug } from './catalogue.js';
 import { classifyPurchaseRow } from './purchase-list.js';
 import { channelName } from './studio-purchases.js';
-import { isNotRequestedMention, isOutOfScopeMention } from './coverage.js';
 import { mapUnitToGradeLevels } from './vendor-analytics.js';
 import { loadKommunStats } from './kommun-stats.js';
 
@@ -73,65 +73,130 @@ function levelsToForms(levels) {
   return out;
 }
 
-// Which catalogue companies one avtal holds, and the functions it covers for
-// each. A channel's avtal holds the companies it resells, never the channel.
-function contractHoldings(c) {
+// Free text (a filename, a summary) cut into phrases classifyLine can read:
+// one company per phrase, so a summary naming three companies yields three.
+function phrases(text) {
+  if (blank(text)) return [];
+  return String(text).replace(/\.(pdf|xlsx|docx|doc|xls)$/i, ' ')
+    .split(/[,;:()\n]|\.\s|\s(?:och|samt|eller)\s|\s[-–—]\s/i)
+    .map((x) => x.trim()).filter((x) => x.length >= 2);
+}
+
+// Every catalogue company a line names, for STRIKING: any kind that resolves
+// to a company counts (an integration line, a discount line), since a probe is
+// a question and striking too much is the safe direction.
+function lineCompanies(ownerSlug, text) {
+  if (blank(text)) return [];
+  const r = classifyLine(ownerSlug, text);
+  return r.kind !== 'uncatalogued' && r.companySlug ? [r.companySlug] : [];
+}
+function vendorCompanies(raw) {
+  if (blank(raw)) return [];
+  const v = classifyVendor(raw);
+  if (v) return [v.slug];
+  const r = classifyLine(null, raw);
+  return OWNER_KINDS.has(r.kind) && r.companySlug ? [r.companySlug] : [];
+}
+
+const productFunctions = (ps) => productBySlug(ps)?.product?.functions;
+
+// Which catalogue companies one avtal holds, as units: one per product it
+// names (fix wave 2 P4: functions resolve PER PRODUCT, then unite, so adding a
+// tagged sibling never removes what an untagged product covered). An untagged
+// product, or a company the avtal names without a product, takes the
+// company-level functions; a product tagged with [] covers nothing. A
+// channel's avtal holds the companies it resells, never the channel, and
+// (P3) an avtal under a channel or an unknown vendor also holds the companies
+// its summary and filename name: "Trelson Avtal ... Digitala prov.pdf" filed
+// under the reseller is still a Trelson avtal.
+function contractUnits(c, lines = []) {
   const vendor = blank(c.vendor_name) ? null : classifyVendor(c.vendor_name);
   const ownerSlug = vendor?.slug ?? null;
-  const held = new Map(); // slug -> { fns: Set, tagged: bool }
-  const hold = (slug) => {
-    if (!slug || !isService(slug)) return null;
-    if (!held.has(slug)) held.set(slug, { fns: new Set(), tagged: false });
-    return held.get(slug);
+  const units = []; // { slug, productSlug, fns: Set, name }
+  const companyFns = (slug) => new Set(BY_SLUG.get(slug)?.functions ?? []);
+  const add = (slug, productSlug, name) => {
+    if (!slug || !isService(slug)) return;
+    const tagged = productSlug ? productFunctions(productSlug) : undefined;
+    units.push({ slug, productSlug: productSlug ?? null, name: name ?? null, fns: tagged ? new Set(tagged) : companyFns(slug) });
   };
-  if (vendor) hold(vendor.slug);
-  else if (!blank(c.vendor_name)) {
-    const r = classifyLine(null, c.vendor_name);
-    if (OWNER_KINDS.has(r.kind)) hold(r.companySlug);
-  }
-  for (const name of c.products ?? []) {
+  for (const name of [...(c.products ?? []), ...lines]) {
     if (blank(name)) continue;
     const r = classifyLine(ownerSlug, name);
     if (!OWNER_KINDS.has(r.kind) || !r.companySlug) continue;
-    const h = hold(r.companySlug);
-    if (!h) continue;
-    const productSlugs = r.kind === 'bundle' ? r.products ?? [] : r.productSlug ? [r.productSlug] : [];
-    for (const ps of productSlugs) {
-      const fns = productBySlug(ps)?.product?.functions;
-      if (!fns) continue;
-      h.tagged = true;
-      for (const f of fns) h.fns.add(f);
+    const productSlugs = r.kind === 'bundle' ? (r.products ?? []).filter(Boolean) : r.productSlug ? [r.productSlug] : [];
+    if (productSlugs.length) for (const ps of productSlugs) add(r.companySlug, ps, name);
+    else add(r.companySlug, null, name);
+  }
+  const vendorSlugs = vendor ? [vendor.slug] : vendorCompanies(c.vendor_name);
+  for (const slug of vendorSlugs) if (!units.some((u) => u.slug === slug)) add(slug, null, null);
+  if (!vendor || vendor.role === 'channel') {
+    for (const text of [...phrases(c.summary), ...phrases(c.filename)]) {
+      for (const slug of lineCompanies(null, text)) if (!units.some((u) => u.slug === slug)) add(slug, null, text);
     }
   }
-  return [...held].map(([slug, h]) => ({
-    slug,
-    functions: h.tagged ? [...h.fns] : [...(BY_SLUG.get(slug)?.functions ?? [])],
-  }));
+  return units;
 }
 
-// The skolformer one avtal covers: its coverage rows plus what its product
-// names say. Unknown counts as grundskolan only; coverage rows that name only
-// other levels (förskola, komvux) cover neither school form.
-function contractForms(c, covRows) {
-  const levels = covRows.map((r) => r.grade_level);
-  const forms = levelsToForms(levels);
-  for (const n of c.products ?? []) for (const f of levelsToForms(mapUnitToGradeLevels(String(n ?? '')))) forms.add(f);
-  if (forms.size) return forms;
-  return covRows.length ? new Set() : new Set(['grundskola']);
+// The skolformer each unit of one avtal covers. A coverage row that names a
+// product (or company) of the avtal covers that unit only (fix wave 2 P5); a
+// row that names nothing we can place covers every unit, as before. A unit's
+// own product name adds its levels ("Unikum gymnasiet"). Unknown counts as
+// grundskolan only; rows that name only other levels (förskola, komvux) cover
+// neither school form.
+function unitForms(c, covRows, units) {
+  const vendor = blank(c.vendor_name) ? null : classifyVendor(c.vendor_name);
+  const ownerSlug = vendor?.slug ?? null;
+  const named = units.map(() => []);
+  const generic = [];
+  for (const row of covRows) {
+    const r = blank(row.product_name) ? { kind: 'uncatalogued' } : classifyLine(ownerSlug, row.product_name);
+    const ps = r.kind === 'bundle' ? (r.products ?? []) : r.productSlug ? [r.productSlug] : [];
+    let hit = ps.length ? units.map((u, i) => (ps.includes(u.productSlug) ? i : -1)).filter((i) => i >= 0) : [];
+    if (!hit.length && r.companySlug && r.kind !== 'uncatalogued') hit = units.map((u, i) => (u.slug === r.companySlug ? i : -1)).filter((i) => i >= 0);
+    if (hit.length) for (const i of hit) named[i].push(row.grade_level);
+    else generic.push(row.grade_level);
+  }
+  const contractLevels = new Set();
+  for (const n of c.products ?? []) for (const f of levelsToForms(mapUnitToGradeLevels(String(n ?? '')))) contractLevels.add(f);
+  return units.map((u, i) => {
+    const levels = [...named[i], ...generic];
+    const forms = levelsToForms(levels);
+    const own = u.name ? levelsToForms(mapUnitToGradeLevels(String(u.name))) : contractLevels;
+    for (const f of own) forms.add(f);
+    if (forms.size) return forms;
+    return levels.length ? new Set() : new Set(['grundskola']);
+  });
 }
 
 function mentionCompanies(m) {
-  const out = new Set();
+  const out = new Set(vendorCompanies(m?.vendor));
   const vendor = blank(m?.vendor) ? null : classifyVendor(m.vendor);
-  if (vendor) out.add(vendor.slug);
-  else if (!blank(m?.vendor)) {
-    const r = classifyLine(null, m.vendor);
-    if (OWNER_KINDS.has(r.kind) && r.companySlug) out.add(r.companySlug);
-  }
-  if (!blank(m?.product)) {
-    const r = classifyLine(vendor?.slug ?? null, m.product);
-    if ((r.kind === 'product' || r.kind === 'bundle') && r.companySlug) out.add(r.companySlug);
-  }
+  for (const slug of lineCompanies(vendor?.slug ?? null, m?.product)) out.add(slug);
+  return [...out].filter(isService);
+}
+
+// Every company one document the kommun sent names (fix wave 2 P1): its
+// vendor, its products and line items, the analysis's own vendor, products,
+// line items and mentions (UNFILTERED: the evidence gate decides what we may
+// claim is missing, not what we know), its filename and its summary. Any
+// document counts: avtal, faktura, PUB-avtal, prislista, licensbevis,
+// följebrev.
+export function documentCompanies(d) {
+  let a = d?.analysis_json;
+  if (typeof a === 'string') { try { a = JSON.parse(a); } catch { a = null; } }
+  if (!a || typeof a !== 'object') a = {};
+  const out = new Set();
+  const vendors = [d?.vendor_name, a.vendor_name].filter((v) => !blank(v));
+  for (const v of vendors) for (const slug of vendorCompanies(v)) out.add(slug);
+  const owner = vendors.map((v) => classifyVendor(v)).find(Boolean)?.slug ?? null;
+  const lines = [
+    ...(d?.products ?? []), ...(d?.lines ?? []),
+    ...(Array.isArray(a.products) ? a.products : []),
+    ...(Array.isArray(a.line_items) ? a.line_items.map((l) => l?.product_name) : []),
+  ].filter((x) => typeof x === 'string');
+  for (const l of lines) for (const slug of lineCompanies(owner, l)) out.add(slug);
+  for (const m of Array.isArray(a.mentioned_agreements) ? a.mentioned_agreements : []) for (const slug of mentionCompanies(m)) out.add(slug);
+  for (const t of [...phrases(d?.filename), ...phrases(d?.summary ?? a.summary)]) for (const slug of lineCompanies(null, t)) out.add(slug);
   return [...out].filter(isService);
 }
 
@@ -184,10 +249,13 @@ export function collectMentions(rows = []) {
 //   purchaseRows  purchase rows { kommun_kod, supplier, product, channel }
 //   coverage      contract_coverage rows { contract_id, grade_level }
 //   mentions      THIS kommun's mentions { vendor, product, note }
+//   documents     THIS kommun's documents, every contracts row whatever its
+//                 type { contract_id, is_contract, vendor_name, analysis_json,
+//                 filename, summary, products, lines } (documentCompanies)
 //   skolformer    { grundskola, gymnasiet }: true when the kommun has elever in
 //                 its own schools, false when it has none, null/absent unknown
 //                 (skolformerFromStats). False forms are never asked about.
-export function buildProbeList({ kommunKod, contracts = [], purchaseRows = [], coverage = [], mentions = [], skolformer = null } = {}) {
+export function buildProbeList({ kommunKod, contracts = [], purchaseRows = [], coverage = [], mentions = [], documents = [], skolformer = null } = {}) {
   const kod = kommunKod == null ? null : String(kommunKod);
   const own = (r) => kod != null && String(r?.kommun_kod ?? '') === kod;
 
@@ -204,23 +272,28 @@ export function buildProbeList({ kommunKod, contracts = [], purchaseRows = [], c
     footprint.get(slug).add(String(k));
   };
 
+  // Line items of this kommun's avtal (the documents carry them).
+  const linesBy = new Map();
+  for (const d of documents) if (d?.contract_id != null && d.lines?.length) linesBy.set(d.contract_id, d.lines);
+
   // 1 + 3: what this kommun holds, and the functions it covers.
   const held = new Set();
   const covered = new Map(); // fn -> { forms: Set, holders: Set(slug) }
   for (const c of contracts) {
-    const holdings = contractHoldings(c);
-    for (const h of holdings) seenIn(h.slug, c.kommun_kod);
-    if (!own(c)) continue;
-    const forms = contractForms(c, covBy.get(c.contract_id) ?? []);
-    for (const h of holdings) {
-      held.add(h.slug);
-      for (const f of h.functions) {
+    const mine = own(c);
+    const units = contractUnits(c, mine ? linesBy.get(c.contract_id) ?? [] : []);
+    for (const u of units) seenIn(u.slug, c.kommun_kod);
+    if (!mine) continue;
+    const forms = unitForms(c, covBy.get(c.contract_id) ?? [], units);
+    units.forEach((u, i) => {
+      held.add(u.slug);
+      for (const f of u.fns) {
         if (!covered.has(f)) covered.set(f, { forms: new Set(), holders: new Set() });
         const e = covered.get(f);
-        for (const x of forms) e.forms.add(x);
-        e.holders.add(h.slug);
+        for (const x of forms[i]) e.forms.add(x);
+        e.holders.add(u.slug);
       }
-    }
+    });
   }
 
   // 2: bought, or named in its own documents.
@@ -232,10 +305,8 @@ export function buildProbeList({ kommunKod, contracts = [], purchaseRows = [], c
     if (own(r) && !bought.has(c.company_slug)) bought.set(c.company_slug, c.channel_slug ?? null);
   }
   const named = new Set();
-  for (const m of mentions) {
-    if (isNotRequestedMention(m) || isOutOfScopeMention(m)) continue;
-    for (const slug of mentionCompanies(m)) named.add(slug);
-  }
+  for (const m of mentions) for (const slug of mentionCompanies(m)) named.add(slug);
+  for (const d of documents) for (const slug of documentCompanies(d)) named.add(slug);
 
   const struck = [];
   const groups = new Map(); // `${category}\u0000${note}` -> { category, note, members: [company] }
@@ -312,15 +383,16 @@ function safeStats() {
 
 // The one IO wrapper: the probe for one kommun read from an open pilot DB
 // (src/storage.js). Contracts and purchase rows are fleet-wide so each
-// category follows footprint; mentions are the kommun's own, across all its
-// conversations (an avtal a handoff conversation delivered is still held).
+// category follows footprint; documents are the kommun's own, every one it
+// sent across all its conversations (an avtal a handoff conversation
+// delivered is still held).
 export function probeFromDb(db, kommunKod, { stats } = {}) {
   return buildProbeList({
     kommunKod,
     contracts: db.listContractFacts(),
     purchaseRows: db.listPurchaseRows(),
     coverage: db.listCoverage(),
-    mentions: collectMentions(db.listContractInfoForKommun(kommunKod)),
+    documents: db.listProbeDocumentsForKommun(kommunKod),
     skolformer: skolformerFromStats(stats === undefined ? safeStats() : stats, kommunKod),
   });
 }
