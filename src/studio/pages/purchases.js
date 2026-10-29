@@ -24,7 +24,11 @@ export function licenceText(p, today = null) {
   return `licensperiod ${ended ? 'slutade' : 'till'} ${p.licence_end}${p.licence_basis === 'lasar' && p.school_year ? ` (läsår ${p.school_year})` : ''}`;
 }
 
-const rowName = (p) => p.product ?? p.supplier ?? 'okänd rad';
+// A row by its catalogue names only (fix wave 2 E3): rows whose supplier is
+// not in the catalogue never reach a list, so a ledger payee (possibly a
+// private person) is never printed.
+const rowName = (p) => productLabel(p.product_slug) ?? p.product ?? p.company_name ?? companyBySlug(p.company_slug)?.canonical ?? 'okänd rad';
+const unmatchedText = (n) => `${nOf(n, 'rad', 'rader')} utan leverantör i katalogen`;
 
 function companyGroups(rows) {
   const by = new Map();
@@ -37,7 +41,7 @@ function companyGroups(rows) {
 }
 
 function endsList(rows, today) {
-  const ends = upcomingLicenceEnds(rows, { today });
+  const ends = upcomingLicenceEnds(rows.filter((p) => p.company_slug), { today });
   if (!ends.length) return '';
   const items = ends.slice(0, MAX_ENDS).map((p) => `<li><b>${esc(p.licence_end)}</b><span>${esc(rowName(p))}</span><span class="meta">${esc(`${monthsUntil(p.licence_end, today)}${p.licence_basis === 'lasar' ? ', slutet av läsåret' : ''}`)}</span></li>`).join('');
   const more = ends.length > MAX_ENDS ? `<p class="meta">${esc(`${fmtInt(ends.length - MAX_ENDS)} licensperioder till slutar senare.`)}</p>` : '';
@@ -77,9 +81,8 @@ export function kommunPurchaseSection({ rows = [], today }) {
     const restCo = groups.length > MAX_COMPANIES
       ? fold(`Visa ${nOf(groups.length - MAX_COMPANIES, 'leverantör', 'leverantörer')} till`, `<ul class="pu-list">${groups.slice(MAX_COMPANIES).map(item).join('')}</ul>`)
       : '';
-    const unk = unknown.length
-      ? fold(`${nOf(unknown.length, 'rad', 'rader')} som vi inte kan koppla till en leverantör i katalogen`, `<ul class="pu-raw">${unknown.slice(0, 60).map((p) => `<li>${esc([p.supplier, p.product].filter(Boolean).join(': '))}</li>`).join('')}</ul>${unknown.length > 60 ? `<p class="meta">${esc(`och ${fmtInt(unknown.length - 60)} till.`)}</p>` : ''}`)
-      : '';
+    // A count only, never the raw supplier or product text.
+    const unk = unknown.length ? `<p class="meta">${esc(unmatchedText(unknown.length))}</p>` : '';
     return `<article class="card pu-card" style="--i:${i}">
   <div class="viz-head"><span class="viz-label"><i class="pu-mark" aria-hidden="true"></i>${esc(label)}</span><span class="viz-n">${esc(nOf(groups.length, 'leverantör i katalogen', 'leverantörer i katalogen'))}</span></div>
   <p class="meta">${esc(docLine(ps))}</p>

@@ -116,8 +116,11 @@ describe('kommun page', () => {
     expect(t).not.toMatch(/\b300 kr\b/);
     expect(t).toContain('licensperiod till 2027-05-31');
     expect(t).toContain('Licensperioder som löper ut');
-    // The unknown title is listed, not attributed to Skolon's own product.
-    expect(t).toContain('Singellicens 12 mån för Exempelverktyg');
+    // Fix wave 2 E3: a row with no catalogue supplier is only a count, never
+    // its raw text (a ledger payee can be a private person). It is not
+    // attributed to Skolon's own product either.
+    expect(t).toContain('1 rad utan leverantör i katalogen');
+    expect(t).not.toContain('Singellicens 12 mån för Exempelverktyg');
     expect(t).toMatch(/href="\/studio\/leverantor\/binogi"/);
   });
 
@@ -184,3 +187,18 @@ describe('Om datan', () => {
     noLeaks(t);
   });
 });
+
+describe('fix wave 2 E3: unmatched rows are a count', () => {
+  it('a payee outside the catalogue is never printed, not even in the licence-end list', async () => {
+    seedList('1401', [
+      row({ amount_sek: 100, period_end: '2027-05-31' }),
+      row({ supplier: 'Exempel Exempelsson', product: 'Konsultarvode Exempel Exempelsson', period_end: '2027-01-31', channel: null }),
+      row({ supplier: 'Bygg och Exempel AB', product: null, period_end: '2027-02-28', channel: null }),
+    ], { channel: null });
+    const t = (await get('/studio/kommun/1401')).text;
+    expect(t).not.toContain('Exempelsson');
+    expect(t).not.toContain('Bygg och Exempel');
+    expect(t).toMatch(/2 rader utan leverantör i katalogen/);
+  });
+});
+

@@ -691,7 +691,6 @@ const COMPONENT_CSS = `
 .pu-co { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .pu-co > a, .pu-co > span:first-child { font-weight: 600; }
 .pu-prod { color: var(--ink-2); font-size: var(--t-xs); }
-.pu-raw { margin: var(--s-2) 0 0; padding-left: 1.1em; font-size: var(--t-xs); color: var(--ink-2); columns: 2 220px; }
 .pu-ends { display: flex; flex-direction: column; gap: var(--s-3); }
 .pu-end-list { list-style: none; margin: 0; padding: 0; }
 .pu-end-list li { display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; gap: var(--s-3); align-items: baseline; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: var(--t-sm); }
