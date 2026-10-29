@@ -97,15 +97,17 @@ describe('popularProbeCompanies', () => {
 });
 
 describe('T_CROSSCHECK wording', () => {
-  const m = T_CROSSCHECK({ ...ctx, crosscheck_groups: [
-    { category: 'läromedel', label: 'Läromedel', names: ['Magma', 'Binogi'] },
-    { category: 'prov', label: 'Prov', names: ['DigiExam', 'Teachiq', 'Trelson'] },
-  ] });
+  const m = T_CROSSCHECK({ ...ctx, probe: { categories: [
+    { category: 'laromedel', label: 'Läromedel', names: ['Radish (Magma)', 'Binogi'], more: 4 },
+    { category: 'prov', label: 'Prov och bedömning', names: ['DigiExam', 'Teachiq (Exam.net)', 'Trelson'] },
+    { category: 'larplattform', label: 'Lärplattform', note: 'för gymnasiet', names: ['itslearning'] },
+  ], struck: [] } });
 
   it('asks in the verifying form, one line per category with names inline', () => {
-    expect(m.body).toMatch(/stämmer det att kommunen inte har något avtal/i);
-    expect(m.body).toContain('- Läromedel: Magma, Binogi');
-    expect(m.body).toContain('- Prov: DigiExam, Teachiq, Trelson');
+    expect(m.body).toMatch(/stämmer det att kommunen inte har avtal för något av följande\?/i);
+    expect(m.body).toContain('- Läromedel: Radish (Magma), Binogi eller liknande');
+    expect(m.body).toContain('- Prov och bedömning: DigiExam, Teachiq (Exam.net), Trelson');
+    expect(m.body).toContain('- Lärplattform för gymnasiet: itslearning');
   });
 
   it('lets silence close the case rather than stranding it', () => {

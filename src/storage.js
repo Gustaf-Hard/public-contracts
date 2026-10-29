@@ -1782,6 +1782,22 @@ export function openDb(path) {
     `).all(conversationId);
   }
 
+  // Same projection for EVERY conversation of one kommun (central, handoffs,
+  // förvaltningar). Feeds the probe list's mentions (src/probe-list.js): a
+  // company the kommun named in any of its documents is known already.
+  function listContractInfoForKommun(kommunKod) {
+    return db.prepare(`
+      SELECT c.is_contract AS is_contract, v.name AS vendor_name, c.analysis_json AS analysis_json, c.document_type AS document_type
+      FROM attachments a
+      JOIN contracts c ON c.attachment_id = a.id
+      JOIN messages m ON m.id = a.message_id
+      JOIN conversations conv ON conv.id = m.conversation_id
+      LEFT JOIN vendors v ON v.id = c.vendor_id
+      WHERE conv.kommun_kod = ?
+      ORDER BY a.id
+    `).all(kommunKod);
+  }
+
   // Filenames per message for the WHOLE conversation, in attachment-id order.
   // Feeds the draft-context thread log (2026-09-12 design): the draft LLM must
   // see what each mail carried so it can never claim a delivered avtal is
@@ -2459,7 +2475,7 @@ export function openDb(path) {
     listParkedAnalysesToAlert,
     markParkedAnalysesAlerted,
     listContractInfoForMessage,
-    listContractInfoForConversation,
+    listContractInfoForConversation, listContractInfoForKommun,
     listAttachmentsForConversation,
     countUnreadAnalysableAttachments,
     listContractDeliveryEvents,

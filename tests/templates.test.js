@@ -8,6 +8,7 @@ import {
   T_FOLLOWUP_FINAL,
 } from '../src/templates.js';
 import { T_REQUEST_MISSING, T_UPDATE, T_DELAY_ACK, T_UPPGIFT, formatDateSv, computeReceivedMissing, chooseDeliveryReply } from '../src/templates.js';
+import { buildProbeList } from '../src/probe-list.js';
 
 const ctx = {
   kommun_namn: 'Malå',
@@ -251,7 +252,7 @@ describe('T_REQUEST_MISSING', () => {
   // Facts come from buildCoverageFacts; these are hand-built equivalents.
   const facts = (over = {}) => ({
     received: [], received_unresolved: [], channels_seen: [], undocumented: [],
-    not_yet_seen: [], has_missing: false, ...over,
+    has_missing: false, ...over,
   });
 
   it('keeps our extracted vendor names OUT of the ask', () => {
@@ -270,13 +271,13 @@ describe('T_REQUEST_MISSING', () => {
 
   it('never names a company we already received, under any of its names', () => {
     // Borlänge: Magma delivered. Neither "Magma" nor "Radish" may appear.
+    const probe = buildProbeList({ kommunKod: '9001', contracts: [{ contract_id: 1, kommun_kod: '9001', vendor_name: 'Magma', products: ['Magma'] }] });
     const m = T_REQUEST_MISSING({ ...base, facts: facts({
       received: [{ slug: 'radish', canonical: 'Radish', products: ['Magma'] }],
-      not_yet_seen: [{ slug: 'ne', canonical: 'Nationalencyklopedin', probeLabel: 'NE' }],
-    }) });
+    }), probe });
     expect(m.body).not.toMatch(/Radish/);
     expect(m.body).not.toMatch(/Magma/);
-    expect(m.body).toMatch(/NE/);
+    expect(m.body).toMatch(/\bNE\b/);
   });
 
   it('asks for the kommuns own avrop when a procurement channel appeared, never the framework contract', () => {
@@ -293,20 +294,21 @@ describe('T_REQUEST_MISSING', () => {
     expect(m.body).not.toMatch(/avrop/);
   });
 
-  it('probes only the ABSENT watchlist companies, by the brand a kommun recognizes', () => {
-    const m = T_REQUEST_MISSING({ ...base, facts: facts({
-      received: [{ slug: 'radish', canonical: 'Radish', products: ['Magma'] }],
-      not_yet_seen: [
-        { slug: 'ilt', canonical: 'ILT Education', probeLabel: 'Inläsningstjänst' },
-        { slug: 'binogi', canonical: 'Binogi', probeLabel: 'Binogi' },
-      ],
-    }) });
-    expect(m.body).toMatch(/Inläsningstjänst, Binogi eller liknande\?/);
-    expect(m.body).not.toMatch(/ILT Education/);  // company canonical, not the brand
+  it('asks the grouped probe in the verifying form, by the names a kommun knows', () => {
+    const probe = { categories: [
+      { category: 'laromedel', label: 'Läromedel', names: ['ILT (Inläsningstjänst)', 'Binogi'] },
+      { category: 'larplattform', label: 'Lärplattform', note: 'för gymnasiet', names: ['itslearning', 'Vklass'] },
+    ], struck: [] };
+    const m = T_REQUEST_MISSING({ ...base, facts: facts(), probe });
+    expect(m.body).toMatch(/Stämmer det att kommunen inte har avtal för något av följande\?/);
+    expect(m.body).toContain('- Läromedel: ILT (Inläsningstjänst), Binogi');
+    expect(m.body).toContain('- Lärplattform för gymnasiet: itslearning, Vklass');
+    expect(m.body).toMatch(/Finns något av dem tar jag gärna del av avtalet\./);
   });
 
-  it('drops the probe when every watchlist company is accounted for', () => {
-    const m = T_REQUEST_MISSING({ ...base, facts: facts({ undocumented: [{ name: 'X' }], has_missing: true }) });
+  it('drops the probe when nothing is left to ask about', () => {
+    const m = T_REQUEST_MISSING({ ...base, facts: facts({ undocumented: [{ name: 'X' }], has_missing: true }), probe: { categories: [], struck: [] } });
+    expect(m.body).not.toMatch(/Stämmer det/);
     expect(m.body).not.toMatch(/eller liknande/);
   });
 
@@ -327,14 +329,13 @@ describe('T_REQUEST_MISSING', () => {
     const m = T_REQUEST_MISSING({ ...base, facts: facts({
       received: [{ slug: 'radish', canonical: 'Radish', products: ['Magma'] }],
       channels_seen: [{ slug: 'adda', canonical: 'Adda' }],
-      not_yet_seen: [{ slug: 'ne', canonical: 'Nationalencyklopedin', probeLabel: 'NE' }],
       has_missing: false,
-    }) });
+    }), probe: { categories: [{ category: 'laromedel', label: 'Läromedel', names: ['NE', 'Binogi'] }], struck: [] } });
     expect(m.body).not.toMatch(/saknar/);
     expect(m.body).not.toMatch(/inte .*bifogade/);
     expect(m.body).toMatch(/Tack för avtalen/);
     expect(m.body).toMatch(/avrop/);
-    expect(m.body).toMatch(/NE eller liknande/);
+    expect(m.body).toMatch(/- Läromedel: NE, Binogi/);
   });
 
   it('thanks for what arrived without naming it, and still asks when nothing real arrived', () => {
@@ -352,9 +353,9 @@ describe('T_REQUEST_MISSING', () => {
       received: [{ slug: 'radish', canonical: 'Radish', products: ['Magma'] }],
       channels_seen: [{ slug: 'adda', canonical: 'Adda' }],
       undocumented: [{ slug: 'vklass', canonical: 'Vklass' }],
-      not_yet_seen: [{ slug: 'ne', canonical: 'Nationalencyklopedin', probeLabel: 'NE' }],
       has_missing: true,
-    }) });
+    }), probe: buildProbeList({ kommunKod: '9001' }) });
+    expect(m.body).toMatch(/Stämmer det/);
     expect(m.body).not.toMatch(/[—–]/);
   });
 

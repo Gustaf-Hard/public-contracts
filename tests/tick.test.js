@@ -1114,6 +1114,10 @@ describe('runTick — contract-aware delivery draft', () => {
       return atts.length;
     };
     await runTick(makeDeps({ gmail: fakeGmail({ listResult: [{ id: 'cov-1' }], getResult: { 'cov-1': delivery('cov-1', 'att-c1', 'Magma.pdf') } }), analyseContracts: analyseBatch1 }));
+    // The kommun's purchase list shows Binogi bought via Skolon: known, so the
+    // probe must not ask about it.
+    const att1 = db.raw.prepare('SELECT a.id FROM attachments a JOIN messages m ON m.id = a.message_id WHERE m.conversation_id = ?').get(convId);
+    db.replacePurchaseRows(att1.id, { rows: [{ supplier: 'Binogi Sverige AB', product: null, channel: 'skolon' }], method: 'xlsx', channel: 'skolon' });
 
     // Batch 2: a följebrev naming an undocumented service, so a draft is due.
     const analyseBatch2 = async ({ db: d, onlyMessageId }) => {
@@ -1137,8 +1141,12 @@ describe('runTick — contract-aware delivery draft', () => {
     // Radish (Magma's company) was received in batch 1, so it is not probed.
     expect(last.draft_body).not.toMatch(/Magma/);
     expect(last.draft_body).not.toMatch(/Radish/);
-    // The other watchlist companies, with no trace in either batch, still are.
-    expect(last.draft_body).toMatch(/Inläsningstjänst/);
+    // Companies with no trace for the kommun are asked about, grouped.
+    expect(last.draft_body).toMatch(/Stämmer det att kommunen inte har avtal för något av följande\?/);
+    expect(last.draft_body).toMatch(/^- Läromedel: .*ILT \(Inläsningstjänst\)/m);
+    expect(last.draft_body).toMatch(/^- Lärplattform: /m);
+    // Bought via Skolon: known, not asked.
+    expect(last.draft_body).not.toMatch(/Binogi/);
   });
 });
 
@@ -1221,8 +1229,8 @@ describe('runTick — final checklist', () => {
     getResult: { 'in-s': mkMsg('in-s', 'thr-s', 'Kommun <kommun@slut.se>', 'Det var samtliga avtal.', 'Sv') },
   };
 
-  // The probe pool is data-driven: a company is asked about only when >5
-  // kommuner fleet-wide hold an extracted contract with it. Seed that fleet.
+  // The probe orders each category by footprint: kommuner fleet-wide holding
+  // an extracted contract with the company. Seed that fleet.
   function seedFleetContracts(vendor, n, baseKod) {
     for (let i = 0; i < n; i++) {
       const cid = db.createConversation({
@@ -1243,9 +1251,9 @@ describe('runTick — final checklist', () => {
 
   it('drafts the checklist and moves to CROSSCHECK when contracts are on file', async () => {
     const id = seedDelivering();
-    // Fleet-wide: Binogi and ILT are popular (>5 kommuner). This kommun sends
-    // an ILT contract (via Polyglutt), so the checklist must probe Binogi
-    // under its category line and skip ILT.
+    // Fleet-wide: Binogi and ILT have the widest footprint. This kommun sends
+    // an ILT contract (via Polyglutt), so the checklist must lead its
+    // läromedel line with Binogi and skip ILT.
     seedFleetContracts('Binogi', 6, 9100);
     seedFleetContracts('ILT Education', 6, 9200);
     // One extracted contract: ILT via Polyglutt, so the checklist must skip it.
@@ -1270,8 +1278,9 @@ describe('runTick — final checklist', () => {
     expect(db.getConversation(id).state).toBe('CROSSCHECK');
     const esc = db.listOpenEscalationsForConversation(id)[0];
     expect(esc.draft_template).toBe('T_CROSSCHECK');
-    expect(esc.draft_body).toContain('- Läromedel: Binogi');
+    expect(esc.draft_body).toMatch(/^- Läromedel: Binogi, /m);   // widest footprint first
     expect(esc.draft_body).not.toContain('Inläsningstjänst');   // already received
+    expect(esc.draft_body).toMatch(/^- Prov och bedömning: /m);  // the whole catalogue, not one category
   });
 
   it('does not read a checklist to a kommun with nothing extracted', async () => {

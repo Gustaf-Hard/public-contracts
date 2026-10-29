@@ -1,3 +1,8 @@
+import { renderProbeList } from './probe-list.js';
+
+// The probe question shared by T_REQUEST_MISSING and T_CROSSCHECK.
+const PROBE_QUESTION = 'Stämmer det att kommunen inte har avtal för något av följande?';
+
 function scopeText(role) {
   return role === 'central' ? 'kommunen' : 'utbildningsförvaltningen';
 }
@@ -86,10 +91,9 @@ export function T_RECEIPT(ctx) {
 // are ASKING about, never what they sent: parroting our own extraction back
 // narrows their reply and can assert a wrong extraction as fact.
 export function T_CROSSCHECK(ctx) {
-  // One line per category with the popular names inline — longer pool than
-  // the old flat six, kept readable by grouping (2026-09-05 design).
-  const groups = (ctx.crosscheck_groups ?? []).filter((g) => g && g.names?.length);
-  const list = groups.map((g) => `- ${g.label}: ${g.names.join(', ')}`).join('\n');
+  // One line per category, the probe list of src/probe-list.js (2026-10-29):
+  // the whole catalogue minus what this kommun has shown us.
+  const list = renderProbeList(ctx.probe);
   return {
     subject: `Re: ${ctx.thread_subject}`,
     body: [
@@ -97,7 +101,7 @@ export function T_CROSSCHECK(ctx) {
       '',
       'Tack för beskedet, då har jag tagit emot handlingarna.',
       '',
-      'Som en sista avstämning innan jag avslutar ärendet: stämmer det att kommunen inte har något avtal avseende följande?',
+      `Som en sista avstämning innan jag avslutar ärendet: ${PROBE_QUESTION.charAt(0).toLowerCase()}${PROBE_QUESTION.slice(1)}`,
       '',
       list,
       '',
@@ -321,9 +325,9 @@ export function T_UPDATE(ctx) {
 //   2. A procurement channel gets an avrop ask, never a contract ask: the
 //      framework agreement is Adda's, the avrop is the kommun's and shows the
 //      real products and volumes.
-//   3. The probe names only watchlist companies with NO trace in the
-//      conversation, by the brand the kommun recognizes (probeLabel: "Magma",
-//      not "Radish").
+//   3. The probe (src/probe-list.js) names catalogue companies with no trace
+//      for the kommun, grouped by category, by the name the kommun recognizes
+//      ("Radish (Magma)").
 export function T_REQUEST_MISSING(ctx) {
   const facts = ctx.facts ?? {};
   const gotSomething = (facts.received?.length ?? 0) > 0 || (facts.received_unresolved?.length ?? 0) > 0;
@@ -360,14 +364,13 @@ export function T_REQUEST_MISSING(ctx) {
   }
 
   // Net-new probe. edit-review showed T_REQUEST_MISSING was the one template the
-  // operator consistently rewrote, every time to append this question. Only
-  // companies with no trace at all are named: asking about something they just
-  // delivered is exactly the Borlänge bug.
-  // Comma-joined, not listSv: the operator's own wording is "Inläsningstjänst,
-  // Binogi, NE eller liknande?" — an "och" before "eller liknande" reads clumsy.
-  const absent = (facts.not_yet_seen ?? []).map((c) => c.probeLabel ?? c.canonical).filter(Boolean);
-  if (absent.length) {
-    parts.push('', `Stämmer det att ni inte har avtal för andra digitala läromedel och tjänster inom skolan, till exempel ${absent.join(', ')} eller liknande?`);
+  // operator consistently rewrote, every time to append this question. The list
+  // (src/probe-list.js) is the whole catalogue minus everything this kommun has
+  // shown us: asking about something they just delivered is the Borlänge bug.
+  // It is a question, never a claim that anything is missing.
+  const probeLines = renderProbeList(ctx.probe);
+  if (probeLines) {
+    parts.push('', PROBE_QUESTION, '', probeLines, '', 'Finns något av dem tar jag gärna del av avtalet.');
   }
 
   parts.push('', signature(ctx));

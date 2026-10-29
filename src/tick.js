@@ -2,9 +2,8 @@ import { T_INITIAL, T_PRECISION, T_RECEIPT, T_FOLLOWUP_NUDGE, T_FOLLOWUP_CLOSE, 
 import { REQUEUED_REASON_PREFIX } from './storage.js';
 import { computeKommunReview } from './contract-lifecycle.js';
 import { matchWatchlist } from './watchlist.js';
-import { crosscheckProbeGroups } from './vendor-kb.js';
+import { buildProbeList, collectMentions } from './probe-list.js';
 import { parseHandoffTargets } from './handoff.js';
-import { popularProbeCompanies } from './vendor-analytics.js';
 import { buildCoverageFacts } from './coverage.js';
 import { classify, isCloserText } from './classifier.js';
 import { inferThreadStatus } from './threads.js';
@@ -37,6 +36,21 @@ function isRequeuedDraft(esc, log) {
   return requeued;
 }
 
+// The follow-up probe for one kommun (2026-10-29): the whole catalogue minus
+// what this kommun has shown us. Contracts and purchase rows are fleet-wide so
+// each category is ordered by footprint; mentions are the kommun's own, across
+// all its conversations. Kommun-wide, not per conversation: an avtal a handoff
+// conversation delivered is still held.
+function probeForKommun(db, conv) {
+  return buildProbeList({
+    kommunKod: conv.kommun_kod,
+    contracts: db.listContractFacts(),
+    purchaseRows: db.listPurchaseRows(),
+    coverage: db.listCoverage(),
+    mentions: collectMentions(db.listContractInfoForKommun(conv.kommun_kod)),
+  });
+}
+
 function fromHeader(env) {
   return `${env.GMAIL_FROM_NAME} <${env.GMAIL_USER_EMAIL}>`;
 }
@@ -58,8 +72,8 @@ function tplCtx(conv, env, extra = {}) {
     // Perpetual-refresh (T_UPDATE) context, forwarded when present.
     arendenummer: extra.arendenummer ?? conv.arendenummer ?? null,
     review_contracts: extra.review_contracts ?? [],
-    // Final-checklist (T_CROSSCHECK) vendor list.
-    crosscheck_groups: extra.crosscheck_groups ?? [],
+    // Probe list (src/probe-list.js) for T_REQUEST_MISSING and T_CROSSCHECK.
+    probe: extra.probe ?? null,
     // Delay/OOO acknowledgement (T_DELAY_ACK) context.
     delay_date: extra.delay_date ?? null,
   };
@@ -778,7 +792,7 @@ async function dispatchEscalationForIngest(pending, deps) {
       if (choice.template === 'T_REQUEST_MISSING') {
         draftTemplate = 'T_REQUEST_MISSING';
         llmDraft = null; // the PDF-blind LLM draft must not win here
-        templateCtx = { facts };
+        templateCtx = { facts, probe: probeForKommun(db, updated) };
       }
     } catch (e) {
       deps.log?.(`inline contract analysis error: ${e.message}`);
@@ -794,14 +808,12 @@ async function dispatchEscalationForIngest(pending, deps) {
       deps.log?.(`crosscheck contract analysis error: ${e.message}`);
     }
     const info = db.listContractInfoForConversation(updated.id);
-    const { all } = computeReceivedMissing(info);
-    // Probe pool is fleet-wide and data-driven: companies >5 kommuner already
-    // have (popularProbeCompanies), grouped by category, minus what THIS
-    // kommun has shown, with one-per-kommun categories settled entirely.
-    const popular = popularProbeCompanies(db.listContractFacts());
-    const groups = info.some((r) => r.is_contract) ? crosscheckProbeGroups({ received: all, popular }) : [];
-    if (groups.length > 0) {
-      templateCtx = { crosscheck_groups: groups };
+    // The probe list (src/probe-list.js): the whole catalogue, grouped by
+    // category, minus what THIS kommun has shown us, with exclusive functions
+    // an avtal already covers settled.
+    const probe = info.some((r) => r.is_contract) ? probeForKommun(db, updated) : null;
+    if (probe && probe.categories.length > 0) {
+      templateCtx = { probe };
       llmDraft = null;   // the deterministic checklist wins over the LLM's "tack"
     } else {
       // Nothing extracted, or nothing left to ask: reading the whole category
@@ -825,7 +837,7 @@ async function dispatchEscalationForIngest(pending, deps) {
         if (chooseDeliveryReply({ facts, unread_documents: unreadDocuments() }).template === 'T_REQUEST_MISSING') {
           draftTemplate = 'T_REQUEST_MISSING';
           llmDraft = null;
-          templateCtx = { facts };
+          templateCtx = { facts, probe: probeForKommun(db, updated) };
         } else {
           draftTemplate = llmDraft ? 'llm' : 'free_form';
         }
