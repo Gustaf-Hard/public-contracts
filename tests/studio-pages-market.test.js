@@ -406,7 +406,14 @@ describe('sums are floors, coverage is in elever', () => {
     // 5 x 2 700 of 8 x 2 700 known; Ale is out of both sides and named
     expect(t).toContain('Kommunerna med avtal i underlaget har 63 % av eleverna i grundskolan i de 8 kommuner där elevantalet är känt, 1 kommun utan känt elevantal räknas inte');
     // The category cards state the same basis (fix wave 2 S1).
-    expect(t).toMatch(/av eleverna i grundskolan i 8 kommuner med känt elevantal/);
+    expect(t).toMatch(/av eleverna i grundskolan i de 8 kommuner där elevantalet är känt/);
     expect(t).not.toMatch(/av eleverna i grundskolan(?! i (de )?8 kommuner)/);
+    // Fix wave 3 Q3: the hero fact box uses the same qualified text.
+    expect(t).not.toContain('av grundskolans');
+    expect(t).toMatch(/Deras elever\s*63 % av eleverna i grundskolan i de 8 kommuner där elevantalet är känt/);
+    // ... and so does the kategori header's Kommuner fact.
+    const k = plain((await get(a, '/studio/kategori/larplattform?partial=1')).text);
+    expect(k).not.toContain('av grundskolans elever');
+    expect(k).toMatch(/med minst ett aktivt avtal, \d+ % av eleverna i grundskolan i de 8 kommuner där elevantalet är känt/);
   });
 });

@@ -17,7 +17,7 @@ import {
   isNum, headline, byContract, byAvtal, distinctCount, kommunNamer, productNames, productHref, companyHref,
   section, breadcrumb, priceStrip, medianText, evidenceSection, renewalTileProps, peerGroupKods,
   modelLabel, safeAll, nOf, RENEWAL_MONTHS, isIso, coverageMap, noneStatusText, laneValue,
-  floorText, elevCoverageText, ELEV_BASIS,
+  floorText, elevCoverageText, elevShareText, ELEV_BASIS,
 } from './common.js';
 import { knownValue, shareBar, topThree, vendorRankings } from './marknad.js';
 
@@ -216,7 +216,7 @@ export function renderKategori({ category, facts, stats, statusMap, today, page 
     answer,
     facts: [
       { label: 'Minst per år i underlaget', value: kv.value == null ? null : fmtKrCompact(kv.value), sub: kv.total ? `känt för ${fmtInt(kv.known)} av ${fmtInt(kv.total)} avtal, en lägsta nivå` : 'inga aktiva avtal' },
-      { label: 'Kommuner', value: kommuner, unit: `av ${fmtInt(KOMMUNER_TOTAL)}`, sub: `med minst ett aktivt avtal${cov && isNum(cov.share) ? `, ${fmtPct(cov.share)} av grundskolans elever` : ''}` },
+      { label: 'Kommuner', value: kommuner, unit: `av ${fmtInt(KOMMUNER_TOTAL)}`, sub: `med minst ett aktivt avtal${elevShareText(cov) ? `, ${elevShareText(cov)}` : ''}` },
       { label: 'Median per elev', value: dist.suppressed ? null : fmtPrice(dist.median), unit: dist.suppressed ? '' : 'kr/elev', sub: dist.suppressed ? medianText(dist) : `n = ${fmtInt(dist.n)} kommuner med känt pris` },
     ],
     viz: avtal.length ? shareBar(topThree(facts, slug)) : '',

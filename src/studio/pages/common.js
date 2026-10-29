@@ -28,13 +28,22 @@ export const floorText = (value) => (isNum(value) ? `minst ${fmtKrCompact(value)
 // and says so (fix wave 2 S1): "... i de 289 kommuner där elevantalet är
 // känt". Never an unqualified national percentage.
 export function elevCoverageText(cov, { who = 'Kommunerna med avtal i underlaget' } = {}) {
-  if (!cov || !isNum(cov.share)) return 'Elevtäckningen är okänd';
+  const share = elevShareText(cov);
+  return share == null ? 'Elevtäckningen är okänd' : `${who} har ${share}`;
+}
+
+// The one qualified share text (fix wave 3 Q3), for every surface that shows
+// the elev share: "63 % av eleverna i grundskolan[ i de 8 kommuner där
+// elevantalet är känt][, 1 kommun utan känt elevantal räknas inte]". Null when
+// the share is unknown; each caller words its own unknown.
+export function elevShareText(cov) {
+  if (!cov || !isNum(cov.share)) return null;
   const k = cov.kommuner_known_total;
   const basis = cov.total_unknown > 0 && isNum(k)
     ? (k === 1 ? ' i den 1 kommun där elevantalet är känt' : ` i de ${fmtInt(k)} kommuner där elevantalet är känt`)
     : '';
   const unk = cov.kommuner_unknown ? `, ${nOf(cov.kommuner_unknown, 'kommun', 'kommuner')} utan känt elevantal räknas inte` : '';
-  return `${who} har ${fmtPct(cov.share)} av eleverna i grundskolan${basis}${unk}`;
+  return `${fmtPct(cov.share)} av eleverna i grundskolan${basis}${unk}`;
 }
 
 // The basis line under a coverage figure.

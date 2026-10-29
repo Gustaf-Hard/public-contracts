@@ -11,7 +11,7 @@ import { kpiTile, emptyPanel } from '../components.js';
 import { rankingBars } from '../charts.js';
 import {
   isNum, headline, byContract, categoryLabel, companyHref, kommunHref, kommunNamer,
-  section, renewalTileProps, nOf, isIso, notDone, floorText, elevCoverageText, ELEV_BASIS,
+  section, renewalTileProps, nOf, isIso, notDone, floorText, elevCoverageText, elevShareText, ELEV_BASIS,
 } from './common.js';
 
 export const ADDA_MONTH = '2027-01';
@@ -86,13 +86,9 @@ export function topThree(facts, category) {
   return companyShares(facts, { category }).slice(0, 3).map((s) => ({ name: s.name, share: s.n_known ? s.share_value : null }));
 }
 
-// "67 % av eleverna i grundskolan" for a card; unknown stays unknown. With
-// any kommun's elevantal unknown, the share states its basis (S1).
-function elevShareShort(cov) {
-  if (!cov || !isNum(cov.share)) return 'elevtäckning okänd';
-  const basis = cov.total_unknown > 0 && isNum(cov.kommuner_known_total) ? ` i ${nOf(cov.kommuner_known_total, 'kommun', 'kommuner')} med känt elevantal` : '';
-  return `${fmtPct(cov.share)} av eleverna i grundskolan${basis}${cov.kommuner_unknown ? `, ${nOf(cov.kommuner_unknown, 'kommun', 'kommuner')} utan känt elevantal` : ''}`;
-}
+// The card's share: the one qualified text (elevShareText); unknown stays
+// unknown.
+const elevShareShort = (cov) => elevShareText(cov) ?? 'elevtäckning okänd';
 
 export function categoryCards({ facts, stats = null, includeEmpty = false }) {
   const market = new Map(marketByCategory(facts).map((m) => [m.category, m]));
@@ -350,7 +346,7 @@ export function renderMarknad({ facts, stats, statusMap, today, basis }) {
       ${completenessRing({ covered })}
       <dl class="mk-facts">
         <div><dt>Kommuner med avtal</dt><dd><b>${esc(fmtInt(covered))}</b> av ${esc(fmtInt(KOMMUNER_TOTAL))}</dd></div>
-        <div><dt>Deras elever</dt><dd>${cov && isNum(cov.share) ? `<b>${esc(fmtPct(cov.share))}</b> av grundskolans` : 'okänt'}</dd></div>
+        <div><dt>Deras elever</dt><dd>${esc(elevShareText(cov) ?? 'okänt')}</dd></div>
         <div><dt>Insamling klar</dt><dd><b>${esc(fmtInt(b.done ?? 0))}</b> ${(b.done ?? 0) === 1 ? 'kommun' : 'kommuner'}${b.dead_end || b.partial ? `, ${esc(notDone(b.dead_end, b.partial))}` : ''}</dd></div>
         <div><dt>Aktiva avtal</dt><dd><b>${esc(fmtInt(active))}</b> av ${esc(fmtInt(collected))} insamlade</dd></div>
       </dl>
