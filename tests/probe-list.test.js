@@ -2,7 +2,8 @@
 // catalogue, minus everything this kommun has shown us. Hand-written fixtures
 // only: the repo is public, so no real kommun data.
 import { describe, it, expect } from 'vitest';
-import { buildProbeList, renderProbeList, collectMentions, PROBE_CAP } from '../src/probe-list.js';
+import { buildProbeList, renderProbeList, collectMentions, skolformerFromStats, PROBE_CAP } from '../src/probe-list.js';
+import { loadKommunStats } from '../src/kommun-stats.js';
 
 const K = '9001';
 const avtal = (id, vendor, products = [], kommun = K) => ({ contract_id: id, kommun_kod: kommun, vendor_name: vendor, products });
@@ -206,5 +207,47 @@ describe('buildProbeList: Binogi is never singled out', () => {
     expect(entries(probe, 'laromedel')).toEqual([]);
     expect(allNames(probe)).not.toContain('Binogi');
     expect(reasonFor(probe, 'Binogi')).toBeTruthy();
+  });
+});
+
+describe('buildProbeList: skolformer the kommun does not run', () => {
+  const stats = loadKommunStats({ data: {
+    sources: { siris_6_grundskola: { status: 'ok' }, siris_57_gymnasieskola: { status: 'ok' } },
+    kommuner: {
+      9001: { namn: 'Utan gymnasium', elever: { '1-3': 200, '4-6': 210, '7-9': 190, Gymnasiet: null } },
+      9002: { namn: 'Med gymnasium', elever: { '1-3': 200, '4-6': 210, '7-9': 190, Gymnasiet: 300 } },
+      9003: { namn: 'Noll i gymnasiet', elever: { '1-3': 200, '4-6': 210, '7-9': 190, Gymnasiet: 0 } },
+    },
+  } });
+
+  it('reads the stats: absent from a source that loaded means no school, a failed source means unknown', () => {
+    expect(skolformerFromStats(stats, '9001')).toEqual({ grundskola: true, gymnasiet: false });
+    expect(skolformerFromStats(stats, '9002')).toEqual({ grundskola: true, gymnasiet: true });
+    expect(skolformerFromStats(stats, '9003')).toEqual({ grundskola: true, gymnasiet: false });
+    expect(skolformerFromStats(stats, '8888')).toEqual({ grundskola: null, gymnasiet: null });
+    const failed = loadKommunStats({ data: { sources: { siris_57_gymnasieskola: { status: 'failed' } },
+      kommuner: { 9001: { elever: { '1-3': 5, Gymnasiet: null } } } } });
+    expect(skolformerFromStats(failed, '9001').gymnasiet).toBeNull();
+  });
+
+  it('never asks "för gymnasiet" in a kommun without a kommunal gymnasieskola', () => {
+    const probe = buildProbeList({ kommunKod: K, contracts: [avtal(1, 'Unikum', ['Unikum'])], skolformer: { grundskola: true, gymnasiet: false } });
+    expect(entries(probe, 'larplattform')).toEqual([]);
+    expect(renderProbeList(probe)).not.toMatch(/för gymnasiet/);
+    expect(reasonFor(probe, 'itslearning')).toMatch(/lärplattform finns redan via Unikum; ingen kommunal gymnasieskola/);
+  });
+
+  it('with no avtal at all the category is asked plainly, without a skolform note', () => {
+    const probe = buildProbeList({ kommunKod: K, skolformer: { grundskola: true, gymnasiet: false } });
+    const lp = entries(probe, 'larplattform');
+    expect(lp).toHaveLength(1);
+    expect(lp[0].note).toBeUndefined();
+  });
+
+  it('keeps the current behaviour when the stats are unknown or show a gymnasieskola', () => {
+    for (const skolformer of [undefined, { grundskola: null, gymnasiet: null }, { grundskola: true, gymnasiet: true }]) {
+      const probe = buildProbeList({ kommunKod: K, contracts: [avtal(1, 'Unikum', ['Unikum'])], skolformer });
+      expect(entries(probe, 'larplattform')[0].note).toBe('för gymnasiet');
+    }
   });
 });

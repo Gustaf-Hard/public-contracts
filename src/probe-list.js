@@ -24,6 +24,7 @@ import { classifyPurchaseRow } from './purchase-list.js';
 import { channelName } from './studio-purchases.js';
 import { isNotRequestedMention, isOutOfScopeMention } from './coverage.js';
 import { mapUnitToGradeLevels } from './vendor-analytics.js';
+import { loadKommunStats } from './kommun-stats.js';
 
 // At most this many names per line; the rest is "eller liknande".
 export const PROBE_CAP = 10;
@@ -48,6 +49,7 @@ export const FUNCTION_LABELS = Object.freeze({
 const PER_SKOLFORM = new Set(['larplattform', 'prov', 'journal']);
 const SKOLFORMER = ['grundskola', 'gymnasiet'];
 const SKOLFORM_LABEL = { grundskola: 'grundskolan', gymnasiet: 'gymnasiet' };
+const NO_SCHOOL_LABEL = { grundskola: 'grundskola', gymnasiet: 'gymnasieskola' };
 const GRUNDSKOLA_LEVELS = new Set(['Förskoleklass', '1-3', '4-6', '7-9']);
 const GYMNASIE_LEVELS = new Set(['Gymnasiet', 'Introduktionsprogrammet']);
 
@@ -133,6 +135,27 @@ function mentionCompanies(m) {
   return [...out].filter(isService);
 }
 
+// Which skolformer the kommun runs schools in, from the kommun-stats snapshot
+// (src/kommun-stats.js, elever in kommunal regi). A kommun missing from a
+// Skolverket export that loaded fine has no school of that form (false); a
+// failed source, or a kommun not in the snapshot, is unknown (null).
+const FORM_SOURCES = {
+  grundskola: { levels: ['1-3', '4-6', '7-9'], source: 'siris_6_grundskola' },
+  gymnasiet: { levels: ['Gymnasiet'], source: 'siris_57_gymnasieskola' },
+};
+export function skolformerFromStats(stats, kommunKod) {
+  const rec = stats?.get?.(String(kommunKod)) ?? null;
+  const out = {};
+  for (const [form, { levels, source }] of Object.entries(FORM_SOURCES)) {
+    if (!rec) { out[form] = null; continue; }
+    const vals = levels.map((l) => rec.elever?.[l]);
+    if (vals.some((v) => typeof v === 'number' && v > 0)) out[form] = true;
+    else if (vals.some((v) => v === 0) && vals.every((v) => v == null || v === 0)) out[form] = false;
+    else out[form] = stats.data?.sources?.[source]?.status === 'ok' ? false : null;
+  }
+  return out;
+}
+
 // Mentions for buildProbeList out of contract-info rows (is_contract,
 // analysis_json): every mentioned_agreements entry, verbatim.
 export function collectMentions(rows = []) {
@@ -156,7 +179,10 @@ export function collectMentions(rows = []) {
 //   purchaseRows  purchase rows { kommun_kod, supplier, product, channel }
 //   coverage      contract_coverage rows { contract_id, grade_level }
 //   mentions      THIS kommun's mentions { vendor, product, note }
-export function buildProbeList({ kommunKod, contracts = [], purchaseRows = [], coverage = [], mentions = [] } = {}) {
+//   skolformer    { grundskola, gymnasiet }: true when the kommun has elever in
+//                 its own schools, false when it has none, null/absent unknown
+//                 (skolformerFromStats). False forms are never asked about.
+export function buildProbeList({ kommunKod, contracts = [], purchaseRows = [], coverage = [], mentions = [], skolformer = null } = {}) {
   const kod = kommunKod == null ? null : String(kommunKod);
   const own = (r) => kod != null && String(r?.kommun_kod ?? '') === kod;
 
@@ -229,9 +255,15 @@ export function buildProbeList({ kommunKod, contracts = [], purchaseRows = [], c
     if (cov) {
       const settled = `${FUNCTION_LABELS[primary] ?? primary} finns redan via ${holderNames(cov.holders)}`;
       if (!PER_SKOLFORM.has(primary)) { struck.push({ name, reason: settled }); continue; }
-      const open = SKOLFORMER.filter((f) => !cov.forms.has(f));
-      if (open.length === 0) { struck.push({ name, reason: settled }); continue; }
-      if (open.length === 1) note = `för ${SKOLFORM_LABEL[open[0]]}`;
+      // A skolform the kommun runs no schools in is never asked about.
+      const run = SKOLFORMER.filter((f) => skolformer?.[f] !== false);
+      const open = run.filter((f) => !cov.forms.has(f));
+      if (open.length === 0) {
+        const none = SKOLFORMER.filter((f) => skolformer?.[f] === false && !cov.forms.has(f));
+        struck.push({ name, reason: settled + none.map((f) => `; ingen kommunal ${NO_SCHOOL_LABEL[f]}`).join('') });
+        continue;
+      }
+      if (open.length < run.length) note = `för ${SKOLFORM_LABEL[open[0]]}`;
     }
     const key = `${category}\u0000${note ?? ''}`;
     if (!groups.has(key)) groups.set(key, { category, note, members: [] });
@@ -268,16 +300,22 @@ export function renderProbeList(probe) {
     .join('\n');
 }
 
+// Unreadable stats mean unknown skolformer: the probe keeps asking.
+function safeStats() {
+  try { return loadKommunStats(); } catch { return null; }
+}
+
 // The one IO wrapper: the probe for one kommun read from an open pilot DB
 // (src/storage.js). Contracts and purchase rows are fleet-wide so each
 // category follows footprint; mentions are the kommun's own, across all its
 // conversations (an avtal a handoff conversation delivered is still held).
-export function probeFromDb(db, kommunKod) {
+export function probeFromDb(db, kommunKod, { stats } = {}) {
   return buildProbeList({
     kommunKod,
     contracts: db.listContractFacts(),
     purchaseRows: db.listPurchaseRows(),
     coverage: db.listCoverage(),
     mentions: collectMentions(db.listContractInfoForKommun(kommunKod)),
+    skolformer: skolformerFromStats(stats === undefined ? safeStats() : stats, kommunKod),
   });
 }
