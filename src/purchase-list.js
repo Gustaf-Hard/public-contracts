@@ -221,7 +221,8 @@ function readTable(sheet, { filename }) {
   // Document-level school year from the lines above the header ("År 2023-24"),
   // else the filename.
   const above = rows.slice(0, h).flat().filter((c) => typeof c === 'string');
-  const docYear = parseSchoolYear(above.join(' ')) ?? parseSchoolYear(filename);
+  // A sheet named for its läsår ("2024-25") dates its rows too.
+  const docYear = parseSchoolYear(above.join(' ')) ?? parseSchoolYear(sheet.name) ?? parseSchoolYear(filename);
   const docChannel = channelFrom(filename, above.join(' '));
   const out = [];
   let total = null;
@@ -265,11 +266,18 @@ function readTable(sheet, { filename }) {
   return { rows: out, total, map };
 }
 
-const dupKey = (r) => `${normName(r.supplier)}\u0000${normName(r.product)}`;
+// A row's full identity (fix wave 2 E4): its order reference when it has
+// one, else every field that can tell two orders apart. Equal supplier and
+// product is not a repeat: a later läsår, another budget unit or a new order
+// has its own row.
+const dupKey = (r) => (r.order_ref
+  ? `ref\u0000${normName(r.order_ref)}`
+  : [normName(r.supplier), normName(r.product), r.amount_sek, r.period_start, r.period_end, r.quantity, r.school_year, r.order_date]
+    .map((v) => (v == null ? '' : String(v))).join('\u0000'));
 
 // Every recognisable table in the workbook. A later sheet that repeats a row
-// already read (same supplier and product: a summary tab of the first) adds
-// only its new rows. No rows are summed; a total row is the stated total.
+// already read (the same identity: a summary tab of the first) adds only its
+// new rows. No rows are summed; a total row is the stated total.
 export function extractXlsxPurchases(sheets = [], { filename = '' } = {}) {
   const rows = [];
   const seen = new Set();

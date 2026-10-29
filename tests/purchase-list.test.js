@@ -185,11 +185,29 @@ describe('extractXlsxPurchases', () => {
     expect(out.rows[1].period_end).toBeNull();
   });
 
-  it('drops a later sheet\'s repeat of a row already read from an earlier sheet', () => {
+  // Fix wave 2 E4: a row is a repeat only on its full identity: the order
+  // reference when it has one, else supplier, product, amount, period,
+  // quantity, läsår and order date. Equal supplier and product is not enough.
+  it('drops a later sheet\'s exact repeat of a row, and only that', () => {
     const a = sheet([['Leverantör', 'Produkt', 'Årskostnad'], ['Binogi', 'Binogi', 100], ['Gleerups', 'Exempel', 50]], 'Blad1');
-    const b = sheet([['Leverantör', 'Produkt', 'Årskostnad'], ['Binogi ', 'Binogi', 120], ['Widgit', 'Widgit Online', 70]], 'Blad2');
+    const b = sheet([['Leverantör', 'Produkt', 'Årskostnad'], ['Binogi ', 'Binogi', 100], ['Gleerups', 'Exempel', 60], ['Widgit', 'Widgit Online', 70]], 'Summering');
     const out = extractXlsxPurchases([a, b], { filename: 'x.xlsx' });
-    expect(out.rows.map((r) => r.product)).toEqual(['Binogi', 'Exempel', 'Widgit Online']);
+    expect(out.rows.map((r) => [r.product, r.amount_sek])).toEqual([['Binogi', 100], ['Exempel', 50], ['Exempel', 60], ['Widgit Online', 70]]);
+  });
+
+  it('keeps rows of a later läsår with the same supplier and product', () => {
+    const y1 = sheet([['Leverantör', 'Produkt', 'Antal', 'Belopp'], ['NE', 'NE Skola', 100, 1000], ['Binogi', 'Binogi', 50, 500], ['Gleerups', 'Exempel', 5, 50]], '2023-24');
+    const y2 = sheet([['Leverantör', 'Produkt', 'Antal', 'Belopp'], ['NE', 'NE Skola', 100, 1000], ['Binogi', 'Binogi', 60, 600]], '2024-25');
+    const out = extractXlsxPurchases([y1, y2], { filename: 'x.xlsx' });
+    expect(out.rows).toHaveLength(5);
+    expect(out.rows.filter((r) => r.supplier === 'NE').map((r) => r.school_year)).toEqual(['2023/24', '2024/25']);
+  });
+
+  it('an order reference is the identity when there is one', () => {
+    const a = sheet([['Ordernummer', 'Leverantör', 'Produkt', 'Belopp'], ['EX-1', 'Binogi', 'Binogi', 100], ['EX-2', 'Binogi', 'Binogi', 100]], 'Ordrar');
+    const b = sheet([['Ordernummer', 'Leverantör', 'Produkt', 'Belopp'], ['EX-1', 'Binogi', 'Binogi licens', 100], ['EX-3', 'Binogi', 'Binogi', 100]], 'Kopia');
+    const out = extractXlsxPurchases([a, b], { filename: 'x.xlsx' });
+    expect(out.rows.map((r) => r.order_ref)).toEqual(['EX-1', 'EX-2', 'EX-3']);
   });
 
   it('says unrecognised when no sheet has a usable header', () => {
