@@ -98,4 +98,15 @@ describe('purchase storage', () => {
     db.recordPurchaseFailure(a, { reason: 'transient:api_5xx', permanent: false });
     expect(db.listPurchaseRows()).toHaveLength(1);
   });
+
+  // Fix wave 2 E8: a document re-analysed into an avtal is an avtal, not a
+  // purchase list. Its stored rows stay on disk but are no longer read.
+  it('rows of a document now classified as an avtal are not listed', () => {
+    const att = seed();
+    db.replacePurchaseRows(att, { rows: [row()], method: 'xlsx' });
+    expect(db.listPurchaseRows()).toHaveLength(1);
+    db.raw.prepare('UPDATE contracts SET is_contract = 1, document_type = ? WHERE attachment_id = ?').run('avtal', att);
+    expect(db.listPurchaseRows()).toHaveLength(0);
+  });
 });
+

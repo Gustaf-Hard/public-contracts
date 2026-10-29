@@ -2137,7 +2137,9 @@ export function openDb(path, { readonly = false } = {}) {
   }
 
   // Every stored purchase row with its kommun and document facts, for the
-  // studio. No filename: it can carry a person's name.
+  // studio and the probe. No filename: it can carry a person's name. A
+  // document re-analysed into an avtal (is_contract = 1, fix wave 2 E8) is
+  // an avtal now, so its rows are not read.
   function listPurchaseRows() {
     return db.prepare(`
       SELECT pr.id, pr.attachment_id, pr.row_index, pr.supplier, pr.product, pr.channel, pr.quantity, pr.unit,
@@ -2150,6 +2152,7 @@ export function openDb(path, { readonly = false } = {}) {
       JOIN messages m ON m.id = a.message_id
       JOIN conversations conv ON conv.id = m.conversation_id
       LEFT JOIN purchase_documents pd ON pd.attachment_id = pr.attachment_id
+      WHERE NOT EXISTS (SELECT 1 FROM contracts c WHERE c.attachment_id = pr.attachment_id AND c.is_contract = 1)
       ORDER BY pr.attachment_id, pr.row_index
     `).all().map((r) => {
       let grades = [];
