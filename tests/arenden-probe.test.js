@@ -14,7 +14,7 @@ describe('ärende page probe fold', () => {
   it('folds the struck names with their reasons under a summary line', () => {
     const html = renderArenden({ cases: [], selected: selected({
       categories: [{ category: 'laromedel', label: 'Läromedel', names: ['Binogi', 'Skolplus'], more: 3 }],
-      struck: [{ name: 'Natur & Kultur', reason: 'köpt via Skolon' }, { name: 'Unikum', reason: 'lärplattform finns redan (SchoolSoft)' }],
+      struck: [{ name: 'Natur & Kultur', reason: 'köpt via Skolon' }, { name: 'Unikum', reason: 'lärplattform finns redan via SchoolSoft' }],
     }), selectedId: 7 });
     expect(html).toMatch(/<details class="probe-fold">/);
     expect(html).toMatch(/5 frågas, 2 strukna/);

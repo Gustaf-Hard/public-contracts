@@ -227,7 +227,7 @@ export function buildProbeList({ kommunKod, contracts = [], purchaseRows = [], c
     const primary = c.functions?.[0];
     const cov = primary ? covered.get(primary) : null;
     if (cov) {
-      const settled = `${FUNCTION_LABELS[primary] ?? primary} finns redan (${holderNames(cov.holders)})`;
+      const settled = `${FUNCTION_LABELS[primary] ?? primary} finns redan via ${holderNames(cov.holders)}`;
       if (!PER_SKOLFORM.has(primary)) { struck.push({ name, reason: settled }); continue; }
       const open = SKOLFORMER.filter((f) => !cov.forms.has(f));
       if (open.length === 0) { struck.push({ name, reason: settled }); continue; }
