@@ -6,7 +6,7 @@ import { zipSync, strToU8 } from 'fflate';
 import {
   channelFrom, isPurchaseListCandidate, parseSchoolYear, schoolYearEnd, licenceMonths, parseDate, parseAmount,
   mapHeaderRow, extractXlsxPurchases, looksLikePurchaseList, normalisePurchaseRow, classifyPurchaseRow,
-  PURCHASE_SCHEMA, countUnionParams, extractPurchasesWithLlm, extractPurchases, rowsFromLlm,
+  PURCHASE_SCHEMA, countUnionParams, extractPurchasesWithLlm, extractPurchases, rowsFromLlm, supplierCompany,
 } from '../src/purchase-list.js';
 
 const sheet = (rows, name = 'Blad1') => ({ name, rows, rowNumbers: rows.map((_, i) => i + 1) });
@@ -269,6 +269,22 @@ describe('classifyPurchaseRow', () => {
   it('a supplier name that merely contains a catalogue word matches nothing', () => {
     for (const supplier of ['Exempel Elfirma Stig AB', 'Stig Exempelbygg AB', 'Magma Exempelbygg AB', 'Clio Exempelfastigheter AB', 'Tyra Exempelsdotter', 'Exempelhotellet AB', 'Exempel AB/ Matteappen Magma']) {
       expect(classifyPurchaseRow({ supplier, product: null }).company_slug, supplier).toBeNull();
+    }
+  });
+
+  // Fix wave 3 Q8: real legal names are explicit aliases; the matcher stays exact.
+  it('real legal names of catalogue companies match, as explicit aliases', () => {
+    const cases = {
+      'Unikum Datorsystem AB': 'unikum', 'Clio Online Sverige AB': 'clio', 'Clio Online ApS': 'clio', 'Skolon AB (publ)': 'skolon',
+      'Bokförlaget Natur och Kultur': 'natur-kultur', 'Claro Software Ltd': 'claro', 'itslearning AS': 'itslearning',
+      'Showbie Inc.': 'showbie', 'SpeedAdmin ApS': 'speedadmin', 'Kide Science Oy': 'kide-science', 'Creaza AS': 'creaza',
+    };
+    for (const [supplier, slug] of Object.entries(cases)) expect(supplierCompany(supplier)?.slug, supplier).toBe(slug);
+  });
+
+  it('the strict matcher is not loosened by the aliases', () => {
+    for (const supplier of ['Unikum Exempeldatorsystem AB', 'Clio Online Exempel AB', 'Skolon Exempel AB (publ)', 'Exempel AB (publ)']) {
+      expect(supplierCompany(supplier), supplier).toBeNull();
     }
   });
 
