@@ -94,6 +94,14 @@ export function T_CROSSCHECK(ctx) {
   // One line per category, the probe list of src/probe-list.js (2026-10-29):
   // the whole catalogue minus what this kommun has shown us.
   const list = renderProbeList(ctx.probe);
+  // No list (fix wave 2: files still unread, or the probe failed): a plain
+  // receipt. It asks nothing and closes nothing; the operator decides.
+  if (!list) {
+    return {
+      subject: `Re: ${ctx.thread_subject}`,
+      body: ['Hej,', '', 'Tack för beskedet, då har jag tagit emot handlingarna.', '', signature(ctx)].join('\n'),
+    };
+  }
   return {
     subject: `Re: ${ctx.thread_subject}`,
     body: [

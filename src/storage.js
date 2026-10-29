@@ -1847,6 +1847,23 @@ export function openDb(path) {
     `).get(conversationId)?.n ?? 0;
   }
 
+  // The same unread notion for EVERY conversation of one kommun (fix wave 2
+  // P2): the probe list is kommun-wide, so while any analysable file of the
+  // kommun sits unread (pending or parked) we cannot say what it lacks.
+  function countUnreadAnalysableAttachmentsForKommun(kommunKod) {
+    return db.prepare(`
+      SELECT COUNT(*) AS n
+      FROM attachments a
+      JOIN messages m ON m.id = a.message_id
+      JOIN conversations conv ON conv.id = m.conversation_id
+      LEFT JOIN contracts c ON c.attachment_id = a.id
+      WHERE conv.kommun_kod = ?
+        AND c.id IS NULL
+        AND (a.mime_type = 'application/pdf' OR lower(a.filename) LIKE '%.pdf'
+             OR lower(a.filename) LIKE '%.xlsx' OR lower(a.filename) LIKE '%.docx')
+    `).get(String(kommunKod))?.n ?? 0;
+  }
+
   // --- Collection velocity (read-only; no schema change) ---
   // A machine reply is auto_ack (diariesystem receipt) or auto_reply (OOO).
   // `unknown` and NULL count as HUMAN: no robot marker matched, so a person
@@ -2493,7 +2510,7 @@ export function openDb(path) {
     listContractInfoForMessage,
     listContractInfoForConversation, listProbeDocumentsForKommun,
     listAttachmentsForConversation,
-    countUnreadAnalysableAttachments,
+    countUnreadAnalysableAttachments, countUnreadAnalysableAttachmentsForKommun,
     listContractDeliveryEvents,
     listCaseTimings,
     countFilesByDocumentType,

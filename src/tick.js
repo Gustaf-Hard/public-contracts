@@ -37,8 +37,21 @@ function isRequeuedDraft(esc, log) {
 }
 
 // The follow-up probe for one kommun (src/probe-list.js): kommun-wide, not
-// per conversation.
-const probeForKommun = (db, conv) => probeFromDb(db, conv.kommun_kod);
+// per conversation. Never throws (fix wave 2 P6): a display-grade list must not
+// change the template or crash ingest, so a failure degrades to "no probe".
+// While ANY analysable file of the kommun sits unread, pending or parked (P2),
+// the probe is left out: we cannot ask whether they lack an avtal that may be
+// lying unread on our own disk. `note` goes on the escalation reason.
+function probeForKommun(db, conv, log) {
+  try {
+    const unread = db.countUnreadAnalysableAttachmentsForKommun(conv.kommun_kod);
+    if (unread > 0) return { probe: null, note: `probe utelämnad: ${unread} olästa dokument i kommunen` };
+    return { probe: probeFromDb(db, conv.kommun_kod), note: null };
+  } catch (e) {
+    log?.(`probe error for ${conv.kommun_namn}/${conv.role}: ${e.message}`);
+    return { probe: null, note: 'probe utelämnad: kunde inte beräknas' };
+  }
+}
 
 function fromHeader(env) {
   return `${env.GMAIL_FROM_NAME} <${env.GMAIL_USER_EMAIL}>`;
@@ -711,6 +724,7 @@ async function dispatchEscalationForIngest(pending, deps) {
   let templateCtx = {};
   let watchlistVendors = [];
   let reasonPrefix = null;
+  const addReason = (note) => { reasonPrefix = reasonPrefix ? `${reasonPrefix} | ${note}` : note; };
   // The same out-of-office firing again (often triggered by our own ack) is not
   // new information from the kommun, so it must not void a pending draft.
   let isRepeatAutoresponder = false;
@@ -776,12 +790,17 @@ async function dispatchEscalationForIngest(pending, deps) {
         // document freezes this conversation's missing-claim until un-parked,
         // and the escalation reason is the one surface they see in Slack.
         const suppressedNote = `⏳ ${unread} dokument olästa — saknas-påstående undertryckt`;
-        reasonPrefix = reasonPrefix ? `${reasonPrefix} | ${suppressedNote}` : suppressedNote;
+        addReason(suppressedNote);
       }
       if (choice.template === 'T_REQUEST_MISSING') {
+        // Probe first (it never throws), then assign all three together: a
+        // throw anywhere above leaves a clean T_RECEIPT, never a
+        // T_REQUEST_MISSING without its facts.
+        const { probe, note } = probeForKommun(db, updated, deps.log);
+        if (note) addReason(note);
         draftTemplate = 'T_REQUEST_MISSING';
         llmDraft = null; // the PDF-blind LLM draft must not win here
-        templateCtx = { facts, probe: probeForKommun(db, updated) };
+        templateCtx = { facts, probe };
       }
     } catch (e) {
       deps.log?.(`inline contract analysis error: ${e.message}`);
@@ -796,12 +815,23 @@ async function dispatchEscalationForIngest(pending, deps) {
     } catch (e) {
       deps.log?.(`crosscheck contract analysis error: ${e.message}`);
     }
-    const info = db.listContractInfoForConversation(updated.id);
+    let hasAvtal = false;
+    try {
+      hasAvtal = db.listContractInfoForConversation(updated.id).some((r) => r.is_contract);
+    } catch (e) {
+      deps.log?.(`crosscheck contract lookup error: ${e.message}`);
+    }
     // The probe list (src/probe-list.js): the whole catalogue, grouped by
     // category, minus what THIS kommun has shown us, with exclusive functions
     // an avtal already covers settled.
-    const probe = info.some((r) => r.is_contract) ? probeForKommun(db, updated) : null;
-    if (probe && probe.categories.length > 0) {
+    const { probe, note } = hasAvtal ? probeForKommun(db, updated, deps.log) : { probe: null, note: null };
+    if (note) {
+      // Unread files or a failed probe: the closing mail goes out without the
+      // list (T_CROSSCHECK renders a plain receipt), and the reason says why.
+      addReason(note);
+      templateCtx = { probe: null };
+      llmDraft = null;
+    } else if (probe && probe.categories.length > 0) {
       templateCtx = { probe };
       llmDraft = null;   // the deterministic checklist wins over the LLM's "tack"
     } else {
@@ -824,9 +854,11 @@ async function dispatchEscalationForIngest(pending, deps) {
         // when there is genuinely nothing to propose.
         const facts = buildCoverageFacts(db.listContractInfoForConversation(updated.id));
         if (chooseDeliveryReply({ facts, unread_documents: unreadDocuments() }).template === 'T_REQUEST_MISSING') {
+          const { probe, note } = probeForKommun(db, updated, deps.log);
+          if (note) addReason(note);
           draftTemplate = 'T_REQUEST_MISSING';
           llmDraft = null;
-          templateCtx = { facts, probe: probeForKommun(db, updated) };
+          templateCtx = { facts, probe };
         } else {
           draftTemplate = llmDraft ? 'llm' : 'free_form';
         }
