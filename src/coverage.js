@@ -8,7 +8,7 @@
 // verbatim rather than guessed at or dropped.
 // See docs/superpowers/specs/2026-07-28-vendor-product-knowledge-base-design.md
 
-import { COMPANIES, resolveCompany, probeName } from './vendor-kb.js';
+import { resolveCompany } from './vendor-kb.js';
 
 function parseAnalysis(a) {
   if (typeof a === 'string') { try { return JSON.parse(a); } catch { return null; } }
@@ -69,11 +69,10 @@ export function isNotRequestedMention(m) {
 //   received_unresolved real contracts whose vendor is not in the KB (verbatim)
 //   channels_seen       procurement channels seen anywhere (drives the avrop ask)
 //   undocumented        services named but with no document attached
-//   not_yet_seen        watchlist services with NO trace at all, probe-labelled
 //   has_missing         anything still owed to us
 //
 // Rules: a delivered product counts for its company (Magma ⇒ Radish received);
-// a received company never appears in `undocumented` or `not_yet_seen`; a
+// a received company never appears in `undocumented`; a
 // `role: 'channel'` name is never a missing contract — we ask for the kommun's
 // own avrop behind it instead.
 export function buildCoverageFacts(rows = []) {
@@ -83,7 +82,6 @@ export function buildCoverageFacts(rows = []) {
   const receivedUnresolved = [];
   const seenUnresolved = new Set();
   const channels = new Map();          // slug → { slug, canonical }
-  const mentioned = new Set();         // slugs named anywhere, documented or not
 
   const noteChannel = (c) => { if (!channels.has(c.slug)) channels.set(c.slug, { canonical: c.canonical, slug: c.slug }); };
 
@@ -93,7 +91,6 @@ export function buildCoverageFacts(rows = []) {
     const names = [r.vendor_name, ...products].filter(Boolean);
     const hits = names.map((n) => resolveCompany(n)).filter(Boolean);
     for (const h of hits) {
-      mentioned.add(h.slug);
       // A ramavtal PDF is a real document, but not an avtal with a service.
       if (h.role === 'channel') noteChannel(h);
     }
@@ -131,10 +128,7 @@ export function buildCoverageFacts(rows = []) {
       const name = m?.vendor;
       if (!name) continue;
       const resolved = resolveCompany(name);
-      if (resolved) {
-        mentioned.add(resolved.slug);
-        if (resolved.role === 'channel') { noteChannel(resolved); continue; }
-      }
+      if (resolved?.role === 'channel') { noteChannel(resolved); continue; }
       if (m.doc_attached !== false) continue;
       // Never ask for something we said we did not want, or that the document
       // says no longer exists.
@@ -158,19 +152,11 @@ export function buildCoverageFacts(rows = []) {
     }
   }
 
-  // Watchlist services with no trace at all — the probe list. "Mentioned but
-  // undocumented" is deliberately excluded: we already know they use it, and
-  // asking "har ni avtal med X?" about something they just named reads badly.
-  const not_yet_seen = COMPANIES
-    .filter((c) => c.watchlist && c.role === 'service' && !received.has(c.slug) && !mentioned.has(c.slug))
-    .map((c) => ({ slug: c.slug, canonical: c.canonical, probeLabel: probeName(c) }));
-
   return {
     received: [...received.values()],
     received_unresolved: receivedUnresolved,
     channels_seen: [...channels.values()],
     undocumented,
-    not_yet_seen,
     has_missing: undocumented.length > 0,
   };
 }

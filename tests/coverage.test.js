@@ -24,7 +24,6 @@ describe('buildCoverageFacts', () => {
     const f = buildCoverageFacts(rows);
     expect(f.received.map((r) => r.slug)).toEqual(['radish']);
     expect(f.received[0]).toMatchObject({ canonical: 'Radish', role: 'service', products: ['Magma'] });
-    expect(f.not_yet_seen.map((c) => c.slug)).not.toContain('radish');
     expect(f.undocumented).toEqual([]);
     expect(f.channels_seen.map((c) => c.slug)).toEqual(['adda', 'laromedia']);
     expect(f.has_missing).toBe(false);
@@ -38,7 +37,6 @@ describe('buildCoverageFacts', () => {
     const f = buildCoverageFacts(rows);
     expect(f.received.map((r) => r.slug)).toEqual(['ilt']);
     expect(f.undocumented).toEqual([]);
-    expect(f.not_yet_seen.map((c) => c.slug)).not.toContain('ilt');
   });
 
   it('lists a genuinely undocumented service as missing', () => {
@@ -64,17 +62,10 @@ describe('buildCoverageFacts', () => {
     expect(f.has_missing).toBe(true);
   });
 
-  it('not_yet_seen lists watchlist companies with no trace at all, by probe label', () => {
-    const f = buildCoverageFacts([row(1, 'Magma', { products: ['Magma'], mentioned_agreements: [] })]);
-    // Radish is received; the other three watchlist companies are untouched.
-    expect(f.not_yet_seen.map((c) => c.probeLabel).sort()).toEqual(['Binogi', 'Inläsningstjänst', 'NE']);
-  });
-
-  it('a merely mentioned watchlist company is not "not yet seen" (we know they use it)', () => {
+  it('a merely mentioned company is undocumented, not received', () => {
     const rows = [row(0, null, { mentioned_agreements: [{ vendor: 'NE', product: '', doc_attached: false }] })];
     const f = buildCoverageFacts(rows);
     expect(f.undocumented.map((u) => u.slug)).toContain('ne');
-    expect(f.not_yet_seen.map((c) => c.slug)).not.toContain('ne');
   });
 
   it('deduplicates and tolerates object analysis_json, empty input and junk', () => {
@@ -96,7 +87,6 @@ describe('buildCoverageFacts', () => {
     const f = buildCoverageFacts([row(1, 'Atea', { products: ['Polyglutt'], mentioned_agreements: [] })]);
     expect(f.received.map((r) => r.slug)).toEqual(['ilt']);
     expect(f.channels_seen.map((c) => c.slug)).toEqual(['atea']);
-    expect(f.not_yet_seen.map((c) => c.slug)).not.toContain('ilt');
   });
 
   it('a channel appearing as a real contract row is a channel, not a received service', () => {
