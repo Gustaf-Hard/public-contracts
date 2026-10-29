@@ -46,7 +46,7 @@ for (const d of res.documents) {
   console.log(`#${d.id} ${d.method}: ${d.rows.length} rader; leverantör ${filled(d.rows, 'supplier')}, produkt ${filled(d.rows, 'product')}, belopp ${filled(d.rows, 'amount_sek')}, antal ${filled(d.rows, 'quantity')}, period ${filled(d.rows, 'period_end')}, läsår ${filled(d.rows, 'school_year')}, årskurser ${filled(d.rows, 'grades')}; i katalogen: ${cls.filter((c) => c.company_slug).length} företag, ${cls.filter((c) => c.product_slug).length} produkter${d.stated_total_sek != null ? '; angiven totalsumma finns' : ''}`);
   for (const r of d.rows.slice(0, show)) console.log('   ', JSON.stringify(r));
 }
-console.log(`${apply ? 'Klart' : 'Torrkörning klar (inget skrivet, inga LLM-anrop)'}: ${res.candidates} kandidater, ${res.written} skrivna, ${res.not_list} inte listor, ${res.would_call_llm} skulle läsas av LLM, ${res.failed} misslyckade (${res.parked.length} parkerade${res.backoff ? `, ${res.backoff} uppskjutna utan bokfört försök` : ''}).`);
+console.log(`${apply ? 'Klart' : 'Torrkörning klar (inget skrivet, inga LLM-anrop)'}: ${res.candidates} kandidater, ${res.written} skrivna (${res.partial} delvis), ${res.not_list} inte listor, ${res.skipped} överhoppade, ${res.would_call_llm} skulle läsas av LLM, ${res.failed} misslyckade (${res.parked.length} parkerade${res.backoff ? `, ${res.backoff} uppskjutna utan bokfört försök` : ''}).`);
 if (res.env_fault) console.log('VARNING: alla filer saknas på disk. Inget bokfördes. Kontrollera PILOT_CONTRACTS_DIR.');
 if (res.systemic) console.log('VARNING: alla försök misslyckades tillfälligt. Kontrollera API-nyckel, modell och schema.');
 db.close();

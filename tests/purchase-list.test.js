@@ -331,9 +331,9 @@ describe('extractPurchases dispatcher', () => {
   const cell = (ref, v) => (typeof v === 'number' ? `<c r="${ref}"><v>${v}</v></c>` : `<c r="${ref}" t="inlineStr"><is><t>${v}</t></is></c>`);
   const xbuf = (rows) => Buffer.from(zipSync({ 'xl/worksheets/sheet1.xml': strToU8(`<worksheet><sheetData>${rows.map((r, i) => `<row r="${i + 1}">${r.map((v, j) => cell(`${'ABCD'[j]}${i + 1}`, v)).join('')}</row>`).join('')}</sheetData></worksheet>`) }));
 
-  it('a recognisable xlsx never reaches the LLM', async () => {
+  it('a recognised xlsx (here: a channel in the filename) never reaches the LLM', async () => {
     const create = vi.fn();
-    const out = await extractPurchases({ buffer: xbuf([['Leverantör', 'Produkt', 'Belopp'], ['Binogi', 'Binogi', 10], ['Exempel AB', 'Exempel', 20]]), filename: 'a.xlsx' }, { client: { messages: { create } } });
+    const out = await extractPurchases({ buffer: xbuf([['Leverantör', 'Produkt', 'Belopp'], ['Binogi', 'Binogi', 10], ['Exempel AB', 'Exempel', 20]]), filename: 'Skolon a.xlsx' }, { client: { messages: { create } } });
     expect(out.method).toBe('xlsx');
     expect(out.rows).toHaveLength(2);
     expect(create).not.toHaveBeenCalled();

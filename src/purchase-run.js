@@ -17,11 +17,13 @@ import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { MAX_PURCHASE_ATTEMPTS } from './storage.js';
 import { resolveAttachmentPath, MIN_ENV_FAULT_MISSING } from './analyse-contract.js';
-import { extractPurchases, extractXlsxPurchases, looksLikePurchaseList } from './purchase-list.js';
+import { extractPurchases, judgeXlsx } from './purchase-list.js';
 import { xlsxSheetsFromBuffer } from './office-text.js';
 
 const extOf = (name) => (/\.([a-z0-9]+)$/i.exec(String(name ?? '')) || [])[1]?.toLowerCase() ?? null;
 const SUPPORTED = new Set(['pdf', 'xlsx', 'docx']);
+// Settled documents a normal run leaves alone (--force re-reads them).
+const DONE = new Set(['rows', 'not_list', 'partial', 'skipped']);
 
 // Where the file is: <filesDir>/<id>.<ext> when a directory of copies named
 // by attachment id is given, else the stored path re-rooted like the
@@ -40,13 +42,13 @@ export async function runPurchaseExtraction({
   contractsDir = null, filesDir = null, env = process.env, client = null, log = () => {},
 } = {}) {
   const result = {
-    candidates: 0, attempted: 0, written: 0, not_list: 0, would_call_llm: 0, failed: 0, transient: 0, backoff: 0,
+    candidates: 0, attempted: 0, written: 0, not_list: 0, skipped: 0, partial: 0, would_call_llm: 0, failed: 0, transient: 0, backoff: 0,
     permanent: 0, parked: [], env_fault: null, systemic: false, documents: [],
   };
   let list = db.listPurchaseCandidates();
   if (onlyId != null) list = list.filter((a) => a.id === onlyId);
   if (!force) {
-    list = list.filter((a) => !['rows', 'not_list'].includes(a.purchase_status) && (a.purchase_attempts ?? 0) < MAX_PURCHASE_ATTEMPTS);
+    list = list.filter((a) => !DONE.has(a.purchase_status) && (a.purchase_attempts ?? 0) < MAX_PURCHASE_ATTEMPTS);
   }
   list = list.filter((a) => SUPPORTED.has(extOf(a.filename) ?? extOf(a.saved_path))).slice(0, limit);
   result.candidates = list.length;
@@ -82,10 +84,17 @@ export async function runPurchaseExtraction({
       // Dry run: the deterministic path only. Anything that needs the LLM is
       // counted, not called.
       if (/\.xlsx$/i.test(filename)) {
-        const x = extractXlsxPurchases(xlsxSheetsFromBuffer(buf, filename) ?? [], { filename });
-        if (x.recognised && looksLikePurchaseList(x.rows)) {
-          result.documents.push({ id: att.id, kommun_kod: att.kommun_kod, method: 'xlsx', rows: x.rows, stated_total_sek: x.stated_total_sek, written: false });
-          log(`purchases DRY #${att.id} (${att.kommun_namn ?? ''}): ${x.rows.length} rader ur kalkylbladet`);
+        const j = judgeXlsx(xlsxSheetsFromBuffer(buf, filename) ?? [], { filename });
+        if (j.verdict === 'skip') {
+          result.skipped += 1;
+          result.documents.push({ id: att.id, kommun_kod: att.kommun_kod, method: 'xlsx', rows: null, skipped: j.reason, written: false });
+          log(`purchases DRY #${att.id} (${att.kommun_namn ?? ''}): hoppas över, ${j.reason}`);
+          continue;
+        }
+        if (j.verdict === 'rows') {
+          if (j.partial.length) result.partial += 1;
+          result.documents.push({ id: att.id, kommun_kod: att.kommun_kod, method: 'xlsx', rows: j.rows, stated_total_sek: j.stated_total_sek, partial: j.partial, written: false });
+          log(`purchases DRY #${att.id} (${att.kommun_namn ?? ''}): ${j.rows.length} rader ur kalkylbladet${j.partial.length ? `, delvis (oläst blad: ${j.partial.join(', ')})` : ''}`);
           continue;
         }
       }
@@ -102,10 +111,14 @@ export async function runPurchaseExtraction({
       else { result.attempted -= 1; log(`purchases SKIPPED #${att.id}: ingen API-nyckel, inget försök bokfört`); }
       continue;
     }
-    db.replacePurchaseRows(att.id, { rows: out.rows, method: out.method, channel: out.channel, stated_total_sek: out.stated_total_sek, isList: out.is_list });
-    if (out.is_list) result.written += 1; else result.not_list += 1;
-    result.documents.push({ id: att.id, kommun_kod: att.kommun_kod, method: out.method, rows: out.rows, stated_total_sek: out.stated_total_sek, written: true });
-    log(`purchases ${out.is_list ? 'WROTE' : 'NOT A LIST'} #${att.id} (${att.kommun_namn ?? ''}): ${out.rows.length} rader, ${out.method}`);
+    const partial = out.partial ?? [];
+    db.replacePurchaseRows(att.id, { rows: out.rows, method: out.method, channel: out.channel, stated_total_sek: out.stated_total_sek, isList: out.is_list, partial, skipped: out.skipped ?? null });
+    if (out.skipped) result.skipped += 1;
+    else if (out.is_list) { result.written += 1; if (partial.length) result.partial += 1; } else result.not_list += 1;
+    result.documents.push({ id: att.id, kommun_kod: att.kommun_kod, method: out.method, rows: out.skipped ? null : out.rows, stated_total_sek: out.stated_total_sek, ...(out.skipped ? { skipped: out.skipped } : {}), partial, written: true });
+    log(out.skipped
+      ? `purchases SKIPPED #${att.id} (${att.kommun_namn ?? ''}): ${out.skipped}`
+      : `purchases ${out.is_list ? 'WROTE' : 'NOT A LIST'} #${att.id} (${att.kommun_namn ?? ''}): ${out.rows.length} rader, ${out.method}${partial.length ? `, delvis (oläst blad: ${partial.join(', ')})` : ''}`);
   }
 
   if (missing.length >= MIN_ENV_FAULT_MISSING && missing.length === result.attempted) {

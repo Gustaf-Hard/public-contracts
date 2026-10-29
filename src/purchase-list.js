@@ -199,7 +199,7 @@ export function mapHeaderRow(cells = []) {
     }
   }
   const has = (f) => columns[f] != null;
-  const recognised = (has('product') || has('supplier')) && (has('amount') || has('quantity') || has('order_date') || has('unit_price') || has('period_start') || has('period_end'));
+  const recognised = (has('product') || has('supplier')) && (has('amount') || has('quantity') || has('order_date') || has('unit_price') || has('period_start') || has('period_end') || has('period_text'));
   return { columns, recognised, score: Object.keys(columns).length };
 }
 
@@ -263,7 +263,7 @@ function readTable(sheet, { filename }) {
     }, { filename });
     if (row) out.push(row);
   }
-  return { rows: out, total, map };
+  return { rows: out, total, map, header: rows[h], above, docChannel };
 }
 
 // A row's full identity (fix wave 2 E4): its order reference when it has
@@ -311,6 +311,79 @@ export function extractXlsxPurchases(sheets = [], { filename = '' } = {}) {
     }
   }
   return { recognised, rows, stated_total_sek: total, channel: channelFrom(filename) };
+}
+
+// ---------------------------------------------------------------- the judge
+
+// Fix wave 2 E1. The deterministic xlsx path reads any table with a supplier
+// and a date, so a leverantörsreskontra or the kommun's whole avtal register
+// would become "purchases". It writes rows only for a document it positively
+// recognises: a channel (Skolon, Atea, Läromedia) or the word licens in the
+// filename, a sheet name, the lines above the header or a header cell, or
+// licence/order columns (antal, licens..., ordernummer, orderdatum,
+// licensperiod). Ledgers and registers are skipped outright.
+export const PURCHASE_ROW_CAP = 2000;
+// Office text handed to the LLM; longer is truncated, and a truncated list
+// is never stored as complete (E6).
+export const PURCHASE_TEXT_MAX = 200_000;
+
+const LEDGER_NAME = /reskontra|verifikation|huvudbok|bokforingsorder/;
+const REGISTER_NAME = /avtalsregister|avtalskatalog/;
+const LEDGER_HEADER = /^verifikation|reskontra/;
+const INVOICE_NO_HEADER = /\bfaktura ?nr\b|fakturanummer|fakturanr/;
+const REGISTER_HEADER = /^avtalsnamn$/;
+const LICENCE_WORD_RE = /licens/;
+const ORDER_HEADER = /^(order ?nr|ordernummer|order|order id|best(allnings)? ?nr|bestallningsnummer|orderdatum|bestallningsdatum)$/;
+const hasData = (sh) => (sh.rows ?? []).filter((r) => r.filter((c) => c != null && c !== '').length >= 2).length >= 2;
+
+function sheetSignals(t, sh) {
+  const heads = (t.header ?? []).filter((c) => typeof c === 'string').map((c) => normName(c));
+  const reject = heads.some((h) => LEDGER_HEADER.test(h)) ? 'verifikationslista eller leverantörsreskontra'
+    : heads.some((h) => REGISTER_HEADER.test(h)) ? 'avtalsregister (kolumnen Avtalsnamn)'
+      : heads.some((h) => INVOICE_NO_HEADER.test(h)) && t.map.columns.quantity == null ? 'leverantörsreskontra (fakturanummer, inga antal)'
+        : null;
+  const text = [sh.name, ...(t.above ?? []), ...(t.header ?? []).filter((c) => typeof c === 'string')].join(' ');
+  const positive = Boolean(channelFrom(sh.name, (t.above ?? []).join(' '), heads.join(' ')))
+    || LICENCE_WORD_RE.test(normName(text))
+    || t.map.columns.quantity != null
+    || heads.some((h) => ORDER_HEADER.test(h));
+  return { reject, positive };
+}
+
+// judgeXlsx(sheets, { filename }) -> { verdict, reason?, rows, partial,
+// stated_total_sek, channel }
+//   verdict 'rows'  write these rows (method xlsx); `partial` names sheets
+//                   that hold data we did not read (E5): the document is
+//                   recorded partial, never fully extracted
+//   verdict 'skip'  not a purchase list (ledger, register, over the row cap):
+//                   recorded skipped with `reason`, no rows
+//   verdict 'llm'   no positive signal and nothing rejected: the LLM, which
+//                   asks is_purchase_list, decides
+export function judgeXlsx(sheets = [], { filename = '' } = {}) {
+  const fname = normName(filename);
+  const empty = { rows: [], partial: [], stated_total_sek: null, channel: channelFrom(filename) };
+  if (LEDGER_NAME.test(fname)) return { ...empty, verdict: 'skip', reason: 'leverantörsreskontra eller verifikationslista (filnamnet)' };
+  if (REGISTER_NAME.test(fname)) return { ...empty, verdict: 'skip', reason: 'avtalsregister (filnamnet)' };
+  const docPositive = Boolean(channelFrom(filename)) || LICENCE_WORD_RE.test(fname);
+  const accepted = []; const unread = []; const rejected = [];
+  let positive = docPositive;
+  for (const sh of sheets ?? []) {
+    const t = readTable(sh, { filename });
+    if (!t) { if (hasData(sh)) unread.push(sh.name); continue; }
+    const sig = sheetSignals(t, sh);
+    if (sig.reject) { rejected.push({ name: sh.name, reason: sig.reject }); continue; }
+    if (sig.positive) positive = true;
+    accepted.push(sh);
+  }
+  if (!accepted.length && rejected.length) return { ...empty, verdict: 'skip', reason: rejected[0].reason };
+  if (!accepted.length) return { ...empty, verdict: 'llm' };
+  if (!positive) return { ...empty, verdict: rejected.length ? 'skip' : 'llm', ...(rejected.length ? { reason: rejected[0].reason } : {}) };
+  const x = extractXlsxPurchases(accepted, { filename });
+  if (x.rows.length > PURCHASE_ROW_CAP) {
+    return { ...empty, verdict: 'skip', reason: `över ${PURCHASE_ROW_CAP} rader (${x.rows.length}): inte en inköpslista` };
+  }
+  if (!looksLikePurchaseList(x.rows)) return { ...empty, verdict: 'llm' };
+  return { verdict: 'rows', rows: x.rows, partial: [...rejected.map((r) => r.name), ...unread], stated_total_sek: x.stated_total_sek, channel: x.channel };
 }
 
 // A list is rows of product (or supplier) with an amount, a quantity or a
@@ -581,23 +654,30 @@ export async function extractPurchasesWithLlm({ pdf = null, text = null, ctx = {
   }
 }
 
-// One document to rows. XLSX with recognisable headers: deterministic, no
-// LLM. Anything else (PDF, an xlsx we cannot map, a docx) goes to the LLM.
-// Returns { method, is_list, rows, stated_total_sek, channel } or null when
-// nothing could be read (the failure went to onFailure, or no key).
+// One document to rows. XLSX the judge recognises (judgeXlsx): deterministic,
+// no LLM; one it rejects: a skip, no LLM. Anything else (PDF, an xlsx with no
+// signal, a docx) goes to the LLM, unless its text would be truncated.
+// Returns { method, is_list, rows, stated_total_sek, channel, skipped?,
+// partial? } or null when nothing could be read (the failure went to
+// onFailure, or no key).
 export async function extractPurchases({ buffer, filename = '', kommun_namn = null } = {}, { env = process.env, client = null, onFailure = null } = {}) {
   const ctx = { kommun_namn, filename };
   if (/\.xlsx$/i.test(filename)) {
     const sheets = xlsxSheetsFromBuffer(buffer, filename);
     if (!sheets) { onFailure?.({ permanent: true, reason: 'permanent:office_parse_error', message: 'not a readable xlsx' }); return null; }
-    const x = extractXlsxPurchases(sheets, { filename });
-    if (x.recognised && looksLikePurchaseList(x.rows)) {
-      return { method: 'xlsx', is_list: true, rows: x.rows, stated_total_sek: x.stated_total_sek, channel: x.channel };
+    const j = judgeXlsx(sheets, { filename });
+    if (j.verdict === 'skip') return { method: 'xlsx', is_list: false, rows: [], stated_total_sek: null, channel: j.channel, skipped: j.reason };
+    if (j.verdict === 'rows') {
+      return { method: 'xlsx', is_list: true, rows: j.rows, stated_total_sek: j.stated_total_sek, channel: j.channel, partial: j.partial };
     }
   }
   let answer;
   if (isOfficeDoc(filename)) {
-    const text = officeTextFromBuffer(buffer, filename);
+    const text = officeTextFromBuffer(buffer, filename, { maxChars: Infinity });
+    if (text && text.length > PURCHASE_TEXT_MAX) {
+      onFailure?.({ permanent: true, reason: 'permanent:truncated', message: `text ${text.length} tecken, över ${PURCHASE_TEXT_MAX}: listan skulle kapas` });
+      return null;
+    }
     answer = await extractPurchasesWithLlm({ text, ctx, env, client, onFailure });
   } else {
     answer = await extractPurchasesWithLlm({ pdf: buffer ?? Buffer.alloc(0), ctx, env, client, onFailure });

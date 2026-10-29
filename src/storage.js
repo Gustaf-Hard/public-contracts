@@ -2048,7 +2048,12 @@ export function openDb(path) {
   // transaction: a re-extraction never leaves half the old rows beside half
   // the new, and a failed insert keeps the old rows. isList=false records a
   // "not a purchase list" verdict with no rows.
-  function replacePurchaseRows(attachmentId, { rows = [], method, channel = null, stated_total_sek = null, isList = true } = {}) {
+  // `partial` (fix wave 2 E5): sheet names that hold data we did not read;
+  // the document is then 'partial', never fully extracted, and last_error
+  // names them. `skipped` (E1): a reason the document is not a purchase list
+  // (a ledger, an avtal register, over the row cap); status 'skipped', no
+  // rows, old rows removed.
+  function replacePurchaseRows(attachmentId, { rows = [], method, channel = null, stated_total_sek = null, isList = true, partial = [], skipped = null } = {}) {
     if (!['xlsx', 'llm'].includes(method)) throw new Error(`replacePurchaseRows: method must be xlsx or llm, got ${method}`);
     const ins = db.prepare(`
       INSERT INTO purchase_rows (attachment_id, row_index, supplier, product, channel, quantity, unit, unit_price_sek,
@@ -2058,7 +2063,7 @@ export function openDb(path) {
     const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
     db.transaction(() => {
       db.prepare('DELETE FROM purchase_rows WHERE attachment_id = ?').run(attachmentId);
-      const list = isList ? rows : [];
+      const list = isList && !skipped ? rows : [];
       list.forEach((r, i) => {
         ins.run(
           attachmentId, i, r.supplier ?? null, r.product ?? null, r.channel ?? null, num(r.quantity), r.unit ?? null,
@@ -2069,11 +2074,16 @@ export function openDb(path) {
       });
       db.prepare(`
         INSERT INTO purchase_documents (attachment_id, status, method, channel, stated_total_sek, row_count, attempts, last_error, extracted_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, 0, NULL, datetime('now'), datetime('now'))
+        VALUES (?, ?, ?, ?, ?, ?, 0, ?, datetime('now'), datetime('now'))
         ON CONFLICT(attachment_id) DO UPDATE SET status = excluded.status, method = excluded.method, channel = excluded.channel,
-          stated_total_sek = excluded.stated_total_sek, row_count = excluded.row_count, attempts = 0, last_error = NULL,
+          stated_total_sek = excluded.stated_total_sek, row_count = excluded.row_count, attempts = 0, last_error = excluded.last_error,
           extracted_at = excluded.extracted_at, updated_at = excluded.updated_at
-      `).run(attachmentId, isList && list.length ? 'rows' : 'not_list', method, channel ?? null, num(stated_total_sek), list.length);
+      `).run(
+        attachmentId,
+        skipped ? 'skipped' : !(isList && list.length) ? 'not_list' : partial.length ? 'partial' : 'rows',
+        method, channel ?? null, skipped ? null : num(stated_total_sek), list.length,
+        skipped ? `skipped:${skipped}` : list.length && partial.length ? `partial: oläst blad ${partial.join(', ')}` : null,
+      );
     })();
   }
 
@@ -2083,7 +2093,7 @@ export function openDb(path) {
   function recordPurchaseFailure(attachmentId, { reason, permanent = false } = {}) {
     const cur = db.prepare('SELECT status, attempts FROM purchase_documents WHERE attachment_id = ?').get(attachmentId);
     const attempts = permanent ? MAX_PURCHASE_ATTEMPTS : Math.min(MAX_PURCHASE_ATTEMPTS, (cur?.attempts ?? 0) + 1);
-    const status = cur?.status === 'rows' ? 'rows' : 'failed';
+    const status = ['rows', 'partial'].includes(cur?.status) ? cur.status : 'failed';
     db.prepare(`
       INSERT INTO purchase_documents (attachment_id, status, attempts, last_error, updated_at)
       VALUES (?, ?, ?, ?, datetime('now'))

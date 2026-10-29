@@ -14,7 +14,15 @@ afterEach(() => { db.close(); rmSync(tmp, { recursive: true, force: true }); });
 
 const cell = (ref, v) => (typeof v === 'number' ? `<c r="${ref}"><v>${v}</v></c>` : `<c r="${ref}" t="inlineStr"><is><t>${v}</t></is></c>`);
 const xlsx = (rows) => Buffer.from(zipSync({ 'xl/worksheets/sheet1.xml': strToU8(`<worksheet><sheetData>${rows.map((r, i) => `<row r="${i + 1}">${r.map((v, j) => cell(`${'ABCD'[j]}${i + 1}`, v)).join('')}</row>`).join('')}</sheetData></worksheet>`) }));
-const LIST = [['Leverantör', 'Produkt', 'Belopp'], ['Binogi', 'Binogi', 100], ['Exempel AB', 'Exempel', 50]];
+// An Antal column is a licence signal (judgeXlsx, fix wave 2 E1).
+const LIST = [['Leverantör', 'Produkt', 'Antal', 'Belopp'], ['Binogi', 'Binogi', 10, 100], ['Exempel AB', 'Exempel', 2, 50]];
+const REGISTER = [['Avtalsnamn', 'Leverantörsnamn', 'Slutdatum'], ['Exempelavtal', 'Exempel AB', '2027-01-01'], ['Annat', 'Annan AB', '2028-01-01']];
+const twoSheets = (a, b) => Buffer.from(zipSync({
+  'xl/workbook.xml': strToU8('<workbook><sheets><sheet name="Köp" r:id="rId1"/><sheet name="Pivot" r:id="rId2"/></sheets></workbook>'),
+  'xl/_rels/workbook.xml.rels': strToU8('<Relationships><Relationship Id="rId1" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Target="worksheets/sheet2.xml"/></Relationships>'),
+  'xl/worksheets/sheet1.xml': strToU8(`<worksheet><sheetData>${a.map((r, i) => `<row r="${i + 1}">${r.map((v, j) => cell(`${'ABCD'[j]}${i + 1}`, v)).join('')}</row>`).join('')}</sheetData></worksheet>`),
+  'xl/worksheets/sheet2.xml': strToU8(`<worksheet><sheetData>${b.map((r, i) => `<row r="${i + 1}">${r.map((v, j) => cell(`${'ABCD'[j]}${i + 1}`, v)).join('')}</row>`).join('')}</sheetData></worksheet>`),
+}));
 
 function seed(filename, content) {
   n += 1;
@@ -101,6 +109,47 @@ describe('runPurchaseExtraction', () => {
     const a = seed('a.pdf', Buffer.from('%PDF'));
     const res = await runPurchaseExtraction({ db, apply: true, env: {} });
     expect(res.attempted).toBe(0);
+    expect(db.getPurchaseDocument(a)).toBeNull();
+  });
+
+  // Fix wave 2 E1/E5.
+  it('a rejected xlsx is recorded skipped with its reason, never as rows, and is not retried', async () => {
+    const a = seed('Lista avtal.xlsx', xlsx(REGISTER));
+    const create = vi.fn();
+    const res = await runPurchaseExtraction({ db, apply: true, client: { messages: { create } } });
+    expect(create).not.toHaveBeenCalled();
+    expect(res.written).toBe(0);
+    expect(res.skipped).toBe(1);
+    expect(db.getPurchaseDocument(a)).toMatchObject({ status: 'skipped', row_count: 0, attempts: 0 });
+    expect(db.getPurchaseDocument(a).last_error).toMatch(/avtalsregister/);
+    expect(db.listPurchaseRows()).toHaveLength(0);
+    expect((await runPurchaseExtraction({ db, apply: true })).candidates).toBe(0);
+  });
+
+  it('a forced re-run that now rejects a document removes its old rows', async () => {
+    const a = seed('Lista avtal.xlsx', xlsx(REGISTER));
+    db.replacePurchaseRows(a, { rows: [{ supplier: 'Exempel AB', product: 'X' }], method: 'xlsx' });
+    await runPurchaseExtraction({ db, apply: true, force: true });
+    expect(db.listPurchaseRows()).toHaveLength(0);
+    expect(db.getPurchaseDocument(a).status).toBe('skipped');
+  });
+
+  it('a workbook with an unread data sheet is recorded partial, naming the sheet', async () => {
+    const a = seed('Skolon.xlsx', twoSheets(LIST, [['Radetiketter', 'Utfall'], ['Exempel AB', 10], ['Annan AB', 20]]));
+    const res = await runPurchaseExtraction({ db, apply: true });
+    expect(res.partial).toBe(1);
+    expect(db.getPurchaseDocument(a)).toMatchObject({ status: 'partial', row_count: 2 });
+    expect(db.getPurchaseDocument(a).last_error).toMatch(/Pivot/);
+    expect(db.listPurchaseRows()).toHaveLength(2);
+    expect((await runPurchaseExtraction({ db, apply: true })).candidates).toBe(0);
+  });
+
+  it('the dry run reports a skip without writing it', async () => {
+    const a = seed('Lista avtal.xlsx', xlsx(REGISTER));
+    const res = await runPurchaseExtraction({ db });
+    expect(res.skipped).toBe(1);
+    expect(res.documents[0]).toMatchObject({ id: a, method: 'xlsx', written: false });
+    expect(res.documents[0].skipped).toMatch(/avtalsregister/);
     expect(db.getPurchaseDocument(a)).toBeNull();
   });
 });
