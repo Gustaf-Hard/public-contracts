@@ -20,7 +20,7 @@
 // and purchase rows so the per-category order (and the cap) follows each
 // company's footprint in our data: the number of kommuner where we have seen it.
 
-import { CATEGORIES, companies, classifyVendor, classifyLine, productBySlug } from './catalogue.js';
+import { CATEGORIES, companies, classifyVendor, classifyLine, companiesNamedIn, productBySlug } from './catalogue.js';
 import { classifyPurchaseRow } from './purchase-list.js';
 import { channelName } from './studio-purchases.js';
 import { mapUnitToGradeLevels } from './vendor-analytics.js';
@@ -73,23 +73,60 @@ function levelsToForms(levels) {
   return out;
 }
 
-// Free text (a filename, a summary) cut into phrases classifyLine can read:
-// one company per phrase, so a summary naming three companies yields three.
+// Free text (a filename, a summary, a product cell) cut into phrases
+// classifyLine can read: one company per phrase, so a text naming three
+// companies yields three. "/", "+" and "&" cut too (fix wave 3 Q1); a part only
+// counts when it resolves to a catalogue company, so "Natur & Kultur" (whose
+// parts name nothing) stays one name, read whole.
 function phrases(text) {
   if (blank(text)) return [];
   return String(text).replace(/\.(pdf|xlsx|docx|doc|xls)$/i, ' ')
-    .split(/[,;:()\n]|\.\s|\s(?:och|samt|eller)\s|\s[-–—]\s/i)
+    .split(/[,;:()\n/+&]|\.\s|\s(?:och|samt|eller)\s|\s[-–—]\s/i)
     .map((x) => x.trim()).filter((x) => x.length >= 2);
 }
 
-// Every catalogue company a line names, for STRIKING: any kind that resolves
-// to a company counts (an integration line, a discount line), since a probe is
-// a question and striking too much is the safe direction.
-function lineCompanies(ownerSlug, text) {
+// Every catalogue company a text names, for STRIKING (fix wave 3 Q1: ALL of
+// them, not the first). The whole text (a line, a product cell, a mention;
+// never a prose summary or filename, `whole: false`, where a product pattern
+// can misfire across phrases) and each phrase are classified with the owner
+// AND without it, so a line filed under one vendor still strikes the
+// other companies it names ("Migrering av data från Draftit" under ProReNata);
+// any kind that resolves to a company counts (an integration line, a discount
+// line); and every brand or brand-safe product pattern in the text adds its
+// company ("Everway Claro"). A probe is a question, so striking too much is
+// the safe direction. Memoised: classifyLine is pure and the probe runs per
+// draft and per ärende view.
+const LINE_MEMO = new Map();
+function lineCompanies(ownerSlug, text, { whole = true } = {}) {
   if (blank(text)) return [];
-  const r = classifyLine(ownerSlug, text);
-  return r.kind !== 'uncatalogued' && r.companySlug ? [r.companySlug] : [];
+  const str = String(text);
+  const key = `${whole ? 1 : 0}${ownerSlug ?? ''}\u0000${str}`;
+  const hit = LINE_MEMO.get(key);
+  if (hit) return hit;
+  const out = new Set();
+  const take = (owner, t) => {
+    const r = classifyLine(owner, t);
+    if (r.kind !== 'uncatalogued' && r.companySlug) out.add(r.companySlug);
+  };
+  for (const t of new Set([...(whole ? [str] : []), ...phrases(str)])) {
+    take(ownerSlug, t);
+    if (ownerSlug) take(null, t);
+  }
+  for (const slug of companiesNamedIn(str)) out.add(slug);
+  const res = [...out];
+  if (LINE_MEMO.size > 20000) LINE_MEMO.clear();
+  LINE_MEMO.set(key, res);
+  return res;
 }
+// A vendor string, for striking: its catalogue match plus every company it
+// names ("Everway Claro").
+function vendorNamed(raw) {
+  if (blank(raw)) return [];
+  const v = classifyVendor(raw);
+  return [...new Set([...(v ? [v.slug] : []), ...lineCompanies(null, raw)])];
+}
+// A vendor string, for HOLDING (contractUnits): one owner only, since a held
+// unit credits functions.
 function vendorCompanies(raw) {
   if (blank(raw)) return [];
   const v = classifyVendor(raw);
@@ -131,7 +168,11 @@ function contractUnits(c, lines = []) {
   for (const slug of vendorSlugs) if (!units.some((u) => u.slug === slug)) add(slug, null, null);
   if (!vendor || vendor.role === 'channel') {
     for (const text of [...phrases(c.summary), ...phrases(c.filename)]) {
-      for (const slug of lineCompanies(null, text)) if (!units.some((u) => u.slug === slug)) add(slug, null, text);
+      // One company per phrase here, not lineCompanies: a held unit credits
+      // functions, so only the phrase's own verdict holds.
+      const r = classifyLine(null, text);
+      const slug = r.kind !== 'uncatalogued' ? r.companySlug : null;
+      if (slug && !units.some((u) => u.slug === slug)) add(slug, null, text);
     }
   }
   return units;
@@ -169,7 +210,7 @@ function unitForms(c, covRows, units) {
 }
 
 function mentionCompanies(m) {
-  const out = new Set(vendorCompanies(m?.vendor));
+  const out = new Set(vendorNamed(m?.vendor));
   const vendor = blank(m?.vendor) ? null : classifyVendor(m.vendor);
   for (const slug of lineCompanies(vendor?.slug ?? null, m?.product)) out.add(slug);
   return [...out].filter(isService);
@@ -177,26 +218,27 @@ function mentionCompanies(m) {
 
 // Every company one document the kommun sent names (fix wave 2 P1): its
 // vendor, its products and line items, the analysis's own vendor, products,
-// line items and mentions (UNFILTERED: the evidence gate decides what we may
-// claim is missing, not what we know), its filename and its summary. Any
-// document counts: avtal, faktura, PUB-avtal, prislista, licensbevis,
-// följebrev.
+// line items (name and description) and mentions (UNFILTERED: the evidence
+// gate decides what we may claim is missing, not what we know), its filename
+// and its summary. Every text strikes ALL the companies it names (fix wave 3
+// Q1, lineCompanies). Any document counts: avtal, faktura, PUB-avtal,
+// prislista, licensbevis, följebrev.
 export function documentCompanies(d) {
   let a = d?.analysis_json;
   if (typeof a === 'string') { try { a = JSON.parse(a); } catch { a = null; } }
   if (!a || typeof a !== 'object') a = {};
   const out = new Set();
   const vendors = [d?.vendor_name, a.vendor_name].filter((v) => !blank(v));
-  for (const v of vendors) for (const slug of vendorCompanies(v)) out.add(slug);
+  for (const v of vendors) for (const slug of vendorNamed(v)) out.add(slug);
   const owner = vendors.map((v) => classifyVendor(v)).find(Boolean)?.slug ?? null;
   const lines = [
     ...(d?.products ?? []), ...(d?.lines ?? []),
     ...(Array.isArray(a.products) ? a.products : []),
-    ...(Array.isArray(a.line_items) ? a.line_items.map((l) => l?.product_name) : []),
+    ...(Array.isArray(a.line_items) ? a.line_items.flatMap((l) => [l?.product_name, l?.description]) : []),
   ].filter((x) => typeof x === 'string');
   for (const l of lines) for (const slug of lineCompanies(owner, l)) out.add(slug);
   for (const m of Array.isArray(a.mentioned_agreements) ? a.mentioned_agreements : []) for (const slug of mentionCompanies(m)) out.add(slug);
-  for (const t of [...phrases(d?.filename), ...phrases(d?.summary ?? a.summary)]) for (const slug of lineCompanies(null, t)) out.add(slug);
+  for (const t of [d?.filename, d?.summary ?? a.summary]) for (const slug of lineCompanies(null, t, { whole: false })) out.add(slug);
   return [...out].filter(isService);
 }
 

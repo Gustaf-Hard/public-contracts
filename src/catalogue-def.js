@@ -495,8 +495,9 @@ export const COMPANIES = [
       P('EGIL', 'integration', 'Öppen standard och tjänst för att föra över elevdata mellan system.', /\begil\b/),
     ] },
   { canonical: 'Learn-IT Umeå', slug: 'samverka', category: 'övrigt', role: 'service', website: 'https://samverka.nu',
-    vendors: ['learn it umea', 'samverka nu'], brand: /\bsamverka/, singleProduct: 'Samverka.nu',
-    products: [P('Samverka.nu', 'övrigt', 'Tjänst för att hantera PRAO och praktikplatser.', /\bsamverka/, /prao/)] },
+    // "samverka nu", never the word samverkan / samverkansavtal (fix wave 3).
+    vendors: ['learn it umea', 'samverka nu'], brand: /\bsamverka ?nu\b/, singleProduct: 'Samverka.nu',
+    products: [P('Samverka.nu', 'övrigt', 'Tjänst för att hantera PRAO och praktikplatser.', /\bsamverka ?nu\b/, /prao/)] },
   { canonical: 'Axiell', slug: 'axiell', category: 'övrigt', role: 'service', website: 'https://www.axiell.com',
     vendors: ['axiell'], brand: /axiell/, defaultProduct: 'WeLib',
     products: [

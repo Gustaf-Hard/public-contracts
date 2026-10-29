@@ -2,7 +2,7 @@
 // catalogue, minus everything this kommun has shown us. Hand-written fixtures
 // only: the repo is public, so no real kommun data.
 import { describe, it, expect } from 'vitest';
-import { buildProbeList, renderProbeList, collectMentions, skolformerFromStats, PROBE_CAP, MIN_GYMNASIE_ELEVER } from '../src/probe-list.js';
+import { buildProbeList, renderProbeList, collectMentions, skolformerFromStats, documentCompanies, PROBE_CAP, MIN_GYMNASIE_ELEVER } from '../src/probe-list.js';
 import { classifyVendor } from '../src/catalogue.js';
 import { loadKommunStats } from '../src/kommun-stats.js';
 
@@ -379,5 +379,65 @@ describe('fix wave 2 P5: skolform coverage follows the product the row names', (
     });
     expect(entries(probe, 'larplattform')).toEqual([]);
     expect(namesIn(probe, 'prov')).not.toContain('Dugga');
+  });
+});
+
+// Fix wave 3 Q1 (2026-10-29): one line, phrase or mention can name several
+// companies; every one is struck. Synthetic shapes of live examples.
+describe('fix wave 3 Q1: every company a line or mention names is struck', () => {
+  const companiesOf = (fields) => documentCompanies(doc(fields)).sort();
+
+  it('a comma list in a mention product strikes each catalogue company in it', () => {
+    const got = companiesOf({ analysis_json: { mentioned_agreements: [{ vendor: 'EG', product: 'Edlevo, Speedadmin, Optiplan Skolval' }] } });
+    for (const s of ['tietoevry', 'speedadmin', 'optiplan']) expect(got).toContain(s);
+  });
+
+  it('a mention filed under one vendor still strikes the other companies it names', () => {
+    const got = companiesOf({ analysis_json: { mentioned_agreements: [{ vendor: 'Everway Technology', product: 'Skriva text, LexiFlow, ClaroRead' }] } });
+    expect(got).toEqual(expect.arrayContaining(['everway', 'claro']));
+  });
+
+  it('a slash pair in a summary strikes both sides', () => {
+    expect(companiesOf({ summary: 'Avtal med Exempelby kommun och Oribi/Wizkids om 100 licenser.' })).toEqual(expect.arrayContaining(['everway', 'wizkids']));
+    expect(companiesOf({ summary: 'Avtal mellan förvaltningen och itslearning/Sanoma.' })).toEqual(expect.arrayContaining(['itslearning', 'sanoma']));
+    expect(companiesOf({ summary: 'Licenser för Binogi / Polyglutt' })).toEqual(expect.arrayContaining(['binogi', 'ilt']));
+  });
+
+  it('the same splitting applies to products and line items, and a probe asks about none of them', () => {
+    const probe = buildProbeList({ kommunKod: K, documents: [doc({ products: ['Oribi/Wizkids'], lines: ['Licenser för Binogi / Polyglutt', 'itslearning+Sanoma'] })] });
+    for (const n of ['Everway (Oribi)', 'Wizkids', 'Binogi', 'ILT (Inläsningstjänst)', 'itslearning', 'Sanoma Utbildning']) {
+      expect(allNames(probe)).not.toContain(n);
+      expect(reasonFor(probe, n)).toBe('nämns i kommunens underlag');
+    }
+  });
+
+  it('a line under an owner also strikes the other companies it names', () => {
+    const got = companiesOf({ vendor_name: 'ProReNata', lines: ['Migrering av data från Draftit', 'PMO-överföring'] });
+    expect(got).toEqual(expect.arrayContaining(['prorenata', 'draftit', 'cgm']));
+  });
+
+  it('a vendor string naming two companies strikes both', () => {
+    expect(companiesOf({ analysis_json: { mentioned_agreements: [{ vendor: 'Everway Claro', product: null }] } })).toEqual(expect.arrayContaining(['everway', 'claro']));
+  });
+
+  it('"Natur & Kultur" stays one name and strikes nothing else', () => {
+    expect(companiesOf({ lines: ['Natur & Kultur'] })).toEqual(['natur-kultur']);
+    expect(companiesOf({ summary: 'Läromedel från Natur och Kultur.' })).toEqual(['natur-kultur']);
+  });
+
+  it('a line item description naming a company strikes it', () => {
+    const got = companiesOf({ analysis_json: { line_items: [{ product_name: 'Införandeprojekt', description: 'Inkl konvertering av PMO-databas' }] } });
+    expect(got).toContain('cgm');
+  });
+
+  it('the word samverkan names no company; Samverka.nu still does', () => {
+    expect(companiesOf({ lines: ['Resekostnader i samband med samverkan', 'Samverkansavtal'] })).toEqual([]);
+    expect(companiesOf({ lines: ['Samverka.nu PRAO'] })).toEqual(['samverka']);
+  });
+
+  it('the mentions passed on their own are split the same way', () => {
+    const probe = buildProbeList({ kommunKod: K, mentions: [{ vendor: 'EG', product: 'Edlevo, Speedadmin' }] });
+    expect(allNames(probe)).not.toContain('SpeedAdmin');
+    expect(allNames(probe)).not.toContain('Tietoevry (Edlevo)');
   });
 });

@@ -289,6 +289,21 @@ function classifyRaw(vc, name) {
   return r('uncatalogued', null, tidyName(name));
 }
 
+// Every catalogue company a free text names by brand, in catalogue order. For
+// striking only (src/probe-list.js): a phrase like "Everway Claro" or
+// "Nationalencyklopedin med flera tjänster" names companies that no single
+// classifyLine verdict returns. A brand must end a word (or carry a genitive
+// s: "Claros"), so "samverkan" is not Samverka.nu. Product patterns are not
+// scanned: some are only safe on a product line ("och Insight" is Magma
+// Insight in a Radish row, the reseller Insight in a summary).
+const BRAND_WORD = new Map(COMPANIES.filter((c) => c.brand).map((c) => [c, new RegExp(`(?:${c.brand.source})(?:s)?(?![a-z0-9])`)]));
+export function companiesNamedIn(raw) {
+  if (raw == null || !String(raw).trim()) return [];
+  const n = prepare(raw);
+  if (!n) return [];
+  return COMPANIES.filter((c) => BRAND_WORD.get(c)?.test(n)).map((c) => c.slug);
+}
+
 // Rules 2-13 for one product-line name. `ownerSlug` is the slug classifyVendor
 // gave the line's vendor (null when the vendor is uncatalogued or missing).
 // A line bought through a channel is attributed to the product's owner: the
