@@ -65,10 +65,17 @@ const PUBLIC = COMPANIES.map((c) => Object.freeze({
     category: studioCategory(p.category),
     whatItIs: p.what_it_is,
     ...(p.editions ? { editions: Object.freeze([...p.editions]) } : {}),
+    ...(p.functions ? { functions: Object.freeze([...p.functions]) } : {}),
   }))),
   ...(c.singleProduct ? { singleProduct: c.singleProduct } : {}),
   ...(c.defaultProduct ? { defaultProduct: c.defaultProduct } : {}),
   ...(c.hiddenInStudio ? { hiddenInStudio: true } : {}),
+  // Probe fields (catalogue-def.js "Probe fields", read by src/probe-list.js).
+  ...(c.probeName ? { probeName: c.probeName } : {}),
+  ...(c.functions ? { functions: Object.freeze([...c.functions]) } : {}),
+  ...(c.free ? { free: true } : {}),
+  ...(c.probe === false ? { probe: false } : {}),
+  ...(c.probeCategory ? { probeCategory: c.probeCategory } : {}),
 }));
 const PUBLIC_BY_SLUG = new Map(PUBLIC.map((c) => [c.slug, c]));
 if (PUBLIC_BY_SLUG.size !== PUBLIC.length) throw new Error('catalogue: duplicate company slug');

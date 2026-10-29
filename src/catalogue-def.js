@@ -78,7 +78,7 @@ export const COMPANIES = [
       P('Trovy', 'läromedel', 'Digitalt bibliotek med inlästa skönlitterära böcker.', /trovy/),
       P('Inlästa läromedel', 'läromedel', 'Inlästa versioner av tryckta läroböcker, som ljud i appen.', /inlasta laromedel|ilt digital/, /^(kommun)?abonnemang|^kommunabonnemang|^inlasningstjanst$|\bil\b/),
     ] },
-  { canonical: 'Radish', slug: 'radish', category: 'läromedel', role: 'service', website: null, probeLabel: 'Magma',
+  { canonical: 'Radish', slug: 'radish', category: 'läromedel', role: 'service', website: null,
     vendors: ['radish', 'matteappen', 'radish magma'],
     brand: /radish|magma|matteappen/,
     defaultProduct: 'Magma',
@@ -89,7 +89,7 @@ export const COMPANIES = [
   { canonical: 'Binogi', slug: 'binogi', category: 'läromedel', role: 'service', website: 'https://binogi.se',
     vendors: ['binogi'], brand: /binogi/, singleProduct: 'Binogi',
     products: [P('Binogi', 'läromedel', 'Digitalt läromedel med animerade ämnesfilmer och quiz på flera språk.', /binogi|sprakprojektet/)] },
-  { canonical: 'Nationalencyklopedin', slug: 'ne', category: 'läromedel', role: 'service', website: 'https://ne.se', probeLabel: 'NE',
+  { canonical: 'Nationalencyklopedin', slug: 'ne', category: 'läromedel', role: 'service', website: 'https://ne.se',
     vendors: ['ne', 'nationalencyklopedin', 'ne nationalencyklopedin', 'ne sverige'],
     brand: /\bne\b|nationalencyklopedin/,
     products: [
@@ -598,6 +598,125 @@ skolon.products = [
   P('Skolup AI', 'stödverktyg', 'AI-assistent för lärare och elever i Skolon.', /skolup|skolon (for )?ai/, /\bai\b/, { editions: ['Pro'] }),
   P('Skolon', 'lärplattform', 'Portal för att samla, dela ut och köpa digitala läromedel.', /skolon/, /leveransplattform|inkopsportal|portallosning/, { editions: ['Basic', 'Standard', 'Plus', 'Pro', 'Total'] }),
 ];
+
+// ---------------- Probe fields (2026-10-29, src/probe-list.js) ----------------
+// The follow-up probe ("Stämmer det att kommunen inte har avtal för något av
+// följande?") asks about every service company here, minus what the kommun
+// has shown us. These fields decide how. Applied onto COMPANIES below so the
+// company entries above stay readable.
+//
+//   probeName   what we call the company TO a kommun: "Company (Product)" when
+//               the product is the better known name ("Radish (Magma)").
+//               Falls back to canonical.
+//   free        a free public service (UR and the like): never probed, there
+//               is no avtal to ask for.
+//   probe:false outside the request or not a supplier we can name sensibly
+//               (member associations, hotel booking, alarms, companies whose
+//               offer we do not know). Never probed.
+//   probeCategory  show the company under another studio category than its
+//               own (Microsoft and Google are office suites, not the
+//               kommun's one lärplattform: they go under Övrigt).
+//   functions   what the company's system does for a kommun, PRIMARY FIRST.
+//               Every function below is exclusive: a kommun normally has one
+//               supplier for it. A held avtal covers the functions of the
+//               products it names (product-level `functions` below), or the
+//               company's own list when it names no tagged product. A
+//               candidate is struck when its primary function is covered.
+//               Companies without functions are additive (läromedel,
+//               stödverktyg, most of övrigt): only their own avtal, a
+//               purchase row or a mention strikes them.
+//   products    product name -> functions, for suites whose products do
+//               different jobs (an IST Schema avtal is not an elevregister).
+//
+// Function tags (labels in src/probe-list.js FUNCTION_LABELS):
+//   larplattform       lärplattform              (per skolform)
+//   prov               digitala prov             (per skolform)
+//   journal            elevhälsojournal          (per skolform)
+//   incident           kränkande behandling och incidenter
+//   elevregister       elevregister och elevadministration
+//   schema             schemaläggning
+//   franvaro           frånvaro och närvaro
+//   barnomsorg         förskoleplacering, barnomsorg och fritidshem
+//   vuxenutbildning    elevadministration för vuxenutbildningen
+//   kulturskola        kulturskolans administration
+//   tjanstefordelning  tjänstefördelning
+//   skolplacering      skolval och skolplacering
+// "Per skolform": an avtal covers the function only for the skolformer its
+// contract_coverage rows (or product names) show, grundskolan when unknown.
+// A grundskola lärplattform leaves the question open for gymnasiet.
+const PROBE = {
+  ilt: { probeName: 'ILT (Inläsningstjänst)' },
+  radish: { probeName: 'Radish (Magma)' },
+  ne: { probeName: 'NE', products: { 'NE Digitala prov': ['prov'] } },
+  sli: { probeName: 'SLI Play' },
+  teachiq: { probeName: 'Teachiq (Exam.net)', functions: ['prov'], products: { 'Kunskapsmatrisen': [] } },
+  ur: { free: true },
+  laramera: { probeName: 'LäraMera (Skoltavlan)' },
+  'pl-nordic': { probeName: 'P & L Nordic (LearnWARE)' },
+  everway: { probeName: 'Everway (Oribi)' },
+  'vitec-mv': { probeName: 'Vitec MV (IntoWords)' },
+  symbolbruket: { probeName: 'Symbolbruket (Widgit)' },
+  'no-isolation': { probeName: 'No Isolation (AV1)' },
+  digiexam: { functions: ['prov'] },
+  dugga: { functions: ['prov'] },
+  trelson: { functions: ['prov'] },
+  unikum: { functions: ['larplattform'] },
+  haldor: { functions: ['larplattform'] },
+  infomentor: { probeName: 'InfoMentor', functions: ['larplattform'] },
+  vklass: { functions: ['larplattform', 'franvaro', 'schema'], products: { 'Vklass Närvaro': ['franvaro'] } },
+  itslearning: { functions: ['larplattform'] },
+  meitner: { functions: ['larplattform', 'elevregister'] },
+  showbie: { functions: ['larplattform'] },
+  aleido: { functions: ['larplattform'] },
+  microsoft: { probeCategory: 'ovrigt' },
+  google: { probeName: 'Google Workspace', probeCategory: 'ovrigt' },
+  tietoevry: { probeName: 'Tietoevry (Edlevo)', functions: ['elevregister', 'franvaro', 'barnomsorg', 'vuxenutbildning'], products: { 'Lifecare': [] } },
+  ist: {
+    functions: ['elevregister', 'franvaro', 'schema', 'barnomsorg', 'vuxenutbildning'],
+    products: {
+      'IST Administration': ['elevregister', 'franvaro'], 'IST Schema': ['schema'], 'IST Lärande': ['larplattform'], 'PingPong': ['larplattform'],
+      'IST Analys': [], 'Dexter': [], 'hypernet': [], 'EduCloud': [], 'SkolID': [], 'TextLink': [], 'IST Home Skola': [],
+    },
+  },
+  schoolsoft: { functions: ['elevregister', 'larplattform', 'schema', 'franvaro', 'barnomsorg'], products: { 'SchoolSoft Schema': ['schema'] } },
+  'nova-software': {
+    probeName: 'Skola24', functions: ['schema', 'franvaro'],
+    products: { 'Skola24 Schema': ['schema'], 'Skola24 Frånvaro': ['franvaro'], 'Skola24 Fritidshem': ['barnomsorg'] },
+  },
+  tempus: { functions: ['barnomsorg'], products: { 'Tempus Personal': [], 'Tempus Köksplanering': [] } },
+  quiculum: { functions: ['elevregister', 'larplattform', 'schema', 'franvaro'] },
+  gotit: { probeName: 'Gotit (Alvis)', functions: ['vuxenutbildning'] },
+  speedadmin: { functions: ['kulturskola'] },
+  studyalong: { functions: ['kulturskola'], products: { 'Playalong': [] } },
+  tyra: { functions: ['barnomsorg'] },
+  'plan-digital': { functions: ['tjanstefordelning'] },
+  'royal-schedule': { functions: ['schema'] },
+  optiplan: { functions: ['skolplacering'], products: { 'Optiplan Skolskjuts': [] } },
+  'svensk-utbildningsteknologi': { probe: false },
+  oard: { probe: false },
+  prorenata: { probeName: 'ProReNata', functions: ['journal'] },
+  cgm: { probeName: 'CompuGroup Medical (PMO)', functions: ['journal'] },
+  'digital-fox': { probeName: 'Digital Fox (DF Respons)', functions: ['incident'] },
+  draftit: { probeName: 'Visma Draftit', functions: ['incident'], products: { 'Draftit Skolledning': [] } },
+  skolfederation: { probe: false },
+  sambruk: { probe: false },
+  samverka: { probeName: 'Samverka.nu' },
+  axiell: { probeName: 'Axiell (WeLib)' },
+  cosafe: { probe: false },
+  entergate: { probeName: 'Entergate (esMaker)' },
+  sirvoy: { probe: false },
+};
+for (const [slug, cfg] of Object.entries(PROBE)) {
+  const c = COMPANIES.find((x) => x.slug === slug);
+  if (!c) throw new Error(`catalogue-def PROBE: unknown company ${slug}`);
+  const { products, ...rest } = cfg;
+  Object.assign(c, rest);
+  for (const [name, fns] of Object.entries(products ?? {})) {
+    const p = c.products.find((x) => x.name === name);
+    if (!p) throw new Error(`catalogue-def PROBE: unknown product ${slug}/${name}`);
+    p.functions = fns;
+  }
+}
 
 // Brand owners that appear only as names inside other vendors' rows, not catalogued.
 export const MINOR_BRANDS = [
