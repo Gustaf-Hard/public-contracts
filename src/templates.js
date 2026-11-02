@@ -113,7 +113,7 @@ export function T_CROSSCHECK(ctx) {
       '',
       list,
       '',
-      'Finns något av dem hos er tar jag gärna del av avtalet. Hör jag inget annat betraktar jag min begäran som besvarad.',
+      CROSSCHECK_CLOSE_LINE,
       '',
       signature(ctx),
     ].join('\n'),
@@ -167,13 +167,18 @@ export function T_FOLLOWUP_FINAL(ctx) {
   };
 }
 
+// Fixed close lines, exported so concessionFlags (classifier.js) can exempt
+// them verbatim: they are designed wording, not a draft deciding for us.
+export const FOLLOWUP_CLOSE_LINE = 'Tack igen för avtalen jag fått. Har ni ytterligare avtal som inte skickats än, eller kan vi betrakta begäran som slutförd från er sida?';
+export const CROSSCHECK_CLOSE_LINE = 'Finns något av dem hos er tar jag gärna del av avtalet. Hör jag inget annat betraktar jag min begäran som besvarad.';
+
 export function T_FOLLOWUP_CLOSE(ctx) {
   return {
     subject: `Re: ${ctx.thread_subject}`,
     body: [
       'Hej,',
       '',
-      'Tack igen för avtalen jag fått. Har ni ytterligare avtal som inte skickats än, eller kan vi betrakta begäran som slutförd från er sida?',
+      FOLLOWUP_CLOSE_LINE,
       '',
       signature(ctx),
     ].join('\n'),

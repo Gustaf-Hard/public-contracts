@@ -727,6 +727,10 @@ const CASE_TERMINAL = new Set(['DONE', 'DEAD_END']);
 // Full detail for one conversation (Ärenden detail pane). `kommunFor` looks a
 // kommun record up by kod — passed as a function so the caller does not have to
 // repeat getConversation() just to learn the kod before calling.
+// How long the analysis draft_reply of the latest inbound may pre-fill the
+// blank reply box. NaN (no ingested_at) compares false, so no seed.
+const DRAFT_SEED_MAX_AGE_DAYS = 3;
+
 function loadCaseDetail(db, convId, kommunFor = () => null) {
   if (!db) return null;
   const conv = db.getConversation(convId);
@@ -796,8 +800,15 @@ function loadCaseDetail(db, convId, kommunFor = () => null) {
     && !CASE_TERMINAL.has(conv.state);
 
   const lastIn = [...messages].reverse().find((m) => m.direction === 'inbound') ?? null;
+  // The seed is the draft_reply the analysis wrote for that one mail, blind to
+  // the rest of the thread and never reviewed. Offer it only while it is fresh:
+  // Karlstad #100 was pre-filled a month later with a reply conceding the
+  // avtal for a summary table, which nothing on the page flagged as stale.
   let draft_seed = '';
-  try { draft_seed = JSON.parse(lastIn?.analysis_json ?? 'null')?.draft_reply ?? ''; } catch { /* unparsable */ }
+  const seedAgeMs = Date.now() - Date.parse(String(lastIn?.ingested_at ?? '').replace(' ', 'T') + 'Z');
+  if (seedAgeMs <= DRAFT_SEED_MAX_AGE_DAYS * 86_400_000) {
+    try { draft_seed = JSON.parse(lastIn?.analysis_json ?? 'null')?.draft_reply ?? ''; } catch { /* unparsable */ }
+  }
   const draft_to = needs_draft
     ? resolveReplyRecipient({
         triggeringMessage: lastIn, conv,
@@ -807,7 +818,8 @@ function loadCaseDetail(db, convId, kommunFor = () => null) {
   const draft_subject = 'Re: ' + String(lastIn?.subject ?? 'Begäran om allmänna handlingar').replace(/^(Re|Sv|SV):\s*/i, '');
 
   return { conv, messages, attachmentsByMsg, signatures, escalations, parked_escalations, deferred_escalations, threads, handoff_targets,
-    needs_draft, draft_seed: draft_seed.trim(), draft_to, draft_subject,
+    needs_draft, draft_seed: draft_seed.trim(), draft_seed_date: draft_seed.trim() ? String(lastIn.ingested_at).slice(0, 10) : '',
+    draft_to, draft_subject,
     follow_up: effectiveFollowUp(conv) };
 }
 
@@ -1314,9 +1326,10 @@ export function createDashboardApp({
         finalBody, finalSubject: req.body.subject, finalTo: req.body.to,
         decision: 'edit', slackClient,
         startHandoffs: [].concat(req.body.start_handoff ?? []),
+        acceptConcessions: req.body.accept_concession === '1',
       });
     } catch (e) {
-      if (e.code === 'ESCALATION_NOT_OPEN' || e.code === 'STALE_ESCALATION' || e.code === 'STALE_INGEST') {
+      if (e.code === 'ESCALATION_NOT_OPEN' || e.code === 'STALE_ESCALATION' || e.code === 'STALE_INGEST' || e.code === 'CONCESSION_UNCONFIRMED') {
         return res.status(409).send(escapeForError(e.message));
       }
       return res.status(500).send(`Send failed: ${escapeForError(e.message)}`);
@@ -1644,6 +1657,7 @@ export function createDashboardApp({
         // a string, several an array; sendApprovedReply honours only addresses
         // that are still pending handoff tasks of this conversation.
         startHandoffs: [].concat(req.body.start_handoff ?? []),
+        acceptConcessions: req.body.accept_concession === '1',
       });
     } catch (e) {
       // Claim/staleness violations are expected races, not server errors:
@@ -1651,7 +1665,7 @@ export function createDashboardApp({
       // inbound arrived after the draft, or ingest is down so a "we're still
       // waiting" nudge cannot be trusted. Nothing was double-sent, and the
       // escalation is still open.
-      if (e.code === 'ESCALATION_NOT_OPEN' || e.code === 'STALE_ESCALATION' || e.code === 'STALE_INGEST') {
+      if (e.code === 'ESCALATION_NOT_OPEN' || e.code === 'STALE_ESCALATION' || e.code === 'STALE_INGEST' || e.code === 'CONCESSION_UNCONFIRMED') {
         return res.status(409).send(escapeForError(e.message));
       }
       // A bounce resend with no corrected address: nothing was sent and the

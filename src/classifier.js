@@ -1,3 +1,5 @@
+import { FOLLOWUP_CLOSE_LINE, CROSSCHECK_CLOSE_LINE } from './templates.js';
+
 const AUTO_ACK_PATTERNS = [
   { name: 'arendenummer', re: /Ärendenummer\s*[:\-]\s*[Kk]\d{6,}/i, score: 0.8 },
   { name: 'tack_for_att', re: /Tack för att du hörde av dig/i, score: 0.7 },
@@ -168,6 +170,27 @@ export function delayAckBodyGate(body) {
   if (ATTACHMENT_RE.test(visible)) return { ok: false, reason: 'attachment_language' };
   if (visible.split(/\s+/).length > DELAY_ACK_AUTO_MAX_WORDS) return { ok: false, reason: 'too_long' };
   return { ok: true, reason: null };
+}
+
+// Concession gate (2026-09-28, Karlstad #100 + the concession audit). A draft
+// may restate the operator's decisions but never make a new commitment:
+// accepting a fee, masking or a summary instead of the avtal, waiving the
+// beslut, or closing the request. Returns the reasons found in OUR visible
+// text (quoted kommun text is stripped), [] when clean. Like delayAckBodyGate
+// it is a blocklist: a false flag costs one confirmation tick, a miss costs a
+// sent concession. The two fixed template close lines are exempt verbatim.
+const CONCESSION_RES = [
+  ['accepts', /\b(?:accepterar|godtar|godkänner)\b/i],
+  ['amount', CURRENCY_RE],
+  ['waives_beslut', /behöver inte (?:något |ett )?(?:skriftligt |formellt |överklagbart |motiverat )*beslut/i],
+  ['closes', /\bbetrakta\w* [^.?!]{0,60}\b(?:slutförd|besvarad|avslutad)|behöver inte göra något mer/i],
+  ['enough', /i stället för (?:själva |de )?(?:avtalen|avtalshandlingarna|originalen|originaldokumenten)|räcker för (?:oss|mig)/i],
+];
+
+export function concessionFlags(body) {
+  let visible = stripQuotedText(body ?? '');
+  for (const line of [FOLLOWUP_CLOSE_LINE, CROSSCHECK_CLOSE_LINE]) visible = visible.split(line).join('');
+  return CONCESSION_RES.filter(([, re]) => re.test(visible)).map(([reason]) => reason);
 }
 
 // Fallback "this was everything" detector over the UNQUOTED part of the body

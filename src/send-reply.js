@@ -8,6 +8,7 @@ import { T_INITIAL } from './templates.js';
 import { resolveReplyRecipient } from './threads.js';
 import { updateEscalationResolved } from './slack.js';
 import { DEFERRED_ESCALATION_STATUS } from './storage.js';
+import { concessionFlags } from './classifier.js';
 
 function fromHeader(env) {
   return `${env.GMAIL_FROM_NAME} <${env.GMAIL_USER_EMAIL}>`;
@@ -216,7 +217,7 @@ async function archiveThreadBestEffort({ archiveThreadImpl, gmail, threadId, log
 //  - If Gmail throws after the claim, the escalation is parked as
 //    'send_failed' (never back to 'open') so nothing auto-retries an
 //    ambiguous send; the operator verifies in Gmail Sent first.
-export async function sendApprovedReply({ db, gmail, env, conv, esc, finalBody, finalSubject, finalTo, decision, gmailSendImpl = gmailSend, archiveThreadImpl = archiveThread, slackClient = null, log = null, clock = () => new Date(), startHandoffs = [] }) {
+export async function sendApprovedReply({ db, gmail, env, conv, esc, finalBody, finalSubject, finalTo, decision, gmailSendImpl = gmailSend, archiveThreadImpl = archiveThread, slackClient = null, log = null, clock = () => new Date(), startHandoffs = [], acceptConcessions = false }) {
   const subject = finalSubject ?? esc.draft_subject ?? 'Re: Begäran om allmänna handlingar';
   const triggeringMessage = esc.message_id ? db.getMessageById(esc.message_id) : null;
 
@@ -298,6 +299,19 @@ export async function sendApprovedReply({ db, gmail, env, conv, esc, finalBody, 
         'STALE_INGEST'
       );
     }
+  }
+
+  // Concession gate (2026-09-28, Karlstad #100 + the concession audit). A
+  // body that accepts a fee, masking or a summary instead of the avtal, waives
+  // the beslut or closes the request is a decision only the operator makes:
+  // it needs their explicit acceptConcessions, and the machine never sends one
+  // at all. Checked before the claim, so a refusal leaves the escalation open.
+  const concessions = concessionFlags(finalBody ?? esc.draft_body ?? '');
+  if (concessions.length > 0 && (decision === 'auto_send' || !acceptConcessions)) {
+    throw errWithCode(
+      `Escalation ${esc.id}: svaret ger något som bara du kan besluta (${concessions.join(', ')}: avgift, sekretess, sammanställning i stället för avtal eller avslut). Skicka från dashboarden och kryssa i att du godkänner det, eller ändra texten.`,
+      'CONCESSION_UNCONFIRMED'
+    );
   }
 
   if (!db.claimEscalationForSending(esc.id)) {

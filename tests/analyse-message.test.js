@@ -521,9 +521,9 @@ describe('buildSystemPrompt — invoicing identity comes from env', () => {
     expect(p).not.toMatch(/Org\.nr \d/);
   });
 
-  it('pushes free digital delivery before accepting a copying fee', () => {
+  it('pushes free digital delivery and leaves accepting a fee to the operator', () => {
     const p = buildSystemPrompt({ from_name: 'G', from_email: 'g@x.se' });
-    expect(p).toMatch(/digital leverans .*utan avgift/);
+    expect(p).toMatch(/digitalt som PDF via e-post \(då uppstår ingen kopieringskostnad\)/);
   });
 });
 
@@ -747,6 +747,19 @@ describe('thread context (2026-09-12 design)', () => {
     expect(sys).toContain('Påstå ALDRIG att handlingar saknas');
     expect(sys).toContain('Upprepa ALDRIG en fråga');
     expect(sys).toContain('begäran aldrig nått dem');
+  });
+
+  // Karlstad #100 (2026-09-27): asked "sammanställning or avtal i sin helhet?"
+  // twice, Haiku answered one way on 19 Aug and the other on 24 Aug, the second
+  // time also accepting the page fee. Neither is the model's call.
+  it('system prompt forbids conceding documents, fees or sekretess in a draft', async () => {
+    const client = fakeClientReturning({ intent: 'auto_ack', confidence: 0.95, summary: 's', extracted: {}, suggested_action: 'wait', is_final_delivery: false, draft_reply: '', follow_up_at: null });
+    await analyseMessage('Tack.', baseCtx, { env: { ANTHROPIC_API_KEY: 'k' }, client });
+    const sys = client.messages.create.mock.calls[0][0].system[0].text;
+    expect(sys).toContain('Ge ALDRIG upp avtalshandlingarna');
+    expect(sys).toContain('Acceptera ALDRIG en avgift');
+    expect(sys).toContain('Godta ALDRIG sekretess');
+    expect(sys).not.toMatch(/innan du accepterar en kopieringstaxa/);
   });
 
   // Round-2 finding F3: sender-controlled text shares the context block with

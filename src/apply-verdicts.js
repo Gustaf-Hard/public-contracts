@@ -13,12 +13,17 @@
 //  - `draft_sha256`: the verdict is about a specific draft body. If the row's
 //    body changed since (a backfill, a live patch), the verdict is void.
 //
+// A body that concedes something (concessionFlags) is never sent from a batch:
+// it is reported `concession` and left open, even in a dry run, because
+// accepting a fee, masking or a summary is the operator's click (2026-09-28).
+//
 // `human` rows are never touched. Nothing here retries: a Gmail failure parks
 // the escalation exactly as a dashboard click would, and the batch moves on.
 import { createHash } from 'node:crypto';
 import { sendMessage as gmailSend } from './gmail.js';
 import { sendApprovedReply, deferEscalation } from './send-reply.js';
 import { DEFER_REASONS } from './storage.js';
+import { concessionFlags } from './classifier.js';
 
 export const sha256 = (s) => createHash('sha256').update(s ?? '').digest('hex');
 
@@ -96,6 +101,8 @@ export async function applyVerdicts({
     if (v.verdict !== 'approve' && v.verdict !== 'edit') { done('unknown_verdict'); continue; }
     const finalBody = v.verdict === 'edit' ? (v.final_body ?? '').trim() : (esc.draft_body ?? '');
     if (!finalBody) { done('empty_body'); continue; }
+    const concessions = concessionFlags(finalBody);
+    if (concessions.length) { done('concession', { flags: concessions }); continue; }
     if (!apply) { done('would_send'); continue; }
     if (sentAny) await sleep(delayMs);
     try {

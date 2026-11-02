@@ -200,6 +200,20 @@ Phase-1 pipeline: `scripts/01|02|03 → src/seed.js|crawl.js|verify.js → data/
   backstop, not the guarantee. The zero-stored-attachment rule stays
   conversation-wide.
 
+- **A draft restates the operator's decisions; it never makes a new one.**
+  Accepting a fee, masking/sekretess or a summary instead of the avtal,
+  dropping a vendor, waiving the beslut or closing the request is the
+  operator's call. The prompt forbids it (skrivregler 6-8 in
+  `analyse-message.js`) and `concessionFlags` (classifier.js) enforces it at
+  `sendApprovedReply`: a flagged body needs `acceptConcessions` (the dashboard
+  tick-box, `--accept-concession` on the CLI), Slack approve is refused, and
+  `auto_send` and the batch applier never send one. The two fixed close lines
+  (`FOLLOWUP_CLOSE_LINE`, `CROSSCHECK_CLOSE_LINE`) are exempt verbatim.
+- **A suggestion is only valid against the state it was made from.** The
+  blank reply box pre-fills the latest inbound's analysis `draft_reply` only
+  within `DRAFT_SEED_MAX_AGE_DAYS` (dashboard.js) and labels it as unchecked.
+  Re-draft stale open drafts with `scripts/15-redraft.js` (dry run by default).
+
 ## Conventions that aren't obvious from the code alone
 
 **No schema changes casually.** `storage.js` migrations are append-only

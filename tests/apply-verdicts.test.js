@@ -43,6 +43,17 @@ describe('applyVerdicts', () => {
     expect(res).toEqual([{ esc: escId, verdict: 'approve', outcome: 'would_send' }]);
   });
 
+  it('a conceding body is reported, never sent, even with --apply', async () => {
+    const draft = 'Hej,\n\nJag accepterar avgiften.';
+    const { db, escId } = seed({ draft });
+    const send = vi.fn(async () => ({ id: 'out', threadId: 'thr' }));
+    const res = await applyVerdicts({ db, gmail: {}, env, reviewedAt, apply: true, gmailSendImpl: send, sleep: async () => {},
+      verdicts: [{ esc: escId, verdict: 'approve', draft_sha256: sha(draft) }] });
+    expect(send).not.toHaveBeenCalled();
+    expect(escRow(db, escId).status).toBe('open');
+    expect(res[0]).toMatchObject({ outcome: 'concession', flags: ['accepts'] });
+  });
+
   it('approve sends the draft body unmodified with decision approve_unmodified', async () => {
     const { db, escId } = seed();
     const send = vi.fn(async () => ({ id: 'out', threadId: 'thr' }));
