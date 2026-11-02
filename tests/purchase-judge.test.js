@@ -215,3 +215,39 @@ describe('judgeXlsx: a rejected sheet never reaches the LLM (R1)', () => {
     expect(create).not.toHaveBeenCalled();
   });
 });
+
+// Fix wave 4 R6: common ledger and register header spellings, which win over
+// a channel or licence word in the filename. Invented rows.
+describe('judgeXlsx: ledger and register header variants (R6)', () => {
+  const rowsOf = (head, row) => [head, ...Array.from({ length: 5 }, (_, i) => row(i))];
+  const ledger = (col) => rowsOf([col, 'Leverantör', 'Belopp', 'Datum'], (i) => [`V${i}`, `Exempel ${i} AB`, 100 + i, '2024-03-01']);
+
+  it('a ledger header is skipped under a licence or channel filename', () => {
+    for (const col of ['Ver.nr', 'Vernr', 'Ver nr', 'Verifikationsnummer', 'Lev.fakt.nr', 'Fakturanr', 'Fakturanummer']) {
+      for (const filename of ['Licenser 2024.xlsx', 'Atea 2024.xlsx', 'Utbetalningar licenser 2024.xlsx']) {
+        const j = judgeXlsx([sheet(ledger(col))], { filename });
+        expect(j.verdict, `${col} / ${filename}`).toBe('skip');
+        expect(j.rows, col).toEqual([]);
+      }
+    }
+  });
+
+  it('a supplier invoice number is a ledger even beside an Antal column', () => {
+    const j = judgeXlsx([sheet(rowsOf(['Lev.fakt.nr', 'Leverantör', 'Antal', 'Belopp'], (i) => [`F${i}`, `Exempel ${i} AB`, 1, 100 + i]))], { filename: 'licensuppföljning.xlsx' });
+    expect(j.verdict).toBe('skip');
+  });
+
+  it('an avtal register header is skipped under a licence filename, Antal or not', () => {
+    const reg = (col, third) => rowsOf([col, 'Leverantör', third, 'Slutdatum'], (i) => [`Avtal ${i}`, `Exempel ${i} AB`, third === 'Antal' ? 3 : '2024-01-01', '2026-12-31']);
+    for (const col of ['Avtal', 'Avtalsbenämning', 'Avtalsnamn']) {
+      expect(judgeXlsx([sheet(reg(col, 'Startdatum'))], { filename: 'licensavtal.xlsx' }).verdict, col).toBe('skip');
+      expect(judgeXlsx([sheet(reg(col, 'Antal'), 'Avtal')], { filename: 'Skolon.xlsx' }).verdict, `${col} + Antal`).toBe('skip');
+    }
+  });
+
+  it('a real licence list is still read', () => {
+    const j = judgeXlsx([sheet(rowsOf(['Ordernummer', 'Leverantör', 'Produkt', 'Antal', 'Belopp'], (i) => [`EX-${i}`, 'Exempel AB', `Vara ${i}`, 2, 100 + i]))], { filename: 'Licenser 2024.xlsx' });
+    expect(j.verdict).toBe('rows');
+    expect(j.rows).toHaveLength(5);
+  });
+});

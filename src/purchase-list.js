@@ -337,9 +337,14 @@ export const PURCHASE_TEXT_MAX = 200_000;
 const LEDGER_NAME = /reskontra|verifikation|huvudbok|bokforingsorder/;
 const REGISTER_NAME = /avtalsregister|avtalskatalog/;
 const INVOICE_NAME = /faktur/;
-const LEDGER_HEADER = /^verifikation|reskontra/;
+// Fix wave 4 R6: the common spellings. A voucher number ("Ver.nr", "Vernr")
+// or the supplier's invoice number ("Lev.fakt.nr") is a ledger column, and an
+// avtal name column ("Avtal", "Avtalsbenämning") a register's, whatever else
+// the sheet or the filename says. The kommun's own invoice number
+// ("Fakturanr") still rejects only a sheet with no Antal column.
+const LEDGER_HEADER = /^verifikation|reskontra|^ver ?nr$|^vernr$|^lev ?fakt(ura)? ?nr$|^levfaktnr$|^leverantorens fakturanr/;
 const INVOICE_NO_HEADER = /\bfaktura ?nr\b|fakturanummer|fakturanr/;
-const REGISTER_HEADER = /^avtalsnamn$/;
+const REGISTER_HEADER = /^(avtalsnamn|avtal|avtalsbenamning|avtalets namn)$/;
 const LICENCE_WORD_RE = /licens/;
 const ORDER_HEADER = /^(order ?nr|ordernummer|order|order id|best(allnings)? ?nr|bestallningsnummer|orderdatum|bestallningsdatum)$/;
 const filled = (r) => (r ?? []).some((c) => c != null && c !== '');
@@ -362,7 +367,7 @@ function sheetSignals(t, sh) {
   const heads = (t.header ?? []).filter((c) => typeof c === 'string').map((c) => normName(c));
   const reject = nameReject(sh, t.map.columns.quantity != null)
     ?? (heads.some((h) => LEDGER_HEADER.test(h)) ? 'verifikationslista eller leverantörsreskontra'
-      : heads.some((h) => REGISTER_HEADER.test(h)) ? 'avtalsregister (kolumnen Avtalsnamn)'
+      : heads.some((h) => REGISTER_HEADER.test(h)) ? 'avtalsregister (kolumnen med avtalets namn)'
         : heads.some((h) => INVOICE_NO_HEADER.test(h)) && t.map.columns.quantity == null ? 'leverantörsreskontra (fakturanummer, inga antal)'
           : null);
   const text = [sh.name, ...(t.above ?? []), ...(t.header ?? []).filter((c) => typeof c === 'string')].join(' ');
