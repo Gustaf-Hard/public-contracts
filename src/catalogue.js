@@ -296,7 +296,11 @@ function classifyRaw(vc, name) {
 // s: "Claros"), so "samverkan" is not Samverka.nu. Product patterns are not
 // scanned: some are only safe on a product line ("och Insight" is Magma
 // Insight in a Radish row, the reseller Insight in a summary).
-const BRAND_WORD = new Map(COMPANIES.filter((c) => c.brand).map((c) => [c, new RegExp(`(?:${c.brand.source})(?:s)?(?![a-z0-9])`)]));
+// Fix wave 4 R3: a `\b` that ends an alternative ("\bliber\b") is dropped
+// before the optional s, or "Libers" never matched; the lookahead after the s
+// still ends the word, so "Liberalt", "Nestlé" and "Istanbul" stay unmatched.
+const brandWord = (src) => new RegExp(`(?:${src.replace(/\\b(?=\||$)/g, '')})(?:s)?(?![a-z0-9])`);
+const BRAND_WORD = new Map(COMPANIES.filter((c) => c.brand).map((c) => [c, brandWord(c.brand.source)]));
 export function companiesNamedIn(raw) {
   if (raw == null || !String(raw).trim()) return [];
   const n = prepare(raw);

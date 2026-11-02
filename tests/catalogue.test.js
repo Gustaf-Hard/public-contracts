@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  normName, classifyVendor, classifyLine, companies, companyBySlug, productBySlug, CATEGORIES,
+  normName, classifyVendor, classifyLine, companies, companyBySlug, productBySlug, CATEGORIES, companiesNamedIn,
 } from '../src/catalogue.js';
 import { COMPANIES as KB_COMPANIES } from '../src/vendor-kb.js';
 
@@ -157,5 +157,29 @@ describe('catalogue entries', () => {
       expect(hit, kb.canonical).not.toBeNull();
       expect(hit.slug, kb.canonical).toBe(KB_MERGED[kb.slug] ?? kb.slug);
     }
+  });
+});
+
+// Fix wave 4 R3: the Swedish genitive of a brand that ends a word.
+describe('companiesNamedIn: the genitive s (R3)', () => {
+  it('matches "<brand>s" for brands whose pattern ends in \\b', () => {
+    expect(companiesNamedIn('Avtalet gäller Libers digitala läromedel')).toContain('liber');
+    expect(companiesNamedIn('Fakturan avser ISTs elevregister')).toContain('ist');
+    expect(companiesNamedIn('NEs tjänster')).toContain('ne');
+    expect(companiesNamedIn('Tyras app för förskolan')).toContain('tyra');
+    expect(companiesNamedIn('Clios läromedel')).toContain('clio');
+    expect(companiesNamedIn('SLIs filmer')).toContain('sli');
+    expect(companiesNamedIn('Nomps övningar')).toContain('nomp');
+    expect(companiesNamedIn('BTJs katalog')).toContain('btj');
+    expect(companiesNamedIn('NTAs lådor')).toContain('nta');
+    expect(companiesNamedIn('Polyglutt från ILTs katalog')).toContain('ilt');
+  });
+
+  it('is not loosened otherwise', () => {
+    expect(companiesNamedIn('Nestlé')).not.toContain('ne');
+    expect(companiesNamedIn('Resa till Istanbul')).not.toContain('ist');
+    expect(companiesNamedIn('Liberalt')).not.toContain('liber');
+    expect(companiesNamedIn('Tyrann')).not.toContain('tyra');
+    expect(companiesNamedIn('samverkan')).toEqual([]);
   });
 });
