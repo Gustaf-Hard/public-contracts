@@ -210,6 +210,15 @@ describe('extractXlsxPurchases', () => {
     expect(out.rows.map((r) => r.order_ref)).toEqual(['EX-1', 'EX-2', 'EX-3']);
   });
 
+  // Fix wave 4 minor: the same order reference on two läsår tabs is two rows.
+  it('one order reference on two läsår tabs is two rows', () => {
+    const head = ['Ordernummer', 'Leverantör', 'Produkt', 'Antal', 'Belopp'];
+    const a = sheet([head, ['EX-7', 'Binogi', 'Binogi', 10, 100]], '2024-25');
+    const b = sheet([head, ['EX-7', 'Binogi', 'Binogi', 10, 100]], '2025-26');
+    const out = extractXlsxPurchases([a, b], { filename: 'x.xlsx' });
+    expect(out.rows.map((r) => r.school_year)).toEqual(['2024/25', '2025/26']);
+  });
+
   // Fix wave 3 Q4: order_ref alone is never the identity.
   it('two products under one order reference on different sheets are both kept', () => {
     const a = sheet([['Ordernummer', 'Leverantör', 'Produkt', 'Antal', 'Belopp'], ['EX-1', 'Binogi', 'Binogi', 10, 100]], 'Ordrar');

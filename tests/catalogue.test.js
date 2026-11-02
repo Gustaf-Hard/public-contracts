@@ -183,3 +183,12 @@ describe('companiesNamedIn: the genitive s (R3)', () => {
     expect(companiesNamedIn('samverkan')).toEqual([]);
   });
 });
+
+// Fix wave 4 minor: decomposed (NFD) å/ä/ö, as macOS filenames often are.
+describe('normName: NFD input', () => {
+  it('folds decomposed letters like composed ones', () => {
+    expect(normName('La\u0308raMera avtal')).toBe('laramera avtal');
+    expect(normName('Inla\u0308sningstja\u0308nst')).toBe('inlasningstjanst');
+    expect(companiesNamedIn('Inla\u0308sningstja\u0308nst faktura')).toContain('ilt');
+  });
+});

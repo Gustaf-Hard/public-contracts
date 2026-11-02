@@ -35,7 +35,7 @@ const STUDIO_CATEGORY = {
 };
 const studioCategory = (c) => (c == null ? null : STUDIO_CATEGORY[c] ?? 'ovrigt');
 
-export const normName = (s) => String(s ?? '').toLowerCase()
+export const normName = (s) => String(s ?? '').normalize('NFC').toLowerCase()
   .replace(/[åä]/g, 'a').replace(/ö/g, 'o').replace(/[éè]/g, 'e').replace(/ü/g, 'u').replace(/æ/g, 'ae').replace(/ø/g, 'o')
   .replace(/[^a-z0-9]+/g, ' ').trim();
 const N = normName;

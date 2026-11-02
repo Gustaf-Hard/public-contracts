@@ -270,10 +270,11 @@ function readTable(sheet, { filename }) {
 // orders apart. Equal supplier and product is not a repeat: a later läsår,
 // another budget unit or a new order has its own row. With an order
 // reference (fix wave 3 Q4) the identity is the reference plus product,
-// amount, period and quantity, never the reference alone: one order (or
-// invoice) number can carry several products with no line column.
+// amount, period, quantity and läsår (fix wave 4), never the reference alone:
+// one order (or invoice) number can carry several products with no line
+// column, and a recurring order number can sit on two läsår tabs.
 const dupKey = (r) => (r.order_ref
-  ? ['ref', normName(r.order_ref), normName(r.product), r.amount_sek, r.period_start, r.period_end, r.quantity]
+  ? ['ref', normName(r.order_ref), normName(r.product), r.amount_sek, r.period_start, r.period_end, r.quantity, r.school_year]
   : [normName(r.supplier), normName(r.product), r.amount_sek, r.period_start, r.period_end, r.quantity, r.school_year, r.order_date])
   .map((v) => (v == null ? '' : String(v))).join('\u0000');
 
