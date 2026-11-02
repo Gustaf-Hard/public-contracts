@@ -489,3 +489,54 @@ describe('fix wave 3 Q9: an unnamed product falls back to the whole avtal', () =
     expect(lp[0].note).toBe('för gymnasiet');
   });
 });
+
+// Fix wave 4 R2: a purchase row strikes every company it names, split as in
+// Q1, plus its exact-alias supplier. Invented rows.
+describe('fix wave 4 R2: purchase rows strike every company they name', () => {
+  const row = (supplier, product) => ({ kommun_kod: K, supplier, product, channel: null });
+  const asked = (rows) => allNames(buildProbeList({ kommunKod: K, purchaseRows: rows }));
+
+  it('a slash pair in a product strikes both sides', () => {
+    const names = asked([row('Skolon', 'Oribi/Wizkids')]);
+    expect(names).not.toContain('Everway (Oribi)');
+    expect(names).not.toContain('Wizkids');
+  });
+
+  it('a comma list in a product strikes each company', () => {
+    const names = asked([row('Skolon', 'Skriva text, LexiFlow, ClaroRead')]);
+    expect(names).not.toContain('Everway (Oribi)');
+    expect(names).not.toContain('Claro Software');
+    const names2 = asked([row('Atea', 'Studybee, Haldor')]);
+    expect(names2).not.toContain('StudyBee');
+    expect(names2).not.toContain('Haldor');
+  });
+
+  it('a channel supplier with a slash product strikes both companies', () => {
+    const names = asked([row('Skolon', 'itslearning/Sanoma')]);
+    expect(names).not.toContain('itslearning');
+    expect(names).not.toContain('Sanoma Utbildning');
+  });
+
+  it('the supplier and the company the product names are both struck', () => {
+    let names = asked([row('Binogi', 'Polyglutt')]);
+    expect(names).not.toContain('Binogi');
+    expect(names).not.toContain('ILT (Inläsningstjänst)');
+    names = asked([row('Everway', 'AppWriter')]);
+    expect(names).not.toContain('Everway (Oribi)');
+    expect(names).not.toContain('Wizkids');
+  });
+
+  it('" med " and " inklusive " split when both parts are catalogue names', () => {
+    let names = asked([row('Skolon', 'Polyglutt med ClaroRead')]);
+    expect(names).not.toContain('ILT (Inläsningstjänst)');
+    expect(names).not.toContain('Claro Software');
+    names = asked([row('Skolon', 'Polyglutt inklusive LexiFlow')]);
+    expect(names).not.toContain('Everway (Oribi)');
+    expect(documentCompanies(doc({ products: ['Polyglutt med ClaroRead'] }))).toEqual(expect.arrayContaining(['ilt', 'claro']));
+  });
+
+  it('a payee in the supplier column still names nothing', () => {
+    const probe = buildProbeList({ kommunKod: K, purchaseRows: [row('Exempel Haldorsson AB', 'Konsulttimmar')] });
+    expect(allNames(probe)).toContain('Haldor');
+  });
+});

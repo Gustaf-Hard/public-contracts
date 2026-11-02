@@ -21,7 +21,7 @@
 // company's footprint in our data: the number of kommuner where we have seen it.
 
 import { CATEGORIES, companies, classifyVendor, classifyLine, companiesNamedIn, productBySlug } from './catalogue.js';
-import { classifyPurchaseRow } from './purchase-list.js';
+import { classifyPurchaseRow, supplierCompany } from './purchase-list.js';
 import { channelName } from './studio-purchases.js';
 import { mapUnitToGradeLevels } from './vendor-analytics.js';
 import { loadKommunStats } from './kommun-stats.js';
@@ -108,9 +108,24 @@ function lineCompanies(ownerSlug, text, { whole = true } = {}) {
     const r = classifyLine(owner, t);
     if (r.kind !== 'uncatalogued' && r.companySlug) out.add(r.companySlug);
   };
+  const resolve = (t) => {
+    for (const owner of ownerSlug ? [ownerSlug, null] : [null]) {
+      const r = classifyLine(owner, t);
+      if (r.kind !== 'uncatalogued' && r.companySlug) return r.companySlug;
+    }
+    return null;
+  };
   for (const t of new Set([...(whole ? [str] : []), ...phrases(str)])) {
     take(ownerSlug, t);
     if (ownerSlug) take(null, t);
+    // Fix wave 4 R2: "Polyglutt med ClaroRead", "Polyglutt inklusive
+    // LexiFlow". Split only when EVERY part is a catalogue name on its own,
+    // so "Nationalencyklopedin med flera tjänster" is read as before.
+    const parts = t.split(/\s(?:med|inklusive)\s/i).map((x) => x.trim()).filter(Boolean);
+    if (parts.length > 1) {
+      const slugs = parts.map(resolve);
+      if (slugs.every(Boolean)) for (const slug of slugs) out.add(slug);
+    }
   }
   for (const slug of companiesNamedIn(str)) out.add(slug);
   const res = [...out];
@@ -352,9 +367,15 @@ export function buildProbeList({ kommunKod, contracts = [], purchaseRows = [], c
   const bought = new Map(); // slug -> channel slug | null
   for (const r of purchaseRows) {
     const c = classifyPurchaseRow({ supplier: r.supplier, product: r.product, channel: r.channel ?? r.document_channel ?? null });
-    if (!c.company_slug || !isService(c.company_slug)) continue;
-    seenIn(c.company_slug, r.kommun_kod);
-    if (own(r) && !bought.has(c.company_slug)) bought.set(c.company_slug, c.channel_slug ?? null);
+    if (c.company_slug && isService(c.company_slug)) seenIn(c.company_slug, r.kommun_kod);
+    if (!own(r)) continue;
+    // Fix wave 4 R2: for striking, a row names every company its product
+    // names (split as in Q1, lineCompanies) plus its supplier, matched only
+    // by exact alias (supplierCompany): the supplier column can hold a payee.
+    const sup = supplierCompany(r.supplier);
+    const owner = sup && sup.role !== 'channel' ? sup.slug : null;
+    const slugs = new Set([...(c.company_slug ? [c.company_slug] : []), ...(owner ? [owner] : []), ...lineCompanies(owner, r.product)]);
+    for (const slug of slugs) if (isService(slug) && !bought.has(slug)) bought.set(slug, c.channel_slug ?? null);
   }
   const named = new Set();
   for (const m of mentions) for (const slug of mentionCompanies(m)) named.add(slug);
