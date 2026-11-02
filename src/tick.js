@@ -48,7 +48,16 @@ function isRequeuedDraft(esc, log) {
 function probeForKommun(db, conv, log) {
   try {
     const unread = db.countUnreadAnalysableAttachmentsForKommun(conv.kommun_kod);
-    if (unread > 0) return { probe: null, note: `probe utelämnad: ${unread} ${unread === 1 ? 'oläst dokument' : 'olästa dokument'} i kommunen` };
+    // Fix wave 4 R5: a purchase list we recorded partial (or skipped while it
+    // carries a channel or licence signal) is unread too.
+    const lists = db.countUnreadPurchaseDocumentsForKommun(conv.kommun_kod);
+    if (unread > 0 || lists > 0) {
+      const parts = [
+        ...(unread > 0 ? [`${unread} ${unread === 1 ? 'oläst dokument' : 'olästa dokument'}`] : []),
+        ...(lists > 0 ? [`${lists} ${lists === 1 ? 'oläst inköpslista' : 'olästa inköpslistor'}`] : []),
+      ];
+      return { probe: null, note: `probe utelämnad: ${parts.join(' och ')} i kommunen` };
+    }
     return { probe: probeFromDb(db, conv.kommun_kod), note: null };
   } catch (e) {
     log?.(`probe error for ${conv.kommun_namn}/${conv.role}: ${e.message}`);

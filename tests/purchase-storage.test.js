@@ -11,8 +11,8 @@ let tmp; let db;
 beforeEach(() => { tmp = mkdtempSync(join(tmpdir(), 'purchases-')); db = openDb(join(tmp, 'pilot.db')); db.migrate(); });
 afterEach(() => { db.close(); rmSync(tmp, { recursive: true, force: true }); });
 
-function seed({ kod = '9001', namn = 'Exempelby', filename = 'Inköp.xlsx', documentType = 'följebrev_sammanställning', isContract = 0 } = {}) {
-  const convId = db.createConversation({ kommun_kod: kod, kommun_namn: namn, role: 'central', contact_email: 'reg@example.se', scheduled_send_at: '2026-04-01T08:00:00Z' });
+function seed({ kod = '9001', namn = 'Exempelby', filename = 'Inköp.xlsx', documentType = 'följebrev_sammanställning', isContract = 0, role = 'central' } = {}) {
+  const convId = db.createConversation({ kommun_kod: kod, kommun_namn: namn, role, contact_email: 'reg@example.se', scheduled_send_at: '2026-04-01T08:00:00Z' });
   const msgId = db.recordMessage({
     conversation_id: convId, gmail_message_id: `gm-${Math.random()}`, direction: 'inbound', from_email: 'reg@example.se', to_email: 'me@example.com',
     subject: 'Svar', body_text: 'Se bifogat', classification: null, classification_confidence: null, received_at: '2026-05-02T10:00:00Z', attachment_count: 1,
@@ -110,3 +110,33 @@ describe('purchase storage', () => {
   });
 });
 
+
+// Fix wave 4 R5: purchase data we did not read holds the probe back. A
+// document recorded partial, or skipped while its filename or channel says
+// it is a licence or channel list, counts as unread for the P2 gate.
+describe('countUnreadPurchaseDocumentsForKommun (R5)', () => {
+  it('counts partial documents and signalled skips, nothing else', () => {
+    const big = seed({ filename: 'Skolon export.xlsx', role: 'r1' });
+    db.replacePurchaseRows(big, { rows: [], method: 'xlsx', channel: 'skolon', tooLarge: 'för stor för automatisk läsning (2101 rader)' });
+    expect(db.countUnreadPurchaseDocumentsForKommun('9001')).toBe(1);
+
+    const sheets = seed({ filename: 'Inköp 2025.xlsx', role: 'r2' });
+    db.replacePurchaseRows(sheets, { rows: [row()], method: 'xlsx', partial: ['Övrigt'] });
+    expect(db.countUnreadPurchaseDocumentsForKommun('9001')).toBe(2);
+
+    const lic = seed({ filename: 'Licenser 2025.xlsx', role: 'r3' });
+    db.replacePurchaseRows(lic, { rows: [], method: 'xlsx', skipped: 'verifikationslista eller leverantörsreskontra' });
+    const ch = seed({ filename: 'Export.xlsx', role: 'r4' });
+    db.replacePurchaseRows(ch, { rows: [], method: 'xlsx', channel: 'atea', skipped: 'avtalsregister (kolumnen Avtalsnamn)' });
+    expect(db.countUnreadPurchaseDocumentsForKommun('9001')).toBe(4);
+
+    const plain = seed({ filename: 'Reskontra.xlsx', role: 'r5' });
+    db.replacePurchaseRows(plain, { rows: [], method: 'xlsx', skipped: 'leverantörsreskontra eller verifikationslista (filnamnet)' });
+    const full = seed({ filename: 'Skolon 2025.xlsx', role: 'r6' });
+    db.replacePurchaseRows(full, { rows: [row(), row({ product: 'Annat' })], method: 'xlsx', channel: 'skolon' });
+    const other = seed({ kod: '9002', filename: 'Skolon export.xlsx', role: 'r7' });
+    db.replacePurchaseRows(other, { rows: [], method: 'xlsx', channel: 'skolon', tooLarge: 'för stor' });
+    expect(db.countUnreadPurchaseDocumentsForKommun('9001')).toBe(4);
+    expect(db.countUnreadPurchaseDocumentsForKommun('9003')).toBe(0);
+  });
+});

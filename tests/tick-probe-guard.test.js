@@ -95,6 +95,22 @@ describe('T_REQUEST_MISSING probe guard', () => {
     expect(esc.reason).toMatch(/probe utelämnad: 1 oläst dokument i kommunen/);
   });
 
+  // Fix wave 4 R5: a purchase list recorded partial (too large, or sheets
+  // left unread) is purchase data we did not read: the probe is left out.
+  it('R5: a partial purchase list in the kommun leaves the probe out, and the reason says so', async () => {
+    const other = db.createConversation({ kommun_kod: K, kommun_namn: 'Provkommun', role: 'utbildning', contact_email: 'bun@prov.se', scheduled_send_at: '2026-05-01T00:00:00Z' });
+    const msgId = db.recordMessage({ conversation_id: other, gmail_message_id: 'old-2', direction: 'inbound', from_email: 'bun@prov.se', to_email: 'me@x.se',
+      subject: 'Svar', body_text: 'bifogat', received_at: '2026-05-10T00:00:00Z', attachment_count: 1 });
+    const att = db.recordAttachment({ message_id: msgId, filename: 'Skolon export.xlsx', saved_path: '/nonexistent/x.xlsx', mime_type: 'application/octet-stream', size_bytes: 10 });
+    db.recordContract({ attachment_id: att, is_contract: 0, document_type: 'följebrev_sammanställning', summary: 'Lista' });
+    db.replacePurchaseRows(att, { rows: [], method: 'xlsx', channel: 'skolon', tooLarge: 'för stor för automatisk läsning (2101 rader)' });
+    const id = await run();
+    const esc = escFor(id);
+    expect(esc.draft_template).toBe('T_REQUEST_MISSING');
+    expect(esc.draft_body).not.toMatch(PROBE);
+    expect(esc.reason).toMatch(/probe utelämnad: 1 oläst inköpslista i kommunen/);
+  });
+
   // P6 as ruled (fix wave 3): when the probe fails on the receipt path,
   // T_REQUEST_MISSING stays, without the probe, and the reason notes it. The
   // facts are still true and only the probe is dropped.

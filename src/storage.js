@@ -1867,6 +1867,29 @@ export function openDb(path, { readonly = false } = {}) {
     `).get(String(kommunKod))?.n ?? 0;
   }
 
+  // Fix wave 4 R5: purchase data of the kommun we did not read. A purchase
+  // document recorded 'partial' (too large, or sheets left unread), or
+  // 'skipped' while its channel or filename says it is a channel or licence
+  // list, may name a company no row of ours does: while one exists the probe
+  // is left out, as with an unread attachment. A document since re-analysed
+  // into an avtal (is_contract = 1) is read as an avtal and does not count.
+  function countUnreadPurchaseDocumentsForKommun(kommunKod) {
+    if (!hasPurchaseTables()) return 0;
+    return db.prepare(`
+      SELECT COUNT(*) AS n
+      FROM purchase_documents pd
+      JOIN attachments a ON a.id = pd.attachment_id
+      JOIN messages m ON m.id = a.message_id
+      JOIN conversations conv ON conv.id = m.conversation_id
+      WHERE conv.kommun_kod = ?
+        AND (pd.status = 'partial'
+             OR (pd.status = 'skipped' AND (pd.channel IS NOT NULL OR lower(a.filename) LIKE '%licens%'
+                                             OR lower(a.filename) LIKE '%skolon%' OR lower(a.filename) LIKE '%atea%'
+                                             OR lower(a.filename) LIKE '%laromedia%' OR lower(a.filename) LIKE '%läromedia%')))
+        AND NOT EXISTS (SELECT 1 FROM contracts c WHERE c.attachment_id = a.id AND c.is_contract = 1)
+    `).get(String(kommunKod))?.n ?? 0;
+  }
+
   // --- Collection velocity (read-only; no schema change) ---
   // A machine reply is auto_ack (diariesystem receipt) or auto_reply (OOO).
   // `unknown` and NULL count as HUMAN: no robot marker matched, so a person
@@ -2535,7 +2558,7 @@ export function openDb(path, { readonly = false } = {}) {
     listContractInfoForMessage,
     listContractInfoForConversation, listProbeDocumentsForKommun,
     listAttachmentsForConversation,
-    countUnreadAnalysableAttachments, countUnreadAnalysableAttachmentsForKommun,
+    countUnreadAnalysableAttachments, countUnreadAnalysableAttachmentsForKommun, countUnreadPurchaseDocumentsForKommun,
     listContractDeliveryEvents,
     listCaseTimings,
     countFilesByDocumentType,
