@@ -79,7 +79,7 @@ export const COMPANIES = [
       P('Inlästa läromedel', 'läromedel', 'Inlästa versioner av tryckta läroböcker, som ljud i appen.', /inlasta laromedel|ilt digital/, /^(kommun)?abonnemang|^kommunabonnemang|^inlasningstjanst$|\bil\b/),
     ] },
   { canonical: 'Radish', slug: 'radish', category: 'läromedel', role: 'service', website: null,
-    vendors: ['radish', 'matteappen', 'radish magma'],
+    vendors: ['radish', 'matteappen', 'radish magma', 'radish media'],
     brand: /radish|magma|matteappen/,
     defaultProduct: 'Magma',
     products: [

@@ -288,6 +288,19 @@ describe('classifyPurchaseRow', () => {
     }
   });
 
+  // Fix wave 4 R4: foreign and group company forms are stripped like AB.
+  it('foreign and group legal forms match after stripping, still exactly', () => {
+    const cases = {
+      'Haldor AS': 'haldor', 'Vitec MV A/S': 'vitec-mv', 'Vitec MV AS': 'vitec-mv', 'Wizkids AS': 'wizkids', 'Wizkids A/S': 'wizkids',
+      'SpeedAdmin A/S': 'speedadmin', 'IST Group AB': 'ist', 'Radish Media AB': 'radish', 'Kide Science Ltd': 'kide-science',
+      'Claro Software Limited': 'claro', 'Haldor Oy': 'haldor', 'Haldor GmbH': 'haldor', 'Showbie Inc': 'showbie',
+    };
+    for (const [supplier, slug] of Object.entries(cases)) expect(supplierCompany(supplier)?.slug, supplier).toBe(slug);
+    for (const supplier of ['Haldor Exempel AS', 'Exempel Group AB', 'Exempel Media AB', 'IST Exempel Group AB', 'Wizkids Exempel A/S', 'Group AB', 'AS']) {
+      expect(supplierCompany(supplier), supplier).toBeNull();
+    }
+  });
+
   it('the product field is still classified', () => {
     expect(classifyPurchaseRow({ supplier: 'Exempel AB', product: 'Matteappen Magma' })).toMatchObject({ company_slug: 'radish', product_slug: 'magma' });
   });

@@ -513,7 +513,11 @@ const OWNER_KINDS = new Set(['product', 'bundle', 'unresolved', 'segment', 'addo
 // EXACT equality with one of its aliases, after lower case, punctuation and
 // the company-form words (AB, Aktiebolag, Sverige, Sweden) are stripped. No
 // token or substring matching: "Magma Exempelbygg AB" is not Magma.
-const FORM_WORDS = /(?:^| )(ab|aktiebolag|sverige|sweden)$/;
+// Fix wave 4 R4: the foreign forms (AS, A/S, ApS, Oy, Ltd, Limited, Inc,
+// GmbH) and "Group" are stripped too, from the end only, and what remains
+// must still equal an alias: "IST Group AB" is IST, "Exempel Group AB" is
+// nobody. "Media" is a name word, not a form, so "Radish Media" is an alias.
+const FORM_WORDS = /(?:^| )(ab|aktiebolag|sverige|sweden|as|a s|aps|oy|ltd|limited|inc|gmbh|group)$/;
 export function supplierCompany(raw) {
   if (blank(raw)) return null;
   let n = normName(raw);
