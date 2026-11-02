@@ -164,3 +164,54 @@ describe('extractPurchases with the judge', () => {
     expect(onFailure.mock.calls[0][0]).toMatchObject({ permanent: true, reason: 'permanent:truncated' });
   });
 });
+
+// Fix wave 4 R1: a rejected sheet never reaches any path. When the accepted
+// sheets are too thin for the deterministic path, the LLM gets only the text
+// of the sheets the judge did not reject.
+describe('judgeXlsx: a rejected sheet never reaches the LLM (R1)', () => {
+  const WEAK = [['Produkt', 'Antal'], ['Polyglutt', '30 st'], ['Unikum', 'obegränsat']];
+  const LEDGER = [['Leverantör', 'Belopp'], ['Exempel Person', 500], ['Exempel Bygg AB', 900]];
+  const cell = (ref, v) => (typeof v === 'number' ? `<c r="${ref}"><v>${v}</v></c>` : `<c r="${ref}" t="inlineStr"><is><t>${v}</t></is></c>`);
+  const sheetXml = (rows) => `<worksheet><sheetData>${rows.map((r, i) => `<row r="${i + 1}">${r.map((v, j) => cell(`${'ABCD'[j]}${i + 1}`, v)).join('')}</row>`).join('')}</sheetData></worksheet>`;
+  const book = (named) => Buffer.from(zipSync({
+    'xl/workbook.xml': strToU8(`<workbook><sheets>${named.map(([n], i) => `<sheet name="${n}" sheetId="${i + 1}"/>`).join('')}</sheets></workbook>`),
+    ...Object.fromEntries(named.map(([, rows], i) => [`xl/worksheets/sheet${i + 1}.xml`, strToU8(sheetXml(rows))])),
+  }));
+
+  it('the judge hands the LLM only the non-rejected sheets and names the rejected one as partial', () => {
+    const j = judgeXlsx([sheet(WEAK, 'Skolon'), sheet(LEDGER, 'Leverantörsreskontra')], { filename: 'licenser.xlsx' });
+    expect(j.verdict).toBe('llm');
+    expect(j.llm_sheets).toEqual(['Skolon']);
+    expect(j.partial).toEqual(['Leverantörsreskontra']);
+  });
+
+  it('the LLM input holds no text from the rejected ledger sheet', async () => {
+    const seen = [];
+    const create = vi.fn(async (params) => {
+      seen.push(JSON.stringify(params.messages));
+      return { content: [{ type: 'text', text: JSON.stringify({ is_purchase_list: true, channel: 'skolon', school_year: null, period_start: null, period_end: null, stated_total_sek: null, rows: [{ supplier: '', product: 'Polyglutt', quantity: 30, unit: '', amount_sek: null, period_start: '', period_end: '', school_year: '', grades: [], order_ref: '' }] }) }] };
+    });
+    const out = await extractPurchases({ buffer: book([['Skolon', WEAK], ['Leverantörsreskontra', LEDGER]]), filename: 'licenser.xlsx' }, { client: { messages: { create } } });
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(seen[0]).toMatch(/Polyglutt/);
+    for (const s of ['Exempel Person', 'Exempel Bygg', 'Leverantörsreskontra', '500', '900']) expect(seen[0]).not.toContain(s);
+    expect(out.partial).toEqual(['Leverantörsreskontra']);
+  });
+
+  it('a one-row licence sheet beside a ledger also keeps the ledger out', async () => {
+    const seen = [];
+    const create = vi.fn(async (params) => { seen.push(JSON.stringify(params.messages)); return { content: [{ type: 'text', text: JSON.stringify({ is_purchase_list: false, channel: null, school_year: null, period_start: null, period_end: null, stated_total_sek: null, rows: [] }) }] }; });
+    await extractPurchases({ buffer: book([['Licenser', [['Leverantör', 'Produkt', 'Antal', 'Orderdatum'], ['Binogi', 'Binogi', 10, '2025-08-01']]], ['Leverantörsreskontra', LEDGER]]), filename: 'x.xlsx' }, { client: { messages: { create } } });
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).not.toContain('Exempel Person');
+  });
+
+  it('no usable data outside the rejected sheets: skipped, no LLM call', async () => {
+    const create = vi.fn();
+    const j = judgeXlsx([sheet([['Licenser 2025']], 'Skolon'), sheet(LEDGER, 'Leverantörsreskontra')], { filename: 'licenser.xlsx' });
+    expect(j.verdict).toBe('skip');
+    const out = await extractPurchases({ buffer: book([['Skolon', [['Licenser 2025']]], ['Leverantörsreskontra', LEDGER]]), filename: 'licenser.xlsx' }, { client: { messages: { create } } });
+    expect(out.skipped).toBeTruthy();
+    expect(create).not.toHaveBeenCalled();
+  });
+});

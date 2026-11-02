@@ -380,6 +380,13 @@ function rawPositive(sh) {
   return Boolean(channelFrom(sh.name, top)) || LICENCE_WORD_RE.test(normName(`${sh.name ?? ''} ${top}`));
 }
 
+// The cell text of these sheets only, one line per row (R1): what the LLM
+// reads when the workbook also holds a rejected sheet.
+function sheetsText(sheets) {
+  return sheets.map((sh) => [`Blad: ${sh.name ?? ''}`, ...(sh.rows ?? []).filter(filled)
+    .map((r) => r.filter((c) => c != null && c !== '').join(' | '))].join('\n')).join('\n\n');
+}
+
 // judgeXlsx(sheets, { filename }) -> { verdict, reason?, rows, partial,
 // stated_total_sek, channel }
 //   verdict 'rows'     write these rows (method xlsx); `partial` names sheets
@@ -392,15 +399,18 @@ function rawPositive(sh) {
 //                      automatisk läsning (N rader)") so the operator sees it
 //   verdict 'skip'     not a purchase list (ledger, register, over the row cap
 //                      with no signal): recorded skipped with `reason`, no rows
-//   verdict 'llm'      no positive signal and nothing rejected: the LLM, which
-//                      asks is_purchase_list, decides
+//   verdict 'llm'      no deterministic reading: the LLM, which asks
+//                      is_purchase_list, decides. With a rejected sheet in the
+//                      workbook (R1) it carries `llm_text`, the text of the
+//                      non-rejected sheets only, and `partial` naming the
+//                      sheets the LLM never sees
 export function judgeXlsx(sheets = [], { filename = '' } = {}) {
   const fname = normName(filename);
   const empty = { rows: [], partial: [], stated_total_sek: null, channel: channelFrom(filename) };
   if (LEDGER_NAME.test(fname)) return { ...empty, verdict: 'skip', reason: 'leverantörsreskontra eller verifikationslista (filnamnet)' };
   if (REGISTER_NAME.test(fname)) return { ...empty, verdict: 'skip', reason: 'avtalsregister (filnamnet)' };
   const docPositive = Boolean(channelFrom(filename)) || LICENCE_WORD_RE.test(fname);
-  const accepted = []; const unread = []; const rejected = []; const quiet = [];
+  const accepted = []; const unread = []; const unreadSheets = []; const rejected = []; const quiet = [];
   let positive = docPositive;
   let rawRows = 0;
   for (const sh of sheets ?? []) {
@@ -410,7 +420,7 @@ export function judgeXlsx(sheets = [], { filename = '' } = {}) {
       if (why) { rejected.push({ name: sh.name, reason: why }); continue; }
       rawRows += dataRows(sh);
       if (rawPositive(sh)) positive = true;
-      if (hasData(sh)) unread.push(sh.name);
+      if (hasData(sh)) { unread.push(sh.name); unreadSheets.push(sh); }
       continue;
     }
     const sig = sheetSignals(t, sh);
@@ -427,7 +437,16 @@ export function judgeXlsx(sheets = [], { filename = '' } = {}) {
   if (!accepted.length && !quiet.length && rejected.length) return { ...empty, verdict: 'skip', reason: rejected[0].reason };
   if (!accepted.length) return quiet.length && rejected.length ? { ...empty, verdict: 'skip', reason: rejected[0].reason } : { ...empty, verdict: 'llm' };
   const x = extractXlsxPurchases(accepted, { filename });
-  if (!looksLikePurchaseList(x.rows)) return { ...empty, verdict: 'llm' };
+  if (!looksLikePurchaseList(x.rows)) {
+    if (!rejected.length) return { ...empty, verdict: 'llm' };
+    // Fix wave 4 R1: once a sheet is rejected, the LLM gets only the sheets
+    // that were read on their own signal (and data sheets with no table),
+    // never the whole workbook. A quiet sheet beside a rejected one stays
+    // unread, as above. Nothing usable left: skipped.
+    const llm = [...accepted, ...unreadSheets].filter(hasData);
+    if (!llm.length) return { ...empty, verdict: 'skip', reason: rejected[0].reason };
+    return { ...empty, verdict: 'llm', llm_sheets: llm.map((s) => s.name), llm_text: sheetsText(llm), partial: [...rejected.map((r) => r.name), ...quiet.map((q) => q.name)] };
+  }
   return { verdict: 'rows', rows: x.rows, partial: [...rejected.map((r) => r.name), ...quiet.map((q) => q.name), ...unread], stated_total_sek: x.stated_total_sek, channel: x.channel };
 }
 
@@ -707,6 +726,8 @@ export async function extractPurchasesWithLlm({ pdf = null, text = null, ctx = {
 // onFailure, or no key).
 export async function extractPurchases({ buffer, filename = '', kommun_namn = null } = {}, { env = process.env, client = null, onFailure = null } = {}) {
   const ctx = { kommun_namn, filename };
+  let llmText = null;
+  let llmPartial = [];
   if (/\.xlsx$/i.test(filename)) {
     const sheets = xlsxSheetsFromBuffer(buffer, filename);
     if (!sheets) { onFailure?.({ permanent: true, reason: 'permanent:office_parse_error', message: 'not a readable xlsx' }); return null; }
@@ -716,10 +737,11 @@ export async function extractPurchases({ buffer, filename = '', kommun_namn = nu
     if (j.verdict === 'rows') {
       return { method: 'xlsx', is_list: true, rows: j.rows, stated_total_sek: j.stated_total_sek, channel: j.channel, partial: j.partial };
     }
+    if (j.llm_text != null) { llmText = j.llm_text; llmPartial = j.partial; }
   }
   let answer;
   if (isOfficeDoc(filename)) {
-    const text = officeTextFromBuffer(buffer, filename, { maxChars: Infinity });
+    const text = llmText ?? officeTextFromBuffer(buffer, filename, { maxChars: Infinity });
     if (text && text.length > PURCHASE_TEXT_MAX) {
       onFailure?.({ permanent: true, reason: 'permanent:truncated', message: `text ${text.length} tecken, över ${PURCHASE_TEXT_MAX}: listan skulle kapas` });
       return null;
@@ -731,5 +753,5 @@ export async function extractPurchases({ buffer, filename = '', kommun_namn = nu
   if (!answer) return null;
   const out = rowsFromLlm(answer, { filename });
   const isList = out.is_purchase_list && out.rows.length > 0;
-  return { method: 'llm', is_list: isList, rows: isList ? out.rows : [], stated_total_sek: isList ? out.stated_total_sek : null, channel: out.channel };
+  return { method: 'llm', is_list: isList, rows: isList ? out.rows : [], stated_total_sek: isList ? out.stated_total_sek : null, channel: out.channel, partial: llmPartial };
 }
