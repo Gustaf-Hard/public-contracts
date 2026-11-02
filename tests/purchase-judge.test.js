@@ -62,7 +62,8 @@ describe('judgeXlsx: the row cap (Q7)', () => {
   it('a big channel list is partial, "för stor för automatisk läsning", with no rows', () => {
     const j = judgeXlsx([sheet(many(['Leverantör', 'Produkt', 'Antal', 'Belopp'], (i) => [`Exempel ${i} AB`, `Vara ${i}`, 1, i + 1]))], { filename: 'Skolon.xlsx' });
     expect(j.verdict).toBe('partial');
-    expect(j.reason).toBe(`för stor för automatisk läsning (${PURCHASE_ROW_CAP + 2} rader)`);
+    // R7: the count is the read rows after dedupe, not the sheet's raw lines.
+    expect(j.reason).toBe(`för stor för automatisk läsning (${PURCHASE_ROW_CAP + 1} rader)`);
     expect(j.rows).toEqual([]);
     expect(j.reason).not.toMatch(/inte en inköpslista/);
   });
@@ -249,5 +250,39 @@ describe('judgeXlsx: ledger and register header variants (R6)', () => {
     const j = judgeXlsx([sheet(rowsOf(['Ordernummer', 'Leverantör', 'Produkt', 'Antal', 'Belopp'], (i) => [`EX-${i}`, 'Exempel AB', `Vara ${i}`, 2, 100 + i]))], { filename: 'Licenser 2024.xlsx' });
     expect(j.verdict).toBe('rows');
     expect(j.rows).toHaveLength(5);
+  });
+});
+
+// Fix wave 4 R7: the row cap counts only the sheets that will be read, after
+// per-sheet rejection, and after identical rows are deduped.
+describe('judgeXlsx: the row cap counts what is read (R7)', () => {
+  const list = (n, prefix = 'Vara') => [['Leverantör', 'Produkt', 'Antal', 'Belopp'], ...Array.from({ length: n }, (_, i) => ['Exempel AB', `${prefix} ${i}`, 1, 10 + i])];
+
+  it('a summary tab that repeats the list does not double the count', () => {
+    const j = judgeXlsx([sheet(list(1100), 'Licenser'), sheet(list(1100), 'Sammanställning')], { filename: 'Skolon 2025.xlsx' });
+    expect(j.verdict).toBe('rows');
+    expect(j.rows).toHaveLength(1100);
+  });
+
+  it('a big quiet sheet beside a small licence sheet does not hide the licence rows', () => {
+    const quiet = [['Leverantör', 'Produkt', 'Belopp'], ...Array.from({ length: 2100 }, (_, i) => [`Exempel ${i} AB`, `Annat ${i}`, i + 1])];
+    const j = judgeXlsx([sheet(list(3), 'Skolon'), sheet(quiet, 'Blad2')], { filename: 'x.xlsx' });
+    expect(j.verdict).toBe('rows');
+    expect(j.rows).toHaveLength(3);
+    expect(j.partial).toEqual(['Blad2']);
+  });
+
+  it('a rejected big sheet does not count either', () => {
+    const ledger = [['Verifikationsnr', 'Leverantör', 'Belopp'], ...Array.from({ length: 2100 }, (_, i) => [`V${i}`, `Exempel ${i} AB`, i + 1])];
+    const j = judgeXlsx([sheet(list(3), 'Skolon'), sheet(ledger, 'Blad2')], { filename: 'x.xlsx' });
+    expect(j.verdict).toBe('rows');
+    expect(j.partial).toEqual(['Blad2']);
+  });
+
+  it('distinct rows over the cap across the read sheets are still too large', () => {
+    const j = judgeXlsx([sheet(list(1100, 'A'), 'Licenser'), sheet(list(1100, 'B'), 'Mer')], { filename: 'Skolon 2025.xlsx' });
+    expect(j.verdict).toBe('partial');
+    expect(j.reason).toBe('för stor för automatisk läsning (2200 rader)');
+    expect(j.rows).toEqual([]);
   });
 });

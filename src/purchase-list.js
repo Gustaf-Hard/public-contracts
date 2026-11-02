@@ -417,41 +417,51 @@ export function judgeXlsx(sheets = [], { filename = '' } = {}) {
   const docPositive = Boolean(channelFrom(filename)) || LICENCE_WORD_RE.test(fname);
   const accepted = []; const unread = []; const unreadSheets = []; const rejected = []; const quiet = [];
   let positive = docPositive;
-  let rawRows = 0;
   for (const sh of sheets ?? []) {
     const t = readTable(sh, { filename });
     if (!t) {
       const why = hasData(sh) ? nameReject(sh) : null;
       if (why) { rejected.push({ name: sh.name, reason: why }); continue; }
-      rawRows += dataRows(sh);
       if (rawPositive(sh)) positive = true;
       if (hasData(sh)) { unread.push(sh.name); unreadSheets.push(sh); }
       continue;
     }
     const sig = sheetSignals(t, sh);
     if (sig.reject) { rejected.push({ name: sh.name, reason: sig.reject }); continue; }
-    rawRows += dataRows(sh);
     if (sig.positive) positive = true;
     if (sig.positive || docPositive) accepted.push(sh); else quiet.push(sh);
   }
-  if (rawRows > PURCHASE_ROW_CAP) {
-    return positive
-      ? { ...empty, verdict: 'partial', reason: `för stor för automatisk läsning (${rawRows} rader)` }
-      : { ...empty, verdict: 'skip', reason: `över ${PURCHASE_ROW_CAP} rader (${rawRows}): inte en inköpslista` };
-  }
-  if (!accepted.length && !quiet.length && rejected.length) return { ...empty, verdict: 'skip', reason: rejected[0].reason };
-  if (!accepted.length) return quiet.length && rejected.length ? { ...empty, verdict: 'skip', reason: rejected[0].reason } : { ...empty, verdict: 'llm' };
-  const x = extractXlsxPurchases(accepted, { filename });
-  if (!looksLikePurchaseList(x.rows)) {
-    if (!rejected.length) return { ...empty, verdict: 'llm' };
-    // Fix wave 4 R1: once a sheet is rejected, the LLM gets only the sheets
-    // that were read on their own signal (and data sheets with no table),
-    // never the whole workbook. A quiet sheet beside a rejected one stays
-    // unread, as above. Nothing usable left: skipped.
+  // The row cap (Q7), on what a path would actually read (fix wave 4 R7): the
+  // LLM reads raw text, so its sheets count raw rows; the deterministic path
+  // counts the accepted sheets' rows after identical rows are deduped, so a
+  // summary tab repeating the list does not double it, and a big quiet or
+  // rejected sheet never hides a small licence sheet.
+  const overCap = (n) => (positive
+    ? { ...empty, verdict: 'partial', reason: `för stor för automatisk läsning (${n} rader)` }
+    : { ...empty, verdict: 'skip', reason: `över ${PURCHASE_ROW_CAP} rader (${n}): inte en inköpslista` });
+  const rawOf = (list) => list.reduce((n, sh) => n + dataRows(sh), 0);
+  // Fix wave 4 R1: once a sheet is rejected, the LLM gets only the sheets
+  // read on their own signal (and data sheets with no table), never the whole
+  // workbook. A quiet sheet beside a rejected one stays unread. Nothing usable
+  // left: skipped.
+  const llmWithout = () => {
     const llm = [...accepted, ...unreadSheets].filter(hasData);
     if (!llm.length) return { ...empty, verdict: 'skip', reason: rejected[0].reason };
-    return { ...empty, verdict: 'llm', llm_sheets: llm.map((s) => s.name), llm_text: sheetsText(llm), partial: [...rejected.map((r) => r.name), ...quiet.map((q) => q.name)] };
+    const n = rawOf(llm);
+    if (n > PURCHASE_ROW_CAP) return overCap(n);
+    return { ...empty, verdict: 'llm', llm_sheets: llm.map((sh) => sh.name), llm_text: sheetsText(llm), partial: [...rejected.map((r) => r.name), ...quiet.map((q) => q.name)] };
+  };
+  const llmWhole = () => {
+    const n = rawOf([...quiet, ...accepted, ...unreadSheets]);
+    return n > PURCHASE_ROW_CAP ? overCap(n) : { ...empty, verdict: 'llm' };
+  };
+  if (!accepted.length) {
+    if (rejected.length) return { ...empty, verdict: 'skip', reason: rejected[0].reason };
+    return llmWhole();
   }
+  const x = extractXlsxPurchases(accepted, { filename });
+  if (x.rows.length > PURCHASE_ROW_CAP) return overCap(x.rows.length);
+  if (!looksLikePurchaseList(x.rows)) return rejected.length ? llmWithout() : llmWhole();
   return { verdict: 'rows', rows: x.rows, partial: [...rejected.map((r) => r.name), ...quiet.map((q) => q.name), ...unread], stated_total_sek: x.stated_total_sek, channel: x.channel };
 }
 
